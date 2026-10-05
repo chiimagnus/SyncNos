@@ -2,11 +2,6 @@ import { getURL, isInvalidContextError, send, sendMessage } from '@platform/runt
 
 const INVALIDATED_MESSAGE = 'Extension context invalidated';
 
-function toError(err: unknown, fallbackMessage: string): Error {
-  if (err instanceof Error) return err;
-  return new Error(String(err ?? fallbackMessage));
-}
-
 function hasRuntime(): boolean {
   const anyGlobal = globalThis as any;
   const runtime = anyGlobal.browser?.runtime ?? anyGlobal.chrome?.runtime;
@@ -15,19 +10,14 @@ function hasRuntime(): boolean {
 
 export function createRuntimeClient() {
   let invalidated = false;
-  const listeners = new Set<(error: Error) => void>();
+  let invalidationListener: (() => void) | null = null;
 
-  function notifyInvalidated(reason: unknown) {
+  function notifyInvalidated() {
     if (invalidated) return;
     invalidated = true;
-    const error = toError(reason, INVALIDATED_MESSAGE);
-    for (const listener of Array.from(listeners)) {
-      try {
-        listener(error);
-      } catch (_e) {
-        // ignore listener failures
-      }
-    }
+    const listener = invalidationListener;
+    invalidationListener = null;
+    listener?.();
   }
 
   function ensureAvailable() {
@@ -39,7 +29,7 @@ export function createRuntimeClient() {
       ensureAvailable();
       return await sendMessage(message);
     } catch (error) {
-      if (isInvalidContextError(error)) notifyInvalidated(error);
+      if (isInvalidContextError(error)) notifyInvalidated();
       throw error;
     }
   }
@@ -49,7 +39,7 @@ export function createRuntimeClient() {
       ensureAvailable();
       return await send(type, payload);
     } catch (error) {
-      if (isInvalidContextError(error)) notifyInvalidated(error);
+      if (isInvalidContextError(error)) notifyInvalidated();
       throw error;
     }
   }
@@ -61,37 +51,24 @@ export function createRuntimeClient() {
       const runtime = anyGlobal.browser?.runtime ?? anyGlobal.chrome?.runtime;
       const hasGetUrlCapability = typeof runtime?.getURL === 'function';
       const url = getURL(path);
-      if (hasGetUrlCapability && !url) notifyInvalidated(new Error(INVALIDATED_MESSAGE));
+      if (hasGetUrlCapability && !url) notifyInvalidated();
       return url;
     } catch (error) {
-      if (isInvalidContextError(error)) notifyInvalidated(error);
+      if (isInvalidContextError(error)) notifyInvalidated();
       return '';
     }
   }
 
-  function onInvalidated(listener: (error: Error) => void) {
-    if (typeof listener !== 'function') return () => {};
-    if (invalidated) {
-      let cancelled = false;
-      queueMicrotask(() => {
-        if (cancelled) return;
-        try {
-          listener(new Error(INVALIDATED_MESSAGE));
-        } catch (_e) {
-          // ignore listener failures
-        }
-      });
-      return () => {
-        cancelled = true;
-      };
-    }
-    listeners.add(listener);
-    return () => listeners.delete(listener);
+  function onInvalidated(listener: () => void) {
+    if (invalidated) return () => {};
+    invalidationListener = listener;
+    return () => {
+      if (invalidationListener === listener) invalidationListener = null;
+    };
   }
 
   return {
     getURL: wrappedGetURL,
-    isInvalidContextError,
     onInvalidated,
     send: wrappedSend,
     sendMessage: wrappedSendMessage,

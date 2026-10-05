@@ -9,7 +9,6 @@ vi.mock('@services/shared/inpage-display-mode', async (importOriginal) => {
 });
 vi.mock('@services/shared/storage', () => ({ storageOnChanged: storageMocks.onChanged }));
 
-import { createRuntimeClient } from '@platform/runtime/client';
 import { startContentBootstrap } from '@services/bootstrap/content';
 
 function deferred<T>() {
@@ -35,13 +34,7 @@ function harness(locationInput = 'chatgpt.com') {
     storageListener = listener;
     return removeDisplay;
   });
-  let invalidationListener: ((error: Error) => void) | null = null;
-  const removeRuntime = vi.fn();
   const runtime = {
-    onInvalidated: vi.fn((listener: (error: Error) => void) => {
-      invalidationListener = listener;
-      return removeRuntime;
-    }),
     getURL: vi.fn(() => 'chrome-extension://ext/icon.png'),
   };
   const residents: Array<{ stop: ReturnType<typeof vi.fn> }> = [];
@@ -68,9 +61,7 @@ function harness(locationInput = 'chatgpt.com') {
     residents,
     initRuntime,
     removeDisplay,
-    removeRuntime,
     emitStorage: (changes: any, areaName = 'local') => storageListener?.(changes, areaName),
-    invalidate: () => invalidationListener?.(new Error('Extension context invalidated')),
     setHref: (href: string) => {
       const next = new URL(href);
       locationState.href = next.toString();
@@ -199,47 +190,14 @@ describe('content bootstrap display mode', () => {
     h.bootstrap.stop();
   });
 
-  it('stop unsubscribes both owners and blocks later wake/restart', async () => {
+  it('stop unsubscribes display state and blocks later wake/restart', async () => {
     const h = harness();
     await flush();
     h.bootstrap.stop();
-    expect(h.removeRuntime).toHaveBeenCalledTimes(1);
     expect(h.removeDisplay).toHaveBeenCalledTimes(1);
     expect(h.residents[0]?.stop).toHaveBeenCalledTimes(1);
     h.emitStorage({ inpage_display_mode: { newValue: 'all' } });
     expect(h.wrapper.start).toHaveBeenCalledTimes(1);
-  });
-
-  it('runtime invalidation uses the same bootstrap stop closure', async () => {
-    const h = harness();
-    await flush();
-    h.invalidate();
-    expect(h.removeRuntime).toHaveBeenCalledTimes(1);
-    expect(h.removeDisplay).toHaveBeenCalledTimes(1);
-    expect(h.residents[0]?.stop).toHaveBeenCalledTimes(1);
-    h.emitStorage({ inpage_display_mode: { newValue: 'all' } });
-    expect(h.wrapper.start).toHaveBeenCalledTimes(1);
-  });
-
-  it('honors a runtime invalidation that happened before bootstrap subscribed', async () => {
-    // @ts-expect-error test global
-    globalThis.chrome = { runtime: { id: 'ext', sendMessage: vi.fn() } };
-    const runtime = createRuntimeClient();
-    delete (globalThis.chrome as any).runtime.id;
-    await expect(runtime.send('probe')).rejects.toThrow('Extension context invalidated');
-    Object.defineProperty(globalThis, 'location', { configurable: true, value: { hostname: 'chatgpt.com' } });
-    const wrapper = { start: vi.fn(() => ({ stop: vi.fn() })) };
-    const removeDisplay = vi.fn();
-    storageMocks.onChanged.mockImplementation(() => removeDisplay);
-    displayMocks.read.mockResolvedValueOnce('all');
-
-    const bootstrap = startContentBootstrap({ runtime, createController: () => wrapper });
-    await flush();
-    expect(wrapper.start).not.toHaveBeenCalled();
-    expect(removeDisplay).toHaveBeenCalledTimes(1);
-    bootstrap.stop();
-    // @ts-expect-error test global cleanup
-    delete globalThis.chrome;
   });
 
   it('fail-opens initial read only while its generation is current', async () => {

@@ -65,8 +65,6 @@ function createHarness(options: {
         return { ok: true, data: { upserted: Number(payload?.messages?.length) || 0 } };
       return { ok: true, data: {} };
     },
-    onInvalidated: () => () => {},
-    isInvalidContextError: () => false,
   };
 
   const collector = {

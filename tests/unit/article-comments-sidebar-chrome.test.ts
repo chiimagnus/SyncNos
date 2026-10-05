@@ -433,6 +433,23 @@ describe('article comments sidebar adapters', () => {
     expect(send.mock.calls[0]?.[0]).toBe('findConversationBySourceAndKey');
   });
 
+  it('restores an existing article identity without recapturing the page', async () => {
+    const send = vi.fn(async (type: string) => {
+      if (type === 'findConversationBySourceAndKey') return { ok: true, data: { id: 21 } };
+      throw new Error(`unexpected runtime call: ${type}`);
+    });
+    const adapter = createArticleCommentsSidebarInpageAdapter({ send });
+
+    await expect(
+      adapter.ensureContext?.({ canonicalUrlFallback: 'https://example.com/article#fragment', ensureArticle: false }),
+    ).resolves.toEqual({ canonicalUrl: 'https://example.com/article', conversationId: 21 });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith('findConversationBySourceAndKey', {
+      source: 'web',
+      conversationKey: 'article:https://example.com/article',
+    });
+  });
+
   it('treats a successful runtime envelope with data.ok=false as a failed delete', async () => {
     const adapter = createArticleCommentsSidebarInpageAdapter({
       send: vi.fn(async () => ({ ok: true, data: { ok: false } })),

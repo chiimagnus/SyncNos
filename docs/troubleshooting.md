@@ -28,6 +28,8 @@
 - content → background：receiver 必须早于异步初始化注册。
 - background → content：content receiver 先注册，需要 locale 的 handler 自己等待 readiness。
 - 导航窗口期的 missing receiver 与已建立 port 的关闭是不同故障。
+- Extension reload / update 后，后台会主动向现有 HTTP(S) 标签页注入当前 content bundle；missing receiver 重试只是兜底，不应作为唯一恢复入口。
+- 页面内长期 UI 与 listener 必须归属同一个 content-script lifecycle：新 generation 先通知旧 generation teardown，再接管页面；不得跨 generation 复用旧 DOM 上的 callback / panel API。
 - Extension reload 后的旧 content script 属于旧生命周期，应按 invalidated context 处理。
 
 真实浏览器权限、签名和用户手势不能靠 Profile 修改或自动化绕过后当作 release evidence。

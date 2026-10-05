@@ -30,22 +30,17 @@ describe('runtime client invalidation', () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
-  it('replays invalidation once to late subscribers and supports cancellation', async () => {
+  it('allows a current subscriber to unsubscribe before invalidation', async () => {
     // @ts-expect-error test global
     globalThis.chrome = { runtime: { id: 'ext', sendMessage: vi.fn() } };
     const client = createRuntimeClient();
-    delete (globalThis.chrome as any).runtime.id;
-    await expect(client.send('x')).rejects.toThrow();
-
-    const replayed = vi.fn();
-    client.onInvalidated(replayed);
-    const cancelled = vi.fn();
-    const unsubscribe = client.onInvalidated(cancelled);
+    const listener = vi.fn();
+    const unsubscribe = client.onInvalidated(listener);
     unsubscribe();
-    await Promise.resolve();
-    expect(replayed).toHaveBeenCalledTimes(1);
-    expect(replayed.mock.calls[0]?.[0]?.message).toBe('Extension context invalidated');
-    expect(cancelled).not.toHaveBeenCalled();
+
+    delete (globalThis.chrome as any).runtime.id;
+    await expect(client.send('x')).rejects.toThrow('Extension context invalidated');
+    expect(listener).not.toHaveBeenCalled();
   });
 
   it('treats swallowed invalid getURL failure as invalidation only when getURL exists', async () => {
@@ -72,20 +67,5 @@ describe('runtime client invalidation', () => {
     second.onInvalidated(secondListener);
     expect(second.getURL('icon.png')).toBe('');
     expect(secondListener).not.toHaveBeenCalled();
-  });
-
-  it('isolates throwing late listeners', async () => {
-    // @ts-expect-error test global
-    globalThis.chrome = { runtime: { id: 'ext', sendMessage: vi.fn() } };
-    const client = createRuntimeClient();
-    delete (globalThis.chrome as any).runtime.id;
-    await expect(client.send('x')).rejects.toThrow();
-    client.onInvalidated(() => {
-      throw new Error('listener failed');
-    });
-    const safe = vi.fn();
-    client.onInvalidated(safe);
-    await Promise.resolve();
-    expect(safe).toHaveBeenCalledTimes(1);
   });
 });

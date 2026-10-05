@@ -80,8 +80,6 @@ function createHarness(options?: {
 
   const runtime = {
     send: async () => ({ ok: true, data: {} }),
-    onInvalidated: () => () => {},
-    isInvalidContextError: () => false,
   };
 
   const collectorsRegistry = {

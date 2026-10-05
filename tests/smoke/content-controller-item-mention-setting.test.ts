@@ -64,7 +64,7 @@ describe('content-controller item mention setting', () => {
 
     const start = vi.fn(() => ({ stop: vi.fn() }));
     const controller = createContentController({
-      runtime: { send: async () => ({ ok: true, data: {} }), isInvalidContextError: () => false },
+      runtime: { send: async () => ({ ok: true, data: {} }) },
       collectorsRegistry: null,
       currentPageCapture: {} as any,
       inpageButton: { ensureInpageButton: () => {}, cleanupButtons: () => {}, setSaving: () => {} },
@@ -89,7 +89,7 @@ describe('content-controller item mention setting', () => {
     const stopFn = vi.fn();
     const start = vi.fn(() => ({ stop: stopFn }));
     const controller = createContentController({
-      runtime: { send: async () => ({ ok: true, data: {} }), isInvalidContextError: () => false },
+      runtime: { send: async () => ({ ok: true, data: {} }) },
       collectorsRegistry: null,
       currentPageCapture: {} as any,
       inpageButton: { ensureInpageButton: () => {}, cleanupButtons: () => {}, setSaving: () => {} },

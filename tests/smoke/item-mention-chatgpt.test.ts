@@ -139,11 +139,7 @@ describe('item mention chatgpt controller', () => {
     });
 
     const controller = createItemMentionController({
-      runtime: {
-        send,
-        onInvalidated: () => () => {},
-        isInvalidContextError: () => false,
-      },
+      runtime: { send },
       ui: uiMocks,
     });
     const active = controller.start();
@@ -202,7 +198,7 @@ describe('item mention chatgpt controller', () => {
     });
 
     const controller = createItemMentionController({
-      runtime: { send, onInvalidated: () => () => {}, isInvalidContextError: () => false },
+      runtime: { send },
       ui: uiMocks,
     });
     const active = controller.start();
@@ -259,7 +255,7 @@ describe('item mention chatgpt controller', () => {
     });
 
     const controller = createItemMentionController({
-      runtime: { send, onInvalidated: () => () => {}, isInvalidContextError: () => false },
+      runtime: { send },
       ui: uiMocks,
     });
     const active = controller.start();
@@ -293,7 +289,7 @@ describe('item mention chatgpt controller', () => {
       return { ok: false, data: null, error: { message: 'unexpected', extra: null } };
     });
     const active = createItemMentionController({
-      runtime: { send, onInvalidated: () => () => {}, isInvalidContextError: () => false },
+      runtime: { send },
       ui: uiMocks,
     }).start();
     const el = document.querySelector('#prompt-textarea') as HTMLElement;
@@ -335,7 +331,7 @@ describe('item mention chatgpt controller', () => {
       return { ok: false, data: null, error: { message: 'unexpected', extra: null } };
     });
     const active = createItemMentionController({
-      runtime: { send, onInvalidated: () => () => {}, isInvalidContextError: () => false },
+      runtime: { send },
       ui: uiMocks,
     }).start();
     const el = document.querySelector('#prompt-textarea') as HTMLElement;
@@ -384,7 +380,7 @@ describe('item mention chatgpt controller', () => {
       return { ok: true, data: { candidates: [] }, error: null };
     });
     const active = createItemMentionController({
-      runtime: { send, onInvalidated: () => () => {}, isInvalidContextError: () => false },
+      runtime: { send },
       ui: uiMocks,
     }).start();
     const el = document.querySelector('#prompt-textarea') as HTMLElement;
@@ -430,7 +426,7 @@ describe('item mention chatgpt controller', () => {
       throw new Error('new query failed');
     });
     const active = createItemMentionController({
-      runtime: { send, onInvalidated: () => () => {}, isInvalidContextError: () => false },
+      runtime: { send },
       ui: uiMocks,
     }).start();
     const el = document.querySelector('#prompt-textarea') as HTMLElement;
@@ -469,7 +465,7 @@ describe('item mention chatgpt controller', () => {
       return oldReject.promise;
     });
     const active = createItemMentionController({
-      runtime: { send, onInvalidated: () => () => {}, isInvalidContextError: () => false },
+      runtime: { send },
       ui: uiMocks,
     }).start();
     const el = document.querySelector('#prompt-textarea') as HTMLElement;
@@ -531,7 +527,7 @@ describe('item mention chatgpt controller', () => {
       return { ok: false, data: null, error: { message: 'unexpected', extra: null } };
     });
     const active = createItemMentionController({
-      runtime: { send, onInvalidated: () => () => {}, isInvalidContextError: () => false },
+      runtime: { send },
       ui: uiMocks,
     }).start();
     const el = document.querySelector('#prompt-textarea') as HTMLElement;
@@ -564,7 +560,7 @@ describe('item mention chatgpt controller', () => {
       return { ok: false, data: null, error: { message: 'unexpected', extra: null } };
     });
     const active = createItemMentionController({
-      runtime: { send, onInvalidated: () => () => {}, isInvalidContextError: () => false },
+      runtime: { send },
       ui: uiMocks,
     }).start();
     const oldEditor = document.querySelector('#prompt-textarea') as HTMLElement;
@@ -623,7 +619,7 @@ describe('item mention chatgpt controller', () => {
       return { ok: false, data: null, error: { message: 'unexpected', extra: null } };
     });
     const active = createItemMentionController({
-      runtime: { send, onInvalidated: () => () => {}, isInvalidContextError: () => false },
+      runtime: { send },
       ui: uiMocks,
     }).start();
     const el = document.querySelector('#prompt-textarea') as HTMLElement;

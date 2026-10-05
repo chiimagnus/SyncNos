@@ -16,8 +16,6 @@ import {
 
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
-  onInvalidated?: (listener: (error: Error) => void) => () => void;
-  isInvalidContextError?: (error: unknown) => boolean;
 };
 
 type ItemMentionUiItem = {
@@ -92,7 +90,6 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
       let revisionUnsubscribe: (() => void) | null = null;
       let pendingSearch = false;
       let activeSearch: { activationGeneration: number; requestId: number; query: string } | null = null;
-      const unsubscribeInvalidated = rt.onInvalidated?.(() => stop()) || null;
 
       function stopTimers() {
         if (searchTimer) {
@@ -204,12 +201,8 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
             session = { ...session!, highlightIndex: 0 };
           }
           renderPopup();
-        } catch (error) {
+        } catch (_error) {
           if (!isCurrentSearch()) return;
-          if (rt.isInvalidContextError?.(error)) {
-            stop();
-            return;
-          }
           requestDataRevisionRetry(['conversations']);
           renderPopup();
         } finally {
@@ -262,8 +255,8 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
           adapter.replaceRange(currentEditor, range, markdown);
           inserted = true;
           adapter.focus(currentEditor);
-        } catch (error) {
-          if (rt.isInvalidContextError?.(error)) stop();
+        } catch (_error) {
+          // Keep the current mention session so the user can retry the selection.
         } finally {
           if (inserted) {
             pickInFlight = false;
@@ -436,11 +429,6 @@ export function createItemMentionController(deps: { runtime: RuntimeClient | nul
         pickSeq += 1;
         pickInFlight = false;
         deactivateMentionActivation();
-        try {
-          unsubscribeInvalidated?.();
-        } catch (_e) {
-          // ignore
-        }
         document.removeEventListener('input', onInput, true);
         document.removeEventListener('keydown', onKeyDown, true);
         document.removeEventListener('keyup', onKeyUp, true);

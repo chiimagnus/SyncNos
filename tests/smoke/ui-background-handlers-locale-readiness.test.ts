@@ -13,6 +13,7 @@ import { UI_MESSAGE_TYPES } from '../../src/platform/messaging/message-contracts
 import { scriptingExecuteScript } from '../../src/platform/webext/scripting';
 import { tabsQuery, tabsSendMessage } from '../../src/platform/webext/tabs';
 import { registerUiMessageHandlers } from '../../src/platform/messaging/ui-background-handlers';
+import { refreshContentScriptsAfterExtensionUpdate } from '../../src/platform/messaging/content-script-recovery';
 
 function deferred<T = void>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -95,6 +96,31 @@ describe('UI background handler locale readiness', () => {
     });
     expect(tabsSendMessage).toHaveBeenCalledTimes(2);
     expect(ensureLocaleReady).not.toHaveBeenCalled();
+  });
+
+  it('proactively refreshes every existing HTTP(S) tab after an extension update and isolates per-tab failures', async () => {
+    vi.mocked(tabsQuery).mockResolvedValue([
+      { id: 7, url: 'https://example.com/' },
+      { id: 8, url: 'http://example.test/' },
+      { id: 0, url: 'https://invalid.example/' },
+    ] as any);
+    vi.mocked(scriptingExecuteScript).mockImplementation(async (details: any) => {
+      if (details?.target?.tabId === 7) throw new Error('tab navigated');
+      return [];
+    });
+
+    await expect(refreshContentScriptsAfterExtensionUpdate()).resolves.toBeUndefined();
+
+    expect(tabsQuery).toHaveBeenCalledWith({ url: ['http://*/*', 'https://*/*'] });
+    expect(scriptingExecuteScript).toHaveBeenCalledTimes(2);
+    expect(scriptingExecuteScript).toHaveBeenCalledWith({
+      target: { tabId: 7 },
+      files: ['content-scripts/content.js'],
+    });
+    expect(scriptingExecuteScript).toHaveBeenCalledWith({
+      target: { tabId: 8 },
+      files: ['content-scripts/content.js'],
+    });
   });
 
   it('uses the same reinjection recovery for the in-page comments command', async () => {

@@ -126,6 +126,35 @@ describe('current-page-capture content handlers', () => {
     expect(response?.data).toMatchObject({ kind: 'video', subtitleStatus: 'empty', conversationId: 42, isNew: true });
   });
 
+  it('returns a disposer for the registered runtime listener', () => {
+    const removeListener = vi.fn();
+    let registeredListener: any = null;
+    // @ts-expect-error test global
+    globalThis.chrome = {
+      runtime: {
+        onMessage: {
+          addListener: vi.fn((listener: any) => {
+            registeredListener = listener;
+          }),
+          removeListener,
+        },
+      },
+    };
+
+    const cleanup = registerCurrentPageCaptureContentHandlers(
+      {
+        getCurrentPageCaptureState: vi.fn(),
+        captureCurrentPage: vi.fn(),
+      } as any,
+      { inpageTip: { showSaveTip: vi.fn() }, localeReady: Promise.resolve() },
+    );
+
+    expect(registeredListener).toEqual(expect.any(Function));
+    cleanup();
+    expect(removeListener).toHaveBeenCalledTimes(1);
+    expect(removeListener).toHaveBeenCalledWith(registeredListener);
+  });
+
   it('registers capture listeners immediately and waits for locale before service work', async () => {
     const locale = deferred<void>();
     let registeredListener: any = null;

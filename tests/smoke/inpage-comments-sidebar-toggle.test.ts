@@ -3,6 +3,7 @@ import { act } from 'react';
 import { JSDOM } from 'jsdom';
 
 import {
+  cleanupInpageCommentsPanel,
   createInpageCommentsDomSource,
   getInpageCommentsPanelApi,
 } from '../../src/ui/inpage/inpage-comments-panel-shadow';
@@ -94,6 +95,7 @@ describe('inpage comments sidebar toggle', () => {
   });
 
   afterEach(async () => {
+    act(() => cleanupInpageCommentsPanel());
     if (vi.isFakeTimers()) {
       vi.runOnlyPendingTimers();
       vi.useRealTimers();
@@ -220,6 +222,33 @@ describe('inpage comments sidebar toggle', () => {
     expect(onComposerSelectionRequest).toHaveBeenCalledTimes(1);
 
     selectionSpy.mockRestore();
+    api.dispose();
+  });
+
+  it('never adopts a panel from another content-script generation', async () => {
+    const stale = document.createElement('webclipper-inpage-comments-panel');
+    stale.id = 'webclipper-inpage-comments-panel';
+    stale.setAttribute('data-open', '1');
+    document.documentElement.appendChild(stale);
+    document.documentElement.setAttribute('data-webclipper-comments-dock', '1');
+    document.documentElement.style.setProperty('--webclipper-comments-dock-width', '420px');
+
+    const api = createCommentSidebarPanelTestDriver(getInpageCommentsPanelApi());
+    await act(async () => {
+      api.open({ focusComposer: false });
+      await flushReactScheduler();
+    });
+
+    const fresh = document.getElementById('webclipper-inpage-comments-panel');
+    expect(fresh).toBeTruthy();
+    expect(fresh).not.toBe(stale);
+    expect(document.querySelectorAll('#webclipper-inpage-comments-panel')).toHaveLength(1);
+
+    act(() => cleanupInpageCommentsPanel());
+    expect(document.getElementById('webclipper-inpage-comments-panel')).toBeNull();
+    expect(document.documentElement.hasAttribute('data-webclipper-comments-dock')).toBe(false);
+    expect(document.documentElement.style.getPropertyValue('--webclipper-comments-dock-width')).toBe('');
+
     api.dispose();
   });
 

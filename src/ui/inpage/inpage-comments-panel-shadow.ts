@@ -9,7 +9,7 @@ export type InpageCommentsPanelApi = CommentSidebarPanelApi;
 
 const PANEL_ID = 'webclipper-inpage-comments-panel';
 
-let singleton: { el: HTMLElement; api: CommentSidebarPanelApi } | null = null;
+let singleton: { el: HTMLElement; api: CommentSidebarPanelApi; cleanup: () => void } | null = null;
 function isCommentsSelectionDebugEnabled(): boolean {
   const anyGlobal = globalThis as any;
   if (anyGlobal.__SYNCNOS_DEBUG_COMMENTS_SELECTION__ === true) return true;
@@ -30,30 +30,35 @@ function debugInpagePanel(event: string, payload: Record<string, unknown>) {
   }
 }
 
-function ensurePanel(): { el: HTMLElement; api: CommentSidebarPanelApi } {
+function removeExistingPanel(): void {
+  document.getElementById(PANEL_ID)?.remove();
+}
+
+function ensurePanel(): { el: HTMLElement; api: CommentSidebarPanelApi; cleanup: () => void } {
   if (singleton && document.getElementById(PANEL_ID) === singleton.el) return singleton;
 
-  const existing = document.getElementById(PANEL_ID) as HTMLElement | null;
-  if (existing && (existing as any).__webclipperPanelApi) {
-    singleton = { el: existing, api: (existing as any).__webclipperPanelApi as CommentSidebarPanelApi };
-    debugInpagePanel('ensure_existing_panel', { ok: true });
-    return singleton;
-  }
+  // DOM survives an extension reload; callbacks/runtime do not. Always replace a stale panel.
+  removeExistingPanel();
+  singleton = null;
 
   const host = document.documentElement;
   const rootSource = createInpageCommentRootSource({
     document,
     getPanelRoot: () => singleton?.el || null,
   });
-  const { el, api } = mountThreadedCommentsPanel(host, {
+  const mounted = mountThreadedCommentsPanel(host, {
     surface: 'inpage',
     getLocatorSurfaceRoots: () => rootSource.capture(document.getSelection()),
     getLocatorRoots: (locator) => rootSource.locate(locator),
   });
+  const { el, api } = mounted;
   el.id = PANEL_ID;
 
-  (el as any).__webclipperPanelApi = api;
-  singleton = { el, api };
+  const cleanup = () => {
+    mounted.cleanup();
+    if (singleton?.el === el) singleton = null;
+  };
+  singleton = { el, api, cleanup };
   debugInpagePanel('ensure_new_panel', {
     ok: true,
     viewportWidth: Number(globalThis.innerWidth || 0) || 0,
@@ -104,6 +109,17 @@ export function createInpageCommentsDomSource(input: {
       return String(input.window.location?.href || '');
     },
   };
+}
+
+export function isInpageCommentsPanelOpen(): boolean {
+  return document.getElementById(PANEL_ID)?.getAttribute('data-open') === '1';
+}
+
+export function cleanupInpageCommentsPanel(): void {
+  const current = singleton;
+  singleton = null;
+  if (current && document.getElementById(PANEL_ID) === current.el) current.cleanup();
+  else removeExistingPanel();
 }
 
 export function getInpageCommentsPanelApi(): InpageCommentsPanelApi {
