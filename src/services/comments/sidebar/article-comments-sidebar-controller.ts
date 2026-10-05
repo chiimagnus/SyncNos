@@ -137,7 +137,6 @@ export function createArticleCommentsSidebarController(input: {
   const publishLoadState = (status: CommentSidebarLoadStatus, error: CommentSidebarLoadError | null = null) => {
     if (disposed) return;
     session.updateHost({
-      busy: status === 'loading',
       loadStatus: status,
       loadError: error,
       contextKey: getContextKey(),
@@ -636,7 +635,7 @@ export function createArticleCommentsSidebarController(input: {
     invalidateIdentityReconcile();
     sessionUnsubscribe?.();
     sessionUnsubscribe = null;
-    session.updateHost({ busy: false, loadStatus: 'idle', loadError: null, contextKey: '', actionCallbacks: {} });
+    session.updateHost({ loadStatus: 'idle', loadError: null, contextKey: '', actionCallbacks: {} });
     mutationGeneration += 1;
     operationGeneration += 1;
     abortActiveOperation();

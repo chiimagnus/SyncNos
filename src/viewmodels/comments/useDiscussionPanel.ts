@@ -128,7 +128,7 @@ export function useDiscussionPanel({ snapshot, actions }: UseDiscussionPanelInpu
   return {
     state,
     dispatch,
-    busy: snapshot.busy || localBusyCount > 0,
+    mutationBusy: localBusyCount > 0,
     runBusyTask,
     submitRoot,
     submitReply,

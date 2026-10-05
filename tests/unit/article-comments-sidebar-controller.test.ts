@@ -21,7 +21,6 @@ import { createCommentSidebarSession } from '../../src/services/comments/sidebar
 function createMockPanel() {
   let snapshot = {
     open: false,
-    busy: false,
     composerAttachment: { quoteText: '', locator: null, selectionRevision: 0 },
     comments: [] as any[],
     focusComposerSignal: 0,
@@ -65,7 +64,7 @@ function createMockPanel() {
     api,
     getState: () => ({
       open: snapshot.open,
-      busy: snapshot.busy,
+      loadStatus: snapshot.loadStatus,
       quoteText: snapshot.composerAttachment.quoteText,
       comments: snapshot.comments,
       handlers: handlers(),
@@ -510,7 +509,6 @@ describe('article-comments-sidebar-controller', () => {
       loadStatus: 'stale_error',
       loadError: { code: 'request_failed', message: 'background unavailable' },
     });
-    expect(panel.getState().busy).toBe(false);
   });
 
   it('waits for URL migration before loading and preserves the prior snapshot on migration failure', async () => {
@@ -621,7 +619,7 @@ describe('article-comments-sidebar-controller', () => {
     });
 
     controller.setContext({ canonicalUrl: 'https://example.com/a', conversationId: 1 });
-    await vi.waitFor(() => expect(panel.getState().busy).toBe(true));
+    await vi.waitFor(() => expect(session.getSnapshot().loadStatus).toBe('loading'));
     deferred.resolve([]);
     await vi.waitFor(() => {
       expect(session.getSnapshot().loadStatus).toBe('ready');
@@ -629,7 +627,6 @@ describe('article-comments-sidebar-controller', () => {
     unsubscribe();
 
     expect(states).toEqual(['idle', 'loading', 'ready']);
-    expect(panel.getState().busy).toBe(false);
   });
 
   it('setContext: keeps context stable for same discourse topic across different floors', async () => {
@@ -681,20 +678,19 @@ describe('article-comments-sidebar-controller', () => {
     await vi.waitFor(() => expect(adapter.list).toHaveBeenCalledTimes(1));
     const signal = adapter.list.mock.calls[0]?.[0]?.signal as AbortSignal;
     expect(signal.aborted).toBe(false);
-    expect(panel.getState().busy).toBe(true);
+    expect(session.getSnapshot().loadStatus).toBe('loading');
 
     controller.dispose();
     controller.dispose();
 
     expect(signal.aborted).toBe(true);
-    expect(panel.getState().busy).toBe(false);
 
     deferred.resolve([{ id: 1, parentId: null, commentText: 'late', quoteText: '', createdAt: 1 }]);
     await Promise.resolve();
     await Promise.resolve();
 
     expect(panel.getState().comments).toEqual([]);
-    expect(session.getSnapshot()).toMatchObject({ busy: false, loadStatus: 'idle', loadError: null, contextKey: '' });
+    expect(session.getSnapshot()).toMatchObject({ loadStatus: 'idle', loadError: null, contextKey: '' });
 
     controller.setContext({ canonicalUrl: 'https://example.com/b', conversationId: 2 });
     await controller.open({ focusComposer: true });

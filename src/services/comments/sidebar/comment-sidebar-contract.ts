@@ -39,7 +39,6 @@ export type CommentSidebarPanelApi = {
 };
 
 export type CommentSidebarHostUpdate = {
-  busy?: boolean;
   comments?: CommentSidebarItem[];
   actionCallbacks?: CommentSidebarHostActionCallbacks;
   loadStatus?: CommentSidebarLoadStatus;

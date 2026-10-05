@@ -157,18 +157,17 @@ describe('comment-sidebar-session', () => {
         position: { type: 'TextPositionSelector', start: 0, end: 12 },
       },
     });
-    session.updateHost({ busy: true, comments: [comment], actionCallbacks: { onClose } });
+    session.updateHost({ loadStatus: 'loading', comments: [comment], actionCallbacks: { onClose } });
     session.requestOpen({ focusComposer: true, source: 'inpage' });
 
     expect(session.getSnapshot()).toEqual({
       open: true,
-      busy: true,
       composerAttachment: attachment,
       comments: [comment],
       focusComposerSignal: 1,
       lastOpenSource: 'inpage',
       contextKey: '',
-      loadStatus: 'idle',
+      loadStatus: 'loading',
       loadError: null,
     });
 
@@ -180,9 +179,9 @@ describe('comment-sidebar-session', () => {
     panel.getHost()?.actions.close();
     expect(onClose).toHaveBeenCalledTimes(1);
 
-    session.updateHost({ busy: false, comments: [createComment(2)] });
+    session.updateHost({ loadStatus: 'ready', comments: [createComment(2)] });
     expect(panel.getSnapshot()).toEqual(session.getSnapshot());
-    expect(panel.getSnapshot()).toMatchObject({ busy: false, comments: [{ id: 2 }] });
+    expect(panel.getSnapshot()).toMatchObject({ loadStatus: 'ready', comments: [{ id: 2 }] });
 
     lease.dispose();
     expect(panel.calls.dispose).toBe(1);
@@ -220,21 +219,19 @@ describe('comment-sidebar-session', () => {
 
   it('uses open as direct host state and keeps the focus signal monotonic', () => {
     const session = createCommentSidebarSession();
-    session.updateHost({ busy: true });
+    session.updateHost({ loadStatus: 'loading' });
     session.requestOpen({ focusComposer: true, source: 'app' });
 
     expect(session.getSnapshot()).toMatchObject({
       open: true,
-      busy: true,
       focusComposerSignal: 1,
       lastOpenSource: 'app',
     });
 
     session.requestClose();
-    session.updateHost({ busy: false });
+    session.updateHost({ loadStatus: 'ready' });
     expect(session.getSnapshot()).toMatchObject({
       open: false,
-      busy: false,
       focusComposerSignal: 1,
       lastOpenSource: null,
     });
@@ -285,11 +282,11 @@ describe('comment-sidebar-session', () => {
     const actions = session.actions;
     session.subscribe(listener);
 
-    session.updateHost({ busy: true });
+    session.updateHost({ loadStatus: 'loading' });
     expect(listener).toHaveBeenCalledTimes(1);
     session.dispose();
     await actions.save('after dispose');
-    session.updateHost({ busy: false });
+    session.updateHost({ loadStatus: 'ready' });
     session.requestOpen({ focusComposer: true });
     lease.dispose();
 

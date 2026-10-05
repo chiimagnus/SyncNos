@@ -20,7 +20,6 @@ export type CommentSidebarComposerAttachment = {
 
 export type CommentSidebarHostSnapshot = {
   open: boolean;
-  busy: boolean;
   composerAttachment: CommentSidebarComposerAttachment;
   comments: CommentSidebarItem[];
   focusComposerSignal: number;
@@ -53,7 +52,6 @@ export type CommentSidebarHostActions = {
 export function createCommentSidebarHostSnapshot(): CommentSidebarHostSnapshot {
   return {
     open: false,
-    busy: false,
     composerAttachment: { quoteText: '', locator: null, selectionRevision: 0 },
     comments: [],
     focusComposerSignal: 0,

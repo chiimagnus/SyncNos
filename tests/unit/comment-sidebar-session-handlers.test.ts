@@ -194,7 +194,7 @@ describe('comment sidebar session handlers binding', () => {
     mounted.cleanup();
     mounted.cleanup();
     session.requestClose();
-    session.updateHost({ busy: true });
+    session.updateHost({ loadStatus: 'loading' });
     await flushTasks();
 
     expect(host.querySelector('webclipper-threaded-comments-panel')).toBeNull();

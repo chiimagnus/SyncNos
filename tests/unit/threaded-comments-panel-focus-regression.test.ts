@@ -120,6 +120,36 @@ describe('Threaded comments panel focus regression', () => {
     mounted.cleanup();
   });
 
+  it('keeps the reply composer interactive while comments refresh in the background', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+
+    const mounted = mountThreadedCommentsPanel(host, { surface: 'inpage' });
+    const driver = getCommentSidebarPanelTestDriver(mounted.api);
+    driver.replaceComments([{ id: 1, parentId: null, createdAt: 1, commentText: 'root' }]);
+    await flushReactScheduler();
+
+    const panel = host.querySelector('webclipper-threaded-comments-panel') as HTMLElement;
+    const shadow = panel.shadowRoot!;
+    (shadow.querySelector('.webclipper-inpage-comments-panel__comment') as HTMLElement).click();
+    await flushReactScheduler();
+
+    const replyTextarea = shadow.querySelector(
+      '.webclipper-inpage-comments-panel__reply-textarea',
+    ) as HTMLTextAreaElement;
+    expect(replyTextarea).toBeTruthy();
+    expect(shadow.activeElement).toBe(replyTextarea);
+
+    driver.session.updateHost({ loadStatus: 'loading' });
+    await flushReactScheduler();
+
+    expect(replyTextarea.disabled).toBe(false);
+    expect(shadow.activeElement).toBe(replyTextarea);
+
+    driver.session.updateHost({ loadStatus: 'ready' });
+    mounted.cleanup();
+  });
+
   it('focuses the composer after quote text is applied', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
