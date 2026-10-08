@@ -210,7 +210,11 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     if (conversationId) {
       const routeMatchesConversation = (link: Element) => {
         try {
-          const url = new URL(String(link.getAttribute('href') || ''), env.location.href);
+          const href = String(link.getAttribute('href') || '').trim();
+          if (!/^\/(?:c\/|g\/[^/]+\/c\/)/.test(href) && !/^https?:\/\/[^/]+\/(?:c\/|g\/[^/]+\/c\/)/i.test(href)) {
+            return false;
+          }
+          const url = new URL(href, env.location.href);
           return parseChatgptDurableConversationRoute(url)?.conversationId === conversationId;
         } catch (_error) {
           return false;
@@ -830,6 +834,42 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     return mergePreparedRecords(accumulator, records);
   }
 
+  async function enrichApiSnapshotWithRenderedGraphics(snapshot: any): Promise<any> {
+    const expectedConversationId = String(snapshot?.conversation?.conversationKey || '').trim();
+    if (!expectedConversationId || expectedConversationId !== findConversationIdFromUrl()) return snapshot;
+    const messages = Array.isArray(snapshot.messages) ? snapshot.messages : [];
+    const owned = new Map<string, any>(
+      messages.filter((m: any) => m?.role === 'assistant').map((m: any) => [String(m.messageKey), m]),
+    );
+    if (!owned.size) return snapshot;
+    const { inputsByKey } = readCurrentManualWindow(true);
+    const updates = new Map<string, string>();
+    for (const [key, input] of inputsByKey) {
+      if (input.role !== 'assistant' || !input.rendered || !input.liveRoot || !owned.has(key)) continue;
+      if (!chatgptMarkdown.hasRichGraphic(input.liveRoot)) continue;
+      const rendered = extractManualMessage(
+        { ...input, outerHtml: await chatgptMarkdown.snapshotRichGraphics(input.liveRoot, env.window) },
+        Number(owned.get(key)?.sequence) || 0,
+      );
+      const images = String(rendered?.contentMarkdown || '').match(
+        /^!\[[^\]\n]+\]\(data:image\/png;base64,[A-Za-z0-9+/=]+\)$/gm,
+      );
+      if (!images?.length) continue;
+      const original = String(owned.get(key)?.contentMarkdown || '');
+      updates.set(key, [original, ...images.filter((image) => !original.includes(image))].join('\n\n'));
+    }
+    if (!updates.size) return snapshot;
+    if (findConversationIdFromUrl() !== expectedConversationId) {
+      throw Object.assign(new Error('chatgpt_api_navigation_changed'), { code: 'chatgpt_api_navigation_changed' });
+    }
+    return {
+      ...snapshot,
+      messages: messages.map((message: any) =>
+        updates.has(message.messageKey) ? { ...message, contentMarkdown: updates.get(message.messageKey) } : message,
+      ),
+    };
+  }
+
   // Manual-only dynamic sweep. The provider re-queries after every wait; no turn/message node
   // survives across an await. The original scroll root is restored exactly once in finally.
   async function prepareManualCapture(options: any = {}): Promise<any | null> {
@@ -968,6 +1008,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     getRoot: getConversationRoot,
     prepareManualCapture,
     captureApiLiveTurn,
+    enrichApiSnapshotWithRenderedGraphics,
     __test: {
       sampleIdentityGuard,
       identityConversationKey,

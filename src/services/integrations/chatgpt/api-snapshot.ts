@@ -193,6 +193,38 @@ function renderContentReferences(message: any, text: string, onSchemaDrift: Sche
   return output;
 }
 
+function normalizeRichUiMarkup(markdown: string): string {
+  if (!/^\s*<(?:box|row|col|grid|grid-item|flow|flow-item|card|table|carousel)\b/m.test(markdown)) {
+    return markdown;
+  }
+  let fence = '';
+  return markdown
+    .split('\n')
+    .map((line) => {
+      const marker = line.match(/^\s*(`{3,}|~{3,})/);
+      if (marker) {
+        const kind = marker[1]![0]!;
+        if (!fence) fence = kind;
+        else if (fence === kind) fence = '';
+        return line;
+      }
+      if (fence) return line;
+      return line
+        .replace(/<Entity\b[^>]*\bvalue="([^"]+)"[^>]*\/>/g, '$1')
+        .replace(/<AsyncImage\b[^>]*\bquery="([^"]+)"[^>]*\/>/g, '图片：$1')
+        .replace(/<icon\b[^>]*\bname="([^"]+)"[^>]*\/>/g, (_match, name: string) => {
+          return name === 'arrow-down' ? '↓' : '';
+        })
+        .replace(/<Chart\b[^>]*\/>/g, '[图表：请在原对话查看]')
+        .replace(
+          /<\/?(?:box|row|col|grid|grid-item|flow|flow-item|card|table|table-row|table-cell|carousel|carousel-item|text|title|caption|badge)\b[^>]*>/g,
+          '',
+        )
+        .replace(/^\s+$/, '');
+    })
+    .join('\n');
+}
+
 function renderTextParts(message: any, onSchemaDrift: SchemaDriftReporter): string {
   const parts = currentParts(message, onSchemaDrift);
   const output: string[] = [];
@@ -602,7 +634,7 @@ export function buildChatgptApiSnapshot(input: {
 
         const markdown = appendBlocks([
           ...pendingAuxiliary.map((item) => item.markdown),
-          renderTextParts(message, markSchemaDrift),
+          normalizeRichUiMarkup(renderTextParts(message, markSchemaDrift)),
           renderImageBlocks(pendingImages),
         ]);
         let imageOwnerKey = buildChatgptGeneratedImageMessageKey(pendingImages.map((image) => image.fileId));

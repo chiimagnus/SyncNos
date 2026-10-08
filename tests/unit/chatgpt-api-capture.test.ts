@@ -97,6 +97,42 @@ beforeEach(() => {
 });
 
 describe('ChatGPT API snapshot', () => {
+  it('flattens rendered Rich UI layout markup while preserving prose and fenced code', () => {
+    const original = [
+      '说明：',
+      '',
+      '<box gap={2}>',
+      '  <row justify="center">',
+      '    <icon name="arrow-down"/>',
+      '  </row>',
+      '  <grid columns={2}>',
+      '    <grid-item><box>步骤一</box></grid-item>',
+      '    <grid-item><box>步骤二</box></grid-item>',
+      '  </grid>',
+      '  <AsyncImage query="架构图"/>',
+      '</box>',
+      '',
+      '```html',
+      '<box>这是代码示例</box>',
+      '```',
+    ].join('\n');
+    const result = build(
+      mappingFrom([
+        message({ id: 'user-1', role: 'user', parts: ['q'] }),
+        message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: [original] }),
+      ]),
+    );
+    const rendered = result.snapshot.messages[1].contentMarkdown;
+    expect(rendered).toContain('说明：');
+    expect(rendered).toContain('↓');
+    expect(rendered).toContain('步骤一');
+    expect(rendered).toContain('步骤二');
+    expect(rendered).toContain('图片：架构图');
+    expect(rendered).not.toContain('<grid columns');
+    expect(rendered).toContain('```html\n<box>这是代码示例</box>\n```');
+    expect(result.snapshot.captureMeta.completeness).toBe('complete');
+  });
+
   it('downgrades malformed parts and attachment containers without aborting the conversation', () => {
     const malformedParts = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),

@@ -356,6 +356,61 @@ describe('chatgpt current DOM', () => {
     expect(markdown).not.toContain('M0 0');
   });
 
+  it('ignores ChatGPT skip-to-content fragment links when resolving the conversation title', async () => {
+    const html = `<a href="#_R_jump" aria-label="跳转到内容">跳转到内容</a>
+      <a href="/c/conversation-1" aria-current="page">真实对话标题</a>`;
+    const def = currentDef(currentDom({ beforeTurn: html, userText: 'First prompt' }));
+    const snapshot = (await capturePrepared(def)) as any;
+    expect(snapshot.conversation.title).toBe('真实对话标题');
+    const withoutSidebar = currentDef(
+      currentDom({
+        beforeTurn: `<a href="#_R_jump">跳转到内容</a>`,
+        userText: 'First prompt',
+      }),
+    );
+    const fallback = (await capturePrepared(withoutSidebar)) as any;
+    expect(fallback.conversation.title).toBe('First prompt');
+  });
+
+  it('enriches the matching API message with a DOM-backed SVG snapshot without changing other messages', async () => {
+    const dom = currentDom({
+      assistantContent: `<div data-chatgpt-selection-message-id="assistant-message-1">
+        <div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary">
+          <p>图表正文</p><svg data-d-component="svg" width="200" height="100" viewBox="0 0 200 100" aria-label="结构图"><rect width="200" height="100" /></svg>
+        </div>
+      </div>`,
+    });
+    const url =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
+    vi.spyOn(dom.window.HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage: vi.fn() } as any);
+    vi.spyOn(dom.window.HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(url);
+    (dom.window as any).Image = class {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      set src(_value: string) {
+        this.onload?.();
+      }
+    };
+    const def = currentDef(dom);
+    const snapshot = {
+      conversation: { conversationKey: 'conversation-1' },
+      messages: [
+        { messageKey: 'assistant-message-1', role: 'assistant', contentMarkdown: 'API 原始文本', sequence: 1 },
+        { messageKey: 'other-message', role: 'assistant', contentMarkdown: '其他回答', sequence: 2 },
+      ],
+    };
+    const result = await def.collector.enrichApiSnapshotWithRenderedGraphics(snapshot);
+    expect(result.messages[0].contentMarkdown).toContain('API 原始文本');
+    expect(result.messages[0].contentMarkdown).toContain(`![结构图](${url})`);
+    expect(result.messages[1]).toEqual(snapshot.messages[1]);
+    expect(hasCacheableChatImageReference(result.messages[0].contentMarkdown)).toBe(true);
+    const otherConversation = await def.collector.enrichApiSnapshotWithRenderedGraphics({
+      ...snapshot,
+      conversation: { conversationKey: 'not-current-conversation' },
+    });
+    expect(otherConversation.messages).toEqual(snapshot.messages);
+  });
+
   it('rasterizes SVG charts and Canvas graphics into cacheable PNGs in message order', async () => {
     const dom = current2026Dom({
       assistantBlocks: `<div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary">

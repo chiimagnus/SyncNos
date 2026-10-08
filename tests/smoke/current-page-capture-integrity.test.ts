@@ -55,6 +55,7 @@ function createHarness(input: {
   url?: string;
   syncResponse?: any;
   liveTurn?: () => any;
+  enrich?: (snapshot: any) => any;
   collectorAvailable?: boolean;
   availabilityError?: string;
 }) {
@@ -81,6 +82,7 @@ function createHarness(input: {
   if (input.prepare) collector.prepareManualCapture = input.prepare;
   if (input.collectorId === 'chatgpt') collector.captureApiLiveTurn = input.liveTurn || (() => ({ kind: 'none' }));
   else if (input.liveTurn) collector.captureApiLiveTurn = input.liveTurn;
+  if (input.enrich) collector.enrichApiSnapshotWithRenderedGraphics = input.enrich;
   if (input.url) vi.stubGlobal('location', { href: input.url });
   const videoCapture = {
     captureVideoTranscript: vi.fn(
@@ -389,6 +391,25 @@ describe('current page capture integrity routing', () => {
     expect(liveTurn).not.toHaveBeenCalled();
     expect(harness.calls[1].payload).toMatchObject({ mode: 'snapshot', diff: null });
     expect(result).toMatchObject({ captureCompleteness: 'complete' });
+  });
+
+  it('persists API visual media enrichment before the same canonical save', async () => {
+    chatgptApiMocks.readEnabled.mockResolvedValue(true);
+    const snapshot = chatSnapshot();
+    chatgptApiMocks.capture.mockResolvedValue({ snapshot, currentTurnState: 'finalized' });
+    const enrich = vi.fn(async (current) => ({
+      ...current,
+      messages: [{ ...current.messages[0], contentMarkdown: '加上图表资源' }],
+    }));
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      snapshot,
+      enrich,
+      url: 'https://chatgpt.com/c/conversation-1',
+    });
+    await harness.service.captureCurrentPage();
+    expect(enrich).toHaveBeenCalledWith(snapshot);
+    expect(harness.calls[1].payload.messages[0].contentMarkdown).toBe('加上图表资源');
   });
 
   it('augments an enabled API snapshot with only the current stable live turn and persists it as partial append', async () => {

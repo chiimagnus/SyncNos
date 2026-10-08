@@ -51,6 +51,7 @@ DeepSeek 的 `data-virtual-list-item-key` 在新用户消息上是保留的临�
 - 用户上传和 AI 生成的内容图片属于 conversation 内容；普通 tool/MCP 截图不是内容资产。
 - 正文保存不得等待图片网络。临时 signed URL、session credential 或原始私有 backend response 不作为持久内容。
 - ChatGPT 手动 DOM 采集的 SVG/Canvas 图表尽量转换为静态 PNG 并复用现有图片缓存；保留新式卡片/流程的阅读顺序及可识别控件状态，不保存可执行交互代码。图形无法转换时保留明确占位，不能宣称已保留原图。
+- ChatGPT Advanced API 采集以 backend mapping 为历史真源：把可识别的 Rich UI 布局标记转为静态可读内容，并仅按已确认的消息 ID 补充当前渲染 DOM 的 SVG/Canvas 图片；历史消息未渲染时不伪造截图。DOM 标题解析只能使用真实会话链接，不能把页内跳转链接视为会话标题。
 
 ## 长对话与完整性
 
