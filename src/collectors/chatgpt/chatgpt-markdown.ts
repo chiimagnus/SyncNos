@@ -105,6 +105,47 @@ export function isChatgptNonContentImageUrl(src: unknown): boolean {
   );
 }
 
+const RICH_LAYOUT_COMPONENTS = new Set([
+  'box',
+  'card',
+  'col',
+  'row',
+  'grid',
+  'grid-item',
+  'flow',
+  'flow-item',
+  'carousel-item',
+]);
+
+function isRichGraphic(node: any): boolean {
+  if (!node || !node.getAttribute) return false;
+  const tag = String(node.tagName || '').toLowerCase();
+  if (tag !== 'svg' && tag !== 'canvas') return false;
+  if (node.getAttribute('data-d-component') === 'icon') return false;
+  if (node.closest?.("[aria-hidden='true'], [data-markdown-copy='exclude']")) return false;
+  return (
+    tag === 'canvas' ||
+    node.getAttribute('data-d-component') === 'svg' ||
+    node.closest?.("[data-d-component='chart']") != null ||
+    node.classList?.contains('recharts-surface') ||
+    (node.getAttribute('role') === 'img' && !!node.getAttribute('aria-label'))
+  );
+}
+
+function hasRichGraphic(root: any): boolean {
+  if (!root) return false;
+  if (isRichGraphic(root)) return true;
+  return Array.from(root.querySelectorAll?.('svg, canvas') || []).some(isRichGraphic);
+}
+
+function graphicPlaceholder(node: any): string {
+  const label = String(node.getAttribute?.('aria-label') || node.querySelector?.('title')?.textContent || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 160);
+  return label ? `[图表：${label}]` : '[图表：请在原对话查看]';
+}
+
 function removeNonContentNodes(container: any): any {
   if (!container || !container.querySelectorAll) return container;
 
@@ -151,6 +192,16 @@ function removeNonContentNodes(container: any): any {
     } catch (_e) {
       // ignore
     }
+  });
+
+  container.querySelectorAll('svg, canvas').forEach((el: any) => {
+    if (!isRichGraphic(el)) return;
+    const placeholder = container.ownerDocument.createElement('p');
+    placeholder.textContent = graphicPlaceholder(el);
+    for (const sibling of [el.previousSibling, el.nextSibling]) {
+      if (sibling?.nodeType === 3 && !String(sibling.textContent || '').trim()) sibling.remove();
+    }
+    el.replaceWith(placeholder);
   });
 
   container.querySelectorAll('svg, path, input, select, option, script, style').forEach((el: any) => {
@@ -515,7 +566,10 @@ function htmlToMarkdown(root: any): any {
     }
 
     const rendered = renderChildren(node, ctx);
-    if (tag === 'div' || tag === 'section' || tag === 'article') return rendered;
+    if (RICH_LAYOUT_COMPONENTS.has(String(node.getAttribute?.('data-d-component') || ''))) {
+      const content = normalizeMarkdown(rendered);
+      return content ? `\n\n${content}\n\n` : '';
+    }
     return rendered;
   }
 
@@ -551,6 +605,7 @@ const api = {
   extractRenderedText,
   extractAssistantMarkdown,
   extractAssistantText,
+  hasRichGraphic,
 };
 
 export default api;

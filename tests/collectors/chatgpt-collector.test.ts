@@ -327,6 +327,51 @@ describe('chatgpt current DOM', () => {
     expect(markdown).not.toContain('chatgpt.com/images/ecosystem/apps/github/icon.png');
   });
 
+  it('preserves the reading order of Intelligent UI cards, flows and tables', async () => {
+    const dom = current2026Dom({
+      assistantBlocks: `
+        <div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary">
+          <h2>处理流程</h2>
+          <div data-d-component="box" data-d-direction="col">
+            <div data-d-component="box"><p>输入数据</p></div>
+            <div data-d-component="row"><svg data-d-component="icon"><path d="M0 0"></path></svg></div>
+            <div data-d-component="box"><p>转换为图表</p><span data-d-component="caption">保留数据含义</span></div>
+            <div data-d-component="grid">
+              <div data-d-component="grid-item"><div data-d-component="box"><p>模块甲</p><span>注释甲</span></div></div>
+              <div data-d-component="grid-item"><div data-d-component="box"><p>模块乙</p><span>注释乙</span></div></div>
+            </div>
+          </div>
+          <div data-d-component="table"><table><tr><th>项目</th><th>结果</th></tr><tr><td>A</td><td>通过</td></tr></table></div>
+        </div>`,
+    });
+    const snapshot = (await capturePrepared(currentDef(dom))) as any;
+    const markdown = snapshot.messages[1].contentMarkdown;
+    expect(markdown).toContain('## 处理流程');
+    expect(markdown).toMatch(/输入数据\n\n转换为图表/);
+    expect(markdown).toMatch(/保留数据含义\n\n模块甲/);
+    expect(markdown).toMatch(/注释甲\n\n模块乙/);
+    expect(markdown).toContain('| 项目 | 结果 |');
+    expect(markdown).toContain('| A | 通过 |');
+    expect(markdown).not.toContain('M0 0');
+  });
+
+  it('keeps a meaningful placeholder for chart-only content without recording decorative icons', async () => {
+    const dom = current2026Dom({
+      assistantBlocks: `<div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary">
+        <svg data-d-component="icon"><path d="M0 0"></path></svg>
+        <svg class="recharts-surface" viewBox="0 0 200 100"><path d="M0 0 L100 50"></path></svg>
+        <svg role="img" aria-label="收入趋势"><path d="M0 0 L100 60"></path></svg>
+      </div>`,
+    });
+    const def = currentDef(dom);
+    const assistant = def.collector.__test.manualAdapter
+      .readDescriptors()
+      .find((descriptor: any) => descriptor.role === 'assistant');
+    expect(assistant.rendered).toBe(true);
+    const snapshot = (await capturePrepared(def)) as any;
+    expect(snapshot.messages[1].contentMarkdown).toBe('[图表：请在原对话查看]\n\n[图表：收入趋势]');
+  });
+
   it('preserves hidden rendered code sources such as Mermaid', () => {
     const dom = new JSDOM(`<!doctype html><body>
       <div id="root">

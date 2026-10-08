@@ -494,6 +494,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     const imageUrls = extractChatgptImageUrlsForRole(wrapper, role);
     const node = role === 'user' ? userContentNode(wrapper) : assistantContentNode(wrapper);
     const text = env.normalize.normalizeText(node?.innerText || node?.textContent || '');
+    const hasRichGraphic = role === 'assistant' && chatgptMarkdown.hasRichGraphic(node);
     const iframe = role === 'assistant' ? findDeepResearchIframe(wrapper) : null;
     const iframeUrl = String(iframe?.getAttribute?.('src') || '').trim();
     const effectiveCot = role === 'assistant' && !iframe ? cot : null;
@@ -508,12 +509,20 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       turnKey,
       withinTurn,
       role,
-      fingerprint: descriptorFingerprint({ role, key, text, cotText, cotMarkdown, imageUrls, iframeUrl }),
+      fingerprint: descriptorFingerprint({
+        role,
+        key,
+        text: hasRichGraphic ? `${text}|rich-graphic` : text,
+        cotText,
+        cotMarkdown,
+        imageUrls,
+        iframeUrl,
+      }),
       hasDeepResearch: !!iframe,
       rendered:
         !streaming &&
         hasFinalAssistantSurface &&
-        (!!text || !!cotText || !!cotMarkdown || imageUrls.length > 0 || !!iframe),
+        (!!text || !!cotText || !!cotMarkdown || imageUrls.length > 0 || !!iframe || hasRichGraphic),
       visible: isVisibleWindow(wrapper),
       outerHtml: String(serializedRoot?.outerHTML || ''),
       imageUrls,
