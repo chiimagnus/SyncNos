@@ -50,6 +50,7 @@ DeepSeek 的 `data-virtual-list-item-key` 在新用户消息上是保留的临�
 - 图片和附件属于消息语义时必须进入 fingerprint，避免附件变化却被当作同一消息。
 - 用户上传和 AI 生成的内容图片属于 conversation 内容；普通 tool/MCP 截图不是内容资产。
 - 正文保存不得等待图片网络。临时 signed URL、session credential 或原始私有 backend response 不作为持久内容。
+- ChatGPT 手动 DOM 采集的 SVG/Canvas 图表尽量转换为静态 PNG 并复用现有图片缓存；保留新式卡片/流程的阅读顺序及可识别控件状态，不保存可执行交互代码。图形无法转换时保留明确占位，不能宣称已保留原图。
 
 ## 长对话与完整性
 

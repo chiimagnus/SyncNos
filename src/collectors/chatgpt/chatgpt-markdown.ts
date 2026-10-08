@@ -122,28 +122,212 @@ function isRichGraphic(node: any): boolean {
   const tag = String(node.tagName || '').toLowerCase();
   if (tag !== 'svg' && tag !== 'canvas') return false;
   if (node.getAttribute('data-d-component') === 'icon') return false;
-  if (node.closest?.("[aria-hidden='true'], [data-markdown-copy='exclude']")) return false;
-  return (
+  if (node.getAttribute('data-syncnos-graphic') === 'true') return true;
+  if (node.closest?.("[aria-hidden='true'], [data-markdown-copy='exclude'], button")) return false;
+  if (
     tag === 'canvas' ||
     node.getAttribute('data-d-component') === 'svg' ||
     node.closest?.("[data-d-component='chart']") != null ||
     node.classList?.contains('recharts-surface') ||
     (node.getAttribute('role') === 'img' && !!node.getAttribute('aria-label'))
-  );
+  )
+    return true;
+  const rect = node.getBoundingClientRect?.();
+  const width = Number(rect?.width) || Number.parseFloat(node.getAttribute('width') || '') || 0;
+  const height = Number(rect?.height) || Number.parseFloat(node.getAttribute('height') || '') || 0;
+  return width >= 80 && height >= 50;
 }
 
 function hasRichGraphic(root: any): boolean {
   if (!root) return false;
-  if (isRichGraphic(root)) return true;
+  if (isRichGraphic(root) || root.querySelector?.('img[data-syncnos-graphic="true"]')) return true;
   return Array.from(root.querySelectorAll?.('svg, canvas') || []).some(isRichGraphic);
 }
 
-function graphicPlaceholder(node: any): string {
-  const label = String(node.getAttribute?.('aria-label') || node.querySelector?.('title')?.textContent || '')
+function graphicLabel(node: any): string {
+  return String(node.getAttribute?.('aria-label') || node.querySelector?.('title')?.textContent || '')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 160);
+}
+
+function graphicPlaceholder(node: any): string {
+  const label = graphicLabel(node);
   return label ? `[图表：${label}]` : '[图表：请在原对话查看]';
+}
+
+const SVG_STYLES = [
+  'fill',
+  'stroke',
+  'color',
+  'font-family',
+  'font-size',
+  'font-weight',
+  'opacity',
+  'stroke-width',
+  'stroke-dasharray',
+  'text-anchor',
+];
+const MAX_GRAPHIC_DATA_LENGTH = 2_000_000;
+
+function inlineSvgStyles(source: any, copy: any, win: any): void {
+  if (typeof win?.getComputedStyle !== 'function') return;
+  const sources = [source, ...Array.from(source.querySelectorAll('*'))] as any[];
+  const copies = [copy, ...Array.from(copy.querySelectorAll('*'))] as any[];
+  if (sources.length > 4000) return;
+  for (let index = 0; index < sources.length; index += 1) {
+    if (sources[index]?.namespaceURI !== 'http://www.w3.org/2000/svg') continue;
+    const computed = win.getComputedStyle(sources[index]);
+    for (const property of SVG_STYLES) {
+      const value = computed.getPropertyValue(property).trim();
+      if (value && !/url\((?!['\"]?#)/i.test(value)) copies[index].style.setProperty(property, value);
+    }
+  }
+}
+
+async function renderSvgPng(source: any, copy: any, win: any): Promise<string> {
+  if (source.querySelector?.('foreignObject, image')) return '';
+  const rect = source.getBoundingClientRect?.();
+  const viewBox = String(source.getAttribute('viewBox') || '')
+    .trim()
+    .split(/[\s,]+/)
+    .map(Number);
+  const sourceSize = (key: 'width' | 'height', fallback: number): number => {
+    const attribute = String(source.getAttribute(key) || '');
+    return Number(rect?.[key]) || (/^[\d.]+(?:px)?$/.test(attribute) ? Number.parseFloat(attribute) : 0) || fallback;
+  };
+  const nativeWidth = sourceSize('width', viewBox.length === 4 ? viewBox[2] : 0);
+  const nativeHeight = sourceSize('height', viewBox.length === 4 ? viewBox[3] : 0);
+  if (nativeWidth < 16 || nativeHeight < 16) return '';
+  const scale = Math.min(
+    1,
+    1600 / nativeWidth,
+    1200 / nativeHeight,
+    Math.sqrt(1_800_000 / (nativeWidth * nativeHeight)),
+  );
+  const width = Math.max(1, Math.round(nativeWidth * scale));
+  const height = Math.max(1, Math.round(nativeHeight * scale));
+  const svg = copy.cloneNode(true);
+  svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  svg.setAttribute('width', String(width));
+  svg.setAttribute('height', String(height));
+  if (!svg.getAttribute('viewBox')) svg.setAttribute('viewBox', `0 0 ${nativeWidth} ${nativeHeight}`);
+  inlineSvgStyles(source, svg, win);
+  for (const node of [svg, ...Array.from(svg.querySelectorAll('*'))] as any[]) {
+    for (const attr of Array.from(node.attributes || []) as any[]) {
+      if (
+        /^on/i.test(attr.name) ||
+        ((attr.name === 'href' || attr.name === 'xlink:href') && !attr.value.startsWith('#'))
+      ) {
+        node.removeAttribute(attr.name);
+      }
+    }
+  }
+  svg
+    .querySelectorAll('script, style, foreignObject, animate, animateTransform, animateMotion, set, image')
+    .forEach((node: any) => node.remove());
+  const xml = new win.XMLSerializer().serializeToString(svg);
+  const image = new win.Image();
+  const ready = new Promise<boolean>((resolve) => {
+    const timeout = win.setTimeout(() => finish(false), 1200);
+    const finish = (ok: boolean) => {
+      win.clearTimeout(timeout);
+      image.onload = null;
+      image.onerror = null;
+      resolve(ok);
+    };
+    image.onload = () => finish(true);
+    image.onerror = () => finish(false);
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(xml)}`;
+  });
+  if (!(await ready)) return '';
+  const canvas = source.ownerDocument.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+  ctx.drawImage(image, 0, 0, width, height);
+  const dataUrl = canvas.toDataURL('image/png');
+  return dataUrl.length <= MAX_GRAPHIC_DATA_LENGTH ? dataUrl : '';
+}
+
+function cloneWithControlState(root: any, snapshotCanvases = false): any {
+  if (!root?.cloneNode) return null;
+  const copy = root.cloneNode(true);
+  const selector = 'input[type="checkbox"], input[type="radio"], input[type="range"], option';
+  const live = Array.from(root.querySelectorAll?.(selector) || []) as any[];
+  const snapshots = Array.from(copy.querySelectorAll?.(selector) || []) as any[];
+  for (let index = 0; index < live.length; index += 1) {
+    const src = live[index];
+    const dest = snapshots[index];
+    if (!src?.closest?.('[data-d-component]') || !dest) continue;
+    if (String(src.tagName).toLowerCase() === 'option') dest.toggleAttribute('selected', !!src.selected);
+    else if (src.type === 'range') dest.setAttribute('value', String(src.value || ''));
+    else dest.toggleAttribute('checked', !!src.checked);
+  }
+  if (snapshotCanvases) {
+    const canvases = Array.from(root.querySelectorAll?.('canvas') || []) as any[];
+    const targets = Array.from(copy.querySelectorAll?.('canvas') || []) as any[];
+    for (let index = 0; index < canvases.length; index += 1) {
+      if (!isRichGraphic(canvases[index])) continue;
+      try {
+        const dataUrl = String(canvases[index].toDataURL('image/png') || '');
+        if (!dataUrl.startsWith('data:image/png;base64,') || dataUrl.length > MAX_GRAPHIC_DATA_LENGTH) continue;
+        const image = root.ownerDocument.createElement('img');
+        image.setAttribute('data-syncnos-graphic', 'true');
+        image.setAttribute('src', dataUrl);
+        image.setAttribute('alt', graphicLabel(canvases[index]) || '图表');
+        targets[index].replaceWith(image);
+      } catch (_error) {
+        // Keep the canvas for the text-only fallback when pixels cannot be read.
+      }
+    }
+  }
+  return copy;
+}
+
+async function snapshotRichGraphics(root: any, win: any): Promise<string> {
+  if (!hasRichGraphic(root) || !root?.cloneNode) return '';
+  const copy = cloneWithControlState(root);
+  const sources = Array.from(root.querySelectorAll('svg, canvas')) as any[];
+  const targets = Array.from(copy.querySelectorAll('svg, canvas')) as any[];
+  const jobs: Promise<{ image: any; dataUrl: string; label: string }>[] = [];
+  let count = 0;
+  for (let index = 0; index < sources.length; index += 1) {
+    const source = sources[index];
+    if (!isRichGraphic(source) || count++ >= 12) continue;
+    const target = targets[index];
+    target.setAttribute('data-syncnos-graphic', 'true');
+    jobs.push(
+      (async () => {
+        let dataUrl = '';
+        try {
+          dataUrl =
+            String(source.tagName).toLowerCase() === 'canvas'
+              ? source.toDataURL('image/png')
+              : await renderSvgPng(source, target, win);
+        } catch (_error) {
+          // A failed local rasterization keeps the original graphic for the readable fallback.
+        }
+        return { image: target, dataUrl, label: graphicLabel(source) || '图表' };
+      })(),
+    );
+  }
+  let totalImageLength = 0;
+  for (const { image, dataUrl, label } of await Promise.all(jobs)) {
+    if (!dataUrl.startsWith('data:image/png;base64,') || dataUrl.length > MAX_GRAPHIC_DATA_LENGTH) continue;
+    if (totalImageLength + dataUrl.length > 4_000_000) continue;
+    totalImageLength += dataUrl.length;
+    const replacement = root.ownerDocument.createElement('img');
+    replacement.setAttribute('data-syncnos-graphic', 'true');
+    replacement.setAttribute('src', dataUrl);
+    replacement.setAttribute('alt', label);
+    for (const sibling of [image.previousSibling, image.nextSibling]) {
+      if (sibling?.nodeType === 3 && !String(sibling.textContent || '').trim()) sibling.remove();
+    }
+    image.replaceWith(replacement);
+  }
+  return copy.outerHTML;
 }
 
 function removeNonContentNodes(container: any): any {
@@ -192,6 +376,49 @@ function removeNonContentNodes(container: any): any {
     } catch (_e) {
       // ignore
     }
+  });
+
+  const controls =
+    '[data-d-component="checkbox"], [data-d-component="radio"], [data-d-component="radio-group"], [data-d-component="slider"], [data-d-component="select"], [data-d-component="segmented-control"]';
+  container.querySelectorAll(controls).forEach((el: any) => {
+    if (!container.contains(el)) return;
+    const kind = String(el.getAttribute('data-d-component') || '');
+    const label = String(el.getAttribute('aria-label') || el.textContent || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const selected = el.querySelector?.(
+      '[aria-checked="true"], [aria-pressed="true"], [data-state="checked"], [data-state="active"], input:checked, option:checked',
+    );
+    let summary = '';
+    if (kind === 'checkbox' || kind === 'radio') {
+      const state =
+        el.getAttribute('aria-checked') ||
+        el.getAttribute('data-state') ||
+        selected?.getAttribute?.('aria-checked') ||
+        selected?.getAttribute?.('data-state');
+      const checked =
+        state === 'true' ||
+        state === 'checked' ||
+        !!el.matches?.('input:checked') ||
+        !!el.querySelector?.('input:checked');
+      summary = `${checked ? '[x]' : '[ ]'} ${label || '选项'}`;
+    } else if (kind === 'slider') {
+      const valueNode = el.querySelector?.('[role="slider"], input[type="range"]') || el;
+      const value =
+        valueNode.getAttribute('aria-valuetext') ||
+        valueNode.getAttribute('aria-valuenow') ||
+        valueNode.getAttribute('value');
+      summary = `${label || '滑块'}：${String(value || '').trim()}`;
+    } else {
+      const selectedLabel = String(selected?.getAttribute?.('aria-label') || selected?.textContent || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      summary = `${label || '选择'}${selectedLabel && selectedLabel !== label ? `：${selectedLabel}` : ''}`;
+    }
+    if (!summary.trim()) return;
+    const replacement = container.ownerDocument.createElement('p');
+    replacement.textContent = summary;
+    el.replaceWith(replacement);
   });
 
   container.querySelectorAll('svg, canvas').forEach((el: any) => {
@@ -539,6 +766,13 @@ function htmlToMarkdown(root: any): any {
     if (tag === 'img') {
       const src = node.getAttribute ? String(node.getAttribute('src') || '').trim() : '';
       if (isChatgptNonContentImageUrl(src)) return '';
+      if (
+        node.getAttribute?.('data-syncnos-graphic') === 'true' &&
+        /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(src)
+      ) {
+        const alt = String(node.getAttribute('alt') || '图表').replace(/[\[\]\\]/g, '\\$&');
+        return `\n\n![${alt}](${src})\n\n`;
+      }
       if (/^https?:\/\//i.test(src)) return `![](${src})`;
       return '';
     }
@@ -606,6 +840,8 @@ const api = {
   extractAssistantMarkdown,
   extractAssistantText,
   hasRichGraphic,
+  cloneWithControlState,
+  snapshotRichGraphics,
 };
 
 export default api;

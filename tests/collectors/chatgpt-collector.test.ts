@@ -2,6 +2,7 @@ import { JSDOM } from 'jsdom';
 import { describe, expect, it, vi } from 'vitest';
 import { buildChatgptGeneratedImageMessageKey } from '@services/shared/chatgpt-image-identity';
 import { markdownToSemanticText } from '@services/shared/markdown-semantic-text';
+import { hasCacheableChatImageReference } from '@services/conversations/data/image-inline';
 import normalizeApi from '@services/shared/normalize.ts';
 import { createCollectorEnv } from '../../src/collectors/collector-env.ts';
 import { createChatgptCollectorDef } from '../../src/collectors/chatgpt/chatgpt-collector.ts';
@@ -353,6 +354,86 @@ describe('chatgpt current DOM', () => {
     expect(markdown).toContain('| 项目 | 结果 |');
     expect(markdown).toContain('| A | 通过 |');
     expect(markdown).not.toContain('M0 0');
+  });
+
+  it('rasterizes SVG charts and Canvas graphics into cacheable PNGs in message order', async () => {
+    const dom = current2026Dom({
+      assistantBlocks: `<div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary">
+        <p>图表开始</p>
+        <svg data-d-component="svg" aria-label="收入趋势" width="200" height="100" viewBox="0 0 200 100">
+          <rect width="200" height="100" fill="#336699"></rect>
+          <text x="20" y="50">收入增长</text>
+        </svg>
+        <p>第二个图形</p>
+        <canvas aria-label="当前画布" width="200" height="100"></canvas>
+        <p>图表结束</p>
+      </div>`,
+    });
+    const imageUrl =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
+    const getContext = vi
+      .spyOn(dom.window.HTMLCanvasElement.prototype, 'getContext')
+      .mockReturnValue({ drawImage: vi.fn() } as any);
+    const toDataURL = vi.spyOn(dom.window.HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(imageUrl);
+    const assignedSvgSources: string[] = [];
+    (dom.window as any).Image = class {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      set src(value: string) {
+        assignedSvgSources.push(value);
+        this.onload?.();
+      }
+    };
+    const snapshot = (await capturePrepared(currentDef(dom))) as any;
+    const markdown = snapshot.messages[1].contentMarkdown;
+    expect(markdown).toContain(`![收入趋势](${imageUrl})`);
+    expect(markdown).toContain(`![当前画布](${imageUrl})`);
+    expect(markdown.indexOf('图表开始')).toBeLessThan(markdown.indexOf('![收入趋势]'));
+    expect(markdown.indexOf('![收入趋势]')).toBeLessThan(markdown.indexOf('第二个图形'));
+    expect(markdown.indexOf('![当前画布]')).toBeLessThan(markdown.indexOf('图表结束'));
+    expect(hasCacheableChatImageReference(markdown)).toBe(true);
+    expect(assignedSvgSources[0]).toContain('data:image/svg+xml');
+    expect(getContext).toHaveBeenCalled();
+    expect(toDataURL).toHaveBeenCalled();
+  });
+
+  it('keeps canvas pixels when ChatGPT splits one assistant turn into multiple primary blocks', async () => {
+    const dom = current2026Dom({
+      assistantBlocks: `<div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary"><canvas aria-label="拆分图表" width="100" height="50"></canvas></div>
+        <div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary"><p>图表说明</p></div>`,
+    });
+    const dataUrl =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
+    vi.spyOn(dom.window.HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(dataUrl);
+    const snapshot = (await capturePrepared(currentDef(dom))) as any;
+    const markdown = snapshot.messages[1].contentMarkdown;
+    expect(markdown).toContain(`![拆分图表](${dataUrl})`);
+    expect(markdown).toContain('图表说明');
+    expect(hasCacheableChatImageReference(markdown)).toBe(true);
+  });
+
+  it('preserves checked, selected and slider values without keeping executable controls', async () => {
+    const dom = current2026Dom({
+      assistantBlocks: `<div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary">
+        <div data-d-component="checkbox"><label><input type="checkbox"> 保留图片</label></div>
+        <div data-d-component="slider" aria-label="透明度"><input type="range" min="0" max="100" value="20"></div>
+        <div data-d-component="segmented-control" aria-label="主题">
+          <button type="button" aria-pressed="false">亮色</button>
+          <button type="button" aria-pressed="true">暗色</button>
+        </div>
+        <p>结束</p>
+      </div>`,
+    });
+    (dom.window.document.querySelector('input[type=checkbox]') as HTMLInputElement).checked = true;
+    (dom.window.document.querySelector('input[type=range]') as HTMLInputElement).value = '75';
+    const snapshot = (await capturePrepared(currentDef(dom))) as any;
+    const markdown = snapshot.messages[1].contentMarkdown;
+    expect(markdown).toContain('[x] 保留图片');
+    expect(markdown).toContain('透明度：75');
+    expect(markdown).toContain('主题：暗色');
+    expect(markdown).toContain('结束');
+    expect(markdown).not.toContain('<input');
+    expect(markdown).not.toContain('<button');
   });
 
   it('keeps a meaningful placeholder for chart-only content without recording decorative icons', async () => {

@@ -252,7 +252,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     if (!nodes.length) return null;
     if (nodes.length === 1) return nodes[0];
     const holder = env.document.createElement('div');
-    for (const node of nodes) holder.appendChild(node.cloneNode(true));
+    for (const node of nodes) holder.appendChild(chatgptMarkdown.cloneWithControlState(node, true));
     return holder;
   }
 
@@ -309,6 +309,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     imageUrls: string[];
     iframeUrl: string;
     cotOuterHtml: string;
+    liveRoot: any;
   };
 
   function getTurnWrappers(root: any): any[] {
@@ -495,6 +496,13 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     const node = role === 'user' ? userContentNode(wrapper) : assistantContentNode(wrapper);
     const text = env.normalize.normalizeText(node?.innerText || node?.textContent || '');
     const hasRichGraphic = role === 'assistant' && chatgptMarkdown.hasRichGraphic(node);
+    const graphicSignature = hasRichGraphic
+      ? compactFingerprintPart(
+          Array.from(node?.querySelectorAll?.('svg, canvas, img[data-syncnos-graphic="true"]') || [])
+            .map((el: any) => String(el.outerHTML || ''))
+            .join('|'),
+        )
+      : '';
     const iframe = role === 'assistant' ? findDeepResearchIframe(wrapper) : null;
     const iframeUrl = String(iframe?.getAttribute?.('src') || '').trim();
     const effectiveCot = role === 'assistant' && !iframe ? cot : null;
@@ -512,7 +520,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       fingerprint: descriptorFingerprint({
         role,
         key,
-        text: hasRichGraphic ? `${text}|rich-graphic` : text,
+        text: hasRichGraphic ? `${text}|${graphicSignature}` : text,
         cotText,
         cotMarkdown,
         imageUrls,
@@ -524,10 +532,15 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         hasFinalAssistantSurface &&
         (!!text || !!cotText || !!cotMarkdown || imageUrls.length > 0 || !!iframe || hasRichGraphic),
       visible: isVisibleWindow(wrapper),
-      outerHtml: String(serializedRoot?.outerHTML || ''),
+      outerHtml:
+        role === 'assistant' &&
+        serializedRoot?.querySelector?.('input[type="checkbox"], input[type="radio"], input[type="range"], option')
+          ? String(chatgptMarkdown.cloneWithControlState(serializedRoot)?.outerHTML || serializedRoot?.outerHTML || '')
+          : String(serializedRoot?.outerHTML || ''),
       imageUrls,
       iframeUrl,
       cotOuterHtml: effectiveCot?.outerHtml || '',
+      liveRoot: role === 'assistant' ? serializedRoot : null,
     };
   }
 
@@ -563,6 +576,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         imageUrls: _imageUrls,
         iframeUrl: _iframeUrl,
         cotOuterHtml: _cotOuterHtml,
+        liveRoot: _liveRoot,
         ...descriptor
       } = extractionInput;
       descriptors.push(descriptor);
@@ -601,7 +615,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       contentText = joinContentBlocks([cot.text, contentText]);
       baseMarkdown = joinContentBlocks([cot.markdown || cot.text, baseMarkdown]);
     }
-    if (!contentText && !input.imageUrls.length) return null;
+    if (!contentText && !input.imageUrls.length && !baseMarkdown.trim()) return null;
     return {
       messageKey: input.key,
       role: input.role,
@@ -796,6 +810,9 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       }
       const input = inputsByKey.get(descriptor.key);
       if (!input) continue;
+      if (input.role === 'assistant' && input.liveRoot && chatgptMarkdown.hasRichGraphic(input.liveRoot)) {
+        input.outerHtml = (await chatgptMarkdown.snapshotRichGraphics(input.liveRoot, env.window)) || input.outerHtml;
+      }
       const message = extractManualMessage(input, i);
       if (!message) continue;
       records.push({
