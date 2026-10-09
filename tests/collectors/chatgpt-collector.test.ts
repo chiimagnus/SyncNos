@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { buildChatgptGeneratedImageMessageKey } from '@services/shared/chatgpt-image-identity';
 import { markdownToSemanticText } from '@services/shared/markdown-semantic-text';
 import { hasCacheableChatImageReference } from '@services/conversations/data/image-inline';
+import { resolveScrollRoot } from '@collectors/virtualized-chat/virtualized-chat-sweep';
 import normalizeApi from '@services/shared/normalize.ts';
 import { createCollectorEnv } from '../../src/collectors/collector-env.ts';
 import { createChatgptCollectorDef } from '../../src/collectors/chatgpt/chatgpt-collector.ts';
@@ -151,6 +152,33 @@ function current2026Dom(
   return dom;
 }
 
+function articleTurnDom(options: { firstOrdinal?: number; assistantId?: string; includeOrdinal?: boolean } = {}) {
+  const firstOrdinal = options.firstOrdinal ?? 0;
+  const assistantId = options.assistantId ?? 'modern-assistant-1';
+  const userOrdinal = options.includeOrdinal === false ? '' : ` data-testid="conversation-turn-${firstOrdinal}"`;
+  const assistantOrdinal =
+    options.includeOrdinal === false ? '' : ` data-testid="conversation-turn-${firstOrdinal + 1}"`;
+  const dom = setupChatgptDom(
+    `<article data-turn="user" data-turn-id="render-user-1"${userOrdinal}>
+       <div data-message-author-role="user" data-message-id="modern-user-1">
+         <div class="user-message-bubble-color"><div class="whitespace-pre-wrap">Modern question</div></div>
+       </div>
+     </article>
+     <article data-turn="assistant" data-turn-id="render-assistant-1"${assistantOrdinal}>
+       <div data-message-author-role="assistant"${assistantId ? ` data-message-id="${assistantId}"` : ''}>
+         <div class="markdown prose"><p>Modern <strong>answer</strong>.</p></div>
+         <button>Copy</button>
+       </div>
+     </article>`,
+    'https://chatgpt.com/c/modern-conversation',
+  );
+  (dom.window as any).scrollTo = vi.fn();
+  for (const message of Array.from(dom.window.document.querySelectorAll('[data-message-author-role]'))) {
+    (message as any).getBoundingClientRect = () => ({ top: 0, bottom: 100, height: 100, width: 500 });
+  }
+  return dom;
+}
+
 function currentDef(dom: JSDOM) {
   return createChatgptCollectorDef(
     createCollectorEnv({
@@ -177,6 +205,122 @@ async function capturePrepared(def: any, options: any = {}) {
 }
 
 describe('chatgpt current DOM', () => {
+  it('captures role-based data-turn-id articles using real message IDs, not transient turn IDs', async () => {
+    const dom = articleTurnDom();
+    const def = currentDef(dom);
+    const snapshot = (await capturePrepared(def)) as any;
+    expect(snapshot.captureMeta.completeness).toBe('complete');
+    expect(snapshot.messages.map((message: any) => [message.messageKey, message.role])).toEqual([
+      ['modern-user-1', 'user'],
+      ['modern-assistant-1', 'assistant'],
+    ]);
+    expect(snapshot.messages[0].contentMarkdown).toBe('Modern question');
+    expect(snapshot.messages[1].contentMarkdown).toBe('Modern **answer**.');
+    expect(snapshot.messages[1].contentMarkdown).not.toContain('Copy');
+    expect(def.collector.captureApiLiveTurn({ expectedConversationId: 'modern-conversation' })).toMatchObject({
+      kind: 'candidate',
+      userMessage: { messageKey: 'modern-user-1' },
+      assistantMessage: { messageKey: 'modern-assistant-1' },
+    });
+    dom.window.document.querySelector('[data-turn="user"]')?.setAttribute('data-turn-id', 'rerendered-user');
+    dom.window.document.querySelector('[data-turn="assistant"]')?.setAttribute('data-turn-id', 'rerendered-assistant');
+    expect(def.collector.__test.manualAdapter.readDescriptors().map((descriptor: any) => descriptor.key)).toEqual([
+      'modern-user-1',
+      'modern-assistant-1',
+    ]);
+  });
+
+  it('ignores explicitly hidden sibling messages in modern articles', async () => {
+    const dom = articleTurnDom();
+    const assistantTurn = dom.window.document.querySelector('[data-turn="assistant"]')!;
+    assistantTurn.insertAdjacentHTML(
+      'beforeend',
+      '<div hidden data-message-author-role="assistant" data-message-id="old-hidden-sibling">obsolete reply</div>',
+    );
+    const snapshot = (await capturePrepared(currentDef(dom))) as any;
+    expect(snapshot.captureMeta.completeness).toBe('complete');
+    expect(snapshot.messages.map((message: any) => message.messageKey)).toEqual([
+      'modern-user-1',
+      'modern-assistant-1',
+    ]);
+  });
+
+  it('does not declare a modern turn window complete when older ordinals may be missing', () => {
+    const partial = currentDef(articleTurnDom({ firstOrdinal: 7 }));
+    expect(partial.collector.__test.manualAdapter.readBoundaryState('top')).toBe('pending');
+    const unknown = currentDef(articleTurnDom({ includeOrdinal: false }));
+    expect(unknown.collector.__test.manualAdapter.readBoundaryState('top')).toBe('pending');
+  });
+
+  it('retains visible modern messages as a partial capture when history cannot reach the true top', async () => {
+    const snapshot = (await capturePrepared(currentDef(articleTurnDom({ firstOrdinal: 7 })), {
+      boundaryTimeoutMs: 5,
+      stepTimeoutMs: 15,
+      totalDeadlineMs: 200,
+    })) as any;
+    expect(snapshot.captureMeta.completeness).toBe('partial');
+    expect(snapshot.messages.map((message: any) => message.messageKey)).toEqual([
+      'modern-user-1',
+      'modern-assistant-1',
+    ]);
+  });
+
+  it('marks a visible modern assistant with no message ID as incomplete rather than deleting history', async () => {
+    const snapshot = (await capturePrepared(currentDef(articleTurnDom({ assistantId: '' })))) as any;
+    expect(snapshot.captureMeta.completeness).toBe('partial');
+    expect(snapshot.captureMeta.reasons).toContain('unstable_identity');
+    expect(snapshot.messages.map((message: any) => message.messageKey)).toEqual(['modern-user-1']);
+  });
+
+  it('finds the real scroll ancestor in an article layout without the old timeline-scroll attribute', () => {
+    const dom = articleTurnDom();
+    const main = dom.window.document.querySelector('main')!;
+    const scrollRoot = dom.window.document.createElement('div');
+    scrollRoot.style.overflowY = 'auto';
+    Object.defineProperties(scrollRoot, { scrollHeight: { value: 900 }, clientHeight: { value: 200 } });
+    while (main.firstChild) scrollRoot.appendChild(main.firstChild);
+    main.appendChild(scrollRoot);
+    const seed = currentDef(dom).collector.__test.manualAdapter.readScrollSeed();
+    expect(seed).toBe(dom.window.document.querySelector('article'));
+    expect(resolveScrollRoot({ document: dom.window.document, window: dom.window as any }, seed)).toBe(scrollRoot);
+  });
+
+  it('captures twelve separate article turns in order without inventing extra messages', async () => {
+    const html = Array.from(
+      { length: 12 },
+      (_, index) =>
+        `<article data-turn="user" data-turn-id="user-turn-${index}" data-testid="conversation-turn-${index * 2}">
+        <div data-message-author-role="user" data-message-id="user-${index}">
+          <div class="whitespace-pre-wrap">Question ${index}</div>
+        </div>
+      </article>
+      <article data-turn="assistant" data-turn-id="assistant-turn-${index}" data-testid="conversation-turn-${index * 2 + 1}">
+        <div data-message-author-role="assistant" data-message-id="assistant-${index}">
+          <div class="markdown prose"><p>Answer ${index}</p></div>
+        </div>
+      </article>`,
+    ).join('');
+    const dom = setupChatgptDom(html, 'https://chatgpt.com/c/modern-conversation');
+    (dom.window as any).scrollTo = vi.fn();
+    const snapshot = (await capturePrepared(currentDef(dom))) as any;
+    expect(snapshot.captureMeta.completeness).toBe('complete');
+    expect(snapshot.messages).toHaveLength(24);
+    expect(snapshot.messages.map((message: any) => message.messageKey)).toEqual(
+      Array.from({ length: 12 }, (_, index) => [`user-${index}`, `assistant-${index}`]).flat(),
+    );
+    expect(snapshot.messages.at(-1)).toMatchObject({ role: 'assistant', contentMarkdown: 'Answer 11' });
+  });
+
+  it('keeps a generating article assistant unresolved until the completion status disappears', () => {
+    const dom = articleTurnDom();
+    const turn = dom.window.document.querySelector('[data-turn="assistant"]')!;
+    turn.insertAdjacentHTML('beforeend', '<div role="status" aria-live="polite">Generating</div>');
+    const def = currentDef(dom);
+    expect(def.collector.__test.manualAdapter.readUnresolvedKeys()).toContain('modern-assistant-1');
+    turn.querySelector('[role="status"]')?.remove();
+    expect(def.collector.__test.manualAdapter.readUnresolvedKeys()).not.toContain('modern-assistant-1');
+  });
+
   it('matches only the canonical ChatGPT hostname and keeps empty chat surfaces ready', () => {
     const canonical = currentDef(currentDom());
     expect(canonical.matches({ hostname: 'chatgpt.com' })).toBe(true);
@@ -188,6 +332,19 @@ describe('chatgpt current DOM', () => {
 
     const settings = currentDef(setupChatgptDom('', 'https://chatgpt.com/settings'));
     expect(settings.collector.isCaptureAvailable()).toBe(false);
+  });
+
+  it('prefers the grouped-turn reader if a DOM turn also carries a newer turn identifier', async () => {
+    const dom = currentDom();
+    const turn = dom.window.document.querySelector('[data-turn-key]')!;
+    turn.setAttribute('data-turn-id', 'additional-id');
+    turn.setAttribute('data-turn', 'user');
+    const snapshot = (await capturePrepared(currentDef(dom))) as any;
+    expect(snapshot.captureMeta.completeness).toBe('complete');
+    expect(snapshot.messages.map((message: any) => message.messageKey)).toEqual([
+      'user-message-1',
+      'assistant-message-1',
+    ]);
   });
 
   it('captures 2026 turn-shell assistants when search units only identify the user', async () => {
