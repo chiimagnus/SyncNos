@@ -281,6 +281,26 @@ SYNCNOS-ATTACHMENT-ACK
 - 标题来自网页内当前会话；浏览器标签页 `<title>` 不得覆盖真实会话标题。
 - 网页没有稳定标题时，才允许从首条 user semantic text 生成短标题。
 
+### RICH-01：ChatGPT 结构化图表与静态图片
+
+在独立 ChatGPT 测试会话发送：
+
+```text
+请直接渲染原生交互式折线图（Chart，不要生成位图或代码块）。
+标题：SyncNos 图表真机测试。
+横轴：2021、2022、2023、2024、2025、2026。
+数值：11、18、14、29、24、38。
+图表下输出 SN-REAL-CHART-20261009。
+```
+
+依次使用手动 DOM、用户显式开启的 Advanced API 保存同一会话，并实际导出 Markdown ZIP：
+
+- Source 必须确实出现图表或可验证的结构化数据；站点无法加载时记 INCONCLUSIVE。
+- 两条采集路径均保存 6 行原始数值，以及静态 PNG（可用时）；不可把 SVG 坐标或像素猜成数值。
+- 图片进入 `syncnos-asset://` 缓存，重复保存不得产生重复消息；完整性状态不能因正文未使用的元数据引用而误降级。
+- 导出 Markdown 中数据表单独成块，并将图片引用改成 ZIP 内真实可解码的 PNG 附件。
+- 切换采集模式、后台测试或重新打开会话不得删除现存数据；测试后恢复原采集设置与页面焦点。
+
 ### UI-01：Markdown 展示压力测试
 
 此用例专门验证 Render 层。可复用 DOM-02 / DOM-03 的已保存记录，再补一条宽表和双位数列表。
@@ -313,6 +333,7 @@ Capture / Persist 已 PASS 但上述视觉错误存在时，只记 Render FAIL�
 | 虚拟列表 / 分批历史 / completeness | DOM-05 全 12 轮、后台 → 前台恢复、DOM-08 |
 | branch / edit / retry | DOM-06、DOM-08 |
 | 图片 / 文件 / 视频附件 | DOM-07、DOM-08 |
+| ChatGPT 交互式图表 / Rich UI | RICH-01、DOM-08、UI-01 |
 | conversation / message identity / title | DOM-05、DOM-08 |
 | Markdown UI / CSS | DOM-02、DOM-03、UI-01，App + popup |
 

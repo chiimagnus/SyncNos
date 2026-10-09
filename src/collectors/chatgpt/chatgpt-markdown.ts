@@ -286,6 +286,70 @@ function cloneWithControlState(root: any, snapshotCanvases = false): any {
   return copy;
 }
 
+function chartAccessibleTable(source: any, target: any): void {
+  if (!source.classList?.contains('recharts-surface')) return;
+  let original = source.parentElement;
+  let cloned = target.parentElement;
+  let list: any = null;
+  for (let i = 0; i < 16 && original && cloned; i += 1) {
+    const candidate = original.querySelector?.('ul.sr-only');
+    if (candidate && original.querySelectorAll('svg.recharts-surface').length === 1) {
+      list = candidate;
+      break;
+    }
+    original = original.parentElement;
+    cloned = cloned.parentElement;
+  }
+  if (!list || !cloned) return;
+  const rows = Array.from(list.querySelectorAll('li'))
+    .map((item: any) =>
+      String(item.textContent || '')
+        .replace(/\s+/g, ' ')
+        .trim(),
+    )
+    .filter(Boolean);
+  if (!rows.length) return;
+
+  const parsed = rows.map((line) => {
+    const parts = line.match(/^([^:：]+)[:：]\s*(.+)$/);
+    if (!parts) return null;
+    const value = parts[2]!.match(/^(.*?)(?:\s+)?([+-]?(?:\d[\d,]*\.?\d*|\.\d+)(?:e[+-]?\d+)?%?)$/i);
+    if (!value) return null;
+    return { category: parts[1]!.trim(), series: value[1]!.trim() || '数值', value: value[2]! };
+  });
+  const first = parsed[0];
+  const isTable = !!first && parsed.every((row) => row && row.series === first.series);
+  const doc = target.ownerDocument;
+  const replacement = doc.createElement(isTable ? 'table' : 'ul');
+  replacement.setAttribute('data-syncnos-chart-data', 'true');
+  if (isTable) {
+    const header = doc.createElement('tr');
+    for (const text of ['类别', first.series]) {
+      const cell = doc.createElement('th');
+      cell.textContent = text;
+      header.appendChild(cell);
+    }
+    replacement.appendChild(header);
+    for (const row of parsed) {
+      const tr = doc.createElement('tr');
+      for (const text of [row!.category, row!.value]) {
+        const cell = doc.createElement('td');
+        cell.textContent = text;
+        tr.appendChild(cell);
+      }
+      replacement.appendChild(tr);
+    }
+  } else {
+    for (const text of rows) {
+      const item = doc.createElement('li');
+      item.textContent = text;
+      replacement.appendChild(item);
+    }
+  }
+  cloned.querySelector?.('ul.sr-only')?.remove();
+  target.parentElement?.insertBefore(replacement, target);
+}
+
 async function snapshotRichGraphics(root: any, win: any): Promise<string> {
   if (!hasRichGraphic(root) || !root?.cloneNode) return '';
   const copy = cloneWithControlState(root);
@@ -297,6 +361,7 @@ async function snapshotRichGraphics(root: any, win: any): Promise<string> {
     const source = sources[index];
     if (!isRichGraphic(source) || count++ >= 12) continue;
     const target = targets[index];
+    chartAccessibleTable(source, target);
     target.setAttribute('data-syncnos-graphic', 'true');
     jobs.push(
       (async () => {
@@ -705,7 +770,7 @@ function htmlToMarkdown(root: any): any {
       const padded = row.concat(Array(Math.max(0, colCount - row.length)).fill(''));
       out.push(`| ${padded.join(' | ')} |`);
     }
-    return `${out.join('\n')}\n\n`;
+    return `\n\n${out.join('\n')}\n\n`;
   }
 
   function renderNode(node: any, ctx: any): any {

@@ -386,6 +386,21 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
         });
       }
     } else if (sourceType === 'chat') {
+      if (messages.some((message: any) => /\]\(data:image\//i.test(String(message?.contentMarkdown || '')))) {
+        try {
+          // Rasterized UI graphics are local data URLs; cache them even when remote image downloads are disabled.
+          const inlined = await inlineChatImagesInMessages({
+            conversationId,
+            messages,
+            enableHttpImages: false,
+            enableChatgptImages: false,
+          });
+          messages = inlined.messages;
+          imageWarningFlags = inlined.warningFlags.slice();
+        } catch (_error) {
+          // Keep the original image data in the message if local caching fails.
+        }
+      }
       shouldScheduleChatImageBackfill = messages.some((message: any) =>
         hasCacheableChatImageReference(message?.contentMarkdown),
       );

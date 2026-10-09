@@ -370,6 +370,10 @@ describe('chatgpt current DOM', () => {
     );
     const fallback = (await capturePrepared(withoutSidebar)) as any;
     expect(fallback.conversation.title).toBe('First prompt');
+    const titled = currentDom({ beforeTurn: '<a href="#jump">跳转到内容</a>', userText: 'Prompt body' });
+    titled.window.document.title = '生成交互式图表';
+    const withDocumentTitle = (await capturePrepared(currentDef(titled))) as any;
+    expect(withDocumentTitle.conversation.title).toBe('Prompt body');
   });
 
   it('enriches the matching API message with a DOM-backed SVG snapshot without changing other messages', async () => {
@@ -409,6 +413,41 @@ describe('chatgpt current DOM', () => {
       conversation: { conversationKey: 'not-current-conversation' },
     });
     expect(otherConversation.messages).toEqual(snapshot.messages);
+  });
+
+  it('captures real Recharts accessibility rows as an exact data table before the PNG', async () => {
+    const dom = current2026Dom({
+      assistantBlocks: `<div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary">
+        <p>SyncNos 图表真机测试</p>
+        <section><div>
+          ${'<div>'.repeat(9)}
+          <svg class="recharts-surface" width="240" height="120" viewBox="0 0 240 120"><rect width="240" height="120" /></svg>
+          ${'</div>'.repeat(9)}
+          <ul class="sr-only"><li>2021: 数值 11</li><li>2022: 数值 18</li><li>2026: 数值 38</li></ul>
+        </div></section>
+      </div>`,
+    });
+    const url =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
+    vi.spyOn(dom.window.HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage: vi.fn() } as any);
+    vi.spyOn(dom.window.HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(url);
+    (dom.window as any).Image = class {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      set src(_value: string) {
+        this.onload?.();
+      }
+    };
+    const snapshot = (await capturePrepared(currentDef(dom))) as any;
+    const markdown = snapshot.messages[1].contentMarkdown;
+    expect(markdown).toContain('| 类别 | 数值 |');
+    expect(markdown).toContain('SyncNos 图表真机测试\n\n| 类别 | 数值 |');
+    expect(markdown).toContain('| 2021 | 11 |');
+    expect(markdown).toContain('| 2022 | 18 |');
+    expect(markdown).toContain('| 2026 | 38 |');
+    expect(markdown).toContain(`![图表](${url})`);
+    expect(markdown.indexOf('| 2021 | 11 |')).toBeLessThan(markdown.indexOf('![图表]'));
+    expect(markdown.match(/2021 \| 11/g)?.length).toBe(1);
   });
 
   it('rasterizes SVG charts and Canvas graphics into cacheable PNGs in message order', async () => {

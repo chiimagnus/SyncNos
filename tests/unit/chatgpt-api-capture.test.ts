@@ -97,6 +97,134 @@ beforeEach(() => {
 });
 
 describe('ChatGPT API snapshot', () => {
+  it('ignores widget reference metadata when its marker does not occur in rendered text', () => {
+    const widget = 'genui' + JSON.stringify({ charts_widget_v2: { content: { data: [1, 2] } } }) + '';
+    const chart =
+      '<Chart content={{"chartType":"line","xKey":"x","series":[{"dataKey":"y"}],"data":[{"x":"2026","y":38}]}}/>';
+    const snapshot = build(
+      mappingFrom([
+        message({ id: 'user', role: 'user', parts: ['q'] }),
+        message({
+          id: 'assistant',
+          role: 'assistant',
+          channel: 'final',
+          parts: [chart],
+          contentReferences: [{ type: 'client_defined_widget', matched_text: widget }],
+        }),
+      ]),
+    ).snapshot;
+    expect(snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
+    expect(snapshot.messages[1].contentMarkdown).toContain('| 2026 | 38 |');
+  });
+
+  it('preserves the actual Chart payload as a Markdown data table without executing JSX', () => {
+    const chart = {
+      chartType: 'line',
+      meta: { title: 'SyncNos 图表真机测试' },
+      xKey: 'year',
+      series: [{ dataKey: 'value', label: '数值' }],
+      data: [
+        { year: '2021', value: 11 },
+        { year: '2022', value: 18 },
+        { year: '2026', value: 38 },
+      ],
+    };
+    const markup = '<Chart content={' + JSON.stringify(chart) + '}/>';
+    const result = build(
+      mappingFrom([
+        message({ id: 'user-1', role: 'user', parts: ['q'] }),
+        message({
+          id: 'assistant-1',
+          role: 'assistant',
+          channel: 'final',
+          parts: [['图表如下', markup, '', '```jsx', markup, '```', '图表结束'].join('\n')],
+        }),
+      ]),
+    );
+    const content = result.snapshot.messages[1].contentMarkdown;
+    expect(content).toContain('**SyncNos 图表真机测试**（折线图）');
+    expect(content).toContain('| year | 数值 (value) |');
+    expect(content).toContain('| 2021 | 11 |');
+    expect(content).toContain('| 2022 | 18 |');
+    expect(content).toContain('| 2026 | 38 |');
+    expect(content).toContain('```jsx\n' + markup + '\n```');
+    expect(content).not.toContain('[图表：请在原对话查看]');
+    expect(result.snapshot.captureMeta.completeness).toBe('complete');
+  });
+
+  it('preserves multi-series, pie and scatter chart values and non-JSON expressions', () => {
+    const pie =
+      '<Chart content={' +
+      JSON.stringify({
+        chartType: 'pie',
+        nameKey: 'name',
+        valueKey: 'amount',
+        data: [
+          { name: '北区', amount: 25 },
+          { name: '南区', amount: 75 },
+        ],
+      }) +
+      '}/>';
+    const scatter =
+      '<Chart content={' +
+      JSON.stringify({
+        chartType: 'scatter',
+        xKey: 'x',
+        series: [{ dataKey: 'y' }, { dataKey: 'z' }],
+        data: [{ x: 1, y: 2, z: 3 }],
+      }) +
+      '}/>';
+    const dynamic = '<Chart content={chartState.data}/>';
+    const result = build(
+      mappingFrom([
+        message({ id: 'user-1', role: 'user', parts: ['q'] }),
+        message({
+          id: 'assistant-1',
+          role: 'assistant',
+          channel: 'final',
+          parts: [[pie, scatter, dynamic].join('\n\n')],
+        }),
+      ]),
+    );
+    const content = result.snapshot.messages[1].contentMarkdown;
+    expect(content).toContain('| name | amount |');
+    expect(content).toContain('| 北区 | 25 |');
+    expect(content).toContain('| x | y | z |');
+    expect(content).toContain('| 1 | 2 | 3 |');
+    expect(content).toContain(dynamic);
+  });
+
+  it('keeps native UI tables, map locations and mathematical graph expressions as data', () => {
+    const mapPoints = [
+      { id: 'a', name: '地点 A', address: '测试大道 1 号', lat: 31.2, long: 121.4 },
+      { id: 'b', name: '地点 B', ref: 'turn0business0' },
+    ];
+    const expressions = [{ latex: 'y=x^2' }, { latex: 'y=\\sin(x)' }];
+    const source = [
+      '<table><table-row><table-cell header>年份</table-cell><table-cell header>收入</table-cell></table-row><table-row><table-cell>2025</table-cell><table-cell>100</table-cell></table-row></table>',
+      '<MapWidgetV2 points={' + JSON.stringify(mapPoints) + '}/>',
+      '<Graph expressions={' + JSON.stringify(expressions) + '}/>',
+    ].join('\n');
+    const result = build(
+      mappingFrom([
+        message({ id: 'user-1', role: 'user', parts: ['q'] }),
+        message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: [source] }),
+      ]),
+    );
+    const text = result.snapshot.messages[1].contentMarkdown;
+    expect(text).toContain('| 年份 | 收入 |');
+    expect(text).toContain('| 2025 | 100 |');
+    expect(text).toContain('**地图地点数据**');
+    expect(text).toContain('| 地点 A | 测试大道 1 号 | 31.2 | 121.4 |');
+    expect(text).toContain('| 地点 B | turn0business0 |  |  |');
+    expect(text).toContain('**函数图像数据**');
+    expect(text).toContain('- $y=x^2$');
+    expect(text).toContain('- $y=\\sin(x)$');
+    expect(text).not.toContain('<table-cell');
+    expect(text).not.toContain('<MapWidgetV2');
+    expect(text).not.toContain('<Graph');
+  });
+
   it('flattens rendered Rich UI layout markup while preserving prose and fenced code', () => {
     const original = [
       '说明：',

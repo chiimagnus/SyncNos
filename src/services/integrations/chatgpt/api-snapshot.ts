@@ -1,3 +1,4 @@
+import { structuredRichUiMarkdown } from '@services/integrations/chatgpt/rich-ui-data';
 import {
   buildChatgptFileCacheKey,
   buildChatgptGeneratedImageMessageKey,
@@ -169,6 +170,7 @@ function renderContentReferences(message: any, text: string, onSchemaDrift: Sche
     const type = stableString(reference.type).toLowerCase();
     const matched = stableString(reference.matched_text);
     if (type === 'sources_footnote' || !matched || replaced.has(matched) || !matched.includes('')) continue;
+    if (!output.includes(matched)) continue;
 
     let replacement = '';
     if (type === 'grouped_webpages') {
@@ -194,35 +196,55 @@ function renderContentReferences(message: any, text: string, onSchemaDrift: Sche
 }
 
 function normalizeRichUiMarkup(markdown: string): string {
-  if (!/^\s*<(?:box|row|col|grid|grid-item|flow|flow-item|card|table|carousel)\b/m.test(markdown)) {
+  if (
+    !/<(?:Chart|Graph|MapWidgetV2|box|row|col|grid|grid-item|flow|flow-item|card|table|carousel|text|title|caption|badge)\b/.test(
+      markdown,
+    )
+  ) {
     return markdown;
   }
+  const result: string[] = [];
+  let outside: string[] = [];
   let fence = '';
-  return markdown
-    .split('\n')
-    .map((line) => {
-      const marker = line.match(/^\s*(`{3,}|~{3,})/);
-      if (marker) {
-        const kind = marker[1]![0]!;
-        if (!fence) fence = kind;
-        else if (fence === kind) fence = '';
-        return line;
-      }
-      if (fence) return line;
-      return line
-        .replace(/<Entity\b[^>]*\bvalue="([^"]+)"[^>]*\/>/g, '$1')
-        .replace(/<AsyncImage\b[^>]*\bquery="([^"]+)"[^>]*\/>/g, '图片：$1')
-        .replace(/<icon\b[^>]*\bname="([^"]+)"[^>]*\/>/g, (_match, name: string) => {
-          return name === 'arrow-down' ? '↓' : '';
-        })
-        .replace(/<Chart\b[^>]*\/>/g, '[图表：请在原对话查看]')
-        .replace(
-          /<\/?(?:box|row|col|grid|grid-item|flow|flow-item|card|table|table-row|table-cell|carousel|carousel-item|text|title|caption|badge)\b[^>]*>/g,
-          '',
+  const flush = () => {
+    if (!outside.length) return;
+    result.push(
+      structuredRichUiMarkdown(outside.join('\n'))
+        .split('\n')
+        .map((line) =>
+          line
+            .replace(/<Entity\b[^>]*\bvalue="([^"]+)"[^>]*\/>/g, '$1')
+            .replace(/<AsyncImage\b[^>]*\bquery="([^"]+)"[^>]*\/>/g, '图片：$1')
+            .replace(/<icon\b[^>]*\bname="([^"]+)"[^>]*\/>/g, (_match, name: string) =>
+              name === 'arrow-down' ? '↓' : '',
+            )
+            .replace(/<\/(?:box|row|col|grid-item|flow-item|carousel-item)>/g, '\n\n')
+            .replace(
+              /<\/?(?:box|row|col|grid|grid-item|flow|flow-item|card|table|table-row|table-cell|carousel|carousel-item|text|title|caption|badge)\b[^>]*>/g,
+              '',
+            )
+            .replace(/^\s+$/, ''),
         )
-        .replace(/^\s+$/, '');
-    })
-    .join('\n');
+        .join('\n'),
+    );
+    outside = [];
+  };
+  for (const line of markdown.split('\n')) {
+    const marker = line.match(/^\s*(`{3,}|~{3,})/);
+    if (marker) {
+      flush();
+      const kind = marker[1]![0]!;
+      if (!fence) fence = kind;
+      else if (fence === kind) fence = '';
+      result.push(line);
+    } else if (fence) {
+      result.push(line);
+    } else {
+      outside.push(line);
+    }
+  }
+  flush();
+  return result.join('\n');
 }
 
 function renderTextParts(message: any, onSchemaDrift: SchemaDriftReporter): string {
