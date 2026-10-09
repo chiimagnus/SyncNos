@@ -37,7 +37,7 @@ Safari/Xcode 集成使用 `npm run setup:safari:xcode`。排障见 [`troubleshoo
 | 改动 | 最低验证 |
 | --- | --- |
 | Markdown / GitHub 模板 | `npm run format:check` + 修改过的本地链接检查 |
-| 用户 Docs | `npm run website:build` + `npm run format:check` + 在真实浏览器打开所有修改页面；导航/信息架构改动还要逐个检查受影响的中英文正式 route |
+| 用户 Docs | `npm run website:build` + `npm run format:check` + 修改过的本地链接检查 |
 | 常规代码 | `npm run gate:ci` |
 | production build、manifest、权限、打包或发布 | `npm run gate` |
 | CLI / installer / Native Messaging | `npm run gate` + `npm run cli:check`，并在受影响 OS 做真实 discovery/read-back |

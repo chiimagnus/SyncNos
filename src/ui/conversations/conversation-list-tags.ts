@@ -21,6 +21,7 @@ const SOURCE_LABEL_MAP: Record<string, SourceLabelMapItem> = {
   yuanbao: { key: 'yuanbao', i18nKey: 'sourceYuanbao' },
   poe: { key: 'poe', i18nKey: 'sourcePoe' },
   zai: { key: 'zai', i18nKey: 'sourceZai' },
+  grok: { key: 'grok', i18nKey: 'sourceGrok' },
   web: { key: 'web', i18nKey: 'sourceWeb' },
 };
 

@@ -98,6 +98,11 @@ export function canonicalChatIdentityFromUrl(sourceValue: unknown, urlValue: unk
     return threadId ? `notionai:${threadId}` : '';
   }
 
+  if (source === 'grok' && hostname === 'grok.com') {
+    const id = pathId(pathname, /^\/c\/([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})\/?$/i);
+    return id ? 'grok:' + id.toLowerCase() : '';
+  }
+
   if (source === 'zai' && hostname === 'chat.z.ai') {
     const id = pathId(pathname, /^\/c\/([^/?#]+)/);
     return id ? `zai:${id}` : '';
@@ -123,6 +128,7 @@ export function canonicalChatUrlFromUrl(sourceValue: unknown, urlValue: unknown)
     poe: 'https://poe.com',
     notionai: 'https://app.notion.com',
     zai: 'https://chat.z.ai',
+    grok: 'https://grok.com',
   };
   const origin = canonicalOrigins[source] || url.origin;
   const pathname = url.pathname.replace(/\/+$/, '') || '/';

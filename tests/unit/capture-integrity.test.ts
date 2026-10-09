@@ -34,8 +34,9 @@ describe('capture integrity contract', () => {
       'poe',
       'yuanbao',
       'zai',
+      'grok',
     ]);
-    expect(Array.from(AI_CHAT_MANUAL_ONLY_COLLECTOR_IDS)).toEqual(['chatgpt', 'googleaistudio']);
+    expect(Array.from(AI_CHAT_MANUAL_ONLY_COLLECTOR_IDS)).toEqual(['chatgpt', 'googleaistudio', 'grok']);
 
     const supportedIds = new Set(SUPPORTED_AI_CHAT_SITES.map((site) => site.id));
     for (const id of CAPTURE_INTEGRITY_GUARDED_COLLECTOR_IDS) expect(supportedIds.has(id)).toBe(true);

@@ -464,6 +464,7 @@ export const en = {
   sourceYuanbao: 'Yuanbao',
   sourcePoe: 'Poe',
   sourceZai: 'z.ai',
+  sourceGrok: 'Grok',
   sourceWeb: 'Web',
   providerNotion: 'Notion',
   providerObsidian: 'Obsidian',

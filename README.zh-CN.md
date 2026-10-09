@@ -27,7 +27,7 @@
 
 ## 能做什么
 
-- 保存 ChatGPT、Claude、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI 和 z.ai 对话
+- 保存 ChatGPT、Claude、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai 和 Grok 对话
 - 保存网页正文、内容图片，以及 YouTube / Bilibili 字幕与页面信息
 - 在本地库搜索、阅读、划线、评论、朗读和查看数据概览
 - 在支持的 AI 输入框中用 `$` 搜索并插入本地内容

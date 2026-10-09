@@ -68,6 +68,13 @@ describe('resolveConversationListTag', () => {
     expect(result).toEqual({ sourceKey: 'chatgpt', label: 'sourceChatgpt' });
   });
 
+  it('shows Grok as a first-class AI source', () => {
+    expect(resolveConversationListTag({ conversation: { source: 'grok' }, translate: tr })).toEqual({
+      sourceKey: 'grok',
+      label: 'sourceGrok',
+    });
+  });
+
   it('maps Claude to its canonical source label', () => {
     const result = resolveConversationListTag({
       conversation: { source: 'claude' },

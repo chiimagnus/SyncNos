@@ -1186,7 +1186,7 @@ describe('content-controller ai chat autosave backfill', () => {
   });
 
   it('keeps only explicit manual-only providers out of the auto-save source set', () => {
-    expect(Array.from(AI_CHAT_MANUAL_ONLY_COLLECTOR_IDS)).toEqual(['chatgpt', 'googleaistudio']);
+    expect(Array.from(AI_CHAT_MANUAL_ONLY_COLLECTOR_IDS)).toEqual(['chatgpt', 'googleaistudio', 'grok']);
     expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('deepseek')).toBe(true);
     expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('yuanbao')).toBe(true);
     expect(AI_CHAT_AUTO_SAVE_COLLECTOR_IDS.has('poe')).toBe(true);

@@ -461,6 +461,7 @@ export const zh: { [K in TranslationKey]: string } = {
   sourceYuanbao: '元宝',
   sourcePoe: 'Poe',
   sourceZai: 'z.ai',
+  sourceGrok: 'Grok',
   sourceWeb: '网页',
   providerNotion: 'Notion',
   providerObsidian: 'Obsidian',
