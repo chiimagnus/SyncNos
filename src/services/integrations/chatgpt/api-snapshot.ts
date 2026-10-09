@@ -197,7 +197,7 @@ function renderContentReferences(message: any, text: string, onSchemaDrift: Sche
 
 function normalizeRichUiMarkup(markdown: string): string {
   if (
-    !/<(?:Chart|Graph|MapWidgetV2|box|row|col|grid|grid-item|flow|flow-item|card|table|carousel|text|title|caption|badge)\b/.test(
+    !/<(?:Chart|MapWidgetV2|box|row|col|grid|grid-item|flow|flow-item|card|table|carousel|text|title|caption|badge)\b/.test(
       markdown,
     )
   ) {

@@ -407,7 +407,12 @@ describe('background-router conversations', () => {
       { mode: 'append', diff: { added: [], updated: ['m1'], removed: [] } },
     );
     expect(imageInlineMocks.inlineChatImagesInMessages).toHaveBeenCalledWith(
-      expect.objectContaining({ conversationId: 2003, enableHttpImages: false, enableChatgptImages: false }),
+      expect.objectContaining({
+        conversationId: 2003,
+        onlyMessageKeys: new Set(['m1']),
+        enableHttpImages: false,
+        enableChatgptImages: false,
+      }),
     );
   });
 

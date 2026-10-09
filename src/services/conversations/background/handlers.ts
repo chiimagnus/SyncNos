@@ -386,12 +386,19 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
         });
       }
     } else if (sourceType === 'chat') {
-      if (messages.some((message: any) => /\]\(data:image\//i.test(String(message?.contentMarkdown || '')))) {
+      const inlineKeys = new Set<string>();
+      for (const message of messages) {
+        if (/\]\(data:image\//i.test(String(message?.contentMarkdown || '')) && message?.messageKey) {
+          inlineKeys.add(String(message.messageKey));
+        }
+      }
+      if (inlineKeys.size) {
         try {
           // Rasterized UI graphics are local data URLs; cache them even when remote image downloads are disabled.
           const inlined = await inlineChatImagesInMessages({
             conversationId,
             messages,
+            onlyMessageKeys: inlineKeys,
             enableHttpImages: false,
             enableChatgptImages: false,
           });

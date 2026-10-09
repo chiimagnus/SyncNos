@@ -604,22 +604,17 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     const node = input.role === 'user' ? userContentNode(wrapper) : assistantContentNode(wrapper);
     const raw = node?.innerText || node?.textContent || '';
     const fallbackText = env.normalize.normalizeText(raw);
-    let contentText =
-      input.role === 'assistant' ? chatgptMarkdown.extractAssistantText(wrapper) || fallbackText : fallbackText;
     let baseMarkdown =
       input.role === 'assistant'
-        ? chatgptMarkdown.extractAssistantMarkdown(wrapper) || contentText || ''
-        : contentText || '';
+        ? chatgptMarkdown.extractRenderedMarkdown(node) || chatgptMarkdown.extractRenderedText(node) || fallbackText
+        : fallbackText;
     if (input.hasDeepResearch) {
-      const placeholder = input.iframeUrl ? `Deep Research (iframe): ${input.iframeUrl}` : 'Deep Research (iframe)';
-      contentText = placeholder;
-      baseMarkdown = placeholder;
+      baseMarkdown = input.iframeUrl ? `Deep Research (iframe): ${input.iframeUrl}` : 'Deep Research (iframe)';
     } else if (input.role === 'assistant' && input.cotOuterHtml) {
       const cot = extractCotContentFromHtml(input.cotOuterHtml);
-      contentText = joinContentBlocks([cot.text, contentText]);
       baseMarkdown = joinContentBlocks([cot.markdown || cot.text, baseMarkdown]);
     }
-    if (!contentText && !input.imageUrls.length && !baseMarkdown.trim()) return null;
+    if (!baseMarkdown.trim() && !input.imageUrls.length) return null;
     return {
       messageKey: input.key,
       role: input.role,
@@ -838,24 +833,26 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     const expectedConversationId = String(snapshot?.conversation?.conversationKey || '').trim();
     if (!expectedConversationId || expectedConversationId !== findConversationIdFromUrl()) return snapshot;
     const messages = Array.isArray(snapshot.messages) ? snapshot.messages : [];
-    const owned = new Map<string, any>(
-      messages.filter((m: any) => m?.role === 'assistant').map((m: any) => [String(m.messageKey), m]),
+    const originalByKey = new Map<string, string>(
+      messages
+        .filter((m: any) => m?.role === 'assistant')
+        .map((m: any) => [String(m.messageKey), String(m.contentMarkdown || '')]),
     );
-    if (!owned.size) return snapshot;
+    if (!originalByKey.size || !chatgptMarkdown.hasRichGraphic(getConversationRoot())) return snapshot;
     const { inputsByKey } = readCurrentManualWindow(true);
     const updates = new Map<string, string>();
     for (const [key, input] of inputsByKey) {
-      if (input.role !== 'assistant' || !input.rendered || !input.liveRoot || !owned.has(key)) continue;
+      if (input.role !== 'assistant' || !input.rendered || !input.liveRoot || !originalByKey.has(key)) continue;
       if (!chatgptMarkdown.hasRichGraphic(input.liveRoot)) continue;
       const rendered = extractManualMessage(
         { ...input, outerHtml: await chatgptMarkdown.snapshotRichGraphics(input.liveRoot, env.window) },
-        Number(owned.get(key)?.sequence) || 0,
+        0,
       );
       const images = String(rendered?.contentMarkdown || '').match(
         /^!\[[^\]\n]+\]\(data:image\/png;base64,[A-Za-z0-9+/=]+\)$/gm,
       );
       if (!images?.length) continue;
-      const original = String(owned.get(key)?.contentMarkdown || '');
+      const original = originalByKey.get(key)!;
       updates.set(key, [original, ...images.filter((image) => !original.includes(image))].join('\n\n'));
     }
     if (!updates.size) return snapshot;

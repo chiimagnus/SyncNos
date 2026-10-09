@@ -194,16 +194,14 @@ describe('ChatGPT API snapshot', () => {
     expect(content).toContain(dynamic);
   });
 
-  it('keeps native UI tables, map locations and mathematical graph expressions as data', () => {
+  it('keeps native UI tables and map locations as data', () => {
     const mapPoints = [
       { id: 'a', name: '地点 A', address: '测试大道 1 号', lat: 31.2, long: 121.4 },
       { id: 'b', name: '地点 B', ref: 'turn0business0' },
     ];
-    const expressions = [{ latex: 'y=x^2' }, { latex: 'y=\\sin(x)' }];
     const source = [
       '<table><table-row><table-cell header>年份</table-cell><table-cell header>收入</table-cell></table-row><table-row><table-cell>2025</table-cell><table-cell>100</table-cell></table-row></table>',
       '<MapWidgetV2 points={' + JSON.stringify(mapPoints) + '}/>',
-      '<Graph expressions={' + JSON.stringify(expressions) + '}/>',
     ].join('\n');
     const result = build(
       mappingFrom([
@@ -217,12 +215,8 @@ describe('ChatGPT API snapshot', () => {
     expect(text).toContain('**地图地点数据**');
     expect(text).toContain('| 地点 A | 测试大道 1 号 | 31.2 | 121.4 |');
     expect(text).toContain('| 地点 B | turn0business0 |  |  |');
-    expect(text).toContain('**函数图像数据**');
-    expect(text).toContain('- $y=x^2$');
-    expect(text).toContain('- $y=\\sin(x)$');
     expect(text).not.toContain('<table-cell');
     expect(text).not.toContain('<MapWidgetV2');
-    expect(text).not.toContain('<Graph');
   });
 
   it('flattens rendered Rich UI layout markup while preserving prose and fenced code', () => {

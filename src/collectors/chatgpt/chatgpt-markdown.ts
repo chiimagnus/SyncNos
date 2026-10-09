@@ -199,12 +199,7 @@ async function renderSvgPng(source: any, copy: any, win: any): Promise<string> {
   const nativeWidth = sourceSize('width', viewBox.length === 4 ? viewBox[2] : 0);
   const nativeHeight = sourceSize('height', viewBox.length === 4 ? viewBox[3] : 0);
   if (nativeWidth < 16 || nativeHeight < 16) return '';
-  const scale = Math.min(
-    1,
-    1600 / nativeWidth,
-    1200 / nativeHeight,
-    Math.sqrt(1_800_000 / (nativeWidth * nativeHeight)),
-  );
+  const scale = Math.min(1, 1600 / nativeWidth, 1200 / nativeHeight);
   const width = Math.max(1, Math.round(nativeWidth * scale));
   const height = Math.max(1, Math.round(nativeHeight * scale));
   const svg = copy.cloneNode(true);
@@ -480,7 +475,6 @@ function removeNonContentNodes(container: any): any {
         .trim();
       summary = `${label || '选择'}${selectedLabel && selectedLabel !== label ? `：${selectedLabel}` : ''}`;
     }
-    if (!summary.trim()) return;
     const replacement = container.ownerDocument.createElement('p');
     replacement.textContent = summary;
     el.replaceWith(replacement);
@@ -564,26 +558,6 @@ function removeNonContentNodes(container: any): any {
   });
 
   return container;
-}
-
-function getAssistantContentRoot(wrapper: any): any {
-  if (!wrapper) return null;
-  const selection = wrapper.querySelector?.('[data-chatgpt-selection-message-id]');
-  if (selection) return selection;
-
-  const primary = Array.from(
-    wrapper.querySelectorAll?.("[data-markdown-text-style='assistant-message'][data-markdown-text-tone='primary']") ||
-      [],
-  ) as any[];
-  if (primary.length === 1) return primary[0];
-  if (primary.length > 1) {
-    const doc = wrapper.ownerDocument || document;
-    const holder = doc.createElement('div');
-    for (const node of primary) holder.appendChild(node.cloneNode(true));
-    return holder;
-  }
-
-  return wrapper.querySelector?.("[data-markdown-text-style='assistant-message']") || wrapper;
 }
 
 function sanitizeRenderedClone(root: any): any {
@@ -887,14 +861,6 @@ function extractRenderedText(root: any): any {
   return normalizeText(extractTextFromSanitizedClone(cloned));
 }
 
-function extractAssistantMarkdown(wrapper: any): any {
-  return extractRenderedMarkdown(getAssistantContentRoot(wrapper));
-}
-
-function extractAssistantText(wrapper: any): any {
-  return extractRenderedText(getAssistantContentRoot(wrapper));
-}
-
 const api = {
   removeNonContentNodes,
   normalizeMarkdown,
@@ -902,8 +868,6 @@ const api = {
   htmlToMarkdown,
   extractRenderedMarkdown,
   extractRenderedText,
-  extractAssistantMarkdown,
-  extractAssistantText,
   hasRichGraphic,
   cloneWithControlState,
   snapshotRichGraphics,

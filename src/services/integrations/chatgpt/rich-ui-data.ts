@@ -94,16 +94,8 @@ function mapPointsTable(value: unknown): string {
   ].join('\n');
 }
 
-function graphEquations(value: unknown): string {
-  if (!Array.isArray(value) || !value.length) return '';
-  const expressions = value.map((entry) => (typeof entry?.latex === 'string' ? entry.latex : '')).filter(Boolean);
-  return expressions.length
-    ? '**函数图像数据**\n\n' + expressions.map((expression) => '- $' + expression + '$').join('\n')
-    : '';
-}
-
 function extractJsonProp(component: string, prop: string): unknown {
-  const opener = new RegExp('\\b' + prop + '\\s*=\\s*\\{', 'g');
+  const opener = new RegExp('\\b' + prop + '\\s*=\\s*\\{');
   const match = opener.exec(component);
   if (!match) return null;
   let quoted = '';
@@ -137,13 +129,12 @@ function extractJsonProp(component: string, prop: string): unknown {
 
 export function structuredRichUiMarkdown(source: string): string {
   const input = nativeDataTable(source);
-  if (!/<(?:Chart|MapWidgetV2|Graph)\b/.test(input)) return input;
+  if (!/<(?:Chart|MapWidgetV2)\b/.test(input)) return input;
   let output = '';
   let offset = 0;
-  while (offset < input.length) {
-    const match = /<(Chart|MapWidgetV2|Graph)\b/g.exec(input.slice(offset));
-    if (!match) break;
-    const start = offset + match.index;
+  const componentStart = /<(Chart|MapWidgetV2)\b/g;
+  for (let match = componentStart.exec(input); match; match = componentStart.exec(input)) {
+    const start = match.index;
     output += input.slice(offset, start);
     let quoted = '';
     let level = 0;
@@ -168,18 +159,17 @@ export function structuredRichUiMarkdown(source: string): string {
     }
     if (end < 0) {
       output += match[0];
-      offset = start + match[0].length;
+      offset = componentStart.lastIndex;
       continue;
     }
     const component = input.slice(start, end);
     const table =
       match[1] === 'Chart'
         ? chartTable(extractJsonProp(component, 'content'))
-        : match[1] === 'MapWidgetV2'
-          ? mapPointsTable(extractJsonProp(component, 'points'))
-          : graphEquations(extractJsonProp(component, 'expressions'));
+        : mapPointsTable(extractJsonProp(component, 'points'));
     output += table ? '\n\n' + table + '\n\n' : component;
     offset = end;
+    componentStart.lastIndex = end;
   }
   return output + input.slice(offset);
 }
