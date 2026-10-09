@@ -9,6 +9,7 @@ const AI = Object.freeze({
   doubao: { name: '豆包', color: 'orange' },
   yuanbao: { name: '元宝', color: 'red' },
   poe: { name: 'Poe', color: 'pink' },
+  grok: { name: 'Grok', color: 'gray' },
   notionai: { name: 'NotionAI', color: 'brown' },
 });
 

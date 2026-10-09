@@ -24,6 +24,13 @@ describe('collector registration', () => {
     for (const site of SUPPORTED_AI_CHAT_SITES) expect(registeredIds.has(site.id)).toBe(true);
     expect(
       registry.pickActive({
+        href: 'https://grok.com/c/12345678-1234-4234-8234-123456789abc',
+        hostname: 'grok.com',
+        pathname: '/c/12345678-1234-4234-8234-123456789abc',
+      })?.id,
+    ).toBe('grok');
+    expect(
+      registry.pickActive({
         href: 'https://claude.ai/chat/conv-1',
         hostname: 'claude.ai',
         pathname: '/chat/conv-1',

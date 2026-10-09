@@ -45,6 +45,7 @@ export const CAPTURE_INTEGRITY_GUARDED_COLLECTOR_IDS = new Set<string>([
   'poe',
   'yuanbao',
   'zai',
+  'grok',
 ]);
 
 function stableString(value: unknown): string {

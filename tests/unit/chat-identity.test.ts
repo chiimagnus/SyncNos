@@ -29,6 +29,11 @@ describe('canonical chat identity', () => {
       'notionai:0123456789abcdef0123456789abcdef',
     ],
     ['zai', 'https://chat.z.ai/c/zai-1', 'zai:zai-1'],
+    [
+      'grok',
+      'https://grok.com/c/12345678-1234-4234-8234-123456789abc?from=sidebar',
+      'grok:12345678-1234-4234-8234-123456789abc',
+    ],
   ])('derives %s durable identity from its real conversation route', (source, url, expected) => {
     expect(canonicalChatIdentityFromUrl(source, url)).toBe(expected);
   });
@@ -48,6 +53,11 @@ describe('canonical chat identity', () => {
       'https://app.notion.com/chat?t=0123456789abcdef0123456789abcdef',
     ],
     ['doubao', 'https://www.doubao.com/chat/doubao-1?from=history', 'https://www.doubao.com/chat/doubao-1'],
+    [
+      'grok',
+      'https://grok.com/c/12345678-1234-4234-8234-123456789abc?via=sidebar',
+      'https://grok.com/c/12345678-1234-4234-8234-123456789abc',
+    ],
   ])('normalizes %s durable conversation url', (source, url, expected) => {
     expect(canonicalChatUrlFromUrl(source, url)).toBe(expected);
   });
@@ -60,6 +70,10 @@ describe('canonical chat identity', () => {
     expect(canonicalChatIdentityFromUrl('gemini', 'https://gemini.google.com/app')).toBe('');
     expect(canonicalChatIdentityFromUrl('yuanbao', 'https://yuanbao.tencent.com/chat/agent-1')).toBe('');
     expect(canonicalChatIdentityFromUrl('googleaistudio', 'https://aistudio.google.com/prompts/new_chat')).toBe('');
+    expect(canonicalChatIdentityFromUrl('grok', 'https://grok.com/')).toBe('');
+    expect(canonicalChatIdentityFromUrl('grok', 'https://fakegrok.com/c/12345678-1234-4234-8234-123456789abc')).toBe(
+      '',
+    );
     expect(canonicalChatIdentityFromUrl('unknown', 'https://example.com/chat/1')).toBe('');
   });
 });

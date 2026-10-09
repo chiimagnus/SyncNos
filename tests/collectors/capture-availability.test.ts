@@ -10,6 +10,7 @@ import { createKimiCollectorDef } from '../../src/collectors/kimi/kimi-collector
 import { createPoeCollectorDef } from '../../src/collectors/poe/poe-collector.ts';
 import { createYuanbaoCollectorDef } from '../../src/collectors/yuanbao/yuanbao-collector.ts';
 import { createZaiCollectorDef } from '../../src/collectors/zai/zai-collector.ts';
+import { createGrokCollectorDef } from '../../src/collectors/grok/grok-collector.ts';
 
 type Factory = (env: ReturnType<typeof createCollectorEnv>) => { collector: { isCaptureAvailable: () => boolean } };
 
@@ -25,6 +26,13 @@ function availability(factory: Factory, url: string, html = '') {
 }
 
 const cases: Array<{ id: string; factory: Factory; url: string; unsupportedUrl: string; messageHtml: string }> = [
+  {
+    id: 'grok',
+    factory: createGrokCollectorDef,
+    url: 'https://grok.com/c/12345678-1234-4234-8234-123456789abc',
+    unsupportedUrl: 'https://grok.com/',
+    messageHtml: '<main><div data-testid="chat-transcript-scroller"></div></main>',
+  },
   {
     id: 'gemini',
     factory: createGeminiCollectorDef,

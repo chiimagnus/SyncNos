@@ -12,6 +12,7 @@ import { createYuanbaoCollectorDef } from '@collectors/yuanbao/yuanbao-collector
 import { createPoeCollectorDef } from '@collectors/poe/poe-collector.ts';
 import { createNotionAiCollectorDef } from '@collectors/notionai/notionai-collector.ts';
 import { createZaiCollectorDef } from '@collectors/zai/zai-collector.ts';
+import { createGrokCollectorDef } from '@collectors/grok/grok-collector.ts';
 import { createWebCollectorDef } from '@collectors/web/web-collector.ts';
 
 export function registerAllCollectors(registry: CollectorsRegistry, env: CollectorEnv) {
@@ -26,5 +27,6 @@ export function registerAllCollectors(registry: CollectorsRegistry, env: Collect
   registry.register(createPoeCollectorDef(env));
   registry.register(createNotionAiCollectorDef(env));
   registry.register(createZaiCollectorDef(env));
+  registry.register(createGrokCollectorDef(env));
   registry.register(createWebCollectorDef(env));
 }

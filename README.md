@@ -27,7 +27,7 @@ Content is saved in the browser first, then optionally synced to Notion, Obsidia
 
 ## What SyncNos does
 
-- Save chats from ChatGPT, Claude, Gemini, Google AI Studio, DeepSeek, Kimi, Doubao, Yuanbao, Poe, Notion AI, and z.ai
+- Save chats from ChatGPT, Claude, Gemini, Google AI Studio, DeepSeek, Kimi, Doubao, Yuanbao, Poe, Notion AI, z.ai, and Grok
 - Save readable web articles, content images, and YouTube / Bilibili subtitles and page metadata
 - Search, read, highlight, comment, narrate, and view insights from the local library
 - Use `$` in supported AI editors to search and insert local content
