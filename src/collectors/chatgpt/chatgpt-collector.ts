@@ -210,7 +210,11 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     if (conversationId) {
       const routeMatchesConversation = (link: Element) => {
         try {
-          const url = new URL(String(link.getAttribute('href') || ''), env.location.href);
+          const href = String(link.getAttribute('href') || '').trim();
+          if (!/^\/(?:c\/|g\/[^/]+\/c\/)/.test(href) && !/^https?:\/\/[^/]+\/(?:c\/|g\/[^/]+\/c\/)/i.test(href)) {
+            return false;
+          }
+          const url = new URL(href, env.location.href);
           return parseChatgptDurableConversationRoute(url)?.conversationId === conversationId;
         } catch (_error) {
           return false;
@@ -252,7 +256,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     if (!nodes.length) return null;
     if (nodes.length === 1) return nodes[0];
     const holder = env.document.createElement('div');
-    for (const node of nodes) holder.appendChild(node.cloneNode(true));
+    for (const node of nodes) holder.appendChild(chatgptMarkdown.cloneWithControlState(node, true));
     return holder;
   }
 
@@ -309,6 +313,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     imageUrls: string[];
     iframeUrl: string;
     cotOuterHtml: string;
+    liveRoot: any;
   };
 
   function getTurnWrappers(root: any): any[] {
@@ -494,6 +499,14 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     const imageUrls = extractChatgptImageUrlsForRole(wrapper, role);
     const node = role === 'user' ? userContentNode(wrapper) : assistantContentNode(wrapper);
     const text = env.normalize.normalizeText(node?.innerText || node?.textContent || '');
+    const hasRichGraphic = role === 'assistant' && chatgptMarkdown.hasRichGraphic(node);
+    const graphicSignature = hasRichGraphic
+      ? compactFingerprintPart(
+          Array.from(node?.querySelectorAll?.('svg, canvas, img[data-syncnos-graphic="true"]') || [])
+            .map((el: any) => String(el.outerHTML || ''))
+            .join('|'),
+        )
+      : '';
     const iframe = role === 'assistant' ? findDeepResearchIframe(wrapper) : null;
     const iframeUrl = String(iframe?.getAttribute?.('src') || '').trim();
     const effectiveCot = role === 'assistant' && !iframe ? cot : null;
@@ -508,17 +521,30 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       turnKey,
       withinTurn,
       role,
-      fingerprint: descriptorFingerprint({ role, key, text, cotText, cotMarkdown, imageUrls, iframeUrl }),
+      fingerprint: descriptorFingerprint({
+        role,
+        key,
+        text: hasRichGraphic ? `${text}|${graphicSignature}` : text,
+        cotText,
+        cotMarkdown,
+        imageUrls,
+        iframeUrl,
+      }),
       hasDeepResearch: !!iframe,
       rendered:
         !streaming &&
         hasFinalAssistantSurface &&
-        (!!text || !!cotText || !!cotMarkdown || imageUrls.length > 0 || !!iframe),
+        (!!text || !!cotText || !!cotMarkdown || imageUrls.length > 0 || !!iframe || hasRichGraphic),
       visible: isVisibleWindow(wrapper),
-      outerHtml: String(serializedRoot?.outerHTML || ''),
+      outerHtml:
+        role === 'assistant' &&
+        serializedRoot?.querySelector?.('input[type="checkbox"], input[type="radio"], input[type="range"], option')
+          ? String(chatgptMarkdown.cloneWithControlState(serializedRoot)?.outerHTML || serializedRoot?.outerHTML || '')
+          : String(serializedRoot?.outerHTML || ''),
       imageUrls,
       iframeUrl,
       cotOuterHtml: effectiveCot?.outerHtml || '',
+      liveRoot: role === 'assistant' ? serializedRoot : null,
     };
   }
 
@@ -554,6 +580,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         imageUrls: _imageUrls,
         iframeUrl: _iframeUrl,
         cotOuterHtml: _cotOuterHtml,
+        liveRoot: _liveRoot,
         ...descriptor
       } = extractionInput;
       descriptors.push(descriptor);
@@ -577,22 +604,17 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     const node = input.role === 'user' ? userContentNode(wrapper) : assistantContentNode(wrapper);
     const raw = node?.innerText || node?.textContent || '';
     const fallbackText = env.normalize.normalizeText(raw);
-    let contentText =
-      input.role === 'assistant' ? chatgptMarkdown.extractAssistantText(wrapper) || fallbackText : fallbackText;
     let baseMarkdown =
       input.role === 'assistant'
-        ? chatgptMarkdown.extractAssistantMarkdown(wrapper) || contentText || ''
-        : contentText || '';
+        ? chatgptMarkdown.extractRenderedMarkdown(node) || chatgptMarkdown.extractRenderedText(node) || fallbackText
+        : fallbackText;
     if (input.hasDeepResearch) {
-      const placeholder = input.iframeUrl ? `Deep Research (iframe): ${input.iframeUrl}` : 'Deep Research (iframe)';
-      contentText = placeholder;
-      baseMarkdown = placeholder;
+      baseMarkdown = input.iframeUrl ? `Deep Research (iframe): ${input.iframeUrl}` : 'Deep Research (iframe)';
     } else if (input.role === 'assistant' && input.cotOuterHtml) {
       const cot = extractCotContentFromHtml(input.cotOuterHtml);
-      contentText = joinContentBlocks([cot.text, contentText]);
       baseMarkdown = joinContentBlocks([cot.markdown || cot.text, baseMarkdown]);
     }
-    if (!contentText && !input.imageUrls.length) return null;
+    if (!baseMarkdown.trim() && !input.imageUrls.length) return null;
     return {
       messageKey: input.key,
       role: input.role,
@@ -787,6 +809,9 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       }
       const input = inputsByKey.get(descriptor.key);
       if (!input) continue;
+      if (input.role === 'assistant' && input.liveRoot && chatgptMarkdown.hasRichGraphic(input.liveRoot)) {
+        input.outerHtml = (await chatgptMarkdown.snapshotRichGraphics(input.liveRoot, env.window)) || input.outerHtml;
+      }
       const message = extractManualMessage(input, i);
       if (!message) continue;
       records.push({
@@ -802,6 +827,44 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       addPreparedReason(accumulator, 'unstable_identity');
     }
     return mergePreparedRecords(accumulator, records);
+  }
+
+  async function enrichApiSnapshotWithRenderedGraphics(snapshot: any): Promise<any> {
+    const expectedConversationId = String(snapshot?.conversation?.conversationKey || '').trim();
+    if (!expectedConversationId || expectedConversationId !== findConversationIdFromUrl()) return snapshot;
+    const messages = Array.isArray(snapshot.messages) ? snapshot.messages : [];
+    const originalByKey = new Map<string, string>(
+      messages
+        .filter((m: any) => m?.role === 'assistant')
+        .map((m: any) => [String(m.messageKey), String(m.contentMarkdown || '')]),
+    );
+    if (!originalByKey.size || !chatgptMarkdown.hasRichGraphic(getConversationRoot())) return snapshot;
+    const { inputsByKey } = readCurrentManualWindow(true);
+    const updates = new Map<string, string>();
+    for (const [key, input] of inputsByKey) {
+      if (input.role !== 'assistant' || !input.rendered || !input.liveRoot || !originalByKey.has(key)) continue;
+      if (!chatgptMarkdown.hasRichGraphic(input.liveRoot)) continue;
+      const rendered = extractManualMessage(
+        { ...input, outerHtml: await chatgptMarkdown.snapshotRichGraphics(input.liveRoot, env.window) },
+        0,
+      );
+      const images = String(rendered?.contentMarkdown || '').match(
+        /^!\[[^\]\n]+\]\(data:image\/png;base64,[A-Za-z0-9+/=]+\)$/gm,
+      );
+      if (!images?.length) continue;
+      const original = originalByKey.get(key)!;
+      updates.set(key, [original, ...images.filter((image) => !original.includes(image))].join('\n\n'));
+    }
+    if (!updates.size) return snapshot;
+    if (findConversationIdFromUrl() !== expectedConversationId) {
+      throw Object.assign(new Error('chatgpt_api_navigation_changed'), { code: 'chatgpt_api_navigation_changed' });
+    }
+    return {
+      ...snapshot,
+      messages: messages.map((message: any) =>
+        updates.has(message.messageKey) ? { ...message, contentMarkdown: updates.get(message.messageKey) } : message,
+      ),
+    };
   }
 
   // Manual-only dynamic sweep. The provider re-queries after every wait; no turn/message node
@@ -942,6 +1005,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     getRoot: getConversationRoot,
     prepareManualCapture,
     captureApiLiveTurn,
+    enrichApiSnapshotWithRenderedGraphics,
     __test: {
       sampleIdentityGuard,
       identityConversationKey,

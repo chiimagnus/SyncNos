@@ -2,6 +2,7 @@ import { JSDOM } from 'jsdom';
 import { describe, expect, it, vi } from 'vitest';
 import { buildChatgptGeneratedImageMessageKey } from '@services/shared/chatgpt-image-identity';
 import { markdownToSemanticText } from '@services/shared/markdown-semantic-text';
+import { hasCacheableChatImageReference } from '@services/conversations/data/image-inline';
 import normalizeApi from '@services/shared/normalize.ts';
 import { createCollectorEnv } from '../../src/collectors/collector-env.ts';
 import { createChatgptCollectorDef } from '../../src/collectors/chatgpt/chatgpt-collector.ts';
@@ -325,6 +326,225 @@ describe('chatgpt current DOM', () => {
     expect(markdown).toContain('![](https://example.com/chart.png)');
     expect(markdown).not.toContain('gstatic.com/faviconV2');
     expect(markdown).not.toContain('chatgpt.com/images/ecosystem/apps/github/icon.png');
+  });
+
+  it('preserves the reading order of Intelligent UI cards, flows and tables', async () => {
+    const dom = current2026Dom({
+      assistantBlocks: `
+        <div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary">
+          <h2>处理流程</h2>
+          <div data-d-component="box" data-d-direction="col">
+            <div data-d-component="box"><p>输入数据</p></div>
+            <div data-d-component="row"><svg data-d-component="icon"><path d="M0 0"></path></svg></div>
+            <div data-d-component="box"><p>转换为图表</p><span data-d-component="caption">保留数据含义</span></div>
+            <div data-d-component="grid">
+              <div data-d-component="grid-item"><div data-d-component="box"><p>模块甲</p><span>注释甲</span></div></div>
+              <div data-d-component="grid-item"><div data-d-component="box"><p>模块乙</p><span>注释乙</span></div></div>
+            </div>
+          </div>
+          <div data-d-component="table"><table><tr><th>项目</th><th>结果</th></tr><tr><td>A</td><td>通过</td></tr></table></div>
+        </div>`,
+    });
+    const snapshot = (await capturePrepared(currentDef(dom))) as any;
+    const markdown = snapshot.messages[1].contentMarkdown;
+    expect(markdown).toContain('## 处理流程');
+    expect(markdown).toMatch(/输入数据\n\n转换为图表/);
+    expect(markdown).toMatch(/保留数据含义\n\n模块甲/);
+    expect(markdown).toMatch(/注释甲\n\n模块乙/);
+    expect(markdown).toContain('| 项目 | 结果 |');
+    expect(markdown).toContain('| A | 通过 |');
+    expect(markdown).not.toContain('M0 0');
+  });
+
+  it('ignores ChatGPT skip-to-content fragment links when resolving the conversation title', async () => {
+    const html = `<a href="#_R_jump" aria-label="跳转到内容">跳转到内容</a>
+      <a href="/c/conversation-1" aria-current="page">真实对话标题</a>`;
+    const def = currentDef(currentDom({ beforeTurn: html, userText: 'First prompt' }));
+    const snapshot = (await capturePrepared(def)) as any;
+    expect(snapshot.conversation.title).toBe('真实对话标题');
+    const withoutSidebar = currentDef(
+      currentDom({
+        beforeTurn: `<a href="#_R_jump">跳转到内容</a>`,
+        userText: 'First prompt',
+      }),
+    );
+    const fallback = (await capturePrepared(withoutSidebar)) as any;
+    expect(fallback.conversation.title).toBe('First prompt');
+    const titled = currentDom({ beforeTurn: '<a href="#jump">跳转到内容</a>', userText: 'Prompt body' });
+    titled.window.document.title = '生成交互式图表';
+    const withDocumentTitle = (await capturePrepared(currentDef(titled))) as any;
+    expect(withDocumentTitle.conversation.title).toBe('Prompt body');
+  });
+
+  it('enriches the matching API message with a DOM-backed SVG snapshot without changing other messages', async () => {
+    const dom = currentDom({
+      assistantContent: `<div data-chatgpt-selection-message-id="assistant-message-1">
+        <div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary">
+          <p>图表正文</p><svg data-d-component="svg" width="200" height="100" viewBox="0 0 200 100" aria-label="结构图"><rect width="200" height="100" /></svg>
+        </div>
+      </div>`,
+    });
+    const url =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
+    vi.spyOn(dom.window.HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage: vi.fn() } as any);
+    vi.spyOn(dom.window.HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(url);
+    (dom.window as any).Image = class {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      set src(_value: string) {
+        this.onload?.();
+      }
+    };
+    const def = currentDef(dom);
+    const snapshot = {
+      conversation: { conversationKey: 'conversation-1' },
+      messages: [
+        { messageKey: 'assistant-message-1', role: 'assistant', contentMarkdown: 'API 原始文本', sequence: 1 },
+        { messageKey: 'other-message', role: 'assistant', contentMarkdown: '其他回答', sequence: 2 },
+      ],
+    };
+    const result = await def.collector.enrichApiSnapshotWithRenderedGraphics(snapshot);
+    expect(result.messages[0].contentMarkdown).toContain('API 原始文本');
+    expect(result.messages[0].contentMarkdown).toContain(`![结构图](${url})`);
+    expect(result.messages[1]).toEqual(snapshot.messages[1]);
+    expect(hasCacheableChatImageReference(result.messages[0].contentMarkdown)).toBe(true);
+    const otherConversation = await def.collector.enrichApiSnapshotWithRenderedGraphics({
+      ...snapshot,
+      conversation: { conversationKey: 'not-current-conversation' },
+    });
+    expect(otherConversation.messages).toEqual(snapshot.messages);
+  });
+
+  it('captures real Recharts accessibility rows as an exact data table before the PNG', async () => {
+    const dom = current2026Dom({
+      assistantBlocks: `<div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary">
+        <p>SyncNos 图表真机测试</p>
+        <section><div>
+          ${'<div>'.repeat(9)}
+          <svg class="recharts-surface" width="240" height="120" viewBox="0 0 240 120"><rect width="240" height="120" /></svg>
+          ${'</div>'.repeat(9)}
+          <ul class="sr-only"><li>2021: 数值 11</li><li>2022: 数值 18</li><li>2026: 数值 38</li></ul>
+        </div></section>
+      </div>`,
+    });
+    const url =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
+    vi.spyOn(dom.window.HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage: vi.fn() } as any);
+    vi.spyOn(dom.window.HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(url);
+    (dom.window as any).Image = class {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      set src(_value: string) {
+        this.onload?.();
+      }
+    };
+    const snapshot = (await capturePrepared(currentDef(dom))) as any;
+    const markdown = snapshot.messages[1].contentMarkdown;
+    expect(markdown).toContain('| 类别 | 数值 |');
+    expect(markdown).toContain('SyncNos 图表真机测试\n\n| 类别 | 数值 |');
+    expect(markdown).toContain('| 2021 | 11 |');
+    expect(markdown).toContain('| 2022 | 18 |');
+    expect(markdown).toContain('| 2026 | 38 |');
+    expect(markdown).toContain(`![图表](${url})`);
+    expect(markdown.indexOf('| 2021 | 11 |')).toBeLessThan(markdown.indexOf('![图表]'));
+    expect(markdown.match(/2021 \| 11/g)?.length).toBe(1);
+  });
+
+  it('rasterizes SVG charts and Canvas graphics into cacheable PNGs in message order', async () => {
+    const dom = current2026Dom({
+      assistantBlocks: `<div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary">
+        <p>图表开始</p>
+        <svg data-d-component="svg" aria-label="收入趋势" width="200" height="100" viewBox="0 0 200 100">
+          <rect width="200" height="100" fill="#336699"></rect>
+          <text x="20" y="50">收入增长</text>
+        </svg>
+        <p>第二个图形</p>
+        <canvas aria-label="当前画布" width="200" height="100"></canvas>
+        <p>图表结束</p>
+      </div>`,
+    });
+    const imageUrl =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
+    const getContext = vi
+      .spyOn(dom.window.HTMLCanvasElement.prototype, 'getContext')
+      .mockReturnValue({ drawImage: vi.fn() } as any);
+    const toDataURL = vi.spyOn(dom.window.HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(imageUrl);
+    const assignedSvgSources: string[] = [];
+    (dom.window as any).Image = class {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      set src(value: string) {
+        assignedSvgSources.push(value);
+        this.onload?.();
+      }
+    };
+    const snapshot = (await capturePrepared(currentDef(dom))) as any;
+    const markdown = snapshot.messages[1].contentMarkdown;
+    expect(markdown).toContain(`![收入趋势](${imageUrl})`);
+    expect(markdown).toContain(`![当前画布](${imageUrl})`);
+    expect(markdown.indexOf('图表开始')).toBeLessThan(markdown.indexOf('![收入趋势]'));
+    expect(markdown.indexOf('![收入趋势]')).toBeLessThan(markdown.indexOf('第二个图形'));
+    expect(markdown.indexOf('![当前画布]')).toBeLessThan(markdown.indexOf('图表结束'));
+    expect(hasCacheableChatImageReference(markdown)).toBe(true);
+    expect(assignedSvgSources[0]).toContain('data:image/svg+xml');
+    expect(getContext).toHaveBeenCalled();
+    expect(toDataURL).toHaveBeenCalled();
+  });
+
+  it('keeps canvas pixels when ChatGPT splits one assistant turn into multiple primary blocks', async () => {
+    const dom = current2026Dom({
+      assistantBlocks: `<div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary"><canvas aria-label="拆分图表" width="100" height="50"></canvas></div>
+        <div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary"><p>图表说明</p></div>`,
+    });
+    const dataUrl =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
+    vi.spyOn(dom.window.HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(dataUrl);
+    const snapshot = (await capturePrepared(currentDef(dom))) as any;
+    const markdown = snapshot.messages[1].contentMarkdown;
+    expect(markdown).toContain(`![拆分图表](${dataUrl})`);
+    expect(markdown).toContain('图表说明');
+    expect(hasCacheableChatImageReference(markdown)).toBe(true);
+  });
+
+  it('preserves checked, selected and slider values without keeping executable controls', async () => {
+    const dom = current2026Dom({
+      assistantBlocks: `<div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary">
+        <div data-d-component="checkbox"><label><input type="checkbox"> 保留图片</label></div>
+        <div data-d-component="slider" aria-label="透明度"><input type="range" min="0" max="100" value="20"></div>
+        <div data-d-component="segmented-control" aria-label="主题">
+          <button type="button" aria-pressed="false">亮色</button>
+          <button type="button" aria-pressed="true">暗色</button>
+        </div>
+        <p>结束</p>
+      </div>`,
+    });
+    (dom.window.document.querySelector('input[type=checkbox]') as HTMLInputElement).checked = true;
+    (dom.window.document.querySelector('input[type=range]') as HTMLInputElement).value = '75';
+    const snapshot = (await capturePrepared(currentDef(dom))) as any;
+    const markdown = snapshot.messages[1].contentMarkdown;
+    expect(markdown).toContain('[x] 保留图片');
+    expect(markdown).toContain('透明度：75');
+    expect(markdown).toContain('主题：暗色');
+    expect(markdown).toContain('结束');
+    expect(markdown).not.toContain('<input');
+    expect(markdown).not.toContain('<button');
+  });
+
+  it('keeps a meaningful placeholder for chart-only content without recording decorative icons', async () => {
+    const dom = current2026Dom({
+      assistantBlocks: `<div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary">
+        <svg data-d-component="icon"><path d="M0 0"></path></svg>
+        <svg class="recharts-surface" viewBox="0 0 200 100"><path d="M0 0 L100 50"></path></svg>
+        <svg role="img" aria-label="收入趋势"><path d="M0 0 L100 60"></path></svg>
+      </div>`,
+    });
+    const def = currentDef(dom);
+    const assistant = def.collector.__test.manualAdapter
+      .readDescriptors()
+      .find((descriptor: any) => descriptor.role === 'assistant');
+    expect(assistant.rendered).toBe(true);
+    const snapshot = (await capturePrepared(def)) as any;
+    expect(snapshot.messages[1].contentMarkdown).toBe('[图表：请在原对话查看]\n\n[图表：收入趋势]');
   });
 
   it('preserves hidden rendered code sources such as Mermaid', () => {

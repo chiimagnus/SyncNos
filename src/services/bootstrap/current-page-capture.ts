@@ -366,6 +366,9 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
             currentTurnId: apiCapture.currentTurnId,
           });
         }
+        if (typeof target.collector.enrichApiSnapshotWithRenderedGraphics === 'function') {
+          snapshot = await target.collector.enrichApiSnapshotWithRenderedGraphics(snapshot);
+        }
       } else {
         let preparedCapture: unknown;
         if (typeof target.collector.prepareManualCapture === 'function') {

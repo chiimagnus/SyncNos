@@ -1,3 +1,4 @@
+import { structuredRichUiMarkdown } from '@services/integrations/chatgpt/rich-ui-data';
 import {
   buildChatgptFileCacheKey,
   buildChatgptGeneratedImageMessageKey,
@@ -169,6 +170,7 @@ function renderContentReferences(message: any, text: string, onSchemaDrift: Sche
     const type = stableString(reference.type).toLowerCase();
     const matched = stableString(reference.matched_text);
     if (type === 'sources_footnote' || !matched || replaced.has(matched) || !matched.includes('')) continue;
+    if (!output.includes(matched)) continue;
 
     let replacement = '';
     if (type === 'grouped_webpages') {
@@ -191,6 +193,58 @@ function renderContentReferences(message: any, text: string, onSchemaDrift: Sche
     output = output.replace(internalTokens, '');
   }
   return output;
+}
+
+function normalizeRichUiMarkup(markdown: string): string {
+  if (
+    !/<(?:Chart|MapWidgetV2|box|row|col|grid|grid-item|flow|flow-item|card|table|carousel|text|title|caption|badge)\b/.test(
+      markdown,
+    )
+  ) {
+    return markdown;
+  }
+  const result: string[] = [];
+  let outside: string[] = [];
+  let fence = '';
+  const flush = () => {
+    if (!outside.length) return;
+    result.push(
+      structuredRichUiMarkdown(outside.join('\n'))
+        .split('\n')
+        .map((line) =>
+          line
+            .replace(/<Entity\b[^>]*\bvalue="([^"]+)"[^>]*\/>/g, '$1')
+            .replace(/<AsyncImage\b[^>]*\bquery="([^"]+)"[^>]*\/>/g, '图片：$1')
+            .replace(/<icon\b[^>]*\bname="([^"]+)"[^>]*\/>/g, (_match, name: string) =>
+              name === 'arrow-down' ? '↓' : '',
+            )
+            .replace(/<\/(?:box|row|col|grid-item|flow-item|carousel-item)>/g, '\n\n')
+            .replace(
+              /<\/?(?:box|row|col|grid|grid-item|flow|flow-item|card|table|table-row|table-cell|carousel|carousel-item|text|title|caption|badge)\b[^>]*>/g,
+              '',
+            )
+            .replace(/^\s+$/, ''),
+        )
+        .join('\n'),
+    );
+    outside = [];
+  };
+  for (const line of markdown.split('\n')) {
+    const marker = line.match(/^\s*(`{3,}|~{3,})/);
+    if (marker) {
+      flush();
+      const kind = marker[1]![0]!;
+      if (!fence) fence = kind;
+      else if (fence === kind) fence = '';
+      result.push(line);
+    } else if (fence) {
+      result.push(line);
+    } else {
+      outside.push(line);
+    }
+  }
+  flush();
+  return result.join('\n');
 }
 
 function renderTextParts(message: any, onSchemaDrift: SchemaDriftReporter): string {
@@ -602,7 +656,7 @@ export function buildChatgptApiSnapshot(input: {
 
         const markdown = appendBlocks([
           ...pendingAuxiliary.map((item) => item.markdown),
-          renderTextParts(message, markSchemaDrift),
+          normalizeRichUiMarkup(renderTextParts(message, markSchemaDrift)),
           renderImageBlocks(pendingImages),
         ]);
         let imageOwnerKey = buildChatgptGeneratedImageMessageKey(pendingImages.map((image) => image.fileId));
