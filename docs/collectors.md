@@ -43,7 +43,7 @@ DeepSeek 的 `data-virtual-list-item-key` 在新用户消息上是保留的临�
 
 豆包的 `.scroller` 是会卸载离屏消息的虚拟列表，`data-message-id` 只证明消息身份，不证明历史完整。自动保存只读取当前窗口；手动保存复用共享 sweep 补齐可达窗口并恢复滚动位置。当前 DOM 不暴露历史 exhausted 证明，因此两条路径都必须标记 partial 并 append/reconcile，不能因滚到物理顶部或回复已完成就改为 destructive snapshot。
 
-Grok 的会话地址采用 `/c/<UUID>`；角色来自消息上的 `data-testid`，持久身份来自刷新后保持稳定的 `response-<UUID>`。`data-plane-row` 仅标识虚拟列表渲染行，正在生成的新消息中可能与真实消息 ID 不一致，不能作为持久身份或要求二者相等。消息渲染在 `chat-transcript-scroller` 的 plane 虚拟列表中；手动保存扫描可达窗口并始终 partial-safe，不把物理滚动顶部当成后端历史已穷尽，也不自动保存。Grok 首页不应退化为文章抓取。
+Grok 目前**不支持自动保存**：长对话的初始化和后台渲染可能只提供部分消息，无法可靠保证自动采集的消息连续完整。手动采集必须保持 partial-safe，不得因滚动到物理顶部就删除未加载的历史。持久消息身份取 `response-UUID`，不可使用可能与之不同的虚拟行标记 `data-plane-row`；首页不能退化为文章抓取。
 
 ## Markdown 与附件
 

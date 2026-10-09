@@ -8,7 +8,8 @@ description: Save supported AI chats and understand manual capture, auto-save, a
 | Platform | Capture |
 | --- | --- |
 | Claude, Gemini, DeepSeek, Doubao, Kimi, Yuanbao, Poe, Notion AI, z.ai | Manual + auto-save |
-| ChatGPT, Google AI Studio, Grok | Manual |
+| ChatGPT, Google AI Studio | Manual |
+| Grok | Manual; no auto-save support |
 
 Manual capture actively retrieves the history that the current site can safely verify. For virtualized lists, paginated histories, or unfinished replies, SyncNos merges conservatively instead of replacing a complete local history with the currently visible window.
 
@@ -20,7 +21,7 @@ Manual capture actively retrieves the history that the current site can safely v
 
 Platforms listed with auto-save can enable it under **Settings → General → Auto-save**. Auto-save only appends or updates messages that can be identified safely in the current window; it does not scroll the page to backfill older history. Use manual capture when you want SyncNos to retrieve long-chat history.
 
-Grok uses manual capture to scan the reachable conversation history. Because the page does not prove that all older messages have been loaded, capture uses safe merging and never deletes existing off-screen messages. The Grok home page is not a conversation.
+Long Grok conversations may not load fully in background tabs. Keep the conversation tab in the foreground and save manually after the reply finishes.
 
 Notion AI file messages are saved conservatively; some attachment details may be unavailable.
 

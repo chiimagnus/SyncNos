@@ -6,11 +6,9 @@ description: Start here when capture, sync, or connection does not work as expec
 ## Capture is incomplete
 
 - AI chat history is missing: run one manual capture; auto-save does not scroll the page to backfill older messages.
-- Auto-save did not run: confirm **Settings → General → Auto-save** is enabled.
+- Auto-save did not run: first check whether the platform supports it under [Capture AI chats](/docs/en/capture-ai-chats/), then check **Settings → General → Auto-save**.
 - ChatGPT Advanced capture fails: disable Advanced capture and save again.
 - Images are missing: the text is usually already saved; retry with **Cache images** later.
-
-See [Capture AI chats](/docs/en/capture-ai-chats/) for platform support.
 
 ## A keyboard shortcut does not work
 

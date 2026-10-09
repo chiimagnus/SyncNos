@@ -4,7 +4,7 @@
 
 ## 核心能力
 
-- AI 对话：ChatGPT、Claude、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai
+- AI 对话：ChatGPT、Claude、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai、Grok（仅手动保存）
 - 网页与视频：保存网页正文、内容图片、YouTube / Bilibili 字幕与可用页面信息
 - 本地使用：搜索、阅读、划线评论、朗读、大纲、数据概览、$ 插入
 - 输出：同步到 Notion、Obsidian、飞书、GitHub；导出 Markdown / JSON；创建 Backup
