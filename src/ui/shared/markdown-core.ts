@@ -158,53 +158,34 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, ma
     return renderExternalImageWithLink(img, safeSrc);
   };
 
-  // Earlier article captures contain invalid Turndown emphasis such as **标题。**正文.
-  // Repair display tokens without rewriting stored quotes, code blocks, or unrelated chat messages.
-  inst.core.ruler.after('inline', 'syncnos-legacy-article-emphasis', (state) => {
-    if (state.env?.recoverMalformedArticleEmphasis !== true) return;
-    for (const block of state.tokens) {
-      if (block.type !== 'inline' || !block.children) continue;
-      const children = [];
-      for (const child of block.children) {
-        if (child.type !== 'text' || !child.content.includes('*')) {
-          children.push(child);
-          continue;
-        }
-        const pattern = /(\*{1,2})([^*\r\n]+?)\1/gu;
-        let position = 0;
-        let matched = false;
-        for (const match of child.content.matchAll(pattern)) {
-          const raw = match[0];
-          const index = match.index;
-          if (!block.content.includes(raw) || !match[2].trim()) continue;
-          if (child.content[index - 1] === '*' || child.content[index + raw.length] === '*') continue;
+  // Only relax CommonMark punctuation flanking; the inline parser already protects escaped marks and code spans.
+  inst.inline.ruler.before('emphasis', 'syncnos-punctuation-emphasis', (state, silent) => {
+    if (silent || state.src[state.pos] !== '*') return false;
+    const marker = state.src.startsWith('**', state.pos) ? '**' : '*';
+    const start = state.pos + marker.length;
+    if (state.src[start] === '*') return false;
+    const end = state.src.indexOf(marker, start + 1);
+    if (end < 0 || state.src[end + marker.length] === '*') return false;
 
-          if (index > position) {
-            const preceding = new state.Token('text', '', 0);
-            preceding.content = child.content.slice(position, index);
-            children.push(preceding);
-          }
-          const tag = match[1].length === 2 ? 'strong' : 'em';
-          const opening = new state.Token(`${tag}_open`, tag, 1);
-          opening.markup = match[1];
-          const content = new state.Token('text', '', 0);
-          content.content = match[2];
-          const closing = new state.Token(`${tag}_close`, tag, -1);
-          closing.markup = match[1];
-          children.push(opening, content, closing);
-          position = index + raw.length;
-          matched = true;
-        }
-        if (!matched) {
-          children.push(child);
-        } else if (position < child.content.length) {
-          const trailing = new state.Token('text', '', 0);
-          trailing.content = child.content.slice(position);
-          children.push(trailing);
-        }
-      }
-      block.children = children;
-    }
+    const content = state.src.slice(start, end);
+    if (!content || /^\s|\s$/u.test(content) || /[\r\n`\\\[\]_~<>$*]/u.test(content)) return false;
+    const previous = state.src.slice(0, state.pos).at(-1) || '';
+    const next = state.src[end + marker.length] || '';
+    const first = Array.from(content)[0] || '';
+    const last = Array.from(content).at(-1) || '';
+    const isPunctuation = (char: string) => /[\p{P}\p{S}]/u.test(char);
+    const isWord = (char: string) => /[^\s\p{P}\p{S}]/u.test(char);
+    if (!(isPunctuation(last) && isWord(next)) && !(isPunctuation(first) && isWord(previous))) return false;
+
+    const tag = marker.length === 2 ? 'strong' : 'em';
+    const open = state.push(`${tag}_open`, tag, 1);
+    open.markup = marker;
+    const text = state.push('text', '', 0);
+    text.content = state.md.utils.unescapeAll(content);
+    const close = state.push(`${tag}_close`, tag, -1);
+    close.markup = marker;
+    state.pos = end + marker.length;
+    return true;
   });
 
   if (openLinksInNewTab) {

@@ -113,6 +113,15 @@ describe('comment markdown rendering', () => {
     expect(imageLink?.textContent).toBe('remote');
   });
 
+  it('shares punctuation-adjacent emphasis rules with article and chat rendering', async () => {
+    const host = await renderIntoHost(
+      createElement(CommentMarkdown, { markdown: '**采集完成。**继续阅读 *重点。*正文' }),
+    );
+    expect(host.querySelector('strong')?.textContent).toBe('采集完成。');
+    expect(host.querySelector('em')?.textContent).toBe('重点。');
+    expect(host.textContent?.trim()).toBe('采集完成。继续阅读 重点。正文');
+  });
+
   it('does not reparse unchanged comment Markdown on unrelated rerenders', async () => {
     const renderSpy = vi.spyOn(MarkdownIt.prototype, 'render');
     await renderIntoHost(createElement(CommentMarkdown, { markdown: '**same**' }));

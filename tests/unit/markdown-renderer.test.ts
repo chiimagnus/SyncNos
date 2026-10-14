@@ -12,24 +12,58 @@ describe('createMarkdownRenderer', () => {
     expect(html).toContain('<table>');
   });
 
-  it('recovers malformed inline emphasis in saved articles without changing text or code', () => {
+  it('renders punctuation-adjacent emphasis globally without inserting spaces into the text', () => {
     const md = createMarkdownRenderer();
-    const source = '**一、工具是平等的，结果不是。**AI 是放大器。';
-    const plainHtml = md.render(source);
-    expect(plainHtml).toContain('**一、工具是平等的，结果不是。**AI');
+    const example = '**Helium 实机采集已成功。**修复版对已保存的 ChatGPT 会话完成了真实 DOM 抓取';
+    expect(md.render(example)).toContain(
+      '<strong>Helium 实机采集已成功。</strong>修复版对已保存的 ChatGPT 会话完成了真实 DOM 抓取',
+    );
 
-    const html = md.render(source, { recoverMalformedArticleEmphasis: true });
-    expect(html).toContain('<strong>一、工具是平等的，结果不是。</strong>AI 是放大器。');
-    expect(html).not.toContain('**');
-    expect(md.render('*旅行。*计划', { recoverMalformedArticleEmphasis: true })).toContain('<em>旅行。</em>计划');
+    expect(md.render('**一、工具是平等的，结果不是。**AI 是放大器。')).toContain(
+      '<strong>一、工具是平等的，结果不是。</strong>AI 是放大器。',
+    );
+    expect(md.render('前文**！重点**后文')).toContain('前文<strong>！重点</strong>后文');
+    expect(md.render('*旅行。*计划')).toContain('<em>旅行。</em>计划');
+    expect(md.render('**Title.**word')).toContain('<strong>Title.</strong>word');
+    expect(md.render('**A &amp; B。**正文')).toContain('<strong>A &amp; B。</strong>正文');
+    expect(md.render('**普通加粗**正常尾部')).toContain('<strong>普通加粗</strong>正常尾部');
+    expect(md.render('[**标题。**链接](https://example.com)')).toContain(
+      '<a href="https://example.com" target="_blank" rel="noreferrer noopener"><strong>标题。</strong>链接</a>',
+    );
+    expect(md.render('~~**删除。**文本~~')).toContain('<s><strong>删除。</strong>文本</s>');
+  });
 
-    const code = ['`**原样代码。**AI`', '```md', '**围栏代码。**AI', '```'].join('\n');
-    const codeHtml = md.render(code, { recoverMalformedArticleEmphasis: true });
-    expect(codeHtml).toContain('<code>**原样代码。**AI</code>');
-    expect(codeHtml).toContain('**围栏代码。**AI');
+  it('does not reinterpret code, escaped syntax, whitespace-marked literal stars or unsafe HTML', () => {
+    const md = createMarkdownRenderer();
+    const source = [
+      '`**原样代码。**正文`',
+      '',
+      '```md',
+      '**围栏代码。**正文',
+      '```',
+      '',
+      String.raw`\*\*明确转义。\*\*正文`,
+      '',
+      '** 空格表示字面内容 **正文',
+      '',
+      '<script>alert(1)</script>',
+    ].join('\n');
+    const html = md.render(source);
+    expect(html).toContain('<code>**原样代码。**正文</code>');
+    expect(html).toContain('**围栏代码。**正文');
+    expect(html).toContain('**明确转义。**正文');
+    expect(html).toContain('** 空格表示字面内容 **正文');
+    expect(html).not.toContain('<strong>明确转义。</strong>');
+    expect(html).not.toContain('<strong>空格表示字面内容</strong>');
+    expect(html).toContain('&lt;script&gt;');
+    expect(html).not.toContain('<script>');
+  });
 
-    const escaped = String.raw`\\*\\*不要加粗。\\*\\*AI`;
-    expect(md.render(escaped, { recoverMalformedArticleEmphasis: true })).not.toContain('<strong>');
+  it('keeps math rendering intact when recovering punctuation-adjacent emphasis', () => {
+    const md = createKatexMarkdownRenderer();
+    const html = md.render('**结果正确。**下一步计算 $E=mc^2$。');
+    expect(html).toContain('<strong>结果正确。</strong>下一步计算');
+    expect(html).toContain('class="katex"');
   });
 
   it('does not allow raw HTML by default', () => {

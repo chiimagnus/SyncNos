@@ -32,15 +32,14 @@ describe('ChatMessageBubble', () => {
     expect(extractRootSectionClass(assistantHtml)).toContain('tw-bg-[var(--bg-card)]');
   });
 
-  it('repairs saved article emphasis only when explicitly requested', () => {
-    const markdown = '**一、工具是平等的，结果不是。**AI 是放大器';
-    const article = renderToStaticMarkup(
-      createElement(ChatMessageBubble, { markdown, recoverMalformedArticleEmphasis: true }),
-    );
-    expect(article).toContain('<strong>一、工具是平等的，结果不是。</strong>AI 是放大器');
-
-    const chat = renderToStaticMarkup(createElement(ChatMessageBubble, { markdown }));
-    expect(chat).toContain('**一、工具是平等的，结果不是。**AI');
+  it('renders punctuation-adjacent bold across chat and article messages by default', () => {
+    const markdown = '**Helium 实机采集已成功。**修复版对已保存的 ChatGPT 会话完成了真实 DOM 抓取';
+    const chat = renderToStaticMarkup(createElement(ChatMessageBubble, { role: 'assistant', markdown }));
+    const article = renderToStaticMarkup(createElement(ChatMessageBubble, { markdown }));
+    for (const html of [chat, article]) {
+      expect(html).toContain('<strong>Helium 实机采集已成功。</strong>修复版');
+      expect(html).not.toContain('**Helium');
+    }
   });
 
   it('uses medium profile by default and for unknown values', () => {
