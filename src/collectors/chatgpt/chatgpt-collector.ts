@@ -234,6 +234,9 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       const byRoute = links.find(routeMatchesConversation);
       const routeText = env.normalize.normalizeText(renderedElementText(byRoute)).trim();
       if (routeText) return routeText;
+
+      const pageTitle = env.normalize.normalizeText(env.document.title).trim();
+      if (pageTitle && !/^(?:chatgpt|new chat)$/i.test(pageTitle)) return pageTitle;
     }
 
     return firstUserMessageTitle(messages) || 'ChatGPT';

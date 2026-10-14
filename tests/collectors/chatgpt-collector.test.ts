@@ -513,10 +513,53 @@ describe('chatgpt current DOM', () => {
     expect(markdown).not.toContain('M0 0');
   });
 
+  it('uses current document title for durable chats without a rendered history link', async () => {
+    const dom = currentDom({
+      url: 'https://chatgpt.com/c/current-durable-conversation',
+      userText: '请帮我检查工作区中的 Git 状态和文件树',
+      beforeTurn:
+        '<section data-quick-chat-drag-handle="true" aria-label="另一个浮动聊天"><header><h2>另一个浮动聊天</h2></header></section>',
+    });
+    dom.window.document.title = 'Git 管理器改进计划';
+
+    const snapshot = (await capturePrepared(currentDef(dom))) as any;
+    expect(snapshot.conversation.conversationKey).toBe('current-durable-conversation');
+    expect(snapshot.conversation.title).toBe('Git 管理器改进计划');
+
+    const project = currentDom({
+      url: 'https://chatgpt.com/g/p_project/c/project-conversation',
+      userText: 'Project prompt',
+    });
+    project.window.document.title = '项目科研综述';
+    expect((await capturePrepared(currentDef(project))).conversation.title).toBe('项目科研综述');
+  });
+
+  it('does not use generic document titles, floating chats, or titles outside durable conversation routes', async () => {
+    for (const title of ['ChatGPT', 'New chat', '  ']) {
+      const generic = currentDom({
+        userText: 'First user message',
+        beforeTurn:
+          '<section data-quick-chat-drag-handle="true" aria-label="旧的浮动会话"><h2>旧的浮动会话</h2></section>',
+      });
+      generic.window.document.title = title;
+      expect((await capturePrepared(currentDef(generic))).conversation.title).toBe('First user message');
+    }
+
+    const shared = currentDom({ url: 'https://chatgpt.com/share/share-title-test', userText: 'Shared prompt' });
+    shared.window.document.title = '另一个会话的标题';
+    expect((await capturePrepared(currentDef(shared))).conversation.title).toBe('Shared prompt');
+
+    const temporary = currentDom({ url: 'https://chatgpt.com/?temporary-chat=true', userText: 'Temporary prompt' });
+    temporary.window.document.title = '旧会话标题';
+    expect((await capturePrepared(currentDef(temporary))).conversation.title).toBe('Temporary prompt');
+  });
+
   it('ignores ChatGPT skip-to-content fragment links when resolving the conversation title', async () => {
     const html = `<a href="#_R_jump" aria-label="跳转到内容">跳转到内容</a>
       <a href="/c/conversation-1" aria-current="page">真实对话标题</a>`;
-    const def = currentDef(currentDom({ beforeTurn: html, userText: 'First prompt' }));
+    const linked = currentDom({ beforeTurn: html, userText: 'First prompt' });
+    linked.window.document.title = '不该覆盖当前链接的浏览器标题';
+    const def = currentDef(linked);
     const snapshot = (await capturePrepared(def)) as any;
     expect(snapshot.conversation.title).toBe('真实对话标题');
     const withoutSidebar = currentDef(
@@ -530,7 +573,7 @@ describe('chatgpt current DOM', () => {
     const titled = currentDom({ beforeTurn: '<a href="#jump">跳转到内容</a>', userText: 'Prompt body' });
     titled.window.document.title = '生成交互式图表';
     const withDocumentTitle = (await capturePrepared(currentDef(titled))) as any;
-    expect(withDocumentTitle.conversation.title).toBe('Prompt body');
+    expect(withDocumentTitle.conversation.title).toBe('生成交互式图表');
   });
 
   it('enriches the matching API message with a DOM-backed SVG snapshot without changing other messages', async () => {
