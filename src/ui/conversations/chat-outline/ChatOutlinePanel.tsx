@@ -36,7 +36,7 @@ const PANEL_ENTRY_LABEL_STYLE: CSSProperties = {
 function toItemClass(active: boolean): string {
   return [
     buttonMenuItemClassName(),
-    'tw-min-h-[50px] tw-items-start tw-text-xs',
+    'tw-min-h-[50px] tw-shrink-0 tw-items-start tw-text-xs',
     active ? '' : 'webclipper-btn--tone-muted',
   ]
     .filter(Boolean)

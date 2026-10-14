@@ -266,6 +266,11 @@ describe('ArticleOutlineMinimap', () => {
     expect(triggerShell?.getAttribute('aria-hidden')).toBe('true');
     expect(triggerShell?.style.visibility).toBe('hidden');
     expect(panel?.querySelectorAll('[data-reader-outline-entry]')).toHaveLength(3);
+    expect(
+      Array.from(panel?.querySelectorAll('button[data-reader-outline-entry]') || []).every((button) =>
+        button.classList.contains('tw-shrink-0'),
+      ),
+    ).toBe(true);
     const activePanelItem = panel?.querySelector(
       '[data-reader-outline-active="true"][data-reader-outline-level="lvl-2"]',
     ) as HTMLButtonElement | null;
