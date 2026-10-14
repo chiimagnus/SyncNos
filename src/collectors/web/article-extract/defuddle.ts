@@ -53,6 +53,10 @@ function pickSemanticTitleFromContent(content: string) {
 export function extractByDefuddle(baseHref: string): DefuddleArticlePayload | null {
   try {
     const cloned = document.cloneNode(true) as Document;
+    // Defuddle 会把带 anchor/ref 类名的片段链接当作导航，误删表格里的文献来源。
+    for (const link of cloned.querySelectorAll('table th a[href^="#"], table td a[href^="#"]')) {
+      if (normalizeText(link.textContent || '')) link.removeAttribute('class');
+    }
     const parser = new Defuddle(cloned, {
       url: baseHref,
       markdown: false,
