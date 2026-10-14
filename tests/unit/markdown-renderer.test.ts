@@ -12,6 +12,26 @@ describe('createMarkdownRenderer', () => {
     expect(html).toContain('<table>');
   });
 
+  it('recovers malformed inline emphasis in saved articles without changing text or code', () => {
+    const md = createMarkdownRenderer();
+    const source = '**一、工具是平等的，结果不是。**AI 是放大器。';
+    const plainHtml = md.render(source);
+    expect(plainHtml).toContain('**一、工具是平等的，结果不是。**AI');
+
+    const html = md.render(source, { recoverMalformedArticleEmphasis: true });
+    expect(html).toContain('<strong>一、工具是平等的，结果不是。</strong>AI 是放大器。');
+    expect(html).not.toContain('**');
+    expect(md.render('*旅行。*计划', { recoverMalformedArticleEmphasis: true })).toContain('<em>旅行。</em>计划');
+
+    const code = ['`**原样代码。**AI`', '```md', '**围栏代码。**AI', '```'].join('\n');
+    const codeHtml = md.render(code, { recoverMalformedArticleEmphasis: true });
+    expect(codeHtml).toContain('<code>**原样代码。**AI</code>');
+    expect(codeHtml).toContain('**围栏代码。**AI');
+
+    const escaped = String.raw`\\*\\*不要加粗。\\*\\*AI`;
+    expect(md.render(escaped, { recoverMalformedArticleEmphasis: true })).not.toContain('<strong>');
+  });
+
   it('does not allow raw HTML by default', () => {
     const md = createMarkdownRenderer();
     const html = md.render('<script>alert(1)</script>');

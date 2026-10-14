@@ -113,6 +113,42 @@ function createTurndownService() {
     },
   });
 
+  function adjacentInlineChar(node: Node, direction: 'before' | 'after'): string {
+    let current: Node | null = node;
+    while (current?.parentNode) {
+      let sibling = direction === 'before' ? current.previousSibling : current.nextSibling;
+      while (sibling) {
+        if (sibling.nodeName === 'BR') return '';
+        const text = Array.from(sibling.textContent || '');
+        if (text.length) return direction === 'before' ? text.at(-1) || '' : text[0];
+        sibling = direction === 'before' ? sibling.previousSibling : sibling.nextSibling;
+      }
+      current = current.parentNode;
+      if (/^(P|DIV|SECTION|ARTICLE|LI|TD|TH|H[1-6]|BLOCKQUOTE)$/.test(current.nodeName)) break;
+    }
+    return '';
+  }
+
+  turndown.addRule('syncnos-inline-emphasis-boundaries', {
+    filter: ['strong', 'b', 'em', 'i'],
+    replacement(content, node, options) {
+      if (!content.trim()) return '';
+      const tag = String((node as Element).tagName || '').toLowerCase();
+      const delimiter = tag === 'strong' || tag === 'b' ? options.strongDelimiter : options.emDelimiter;
+      const text = String(node.textContent || '');
+      const first = Array.from(text)[0] || '';
+      const last = Array.from(text).at(-1) || '';
+      const before = adjacentInlineChar(node, 'before');
+      const after = adjacentInlineChar(node, 'after');
+      const isPunctuation = (char: string) => /[\p{P}\p{S}]/u.test(char);
+      const isWord = (char: string) => /[^\s\p{P}\p{S}]/u.test(char);
+      // CommonMark can't open/close emphasis next to punctuation on the inner side and text on the outer side.
+      const leading = isPunctuation(first) && isWord(before) ? ' ' : '';
+      const trailing = isPunctuation(last) && isWord(after) ? ' ' : '';
+      return `${leading}${delimiter}${content}${delimiter}${trailing}`;
+    },
+  });
+
   turndown.addRule('syncnos-redundant-strong', {
     filter(node) {
       const name = String((node as any)?.nodeName || '').toLowerCase();

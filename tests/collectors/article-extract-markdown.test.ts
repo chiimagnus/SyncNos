@@ -55,6 +55,33 @@ describe('article-extract markdown', () => {
     expect(md).toContain('const n: number = 1;');
   });
 
+  it('keeps inline emphasis valid when Chinese punctuation meets adjacent text', () => {
+    const html = `
+      <article>
+        <p><strong><span>一、工具是平等的，结果不是。</span></strong><span>AI 是放大器。</span></p>
+        <p>前文<strong>！重点</strong>后文</p>
+        <p><em>旅行。</em>计划继续</p>
+        <p><span><strong>嵌套。</strong></span><span>继续</span></p>
+        <p><span>前文</span><span><strong>！嵌套</strong></span></p>
+        <p><strong>完整句。</strong></p>
+        <pre><code>**原样代码。**AI</code></pre>
+      </article>
+    `;
+    setupDom(new JSDOM(`<body>${html}</body>`, { url: 'https://mp.weixin.qq.com/s/abc123' }));
+
+    const markdown = htmlToMarkdownTurndown(html, 'https://mp.weixin.qq.com/s/abc123');
+    const rendered = new JSDOM(new MarkdownIt().render(markdown)).window.document;
+    const paragraphs = rendered.querySelectorAll('p');
+    expect(markdown).toContain('**一、工具是平等的，结果不是。** AI 是放大器。');
+    expect(paragraphs[0].querySelector('strong')?.textContent).toBe('一、工具是平等的，结果不是。');
+    expect(paragraphs[1].querySelector('strong')?.textContent).toBe('！重点');
+    expect(paragraphs[2].querySelector('em')?.textContent).toBe('旅行。');
+    expect(paragraphs[3].querySelector('strong')?.textContent).toBe('嵌套。');
+    expect(paragraphs[4].querySelector('strong')?.textContent).toBe('！嵌套');
+    expect(paragraphs[5].querySelector('strong')?.textContent).toBe('完整句。');
+    expect(rendered.querySelector('pre code')?.textContent?.trimEnd()).toBe('**原样代码。**AI');
+  });
+
   it('promotes lazy-loaded image urls (data-src) to markdown images', () => {
     const html = `
       <article>

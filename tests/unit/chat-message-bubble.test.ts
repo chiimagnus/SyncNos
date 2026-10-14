@@ -32,6 +32,17 @@ describe('ChatMessageBubble', () => {
     expect(extractRootSectionClass(assistantHtml)).toContain('tw-bg-[var(--bg-card)]');
   });
 
+  it('repairs saved article emphasis only when explicitly requested', () => {
+    const markdown = '**一、工具是平等的，结果不是。**AI 是放大器';
+    const article = renderToStaticMarkup(
+      createElement(ChatMessageBubble, { markdown, recoverMalformedArticleEmphasis: true }),
+    );
+    expect(article).toContain('<strong>一、工具是平等的，结果不是。</strong>AI 是放大器');
+
+    const chat = renderToStaticMarkup(createElement(ChatMessageBubble, { markdown }));
+    expect(chat).toContain('**一、工具是平等的，结果不是。**AI');
+  });
+
   it('uses medium profile by default and for unknown values', () => {
     const defaultHtml = renderToStaticMarkup(createElement(ChatMessageBubble, { markdown: 'hello' }));
     expect(extractMarkdownClass(defaultHtml)).toContain('tw-font-[var(--markdown-font-medium)]');
