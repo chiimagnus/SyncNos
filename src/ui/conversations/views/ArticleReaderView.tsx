@@ -536,7 +536,6 @@ export function ArticleReaderView({
                     role="assistant"
                     markdown={text}
                     syncnosAssetSrcById={assetSrcById}
-                    recoverMalformedArticleEmphasis={!isVideoReader}
                     className={READER_PROSE_CLASS}
                   />
                 );

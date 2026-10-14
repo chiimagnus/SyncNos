@@ -25,7 +25,6 @@ export type ChatMessageBubbleProps = {
   syncnosAssetSrcById?: ReadonlyMap<number, string>;
   chatgptFileSrcById?: ReadonlyMap<string, string>;
   readingProfile?: unknown;
-  recoverMalformedArticleEmphasis?: boolean;
   className?: string;
 };
 
@@ -54,7 +53,6 @@ export function ChatMessageBubble({
   syncnosAssetSrcById,
   chatgptFileSrcById,
   readingProfile,
-  recoverMalformedArticleEmphasis,
   className,
 }: ChatMessageBubbleProps) {
   const bubbleRole = normalizeRole(role);
@@ -89,9 +87,8 @@ export function ChatMessageBubble({
     return renderer.render(String(markdown || ''), {
       syncnosAssetSrcById,
       chatgptFileSrcById,
-      recoverMalformedArticleEmphasis,
     } as any);
-  }, [markdown, syncnosAssetSrcById, chatgptFileSrcById, recoverMalformedArticleEmphasis, containsMath, mathRenderer]);
+  }, [markdown, syncnosAssetSrcById, chatgptFileSrcById, containsMath, mathRenderer]);
   const innerHtml = useMemo(() => ({ __html: html }), [html]);
 
   // NOTE: asset URLs are resolved before render via markdown-it env;

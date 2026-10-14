@@ -48,7 +48,7 @@ Grok 目前**不支持自动保存**：长对话的初始化和后台渲染可�
 ## Markdown 与附件
 
 - provider 先克隆正确的正文 DOM，再删除该站点的 thinking/control/UI 节点；之后才调用通用 Markdown / formula helper。
-- 通用 Markdown renderer 只负责 HTML 语义，不负责识别“哪个节点才是正文”。
+- 通用 Markdown renderer 只负责 HTML 语义，不负责识别“哪个节点才是正文”。文章、对话和评论统一在行内解析阶段兼容 `**标题。**正文` 等标点紧邻格式，保留转义与代码的字面标记；仅影响显示，不改写本地 Markdown。
 - 图片和附件属于消息语义时必须进入 fingerprint，避免附件变化却被当作同一消息。
 - 用户上传和 AI 生成的内容图片属于 conversation 内容；普通 tool/MCP 截图不是内容资产。
 - 正文保存不得等待图片网络。临时 signed URL、session credential 或原始私有 backend response 不作为持久内容。
