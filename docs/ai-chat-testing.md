@@ -29,7 +29,7 @@
 
 ## 执行前检查
 
-1. 使用独立、无敏感内容的测试会话；不要拿私人会话做回归样本。
+1. 使用独立、无敏感内容的测试会话与图片/文件；不要拿私人会话做回归样本。生图若消耗额度或费用，先取得测试授权；未获授权记 BLOCKED。
 2. 记录 provider、日期、当前 commit、浏览器、扩展构建来源，以及 manual / auto-save 路径。不要记录账号、cookie、token 或完整私人 URL。
 3. 本地开发扩展必须来自准备验证的当前代码；重载后确认页面已重新连接扩展。
 4. 虚拟列表、懒加载或后台 tab 必须先进入一次前台并确认正文已 hydrate。空壳 DOM 只能记 INCONCLUSIVE，不能记 FAIL。
@@ -242,26 +242,16 @@ SYNCNOS-STREAM-END
 - provider 能提供 durable branch identity 时保持稳定。
 - 无法证明 branch identity / completeness 时必须降级为 partial-safe，禁止猜测 destructive replace。
 
-### DOM-07：附件
+### DOM-07：普通文件附件
 
-仅在站点原生支持时执行，使用无敏感测试文件：
-
-- 文本文件内容：`SYNCNOS-ATTACHMENT-TEXT`
-- 图片内可见文字：`SYNCNOS-ATTACHMENT-IMAGE`
-
-发送：
+站点原生支持文件上传时，上传内容为 `SYNCNOS-ATTACHMENT-TEXT` 的无敏感文本文件，发送：
 
 ```text
 请确认你收到了测试附件，并在回复最后输出：
 SYNCNOS-ATTACHMENT-ACK
 ```
 
-断言：
-
-- Source、Capture、Persist 中用户正文与真实附件关联正确。
-- 用户上传和 AI 生成的内容图片可作为 conversation 内容。
-- 普通 tool / MCP 截图、装饰图标和页面资源不得误判为内容附件。
-- 附件变化必须反映到消息 identity / fingerprint 所依赖的语义中。
+断言：Source、Capture、Persist 中用户正文与文件附件关联正确，不混入附件按钮、页面图标或其它控件；重复保存不产生重复消息。站点支持视频附件时，另用无敏感短视频核对关联与实际媒体内容，不能只检查封面缩略图。**图片另按 IMG-01 / IMG-02 验收**，不能只凭这里的附件名称判定图片已保存。
 
 ### DOM-08：重复保存、identity 与标题
 
@@ -278,8 +268,37 @@ SYNCNOS-ATTACHMENT-ACK
 - 已存在消息复用稳定 message identity，不产生正文相同的重复项。
 - 无关 query、host alias 或入口参数变化不能拆分真实会话。
 - 已有图片缓存、评论和同步目标继续附着在同一会话上。
-- 标题来自网页内当前会话；浏览器标签页 `<title>` 不得覆盖真实会话标题。
-- 网页没有稳定标题时，才允许从首条 user semantic text 生成短标题。
+- 标题优先取当前会话对应的历史链接；ChatGPT 在已核验正式会话身份且链接未挂载时，可使用当前页面非通用 `<title>`，不能取浮动聊天或其它会话的标题。
+- 无可靠标题时，才允许从首条 user semantic text 生成短标题。
+
+### IMG-01：用户上传图片
+
+适用于原生支持图片上传的站点。准备一张**无敏感信息的 PNG**，包含独特的可见标记 `SYNCNOS-UPLOAD-IMAGE`，使用已知尺寸（建议大于 1000 px，便于识别缩略图）；记录原文件尺寸与 SHA-256。将图片与「这张图是什么？最后回复 `SYNCNOS-IMAGE-UPLOAD-ACK`」一起发到独立测试会话。
+
+断言：
+
+- **Source**：确认用户消息确实包含上传后的图片，记录页面可取得的**完整尺寸**图片资源及其类型（`blob:`、`data:`、HTTP 等）；不要把缩略图、文件名或模型的 ACK 当成图片证据。
+- **Capture**：图片归属于正确的 user message，与正文一起保存；Markdown 含真实图片引用或可恢复的稳定图片身份，不混入站点图标、复制按钮或工具截图；无法读取图片时正文仍可保存，并按 provider 契约记录不完整状态。
+- **Persist**：read-back 后图片引用仍存在；可读取的图片最终进入本地资源缓存，重复保存或 reload 不产生重复消息/图片。不得持久化短效 `blob:`、私有签名 URL 或会话凭据；图片变化不能被旧 fingerprint 吞掉。
+- **Render / 导出**：App、popup 重新打开后能够显示图片；Markdown ZIP 中存在实际可解码的图片文件，Markdown 链接指向该文件。比较导出图片与站点可取得的**完整图片**的尺寸、字节量及可比较时的 SHA-256；站点压缩过上传文件时，不能强行要求与用户原始 PNG 哈希相同。
+
+支持 manual 和 auto-save 的站点须分别检查：手动采集能保存图片，自动保存能在图片稍后加载时补齐图片，而不是只更新文字。只得到文字、缩略图或不可恢复的图片 URL，不能判 PASS；图片资源暂不可得时，应记录 Capture/Persist/导出的具体缺口。
+
+### IMG-02：AI 生成图片
+
+仅在站点**原生支持生图**、且已获测试额度授权时执行。在独立会话发送：
+
+```text
+请直接生成一张图片：浅色背景，画面里有一个橙色圆形和一个蓝色正方形。
+不要只返回绘图代码、ASCII 图或图片网址。完成后输出 SYNCNOS-IMAGE-GEN-ACK。
+```
+
+断言：
+
+- **Source**：等待生成任务结束，确认页面实际显示 AI 生成的图片。模型只回复说明、链接或未完成生成时记 INCONCLUSIVE，不是图片采集 PASS；站点不支持生图才记 N/A。
+- **Capture**：生成图归属于当前 assistant/生成结果消息，即使正文为空也不能丢；普通 tool/MCP 截图、过程预览及隐藏中间产物不能冒充用户可见成品。
+- **Persist / Render / 导出**：对照 IMG-01 检查稳定图片身份、本地缓存、App/popup 重开、Markdown ZIP 图片文件及可验证的完整图片尺寸/字节。重复保存不得重复挂载，切换分支或补充后续回答不能把图错挂到别的消息。
+- **失败语义**：站点图片失效或缓存失败不得丢弃已保存正文/其它图片；支持 auto-save 时，生成图延迟出现后须能更新同一消息。记录部分失败，不得以「保存成功」掩盖缺图。
 
 ### RICH-01：ChatGPT 结构化图表与静态图片
 
@@ -326,13 +345,15 @@ Capture / Persist 已 PASS 但上述视觉错误存在时，只记 Render FAIL�
 
 | 改动 | 最低真实回归 |
 | --- | --- |
-| 普通 provider collector | DOM-01、DOM-02、DOM-04 完成态、DOM-05 至少 4 轮、DOM-08 |
+| 普通 provider collector | DOM-01、DOM-02、DOM-04 完成态、DOM-05 至少 4 轮、DOM-08；新接入或改动图片能力时另跑适用的 IMG-01 / IMG-02 |
 | 用户正文提取 / 折叠控件 | INPUT-01、DOM-08 |
 | Markdown / shared Markdown helper | DOM-02、DOM-03、UI-01；触发问题的 provider + 至少一个同 helper 的其它 provider |
 | streaming / auto-save | DOM-04 生成中 + 完成后、DOM-08 |
 | 虚拟列表 / 分批历史 / completeness | DOM-05 全 12 轮、后台 → 前台恢复、DOM-08 |
 | branch / edit / retry | DOM-06、DOM-08 |
-| 图片 / 文件 / 视频附件 | DOM-07、DOM-08 |
+| 普通文件 / 视频附件 | DOM-07、DOM-08（按站点支持情况） |
+| 用户上传图片、DOM Blob、图片缓存、导出 | IMG-01、DOM-08；核对 App / popup 及 ZIP 实际图片文件 |
+| AI 生图、生成图身份 / 归属 | IMG-02、DOM-08；只对站点原生支持的能力执行 |
 | ChatGPT 交互式图表 / Rich UI | RICH-01、DOM-08、UI-01 |
 | conversation / message identity / title | DOM-05、DOM-08 |
 | Markdown UI / CSS | DOM-02、DOM-03、UI-01，App + popup |
@@ -366,6 +387,9 @@ Capture / Persist 已 PASS 但上述视觉错误存在时，只记 Render FAIL�
 | DOM-06 |  |  |  | N/A |  |  |
 | DOM-07 |  |  |  |  |  |  |
 | DOM-08 |  |  |  | N/A |  |  |
+| IMG-01 |  |  |  |  |  |  |
+| IMG-02 |  |  |  |  |  |  |
+| RICH-01 |  |  |  |  |  |  |
 | UI-01 |  |  |  |  |  |  |
 
 证据只保留足以复核的事实：断言锚点、capture / read-back 结果、conversation/message identity、`captureMeta`、必要截图和阻塞原因。不要保存账号凭据、私人对话或认证材料。
@@ -378,7 +402,7 @@ Capture / Persist 已 PASS 但上述视觉错误存在时，只记 Render FAIL�
 - collector 与 Source 的语义一致；
 - SyncNos 本地 read-back 与 collector 一致；
 - identity / completeness 没有违反当前 provider 契约；
-- 受展示影响时，App / popup 的实际 UI 也通过；
+- 受展示影响时，App / popup 的实际 UI 也通过；适用的 IMG-01 / IMG-02 必须核对实际图片与导出文件，不能只看 Markdown 引用；
 - 所有未执行或证据不足的项目明确标为 N/A、BLOCKED 或 INCONCLUSIVE。
 
 “测试跑绿了”“页面看起来差不多”“保存成功了”都不是完整 E2E 结论。
