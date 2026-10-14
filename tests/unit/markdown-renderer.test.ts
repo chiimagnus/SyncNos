@@ -33,6 +33,22 @@ describe('createMarkdownRenderer', () => {
     expect(md.render('~~**删除。**文本~~')).toContain('<s><strong>删除。</strong>文本</s>');
   });
 
+  it('delegates nested emphasis, links and inline code to markdown-it instead of flattening them', () => {
+    const md = createMarkdownRenderer();
+    const html = md.render('**参阅 [文档](https://example.com)、`git status` 和 *重点*。**接着阅读');
+    expect(html).toContain(
+      '<strong>参阅 <a href="https://example.com" target="_blank" rel="noreferrer noopener">文档</a>、<code>git status</code> 和 <em>重点</em>。</strong>接着阅读',
+    );
+    expect(md.render('***嵌套。***正文')).toContain('<em><strong>嵌套。</strong></em>正文');
+    expect(md.render('**公式 $E=mc^2$。**正文')).toContain('<strong>公式 $E=mc^2$。</strong>正文');
+  });
+
+  it('handles many adjacent emphasis delimiters without recursive scanning', () => {
+    const md = createMarkdownRenderer();
+    const html = md.render('**完成。**下一步 '.repeat(250));
+    expect((html.match(/<strong>完成。<\/strong>/g) || []).length).toBe(250);
+  });
+
   it('does not reinterpret code, escaped syntax, whitespace-marked literal stars or unsafe HTML', () => {
     const md = createMarkdownRenderer();
     const source = [

@@ -63,6 +63,7 @@ describe('article-extract markdown', () => {
         <p><em>旅行。</em>计划继续</p>
         <p><span><strong>嵌套。</strong></span><span>继续</span></p>
         <p><span>前文</span><span><strong>！嵌套</strong></span></p>
+        <p><strong>参阅 <a href="https://example.com/guide">指南</a>。</strong>后文</p>
         <p><strong>完整句。</strong></p>
         <pre><code>**原样代码。**AI</code></pre>
       </article>
@@ -78,7 +79,9 @@ describe('article-extract markdown', () => {
     expect(paragraphs[2].querySelector('em')?.textContent).toBe('旅行。');
     expect(paragraphs[3].querySelector('strong')?.textContent).toBe('嵌套。');
     expect(paragraphs[4].querySelector('strong')?.textContent).toBe('！嵌套');
-    expect(paragraphs[5].querySelector('strong')?.textContent).toBe('完整句。');
+    expect(paragraphs[5].querySelector('strong a')?.getAttribute('href')).toBe('https://example.com/guide');
+    expect(paragraphs[5].querySelector('strong')?.textContent).toBe('参阅 指南。');
+    expect(paragraphs[6].querySelector('strong')?.textContent).toBe('完整句。');
     expect(rendered.querySelector('pre code')?.textContent?.trimEnd()).toBe('**原样代码。**AI');
   });
 
