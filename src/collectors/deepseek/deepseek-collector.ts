@@ -142,12 +142,42 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
     const text = role === 'user' ? extractUserText(item) : extractAssistantText(item);
     const contentNode = role === 'assistant' ? assistantContentNode(item) || item : item;
     const imageUrls = extractImageUrlsFromElement(contentNode);
+    const blobUrls: string[] = [];
+    for (const img of Array.from(contentNode.querySelectorAll('img'))) {
+      const source = [img.currentSrc, img.getAttribute('src')].find((url) => /^blob:/i.test(String(url || '')));
+      if (source && !blobUrls.includes(source)) blobUrls.push(source);
+    }
     const baseMarkdown = role === 'assistant' ? extractAssistantMarkdown(item) || text : text;
     return {
       text,
       imageUrls,
+      blobUrls,
       markdown: appendImageMarkdown(baseMarkdown, imageUrls),
     };
+  }
+
+  async function resolveBlobImage(blobUrl: string, cache: Map<string, string>): Promise<string | null> {
+    const cached = cache.get(blobUrl);
+    if (cached) return cached;
+    try {
+      const fetchFn = (env.window as any).fetch || globalThis.fetch;
+      const response = await fetchFn(blobUrl);
+      if (!response.ok) return null;
+      const blob = await response.blob();
+      if (!blob.size || !/^image\//i.test(blob.type)) return null;
+      const FileReaderCtor = (env.window as any).FileReader;
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReaderCtor();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(blob);
+      });
+      if (!/^data:image\//i.test(dataUrl)) return null;
+      cache.set(blobUrl, dataUrl);
+      return dataUrl;
+    } catch {
+      return null;
+    }
   }
 
   function compactFingerprint(value: string): string {
@@ -167,7 +197,7 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
       !identityPending &&
       !editing &&
       !streaming &&
-      (!!content.text || !!content.markdown || content.imageUrls.length > 0);
+      (!!content.text || !!content.markdown || content.imageUrls.length > 0 || content.blobUrls.length > 0);
     return {
       key,
       role,
@@ -183,6 +213,7 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
           content.text,
           content.markdown,
           content.imageUrls.join('|'),
+          content.blobUrls.join('|'),
         ].join('\u001f'),
       ),
     };
@@ -249,21 +280,37 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
     return atBottom && !!last?.rendered && !last.streaming && !last.editing ? 'confirmed' : 'pending';
   }
 
-  function snapshotMessage(item: Element, descriptor: DeepseekDescriptor, sequence: number): any | null {
+  async function snapshotMessage(
+    item: Element,
+    descriptor: DeepseekDescriptor,
+    sequence: number,
+    imageCache: Map<string, string>,
+  ): Promise<any | null> {
     if (!descriptor.rendered || descriptor.streaming || descriptor.editing) return null;
     const content = extractContent(item, descriptor.role);
-    if (!content.markdown && !content.text && !content.imageUrls.length) return null;
+    const blobImages = await Promise.all(content.blobUrls.map((url) => resolveBlobImage(url, imageCache)));
+    const imageIncomplete = blobImages.some((image) => !image);
+    const markdown = appendImageMarkdown(
+      content.markdown,
+      blobImages.filter((image): image is string => !!image),
+      {
+        allowDataImageUrls: true,
+      },
+    );
+    if (!markdown && !content.text && !content.imageUrls.length) return null;
     return {
       messageKey: descriptor.key,
       role: descriptor.role,
-      contentMarkdown: content.markdown || content.text,
+      contentMarkdown: markdown || content.text,
       sequence,
       updatedAt: Date.now(),
+      ...(imageIncomplete ? { captureMergePolicy: 'preserve-existing-markdown' } : null),
     };
   }
 
   async function harvestCurrentInto(
     accumulator: PreparedAccumulator<any>,
+    imageCache: Map<string, string>,
   ): Promise<{ added: number; updated: number }> {
     const items = getVisibleItems();
     const existingByKey = new Map(accumulator.records.map((record) => [record.key, record]));
@@ -274,7 +321,11 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
       const descriptor = descriptorFromItem(item);
       if (!descriptor) continue;
       const existing = existingByKey.get(descriptor.key);
-      if (existing && existing.fingerprint === descriptor.fingerprint) {
+      if (
+        existing &&
+        existing.fingerprint === descriptor.fingerprint &&
+        existing.payload.captureMergePolicy !== 'preserve-existing-markdown'
+      ) {
         records.push({
           key: existing.key,
           turnKey: existing.turnKey,
@@ -284,8 +335,13 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
         });
         continue;
       }
-      const message = snapshotMessage(item, descriptor, index);
+      const message = await snapshotMessage(item, descriptor, index, imageCache);
       if (!message) continue;
+      if (message.captureMergePolicy === 'preserve-existing-markdown') {
+        accumulator.completeness = 'partial';
+        if (!accumulator.reasons.includes('inline_images_incomplete'))
+          accumulator.reasons.push('inline_images_incomplete');
+      }
       records.push({
         key: descriptor.key,
         turnKey: descriptor.key,
@@ -313,6 +369,7 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
       identityGuard: initialIdentityGuard,
     });
     if (!conversationKey) addPreparedReason(accumulator, 'unstable_identity');
+    const imageCache = new Map<string, string>();
 
     const runtime = { document: env.document, window: env.window };
     const sampleIdentity = createIdentitySampler(initialIdentityGuard);
@@ -338,7 +395,7 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
             const canonical = sampleIdentityGuard();
             target.identityGuard = { ...canonical, anchors: canonical.anchors.slice() };
           },
-          harvest: harvestCurrentInto,
+          harvest: (target) => harvestCurrentInto(target, imageCache),
         },
         accumulator,
         {
@@ -354,7 +411,9 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
           now: options.now,
         },
       );
-      accumulator.completeness = sweep.completeness;
+      accumulator.completeness = accumulator.reasons.includes('inline_images_incomplete')
+        ? 'partial'
+        : sweep.completeness;
     } finally {
       const restored = scrollRestorer.restore();
       if (!restored.restored) {
@@ -411,7 +470,7 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
       });
       accumulator.completeness = 'partial';
       addPreparedReason(accumulator, 'top_not_reached');
-      await harvestCurrentInto(accumulator);
+      await harvestCurrentInto(accumulator, new Map());
       if (!identityGuardsMatch(identityGuard, sampleIdentityGuard())) return null;
       return snapshotFromPreparedCapture(finishPreparedCapture(accumulator));
     }
@@ -435,7 +494,7 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
       prepared.records.map(({ firstSeenIndex: _firstSeenIndex, ...record }: any) => record),
     );
 
-    const finalLive = await harvestCurrentInto(accumulator);
+    const finalLive = await harvestCurrentInto(accumulator, new Map());
     if (accumulator.completeness === 'complete' && (finalLive.added > 0 || finalLive.updated > 0)) {
       accumulator.completeness = 'partial';
       addPreparedReason(accumulator, 'final_live_changed');

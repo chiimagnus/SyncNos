@@ -62,6 +62,61 @@ async function capturePrepared(def: any, options: Record<string, unknown> = {}) 
 }
 
 describe('deepseek-collector', () => {
+  it('captures full-resolution user-uploaded blob images from the rendered DOM without private APIs', async () => {
+    const dom = setupDeepseekDom(
+      item('-2', user('<img src="blob:https://chat.deepseek.com/upload-1" alt="screenshot.png">这是什么？')) +
+        item('2', assistant('<p>这是 VS Code Git 界面。</p>')),
+    );
+    const pendingUser = dom.window.document.querySelector('[data-virtual-list-item-key="-2"]')!;
+    pendingUser.setAttribute('data-syncnos-deepseek-message-id', '1');
+    const imageBytes = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==',
+      'base64',
+    );
+    const fetchBlob = vi.fn(async (url: string) => {
+      expect(url).toBe('blob:https://chat.deepseek.com/upload-1');
+      return { ok: true, blob: async () => new dom.window.Blob([imageBytes], { type: 'image/png' }) };
+    });
+    (dom.window as any).fetch = fetchBlob;
+
+    const def = createDef(dom);
+    const saved = await def.collector.capture();
+    expect(saved.messages).toHaveLength(2);
+    expect(saved.messages[0].messageKey).toBe('deepseek_1');
+    expect(saved.messages[0].contentMarkdown).toContain('这是什么？');
+    expect(saved.messages[0].contentMarkdown).toContain(
+      '![](data:image/png;base64,' + imageBytes.toString('base64') + ')',
+    );
+    expect(saved.messages[0].contentMarkdown).not.toContain('blob:');
+    expect(fetchBlob).toHaveBeenCalledTimes(1);
+
+    const prepared = await capturePrepared(def);
+    expect(prepared.messages[0].contentMarkdown).toContain('![](data:image/png;base64,');
+    expect(prepared.captureMeta.completeness).toBe('complete');
+  });
+
+  it('preserves previous Markdown and marks capture partial when a blob image cannot be read', async () => {
+    const dom = setupDeepseekDom(item('1', user('<img src="blob:https://chat.deepseek.com/missing">这是什么？')));
+    (dom.window as any).fetch = vi.fn(async () => {
+      throw new Error('blob revoked');
+    });
+    const def = createDef(dom);
+
+    const auto = await def.collector.capture();
+    expect(auto.messages[0]).toMatchObject({
+      messageKey: 'deepseek_1',
+      contentMarkdown: '这是什么？',
+      captureMergePolicy: 'preserve-existing-markdown',
+    });
+    expect(auto.captureMeta.completeness).toBe('partial');
+    expect(auto.captureMeta.reasons).toContain('inline_images_incomplete');
+
+    const manual = await capturePrepared(def);
+    expect(manual.messages[0].captureMergePolicy).toBe('preserve-existing-markdown');
+    expect(manual.captureMeta.completeness).toBe('partial');
+    expect(manual.captureMeta.reasons).toContain('inline_images_incomplete');
+    expect(manual.messages[0].contentMarkdown).not.toContain('blob:');
+  });
   it('keeps ready user keys stable when the site replaces a negative render key after reload', async () => {
     const dom = setupDeepseekDom(item('-2', user('prompt')) + item('2', assistant('<p>answer</p>')));
     const def = createDef(dom);
