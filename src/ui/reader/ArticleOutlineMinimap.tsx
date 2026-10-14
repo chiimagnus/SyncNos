@@ -66,7 +66,7 @@ function toItemClass(active: boolean, level: number): string {
   const indentClass = level >= 3 ? 'tw-pl-7' : level === 2 ? 'tw-pl-5' : '';
   return [
     buttonMenuItemClassName(),
-    'tw-min-h-8 tw-items-start tw-text-xs',
+    'tw-min-h-8 tw-shrink-0 tw-items-start tw-text-xs',
     active ? '' : 'webclipper-btn--tone-muted',
     indentClass,
   ]

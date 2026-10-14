@@ -129,6 +129,7 @@ describe('ChatOutlinePanel', () => {
     expect(firstEntry?.classList.contains('webclipper-btn')).toBe(true);
     expect(firstEntry?.classList.contains('webclipper-btn--menu-item')).toBe(true);
     expect(firstEntry?.classList.contains('webclipper-btn--tone-muted')).toBe(true);
+    expect(firstEntry?.classList.contains('tw-shrink-0')).toBe(true);
     expect(panel?.querySelector('[data-chat-outline-active="true"]')?.getAttribute('aria-checked')).toBe('true');
 
     act(() => {
