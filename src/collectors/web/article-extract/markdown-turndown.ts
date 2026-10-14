@@ -93,7 +93,7 @@ function createTurndownService() {
   turndown.addRule('syncnos-table-block-wrapper', {
     filter(node) {
       const name = String((node as any)?.nodeName || '').toLowerCase();
-      if (name !== 'p' && name !== 'section' && name !== 'div') return false;
+      if (name !== 'p' && name !== 'section' && name !== 'div' && name !== 'figure') return false;
       return isInsideTable(node);
     },
     replacement(content) {

@@ -1,5 +1,7 @@
 import { JSDOM } from 'jsdom';
+import MarkdownIt from 'markdown-it';
 import { describe, expect, it } from 'vitest';
+import { extractByDefuddle } from '../../src/collectors/web/article-extract/defuddle.ts';
 import { htmlToMarkdownTurndown } from '../../src/collectors/web/article-extract/markdown-turndown.ts';
 import { markdownToNotionBlocks } from '../../src/services/sync/notion/notion-markdown-blocks.ts';
 
@@ -287,6 +289,64 @@ describe('article-extract markdown', () => {
       /^\|[ \t]+\*\*MJCF\*\*[ \t]+\|[ \t]+描述机器人刚体、关节、质量、惯量、网格和碰撞关系的 XML 模型[ \t]+\|$/,
     );
     expect(md).not.toContain('****MJCF****');
+  });
+
+  it('keeps figure images inside their GFM table cells across multiple rows', () => {
+    const url = 'https://example.com/paper';
+    const html = `
+      <article><table>
+        <thead><tr><th>Defect</th><th>Model</th><th>Source</th></tr></thead>
+        <tbody>
+          <tr><td>Random joints</td><td><figure class="inline-figure"><img src="/fx62.jpg" alt="Image 62"></figure></td><td><a href="#bib79">Qiu et al. (2023)</a></td></tr>
+          <tr><td>Two intersected joints</td><td><figure><a href="/full"><img src="/fx63.jpg" alt="Image 63"></a><figcaption>Simulation view</figcaption></figure></td><td><a href="#bib118">Yan et al. (2023)</a></td></tr>
+        </tbody>
+      </table></article>
+    `;
+    setupDom(new JSDOM(`<body>${html}</body>`, { url }));
+
+    const markdown = htmlToMarkdownTurndown(html, url);
+    const rendered = new JSDOM(new MarkdownIt().render(markdown)).window.document;
+    const rows = rendered.querySelectorAll('table tbody tr');
+    expect(rows).toHaveLength(2);
+    expect(rows[0].querySelector('td:nth-child(2) img')?.getAttribute('src')).toBe('https://example.com/fx62.jpg');
+    expect(rows[0].querySelector('td:nth-child(3) a')?.textContent).toBe('Qiu et al. (2023)');
+    expect(rows[1].querySelector('td:nth-child(2) img')?.getAttribute('src')).toBe('https://example.com/fx63.jpg');
+    expect(rows[1].querySelector('td:nth-child(2)')?.textContent).toContain('Simulation view');
+    expect(rows[1].querySelector('td:nth-child(3) a')?.textContent).toBe('Yan et al. (2023)');
+  });
+
+  it('preserves cited table source links through Defuddle without retaining navigation anchors', () => {
+    const url = 'https://www.sciencedirect.com/science/article/pii/example';
+    const rows = Array.from(
+      { length: 19 },
+      (_, index) => `
+      <tr><td>Random joints ${index}</td><td>DEM</td>
+      <td><figure class="inline-figure"><img src="/fx${index}.jpg" alt="Image ${index}"></figure></td>
+      <td><a class="anchor anchor-primary" href="#bib${index}"><span>Qiu et al. (${2020 + index})</span></a></td></tr>
+    `,
+    ).join('');
+    const html = `<!doctype html><html><head><title>Article</title></head><body>
+      <article><h1>Dynamic rock tests</h1><p>${'SHPB experiments describe dynamic rock failure. '.repeat(85)}</p>
+      <a class="anchor" href="#top">Skip navigation</a>
+      <table><thead><tr><th>Defect</th><th>Method</th><th>Model</th><th>Source</th></tr></thead>
+      <tbody>${rows}</tbody></table></article></body></html>`;
+    setupDom(new JSDOM(html, { url }));
+
+    const article = extractByDefuddle(url);
+    expect(article?.contentHTML).toContain('Qiu et al. (2020)');
+    expect(article?.contentHTML).not.toContain('Skip navigation');
+    const markdown = htmlToMarkdownTurndown(article?.contentHTML, url);
+    const rendered = new JSDOM(new MarkdownIt().render(markdown)).window.document;
+    const tableRows = rendered.querySelectorAll('table tbody tr');
+    expect(tableRows).toHaveLength(19);
+    expect(rendered.querySelectorAll('table tbody td:nth-child(3) img')).toHaveLength(19);
+    expect(rendered.querySelectorAll('table tbody td:nth-child(4) a')).toHaveLength(19);
+    expect(tableRows[0].querySelector('td:nth-child(4) a')?.getAttribute('href')).toBe(`${url}#bib0`);
+    expect(tableRows[0].querySelector('td:nth-child(3) img')?.getAttribute('src')).toBe(
+      'https://www.sciencedirect.com/fx0.jpg',
+    );
+    expect(tableRows[0].querySelector('td:nth-child(4) a')?.textContent).toBe('Qiu et al. (2020)');
+    expect(tableRows[18].querySelector('td:nth-child(4) a')?.textContent).toBe('Qiu et al. (2038)');
   });
 
   it('converts wechat rich_media tables with nested <section>/<span> into markdown tables', () => {

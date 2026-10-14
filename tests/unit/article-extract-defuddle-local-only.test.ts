@@ -30,7 +30,7 @@ afterEach(() => {
 describe('article-extract Defuddle local-only policy', () => {
   it('uses synchronous local parsing and never starts the async network fallback', () => {
     vi.stubGlobal('document', {
-      cloneNode: vi.fn(() => ({})),
+      cloneNode: vi.fn(() => ({ querySelectorAll: vi.fn(() => []) })),
       createElement: vi.fn(() => {
         let innerText = '';
         return {
