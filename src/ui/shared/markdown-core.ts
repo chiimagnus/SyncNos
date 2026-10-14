@@ -158,6 +158,55 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, ma
     return renderExternalImageWithLink(img, safeSrc);
   };
 
+  // Earlier article captures contain invalid Turndown emphasis such as **标题。**正文.
+  // Repair display tokens without rewriting stored quotes, code blocks, or unrelated chat messages.
+  inst.core.ruler.after('inline', 'syncnos-legacy-article-emphasis', (state) => {
+    if (state.env?.recoverMalformedArticleEmphasis !== true) return;
+    for (const block of state.tokens) {
+      if (block.type !== 'inline' || !block.children) continue;
+      const children = [];
+      for (const child of block.children) {
+        if (child.type !== 'text' || !child.content.includes('*')) {
+          children.push(child);
+          continue;
+        }
+        const pattern = /(\*{1,2})([^*\r\n]+?)\1/gu;
+        let position = 0;
+        let matched = false;
+        for (const match of child.content.matchAll(pattern)) {
+          const raw = match[0];
+          const index = match.index;
+          if (!block.content.includes(raw) || !match[2].trim()) continue;
+          if (child.content[index - 1] === '*' || child.content[index + raw.length] === '*') continue;
+
+          if (index > position) {
+            const preceding = new state.Token('text', '', 0);
+            preceding.content = child.content.slice(position, index);
+            children.push(preceding);
+          }
+          const tag = match[1].length === 2 ? 'strong' : 'em';
+          const opening = new state.Token(`${tag}_open`, tag, 1);
+          opening.markup = match[1];
+          const content = new state.Token('text', '', 0);
+          content.content = match[2];
+          const closing = new state.Token(`${tag}_close`, tag, -1);
+          closing.markup = match[1];
+          children.push(opening, content, closing);
+          position = index + raw.length;
+          matched = true;
+        }
+        if (!matched) {
+          children.push(child);
+        } else if (position < child.content.length) {
+          const trailing = new state.Token('text', '', 0);
+          trailing.content = child.content.slice(position);
+          children.push(trailing);
+        }
+      }
+      block.children = children;
+    }
+  });
+
   if (openLinksInNewTab) {
     inst.use(linkAttributes as any, {
       attrs: {
