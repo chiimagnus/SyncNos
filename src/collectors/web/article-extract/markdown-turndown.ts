@@ -133,31 +133,19 @@ function createTurndownService() {
     filter: ['strong', 'b', 'em', 'i'],
     replacement(content, node, options) {
       if (!content.trim()) return '';
-      const tag = String((node as Element).tagName || '').toLowerCase();
-      const delimiter = tag === 'strong' || tag === 'b' ? options.strongDelimiter : options.emDelimiter;
+      const strong = node.nodeName === 'STRONG' || node.nodeName === 'B';
+      if (strong && (node as Element).parentElement?.closest('b,strong')) return content;
+      const delimiter = strong ? options.strongDelimiter : options.emDelimiter;
       const text = String(node.textContent || '');
       const first = Array.from(text)[0] || '';
       const last = Array.from(text).at(-1) || '';
       const before = adjacentInlineChar(node, 'before');
       const after = adjacentInlineChar(node, 'after');
-      const isPunctuation = (char: string) => /[\p{P}\p{S}]/u.test(char);
-      const isWord = (char: string) => /[^\s\p{P}\p{S}]/u.test(char);
-      // CommonMark can't open/close emphasis next to punctuation on the inner side and text on the outer side.
-      const leading = isPunctuation(first) && isWord(before) ? ' ' : '';
-      const trailing = isPunctuation(last) && isWord(after) ? ' ' : '';
+      const punctuation = /[\p{P}\p{S}]/u;
+      const word = /[^\s\p{P}\p{S}]/u;
+      const leading = punctuation.test(first) && word.test(before) ? ' ' : '';
+      const trailing = punctuation.test(last) && word.test(after) ? ' ' : '';
       return `${leading}${delimiter}${content}${delimiter}${trailing}`;
-    },
-  });
-
-  turndown.addRule('syncnos-redundant-strong', {
-    filter(node) {
-      const name = String((node as any)?.nodeName || '').toLowerCase();
-      if (name !== 'b' && name !== 'strong') return false;
-      const parent = (node as Element)?.parentElement;
-      return Boolean(parent?.closest?.('b,strong'));
-    },
-    replacement(content) {
-      return content;
     },
   });
 

@@ -158,34 +158,23 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, ma
     return renderExternalImageWithLink(img, safeSrc);
   };
 
-  // Only relax CommonMark punctuation flanking; the inline parser already protects escaped marks and code spans.
+  // Keep markdown-it's delimiter pairing and nested tokenization; relax only punctuation flanking.
   inst.inline.ruler.before('emphasis', 'syncnos-punctuation-emphasis', (state, silent) => {
-    if (silent || state.src[state.pos] !== '*') return false;
-    const marker = state.src.startsWith('**', state.pos) ? '**' : '*';
-    const start = state.pos + marker.length;
-    if (state.src[start] === '*') return false;
-    const end = state.src.indexOf(marker, start + 1);
-    if (end < 0 || state.src[end + marker.length] === '*') return false;
+    if (silent || state.src[state.pos] !== '*' || Object.hasOwn(state, 'scanDelims')) return false;
+    const scanDelims = state.scanDelims;
+    state.scanDelims = function (pos, canSplitWord) {
+      const delimiters = scanDelims.call(this, pos, canSplitWord);
+      if (this.src[pos] !== '*') return delimiters;
 
-    const content = state.src.slice(start, end);
-    if (!content || /^\s|\s$/u.test(content) || /[\r\n`\\\[\]_~<>$*]/u.test(content)) return false;
-    const previous = state.src.slice(0, state.pos).at(-1) || '';
-    const next = state.src[end + marker.length] || '';
-    const first = Array.from(content)[0] || '';
-    const last = Array.from(content).at(-1) || '';
-    const isPunctuation = (char: string) => /[\p{P}\p{S}]/u.test(char);
-    const isWord = (char: string) => /[^\s\p{P}\p{S}]/u.test(char);
-    if (!(isPunctuation(last) && isWord(next)) && !(isPunctuation(first) && isWord(previous))) return false;
-
-    const tag = marker.length === 2 ? 'strong' : 'em';
-    const open = state.push(`${tag}_open`, tag, 1);
-    open.markup = marker;
-    const text = state.push('text', '', 0);
-    text.content = state.md.utils.unescapeAll(content);
-    const close = state.push(`${tag}_close`, tag, -1);
-    close.markup = marker;
-    state.pos = end + marker.length;
-    return true;
+      const before = Array.from(this.src.slice(Math.max(0, pos - 2), pos)).at(-1) || '';
+      const after = Array.from(this.src.slice(pos + delimiters.length, pos + delimiters.length + 2))[0] || '';
+      const punctuation = /[\p{P}\p{S}]/u;
+      const word = /[^\s\p{P}\p{S}]/u;
+      if (punctuation.test(before) && word.test(after)) delimiters.can_close = true;
+      if (word.test(before) && punctuation.test(after)) delimiters.can_open = true;
+      return delimiters;
+    };
+    return false;
   });
 
   if (openLinksInNewTab) {
