@@ -5,7 +5,7 @@
     { "title": "采集方式", "pages": ["capture", "capture-ai-chats", "capture-articles", "capture-videos"] },
     {
       "title": "功能",
-      "pages": ["features", "library", "comments", "reader", "dollar-mention", "insights", "export-backup"]
+      "pages": ["features", "library", "shortcuts", "comments", "reader", "dollar-mention", "insights", "export-backup"]
     },
     { "title": "同步", "pages": ["sync/index", "sync/notion", "sync/obsidian", "sync/feishu", "sync/github"] },
     { "title": "高级与帮助", "pages": ["cli", "privacy", "faq"] }

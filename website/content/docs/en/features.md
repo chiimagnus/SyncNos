@@ -11,6 +11,6 @@ After capture, you can use:
 - [$ insert](/docs/en/dollar-mention/): insert local content into AI editors
 - [Insights](/docs/en/insights/): view local capture statistics
 - [Export & backup](/docs/en/export-backup/): export files or create a recovery package
-- [Browser shortcuts](/docs/en/capture/#browser-shortcuts): save and open SyncNos quickly
+- [Keyboard shortcuts](/docs/en/shortcuts/): configure keys to open and use SyncNos
 
 Use [Sync](/docs/en/sync/) when you want continuous copies in external services.

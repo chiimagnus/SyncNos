@@ -6,7 +6,7 @@
 
 - AI 对话：ChatGPT、Claude、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai、Grok
 - 网页与视频：保存网页正文、内容图片、YouTube / Bilibili 字幕与可用页面信息
-- 本地使用：搜索、阅读、划线评论、朗读、大纲、数据概览、$ 插入
+- 本地使用：搜索、阅读、划线评论、朗读、大纲、数据概览、$ 插入、可配置快捷键
 - 输出：同步到 Notion、Obsidian、飞书、GitHub；导出 Markdown / JSON；创建 Backup
 
 ## 安装
@@ -19,6 +19,7 @@
 
 - [用户文档](https://chiimagnus.github.io/SyncNos/docs/)
 - [采集](https://chiimagnus.github.io/SyncNos/docs/capture/)
+- [快捷键](https://chiimagnus.github.io/SyncNos/docs/shortcuts/)
 - [同步](https://chiimagnus.github.io/SyncNos/docs/sync/)
 - [导出与备份](https://chiimagnus.github.io/SyncNos/docs/export-backup/)
 - [源码](https://github.com/chiimagnus/SyncNos)

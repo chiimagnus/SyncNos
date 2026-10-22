@@ -18,7 +18,7 @@ The detail view shows actions that fit the item and its sync state, such as:
 
 ## Keyboard navigation
 
-Use [Settings → Keyboard shortcuts](/docs/en/capture/#in-app-shortcuts) to edit or clear shortcuts for next/previous conversations, source/site filters, loaded-item selection, exports, sync actions, copying, opening destinations, and the detail More menu. Unavailable actions remain inactive.
+Use [Settings → Keyboard shortcuts](/docs/en/shortcuts/) to edit or clear shortcuts for next/previous conversations, source/site filters, loaded-item selection, exports, sync actions, copying, opening destinations, and the detail More menu. Unavailable actions remain inactive.
 
 ## Image cache
 
