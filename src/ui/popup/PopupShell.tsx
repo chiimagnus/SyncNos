@@ -15,6 +15,7 @@ import { AppTooltipHost, tooltipAttrs } from '@ui/shared/AppTooltip';
 import { usePopupCurrentPageCapture } from '@viewmodels/popup/usePopupCurrentPageCapture';
 import { usePopupOpenCurrentTabInpageCommentsSidebar } from '@viewmodels/popup/usePopupOpenCurrentTabInpageCommentsSidebar';
 import { useAppThemeMode } from '@viewmodels/theme/useAppThemeMode';
+import { useInAppShortcuts } from '@viewmodels/shortcuts/useInAppShortcuts';
 
 type PopupSyncNudgeProvider = Extract<SyncProvider, 'notion' | 'feishu'>;
 
@@ -163,6 +164,21 @@ function PopupShellFrame() {
     await openOrFocusExtensionAppTab({ route: '/settings' });
     window.close();
   }, []);
+
+  useInAppShortcuts({
+    'open-settings': () => {
+      void onOpenSettings().catch(() => {});
+    },
+    'capture-page': () => {
+      if (!buttonDisabled) void capture().catch(() => {});
+    },
+    'popup-comments': () => {
+      if (commentsButton.disabled) return;
+      void commentsButton.open().then((ok) => {
+        if (ok) window.close();
+      });
+    },
+  });
 
   const onOpenInsightSettings = useCallback(async () => {
     await openOrFocusExtensionAppTab({ route: '/settings?section=aboutyou' });

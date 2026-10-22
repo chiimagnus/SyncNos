@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronRight, Palette, Pause, Play, Square, Type, Volume2 } from 'lucide-react';
 
 import { t } from '@i18n';
@@ -31,6 +31,7 @@ type ReaderHeaderToolbarProps = {
   themeMode: AppThemeMode;
   updateThemeMode: (mode: AppThemeMode) => void | Promise<void>;
   narration: ReaderHeaderNarration;
+  requestedPanel?: 'text' | 'theme' | 'narration' | null;
   className?: string;
 };
 
@@ -52,9 +53,11 @@ export function ReaderHeaderToolbar({
   themeMode,
   updateThemeMode,
   narration,
+  requestedPanel,
   className,
 }: ReaderHeaderToolbarProps) {
   const [openPanel, setOpenPanel] = useState<OpenPanel>(null);
+  const appliedRequestRef = useRef<OpenPanel>(null);
   const labels = {
     toolbarAria: t('readerToolbarAria'),
     text: t('readerTextLayoutButton'),
@@ -71,6 +74,19 @@ export function ReaderHeaderToolbar({
     }
     setOpenPanel(next);
   };
+
+  useEffect(() => {
+    if (!requestedPanel) {
+      appliedRequestRef.current = null;
+      return;
+    }
+    if (appliedRequestRef.current === requestedPanel) return;
+    appliedRequestRef.current = requestedPanel;
+    if ((openPanel === 'text' || openPanel === 'narration') && openPanel !== requestedPanel) {
+      void commitPreview().catch(() => {});
+    }
+    setOpenPanel(requestedPanel);
+  }, [requestedPanel, openPanel, commitPreview]);
 
   if (!features.textLayout && !features.theme && !features.narration) return null;
 

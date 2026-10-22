@@ -15,6 +15,7 @@ import {
   resolveConversationSourceOptionLabel,
 } from '@ui/conversations/conversation-list-tags';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
+import { useInAppShortcuts } from '@viewmodels/shortcuts/useInAppShortcuts';
 import { ConversationSyncFeedbackNotice } from '@ui/conversations/ConversationSyncFeedbackNotice';
 import { navItemClassName } from '@ui/shared/nav-styles';
 import {
@@ -596,6 +597,80 @@ export function ConversationListPane({
     };
   }, [armedDeleteKey, deleteConfirm]);
 
+  const clickButton = (id: string) => {
+    const button = document.getElementById(id);
+    if (button instanceof HTMLElement && !button.matches(':disabled')) button.click();
+  };
+  const activeListRow = () => {
+    const id = Number(effectiveActiveRowId);
+    return filteredItems.find((item) => Number(item.id) === id) || null;
+  };
+  const moveSelection = (step: -1 | 1) => {
+    if (!visibleIds.length) return;
+    const current = visibleIds.indexOf(Number(effectiveActiveRowId));
+    const index = current < 0 ? (step > 0 ? 0 : visibleIds.length - 1) : current + step;
+    if (index >= 0 && index < visibleIds.length) activateRow(visibleIds[index]!);
+  };
+
+  useInAppShortcuts({
+    'filter-source': () => {
+      if (!hasSelection) clickButton('sourceFilterSelect');
+    },
+    'filter-site': () => {
+      if (!hasSelection && listSourceFilterKey === 'web') clickButton('siteFilterSelect');
+    },
+    'select-loaded': () => clickButton('chkSelectAll'),
+    'next-conversation': () => moveSelection(1),
+    'previous-conversation': () => moveSelection(-1),
+    'copy-list-markdown': () => {
+      const row = activeListRow();
+      if (!row) return;
+      const button = document.querySelector<HTMLButtonElement>(
+        `[data-conversation-id="${row.id}"] [data-list-copy-markdown]`,
+      );
+      button?.click();
+    },
+    'copy-list-link': () => {
+      const row = activeListRow();
+      if (!row) return;
+      document.querySelector<HTMLButtonElement>(`[data-conversation-source-link="${row.id}"]`)?.click();
+    },
+    'delete-selected': () => {
+      if (hasSelection && !actionBusy && !syncingAny) clickButton('btnDelete');
+    },
+    'export-menu': () => {
+      if (hasSelection && !actionBusy) clickButton('btnExport');
+    },
+    'export-markdown': () => {
+      if (hasSelection && !actionBusy) void exportSelectedMarkdown();
+    },
+    'export-json': () => {
+      if (hasSelection && !actionBusy) void exportSelectedJson();
+    },
+    'sync-menu': () => {
+      if (!actionBusy && hasSelection) clickButton(singleSyncProvider ? 'btnSyncProvider' : 'btnSyncTo');
+    },
+    'sync-notion': () => {
+      if (hasSelection && !actionBusy && enabledSyncProviders.includes('notion') && !isProviderSyncing('notion'))
+        startSyncProvider('notion');
+    },
+    'sync-obsidian': () => {
+      if (hasSelection && !actionBusy && enabledSyncProviders.includes('obsidian') && !isProviderSyncing('obsidian'))
+        startSyncProvider('obsidian');
+    },
+    'sync-feishu': () => {
+      if (hasSelection && !actionBusy && enabledSyncProviders.includes('feishu') && !isProviderSyncing('feishu'))
+        startSyncProvider('feishu');
+    },
+    'sync-github': () => {
+      if (hasSelection && !actionBusy && enabledSyncProviders.includes('github') && !isProviderSyncing('github'))
+        startSyncProvider('github');
+    },
+    'open-insights': () => {
+      if (!hasSelection) onOpenInsightsSection?.();
+    },
+  });
+
   const sourceFilterActive =
     String(listSourceFilterKey || 'all')
       .trim()
@@ -719,6 +794,7 @@ export function ConversationListPane({
                       className={buttonMiniIconClassName(isActive)}
                       type="button"
                       aria-label={t('copyFullMarkdown')}
+                      data-list-copy-markdown="true"
                       onClick={(e) => void onCopyConversation(conversation as any, e)}
                     >
                       {copiedId === id ? '✓' : '⧉'}

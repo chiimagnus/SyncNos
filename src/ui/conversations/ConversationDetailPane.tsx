@@ -8,6 +8,7 @@ import { useChatOutlineActiveIndex } from '@ui/conversations/chat-outline/useCha
 
 import { t, formatConversationTitle } from '@i18n';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
+import { useInAppShortcuts } from '@viewmodels/shortcuts/useInAppShortcuts';
 import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
 import {
   buttonFilledClassName,
@@ -165,6 +166,8 @@ export function ConversationDetailPane({
   const [urlEditing, setUrlEditing] = useState(false);
   const [urlDraft, setUrlDraft] = useState('');
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [requestedReaderPanel, setRequestedReaderPanel] = useState<'text' | 'theme' | 'narration' | null>(null);
+  const shortcutActionBusyRef = useRef(false);
   const urlInputRef = useRef<HTMLInputElement | null>(null);
   const displayedUrl = String((selected as any)?.url || '').trim();
   const isVideo = String((selected as any)?.sourceType || '') === 'video';
@@ -210,6 +213,7 @@ export function ConversationDetailPane({
   ].join(' ');
   const closeMoreMenu = useCallback(() => {
     setMoreMenuOpen(false);
+    setRequestedReaderPanel(null);
     setReaderToolbarPortalTarget(null);
   }, []);
   const handleMoreMenuOpenChange = useCallback(
@@ -293,6 +297,57 @@ export function ConversationDetailPane({
       else console.error(message);
     });
   };
+
+  const triggerDetailAction = (id: string) => {
+    const action = safeActions.find((item) => item.id === id && !item.disabled);
+    if (!action || shortcutActionBusyRef.current) return;
+    shortcutActionBusyRef.current = true;
+    void Promise.resolve()
+      .then(() => action.onTrigger())
+      .catch((error) => {
+        const message = error instanceof Error && error.message ? error.message : t('actionFailedFallback');
+        window.alert(message);
+      })
+      .finally(() => {
+        shortcutActionBusyRef.current = false;
+      });
+    closeMoreMenu();
+  };
+  const openReaderPanel = (panel: 'text' | 'theme' | 'narration') => {
+    if (!readerFeatures[panel === 'text' ? 'textLayout' : panel]) return;
+    if (moreMenuOpen && requestedReaderPanel === panel) {
+      closeMoreMenu();
+      return;
+    }
+    setMoreMenuOpen(true);
+    setRequestedReaderPanel(panel);
+  };
+
+  useInAppShortcuts({
+    'back-to-list': () => onBack?.(),
+    'detail-copy-link': () => {
+      const button = document.querySelector<HTMLButtonElement>('[data-detail-header-primary-copy]');
+      if (button && !button.disabled) button.click();
+    },
+    'detail-copy-notion': () => triggerDetailAction('copy-notion-link'),
+    'detail-copy-feishu': () => triggerDetailAction('copy-feishu-link'),
+    'detail-copy-github': () => triggerDetailAction('copy-github-link'),
+    'detail-comments': () => {
+      if (canOpenCommentsSidebar) onTriggerCommentsSidebar?.();
+    },
+    'detail-more': () => {
+      if (hasMoreMenuContent) handleMoreMenuOpenChange(!moreMenuOpen);
+    },
+    'detail-markdown': () => triggerDetailAction('copy-full-markdown'),
+    'detail-original': () => triggerDetailAction('open-original'),
+    'detail-open-notion': () => triggerDetailAction('open-in-notion'),
+    'detail-open-obsidian': () => triggerDetailAction('open-in-obsidian'),
+    'detail-open-feishu': () => triggerDetailAction('open-in-feishu'),
+    'detail-open-github': () => triggerDetailAction('open-in-github'),
+    'reader-layout': () => openReaderPanel('text'),
+    'reader-theme': () => openReaderPanel('theme'),
+    'reader-narration': () => openReaderPanel('narration'),
+  });
 
   const detailMetadata = (
     <div className="tw-mb-1 tw-min-w-0" data-detail-metadata="true">
@@ -594,6 +649,7 @@ export function ConversationDetailPane({
               metadata={detailMetadata}
               readerFeatures={readerFeatures}
               readerToolbarPortalTarget={readerToolbarPortalTarget}
+              requestedReaderPanel={requestedReaderPanel}
               outlineScrollRoot={outlineScrollRoot}
             />
           ) : (

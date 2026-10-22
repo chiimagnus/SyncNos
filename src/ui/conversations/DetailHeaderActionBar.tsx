@@ -175,6 +175,7 @@ export function DetailHeaderActionBar({
         <button
           key={action.id}
           type="button"
+          data-detail-header-primary-copy={action.slot === 'copy' ? 'true' : undefined}
           {...resolveActionTooltipAttrs(action)}
           onClick={() => {
             void handleTrigger(action);
@@ -205,6 +206,7 @@ export function DetailHeaderActionBar({
         <button
           key={primaryAction.id}
           type="button"
+          data-detail-header-primary-copy={primaryAction.slot === 'copy' ? 'true' : undefined}
           {...resolveActionTooltipAttrs(primaryAction)}
           onClick={() => {
             void handleTrigger(primaryAction);
