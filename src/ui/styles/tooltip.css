@@ -15,6 +15,21 @@
   z-index: 1600;
 }
 
+.webclipper-tooltip__label,
+.webclipper-tooltip__shortcut {
+  display: block;
+}
+
+.webclipper-tooltip__shortcut {
+  color: rgb(244 247 252 / 62%);
+  font-size: 11px;
+  font-weight: 450;
+}
+
+.webclipper-tooltip__label + .webclipper-tooltip__shortcut {
+  margin-top: 4px;
+}
+
 @media (prefers-color-scheme: dark) {
   .react-tooltip.webclipper-tooltip {
     border-color: rgb(84 90 104 / 70%);

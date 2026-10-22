@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Copy, ExternalLink, ImageDown } from 'lucide-react';
 
 import type { DetailHeaderAction } from '@services/integrations/detail-header-action-types';
+import type { InAppShortcutAction } from '@services/shortcuts/in-app-shortcuts';
 import { t } from '@i18n';
 import { buttonMenuItemClassName } from '@ui/shared/button-styles';
 import { MenuPopover } from '@ui/shared/MenuPopover';
-import { tooltipAttrs } from '@ui/shared/AppTooltip';
+import { tooltipAttrs, tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
 
 type DetailHeaderActionBarProps = {
   actions: DetailHeaderAction[];
@@ -15,7 +16,20 @@ type DetailHeaderActionBarProps = {
   menuTriggerLabel?: string;
   menuTriggerAriaLabel?: string;
   menuAriaLabel?: string;
+  getShortcut?: (action: InAppShortcutAction) => string;
   className?: string;
+};
+
+const DETAIL_SHORTCUT_IDS: Record<string, InAppShortcutAction> = {
+  'copy-notion-link': 'detail-copy-notion',
+  'copy-feishu-link': 'detail-copy-feishu',
+  'copy-github-link': 'detail-copy-github',
+  'copy-full-markdown': 'detail-markdown',
+  'open-original': 'detail-original',
+  'open-in-notion': 'detail-open-notion',
+  'open-in-obsidian': 'detail-open-obsidian',
+  'open-in-feishu': 'detail-open-feishu',
+  'open-in-github': 'detail-open-github',
 };
 
 const PROVIDER_LOGO_SRC: Record<string, string> = {
@@ -52,6 +66,7 @@ export function DetailHeaderActionBar({
   menuTriggerLabel,
   menuTriggerAriaLabel,
   menuAriaLabel,
+  getShortcut,
   className,
 }: DetailHeaderActionBarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -107,9 +122,15 @@ export function DetailHeaderActionBar({
 
   if (!actions.length) return null;
 
-  const copyOnly = actions.every((action) => action.kind === 'copy-text');
+  const actionShortcut = (action: DetailHeaderAction) => {
+    const id = DETAIL_SHORTCUT_IDS[action.id];
+    return id ? getShortcut?.(id) || '' : '';
+  };
   const resolveActionTooltipAttrs = (action: DetailHeaderAction) =>
-    action.kind === 'copy-text' ? {} : tooltipAttrs(action.label);
+    tooltipAttrsWithShortcut(
+      action.label,
+      (action.slot === 'copy' ? getShortcut?.('detail-copy-link') : '') || actionShortcut(action),
+    );
 
   const resolveActionIcon = (action: DetailHeaderAction) => {
     if (action.kind === 'copy-text' && copiedActionId === action.id) {
@@ -141,6 +162,7 @@ export function DetailHeaderActionBar({
             type="button"
             role="menuitem"
             aria-label={action.label}
+            {...tooltipAttrsWithShortcut('', actionShortcut(action))}
             aria-disabled={action.disabled ? 'true' : undefined}
             disabled={busy || !!action.disabled}
             onClick={() => {
@@ -175,6 +197,7 @@ export function DetailHeaderActionBar({
         <button
           key={action.id}
           type="button"
+          data-detail-header-primary-copy={action.slot === 'copy' ? 'true' : undefined}
           {...resolveActionTooltipAttrs(action)}
           onClick={() => {
             void handleTrigger(action);
@@ -205,6 +228,7 @@ export function DetailHeaderActionBar({
         <button
           key={primaryAction.id}
           type="button"
+          data-detail-header-primary-copy={primaryAction.slot === 'copy' ? 'true' : undefined}
           {...resolveActionTooltipAttrs(primaryAction)}
           onClick={() => {
             void handleTrigger(primaryAction);
@@ -229,7 +253,7 @@ export function DetailHeaderActionBar({
           trigger={(triggerProps) => (
             <button
               {...triggerProps}
-              {...(copyOnly ? {} : tooltipAttrs(resolvedMenuTriggerLabel))}
+              {...tooltipAttrs(resolvedMenuTriggerLabel)}
               aria-label={resolvedMenuTriggerAriaLabel}
               className={buttonClassName}
             >
@@ -248,6 +272,7 @@ export function DetailHeaderActionBar({
               className={menuButtonClass}
               type="button"
               role="menuitem"
+              {...tooltipAttrsWithShortcut('', actionShortcut(action))}
               onClick={() => {
                 void handleTrigger(action);
                 setMenuOpen(false);

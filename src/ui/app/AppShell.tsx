@@ -9,11 +9,12 @@ import { LazyArticleCommentsSection, LazyConversationDetailPane } from '@ui/conv
 import type { CommentLocatorSurfaceRoots } from '@ui/comments';
 import { createAppCommentSelectionSource } from '@ui/comments/app-comment-selection-source';
 import { buttonIconCircleGhostClassName, headerButtonClassName } from '@ui/shared/button-styles';
-import { AppTooltipHost, tooltipAttrs } from '@ui/shared/AppTooltip';
+import { AppTooltipHost, tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
 import { useResponsiveTier } from '@ui/shared/hooks/useResponsiveTier';
 import { useArticleCommentsSidebarRuntime } from '@viewmodels/comments/useArticleCommentsSidebarRuntime';
 import { usePopupSyncSelectionHandoff } from '@viewmodels/conversations/usePopupSyncSelectionHandoff';
 import { useAppThemeMode } from '@viewmodels/theme/useAppThemeMode';
+import { useInAppShortcuts } from '@viewmodels/shortcuts/useInAppShortcuts';
 import { decodeConversationLoc, encodeConversationLoc } from '@services/shared/conversation-loc';
 import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { conversationKinds } from '@services/protocols/conversation-kinds';
@@ -244,6 +245,13 @@ export default function AppShell() {
       });
     };
 
+    const shortcut = useInAppShortcuts({
+      'toggle-sidebar': () => {
+        if (!isNarrow) setCollapsed(!sidebarCollapsed);
+      },
+      'open-settings': openSettings,
+    });
+
     const openInsightSettings = () => {
       if (settingsOpen) {
         navigate('/settings?section=aboutyou', { replace: true, state: location.state });
@@ -355,6 +363,8 @@ export default function AppShell() {
       if (!showSettingsSheet) return;
       const onKey = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
+          const target = e.target;
+          if (target instanceof Element && target.closest('[data-shortcut-recording="true"]')) return;
           e.preventDefault();
           e.stopPropagation();
           closeSettings();
@@ -468,7 +478,7 @@ export default function AppShell() {
                               onClick={openSettings}
                               className={headerButtonClassName()}
                               aria-label={t('openSettingsAria')}
-                              {...tooltipAttrs(t('openSettings'))}
+                              {...tooltipAttrsWithShortcut('', shortcut('open-settings'))}
                             >
                               <span className="tw-sr-only">{t('settingsLabel')}</span>
                               <SettingsIcon size={16} strokeWidth={1.6} aria-hidden="true" />
@@ -530,7 +540,7 @@ export default function AppShell() {
                                 onClick={openSettings}
                                 className={headerButtonClassName()}
                                 aria-label={t('openSettingsAria')}
-                                {...tooltipAttrs(t('openSettings'))}
+                                {...tooltipAttrsWithShortcut('', shortcut('open-settings'))}
                               >
                                 <span className="tw-sr-only">{t('settingsLabel')}</span>
                                 <SettingsIcon size={16} strokeWidth={1.6} aria-hidden="true" />
@@ -541,6 +551,7 @@ export default function AppShell() {
                                 onClick={() => setCollapsed(true)}
                                 className={headerButtonClassName()}
                                 aria-label={t('collapseSidebar')}
+                                {...tooltipAttrsWithShortcut(t('collapseSidebar'), shortcut('toggle-sidebar'))}
                               >
                                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                                   <path

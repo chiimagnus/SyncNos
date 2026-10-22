@@ -8,6 +8,7 @@ type TooltipPlace = 'top' | 'right' | 'bottom' | 'left';
 type TooltipAnchorAttrs = {
   'data-tooltip-id'?: string;
   'data-tooltip-content'?: string;
+  'data-tooltip-shortcut'?: string;
   'data-tooltip-place'?: TooltipPlace;
 };
 
@@ -19,6 +20,17 @@ export function tooltipAttrs(content: string | null | undefined, place: TooltipP
     'data-tooltip-content': safeContent,
     'data-tooltip-place': place,
   };
+}
+
+export function tooltipAttrsWithShortcut(
+  label: string,
+  shortcut: string | null | undefined,
+  place: TooltipPlace = 'top',
+) {
+  const key = String(shortcut || '').trim();
+  const content = String(label || '').trim();
+  if (!key) return tooltipAttrs(content, place);
+  return { ...tooltipAttrs([content, key].filter(Boolean).join('\n'), place), 'data-tooltip-shortcut': key };
 }
 
 export function AppTooltipHost() {
