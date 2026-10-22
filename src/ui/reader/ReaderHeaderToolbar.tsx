@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { ChevronRight, Palette, Pause, Play, Square, Type, Volume2 } from 'lucide-react';
 
 import { t } from '@i18n';
@@ -33,7 +33,6 @@ type ReaderHeaderToolbarProps = {
   themeMode: AppThemeMode;
   updateThemeMode: (mode: AppThemeMode) => void | Promise<void>;
   narration: ReaderHeaderNarration;
-  requestedPanel?: 'text' | 'theme' | 'narration' | null;
   getShortcut?: (action: InAppShortcutAction) => string;
   className?: string;
 };
@@ -56,12 +55,10 @@ export function ReaderHeaderToolbar({
   themeMode,
   updateThemeMode,
   narration,
-  requestedPanel,
   getShortcut,
   className,
 }: ReaderHeaderToolbarProps) {
   const [openPanel, setOpenPanel] = useState<OpenPanel>(null);
-  const appliedRequestRef = useRef<OpenPanel>(null);
   const labels = {
     toolbarAria: t('readerToolbarAria'),
     text: t('readerTextLayoutButton'),
@@ -78,19 +75,6 @@ export function ReaderHeaderToolbar({
     }
     setOpenPanel(next);
   };
-
-  useEffect(() => {
-    if (!requestedPanel) {
-      appliedRequestRef.current = null;
-      return;
-    }
-    if (appliedRequestRef.current === requestedPanel) return;
-    appliedRequestRef.current = requestedPanel;
-    if ((openPanel === 'text' || openPanel === 'narration') && openPanel !== requestedPanel) {
-      void commitPreview().catch(() => {});
-    }
-    setOpenPanel(requestedPanel);
-  }, [requestedPanel, openPanel, commitPreview]);
 
   if (!features.textLayout && !features.theme && !features.narration) return null;
 
@@ -120,7 +104,6 @@ export function ReaderHeaderToolbar({
               {...triggerProps}
               data-reader-header-trigger="text"
               aria-label={labels.text}
-              {...tooltipAttrsWithShortcut('', getShortcut?.('reader-layout'))}
               className={readerTriggerClassName()}
             >
               <span className="tw-inline-flex tw-items-center tw-gap-2">
@@ -152,7 +135,6 @@ export function ReaderHeaderToolbar({
               {...triggerProps}
               data-reader-header-trigger="theme"
               aria-label={labels.theme}
-              {...tooltipAttrsWithShortcut('', getShortcut?.('reader-theme'))}
               className={readerTriggerClassName()}
             >
               <span className="tw-inline-flex tw-items-center tw-gap-2">
@@ -184,7 +166,6 @@ export function ReaderHeaderToolbar({
               {...triggerProps}
               data-reader-header-trigger="narration"
               aria-label={labels.narration}
-              {...tooltipAttrsWithShortcut('', getShortcut?.('reader-narration'))}
               className={readerTriggerClassName()}
             >
               <span className="tw-inline-flex tw-items-center tw-gap-2">

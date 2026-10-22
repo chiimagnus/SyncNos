@@ -235,46 +235,6 @@ describe('ReaderHeaderToolbar', () => {
     expect(mocks.stop).toHaveBeenCalledTimes(1);
   });
 
-  it('opens the requested reader panel without requiring a pointer click', () => {
-    const renderPanel = (requestedPanel: 'text' | 'theme' | 'narration' | null) => {
-      act(() => {
-        root!.render(
-          createElement(ReaderHeaderToolbar, {
-            features: { textLayout: true, theme: true, narration: true },
-            prefs: DEFAULT_READER_PREFS,
-            update: mocks.update,
-            preview: mocks.preview,
-            commitPreview: mocks.commitPreview,
-            themeMode: 'system',
-            updateThemeMode: mocks.updateThemeMode,
-            narration: {
-              state: 'paused',
-              isPlaying: false,
-              error: null,
-              webSpeechAvailable: true,
-              stop: mocks.stop,
-              toggle: mocks.toggle,
-            },
-            requestedPanel,
-          }),
-        );
-      });
-    };
-
-    renderPanel('text');
-    expect(document.querySelector('[data-testid="text-layout-action"]')).toBeTruthy();
-    renderPanel('theme');
-    expect(document.querySelector('[data-testid="theme-action"]')).toBeTruthy();
-    expect(
-      document.querySelector('[data-testid="text-layout-action"]')?.closest('[role="menu"]')?.hasAttribute('hidden'),
-    ).toBe(true);
-    expect(mocks.commitPreview).toHaveBeenCalledTimes(1);
-
-    renderPanel('narration');
-    expect(document.querySelector('[data-testid="narration-action"]')).toBeTruthy();
-    expect(mocks.commitPreview).toHaveBeenCalledTimes(1);
-  });
-
   it('keeps text menus free of redundant tips while explaining icon-only narration controls', () => {
     act(() => {
       root!.render(
@@ -288,7 +248,6 @@ describe('ReaderHeaderToolbar', () => {
           updateThemeMode: mocks.updateThemeMode,
           getShortcut: (action) =>
             ({
-              'reader-theme': 'Alt+Shift+T',
               'reader-play-pause': 'Ctrl+Alt+P',
             })[action] || '',
           narration: {
@@ -306,7 +265,7 @@ describe('ReaderHeaderToolbar', () => {
     const textTrigger = document.querySelector('[data-reader-header-trigger="text"]');
     const themeTrigger = document.querySelector('[data-reader-header-trigger="theme"]');
     expect(textTrigger?.getAttribute('data-tooltip-id')).toBeNull();
-    expect(themeTrigger?.getAttribute('data-tooltip-content')).toBe('Alt+Shift+T');
+    expect(themeTrigger?.getAttribute('data-tooltip-content')).toBeNull();
 
     act(() => {
       (document.querySelector('[data-reader-header-trigger="narration"]') as HTMLButtonElement).click();

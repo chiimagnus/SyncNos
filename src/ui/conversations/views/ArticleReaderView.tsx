@@ -43,7 +43,6 @@ type ArticleReaderViewProps = DetailViewSharedProps & {
   metadata?: ReactNode;
   readerFeatures?: ConversationKindDefinition['view']['readerFeatures'];
   readerToolbarPortalTarget?: HTMLElement | null;
-  requestedReaderPanel?: 'text' | 'theme' | 'narration' | null;
   outlineScrollRoot?: Element | null;
 };
 
@@ -89,7 +88,6 @@ export function ArticleReaderView({
   metadata,
   readerFeatures,
   readerToolbarPortalTarget,
-  requestedReaderPanel,
   outlineScrollRoot,
 }: ArticleReaderViewProps) {
   // readerFeatures gates each toolbar piece; chat conversations pass all-false (or
@@ -459,7 +457,6 @@ export function ArticleReaderView({
         themeMode={themeMode}
         updateThemeMode={updateThemeMode}
         narration={toolbarNarration}
-        requestedPanel={requestedReaderPanel}
         getShortcut={shortcut}
       />,
       readerToolbarPortalTarget,
@@ -470,7 +467,6 @@ export function ArticleReaderView({
     prefs,
     preview,
     readerToolbarPortalTarget,
-    requestedReaderPanel,
     shortcut,
     themeMode,
     toolbarNarration,

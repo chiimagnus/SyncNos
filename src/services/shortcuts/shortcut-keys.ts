@@ -3,17 +3,6 @@ export type ShortcutPlatform = 'mac' | 'windows' | 'linux' | 'chromeos' | 'other
 
 type ModifierFamily = 'Ctrl' | 'Meta' | 'Alt' | 'Shift';
 const MODIFIER_ORDER = ['Mod', 'Ctrl', 'Meta', 'Alt', 'Shift'] as const;
-// Existing stored shortcuts may contain physical-side tokens from older builds.
-const LEGACY_MODIFIERS = new Map([
-  ['controlleft', 'Ctrl'],
-  ['controlright', 'Ctrl'],
-  ['metaleft', 'Meta'],
-  ['metaright', 'Meta'],
-  ['altleft', 'Alt'],
-  ['altright', 'Alt'],
-  ['shiftleft', 'Shift'],
-  ['shiftright', 'Shift'],
-]);
 const KEY_CODES = [
   'Space',
   'Tab',
@@ -264,21 +253,8 @@ export function normalizeInAppShortcut(value: unknown): string | null {
   const pieces = value.split('+').map((piece) => piece.trim());
   const key = normalizeKey(pieces.pop() || '');
   if (!key || new Set(pieces).size !== pieces.length) return null;
-  const modifiers: string[] = [];
-  const originalByModifier = new Map<string, string>();
-  for (const piece of pieces) {
-    const source = piece.toLowerCase();
-    const modifier = MODIFIER_NAMES.get(source) || LEGACY_MODIFIERS.get(source);
-    if (!modifier) return null;
-    const previous = originalByModifier.get(modifier);
-    if (previous) {
-      // Both physical sides formerly formed a valid chord; they now mean the same modifier.
-      if (!LEGACY_MODIFIERS.has(source) || !LEGACY_MODIFIERS.has(previous)) return null;
-      continue;
-    }
-    originalByModifier.set(modifier, source);
-    modifiers.push(modifier);
-  }
+  const modifiers = pieces.map((piece) => MODIFIER_NAMES.get(piece.toLowerCase()));
+  if (modifiers.some((modifier) => !modifier) || new Set(modifiers).size !== modifiers.length) return null;
   const sorted = MODIFIER_ORDER.filter((modifier) => modifiers.includes(modifier));
   const shortcut = [...sorted, key].join('+');
   if (shortcut === 'Tab' || shortcut === 'Escape') return null; // Keyboard accessibility.
@@ -355,10 +331,7 @@ function displayModifier(modifier: string, platform: ShortcutPlatform): string {
 
 export function displayInAppShortcutParts(value: string, platform: ShortcutPlatform): string[] {
   if (!value) return [];
-  const parts = value
-    .split('+')
-    .map((piece) => MODIFIER_NAMES.get(piece.toLowerCase()) || LEGACY_MODIFIERS.get(piece.toLowerCase()) || piece);
-  const pieces = [...new Set(parts)];
+  const pieces = value.split('+');
   return pieces.map((piece) => {
     if (MODIFIER_NAMES.has(piece.toLowerCase())) return displayModifier(piece, platform);
     if (/^Numpad[0-9]$/.test(piece)) return `Num ${piece.at(-1)}`;

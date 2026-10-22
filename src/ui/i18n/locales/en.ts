@@ -46,7 +46,7 @@ export const en = {
   keyboardShortcutsBrowserHeading: 'Browser shortcuts',
   keyboardShortcutsInAppHeading: 'Inside SyncNos',
   keyboardShortcutsInAppHint: 'Click a binding to record a shortcut with live key feedback. Left and right modifiers are equivalent. Esc cancels; × clears. Works inside SyncNos only.',
-  keyboardShortcutsNavigationGroup: 'Navigation',
+  keyboardShortcutsNavigationGroup: 'General',
   keyboardShortcutsLibraryGroup: 'Library',
   keyboardShortcutsDetailGroup: 'Details',
   keyboardShortcutsReaderGroup: 'Reader',

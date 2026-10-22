@@ -23,6 +23,10 @@ An assigned binding always has a visible **×** button to clear it. Press **Esc*
 
 For example, the sidebar defaults to `⌘ + \` on macOS and `Ctrl + \` on Windows/Linux. Key labels follow the operating system, without separate left/right modifiers. **Backspace** and **Delete** can also be assigned.
 
+**Copy full Markdown** has one shortcut. It copies the current library entry in the list, or the open content in the detail pane; in a two-column layout, keyboard focus determines the target.
+
+**Export** and **Sync** have shortcuts for opening their menus; select the format or destination in the menu. Reader typography, theme, and narration settings stay in the More menu, while play/pause and stop can still have shortcuts.
+
 Hover over icon controls to see active shortcuts on a separate, subtler line below their descriptions.
 
 ## A shortcut does not work?

@@ -13,7 +13,7 @@ Adjust font, size, line height, content width, letter spacing, alignment, and th
 
 Use browser Web Speech or a configured AI narration endpoint. You can control rate, voice, and playback position, and click a sentence to continue from there.
 
-Reader text layout, theme, narration panels, play/pause, and stop each have configurable keys under [Settings → Keyboard shortcuts](/docs/en/shortcuts/).
+Play/pause and stop narration can be assigned under [Settings → Keyboard shortcuts](/docs/en/shortcuts/). Text layout, theme, and narration settings remain in the reader menu.
 
 ## Outline
 

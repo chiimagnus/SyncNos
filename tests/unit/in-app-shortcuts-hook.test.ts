@@ -157,6 +157,16 @@ describe('in-app keydown dispatch', () => {
     expect(listener).toBeNull();
   });
 
+  it('does not swallow a configured key when the current action is unavailable', async () => {
+    await render();
+    handlers['toggle-sidebar'].mockReturnValueOnce(false);
+    const unavailable = sendKey('\\', 'Backslash', { ctrlKey: true });
+    expect(unavailable.defaultPrevented).toBe(false);
+    const available = sendKey('\\', 'Backslash', { ctrlKey: true });
+    expect(available.defaultPrevented).toBe(true);
+    expect(handlers['toggle-sidebar']).toHaveBeenCalledTimes(2);
+  });
+
   it('does not apply a stale initial read after newer storage changes', async () => {
     let resolveRead!: (value: unknown) => void;
     storage.get.mockReturnValueOnce(
@@ -173,13 +183,10 @@ describe('in-app keydown dispatch', () => {
     expect(handlers['toggle-sidebar']).not.toHaveBeenCalled();
   });
 
-  it('executes migrated old-side bindings with either hand and generic browser modifier flags', async () => {
+  it('uses logical modifier flags regardless of physical key side', async () => {
     await render();
     act(() =>
-      listener?.(
-        { [IN_APP_SHORTCUT_STORAGE_KEY]: { newValue: { 'toggle-sidebar': 'AltRight+ShiftLeft+B' } } },
-        'local',
-      ),
+      listener?.({ [IN_APP_SHORTCUT_STORAGE_KEY]: { newValue: { 'toggle-sidebar': 'Alt+Shift+B' } } }, 'local'),
     );
     const chord = { altKey: true, shiftKey: true };
     sendKey('B', 'KeyB', chord);

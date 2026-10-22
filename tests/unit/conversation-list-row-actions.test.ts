@@ -193,11 +193,10 @@ describe('ConversationListPane row actions', () => {
     shortcutBindings = {
       'filter-source': 'Alt+Shift+F',
       'select-loaded': 'Alt+Shift+A',
-      'copy-list-markdown': 'Ctrl+Alt+M',
+      'copy-markdown': 'Ctrl+Alt+M',
       'copy-list-link': 'Ctrl+Alt+L',
       'open-insights': 'Ctrl+Alt+I',
       'export-menu': 'Ctrl+Alt+E',
-      'export-json': 'Ctrl+Alt+J',
     };
     currentState.items.push({ ...conversation, id: 12, conversationKey: 'conv-12' });
     currentState.listSummary.totalCount = 2;
@@ -233,7 +232,40 @@ describe('ConversationListPane row actions', () => {
     });
     const json = document.querySelector('#menuExportJson') as HTMLButtonElement;
     expect(json.textContent).toBe('jsonExport');
-    expect(json.getAttribute('data-tooltip-content')).toBe('Ctrl+Alt+J');
+    expect(json.getAttribute('data-tooltip-content')).toBeNull();
+  });
+
+  it('keeps export formats and sync destinations clickable without individual key bindings', async () => {
+    currentState.selectedIds = [11];
+    currentState.enabledSyncProviders = ['notion', 'obsidian'];
+    await renderPane();
+
+    await act(async () => {
+      (document.querySelector('#btnExport') as HTMLButtonElement).click();
+      await flushMicrotasks();
+    });
+    const markdown = document.querySelector('#menuExportMarkdown') as HTMLButtonElement;
+    const json = document.querySelector('#menuExportJson') as HTMLButtonElement;
+    expect(markdown.getAttribute('data-tooltip-content')).toBeNull();
+    expect(json.getAttribute('data-tooltip-content')).toBeNull();
+    await act(async () => {
+      markdown.click();
+      await flushMicrotasks();
+    });
+    expect(currentState.exportSelectedMarkdown).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      (document.querySelector('#btnSyncTo') as HTMLButtonElement).click();
+      await flushMicrotasks();
+    });
+    const notion = document.querySelector('#menuSyncToNotion') as HTMLButtonElement;
+    expect(notion).toBeTruthy();
+    expect(notion.getAttribute('data-tooltip-content')).toBeNull();
+    await act(async () => {
+      notion.click();
+      await flushMicrotasks();
+    });
+    expect(currentState.syncSelected).toHaveBeenCalledWith('notion');
   });
 
   it('copies the exact trimmed original https URL from the source badge without activating the row', async () => {

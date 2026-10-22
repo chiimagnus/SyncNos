@@ -61,7 +61,10 @@ export function useInAppShortcutBindings(reportLoadError = true) {
   return { bindings, ready, error, update, reset };
 }
 
-export function useInAppShortcuts(handlers: Partial<Record<InAppShortcutAction, () => void>>, enabled = true) {
+export function useInAppShortcuts(
+  handlers: Partial<Record<InAppShortcutAction, () => void | boolean>>,
+  enabled = true,
+) {
   const { bindings, ready } = useInAppShortcutBindings(false);
   const handlersRef = useRef(handlers);
   handlersRef.current = handlers;
@@ -83,10 +86,9 @@ export function useInAppShortcuts(handlers: Partial<Record<InAppShortcutAction, 
       const action = (Object.keys(handlersRef.current) as InAppShortcutAction[]).find(
         (id) => inAppShortcutMatches(bindings[id], pressed, platform) && typeof handlersRef.current[id] === 'function',
       );
-      if (!action) return;
+      if (!action || handlersRef.current[action]?.() === false) return;
       event.preventDefault();
       event.stopPropagation();
-      handlersRef.current[action]?.();
     };
     document.addEventListener('keydown', onKeyDown);
     return () => {

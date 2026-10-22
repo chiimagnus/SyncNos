@@ -48,7 +48,7 @@ export const zh: { [K in TranslationKey]: string } = {
   keyboardShortcutsBrowserHeading: '浏览器快捷键',
   keyboardShortcutsInAppHeading: 'SyncNos 内部快捷键',
   keyboardShortcutsInAppHint: '点击键位录制；按下时会实时显示组合键。左右修饰键无需区分，Esc 取消录制，× 清空。仅在 SyncNos 内生效。',
-  keyboardShortcutsNavigationGroup: '导航',
+  keyboardShortcutsNavigationGroup: '常用操作',
   keyboardShortcutsLibraryGroup: '收藏列表',
   keyboardShortcutsDetailGroup: '详情',
   keyboardShortcutsReaderGroup: '阅读器',

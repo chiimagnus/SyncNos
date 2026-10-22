@@ -166,7 +166,6 @@ export function ConversationDetailPane({
   const [urlEditing, setUrlEditing] = useState(false);
   const [urlDraft, setUrlDraft] = useState('');
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
-  const [requestedReaderPanel, setRequestedReaderPanel] = useState<'text' | 'theme' | 'narration' | null>(null);
   const shortcutActionBusyRef = useRef(false);
   const urlInputRef = useRef<HTMLInputElement | null>(null);
   const displayedUrl = String((selected as any)?.url || '').trim();
@@ -213,7 +212,6 @@ export function ConversationDetailPane({
   ].join(' ');
   const closeMoreMenu = useCallback(() => {
     setMoreMenuOpen(false);
-    setRequestedReaderPanel(null);
     setReaderToolbarPortalTarget(null);
   }, []);
   const handleMoreMenuOpenChange = useCallback(
@@ -313,15 +311,6 @@ export function ConversationDetailPane({
       });
     closeMoreMenu();
   };
-  const openReaderPanel = (panel: 'text' | 'theme' | 'narration') => {
-    if (!readerFeatures[panel === 'text' ? 'textLayout' : panel]) return;
-    if (moreMenuOpen && requestedReaderPanel === panel) {
-      closeMoreMenu();
-      return;
-    }
-    setMoreMenuOpen(true);
-    setRequestedReaderPanel(panel);
-  };
 
   const shortcut = useInAppShortcuts({
     'back-to-list': () => onBack?.(),
@@ -338,15 +327,11 @@ export function ConversationDetailPane({
     'detail-more': () => {
       if (hasMoreMenuContent) handleMoreMenuOpenChange(!moreMenuOpen);
     },
-    'detail-markdown': () => triggerDetailAction('copy-full-markdown'),
     'detail-original': () => triggerDetailAction('open-original'),
     'detail-open-notion': () => triggerDetailAction('open-in-notion'),
     'detail-open-obsidian': () => triggerDetailAction('open-in-obsidian'),
     'detail-open-feishu': () => triggerDetailAction('open-in-feishu'),
     'detail-open-github': () => triggerDetailAction('open-in-github'),
-    'reader-layout': () => openReaderPanel('text'),
-    'reader-theme': () => openReaderPanel('theme'),
-    'reader-narration': () => openReaderPanel('narration'),
   });
 
   const detailMetadata = (
@@ -659,7 +644,6 @@ export function ConversationDetailPane({
               metadata={detailMetadata}
               readerFeatures={readerFeatures}
               readerToolbarPortalTarget={readerToolbarPortalTarget}
-              requestedReaderPanel={requestedReaderPanel}
               outlineScrollRoot={outlineScrollRoot}
             />
           ) : (

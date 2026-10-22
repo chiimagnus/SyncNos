@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useLayoutEffect, useState } from 'react';
+import { Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
@@ -10,6 +10,7 @@ import type { CommentLocatorSurfaceRoots } from '@ui/comments';
 import { ConversationListPane } from '@ui/conversations/ConversationListPane';
 import { LazyArticleCommentsSection, LazyConversationDetailPane } from '@ui/conversations/LazyConversationSurfaces';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
+import { useInAppShortcuts } from '@viewmodels/shortcuts/useInAppShortcuts';
 import { consumePendingOpenConversation } from '@ui/conversations/pending-open';
 import { CapturedListPaneShell } from '@ui/shared/CapturedListPaneShell';
 import { conversationKinds } from '@services/protocols/conversation-kinds';
@@ -59,6 +60,8 @@ export function ConversationsScene({
   const isNarrow = useIsNarrowScreen();
   const {
     selectedConversation,
+    activeId,
+    detailHeaderActions,
     openConversationExternalBySourceKey,
     openConversationExternalById,
     setDetailSurfaceActive,
@@ -83,6 +86,38 @@ export function ConversationsScene({
     commentsSidebarEnabled &&
     Boolean(selectedConversationCanonicalUrl);
   const detailSurfaceVisible = !isNarrow || narrowRoute === 'detail';
+  const copyingMarkdownRef = useRef(false);
+  useInAppShortcuts({
+    'copy-markdown': () => {
+      const list = document.querySelector<HTMLElement>('[data-conversation-list-pane]');
+      const focus = document.activeElement;
+      const listFocused = focus instanceof Element && !!list?.contains(focus);
+      const listIsActive = isNarrow ? narrowRoute === 'list' : listFocused || !selectedConversation;
+      if (listIsActive) {
+        const focusedRow = focus instanceof Element ? focus.closest<HTMLElement>('[data-conversation-id]') : null;
+        const id = Number(focusedRow?.dataset.conversationId || activeId);
+        if (!Number.isFinite(id) || id <= 0) return false;
+        const button = list?.querySelector<HTMLButtonElement>(
+          `[data-conversation-id="${id}"] [data-list-copy-markdown]`,
+        );
+        if (!button || button.disabled) return false;
+        button.click();
+        return true;
+      }
+      const action = detailHeaderActions?.find((entry) => entry.id === 'copy-full-markdown' && !entry.disabled);
+      if (!action || copyingMarkdownRef.current) return false;
+      copyingMarkdownRef.current = true;
+      void Promise.resolve()
+        .then(() => action.onTrigger())
+        .catch((error: unknown) => {
+          window.alert(error instanceof Error ? error.message : String(error));
+        })
+        .finally(() => {
+          copyingMarkdownRef.current = false;
+        });
+      return true;
+    },
+  });
 
   useLayoutEffect(() => {
     setDetailSurfaceActive(detailSurfaceVisible);

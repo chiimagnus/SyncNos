@@ -24,7 +24,7 @@ const DETAIL_SHORTCUT_IDS: Record<string, InAppShortcutAction> = {
   'copy-notion-link': 'detail-copy-notion',
   'copy-feishu-link': 'detail-copy-feishu',
   'copy-github-link': 'detail-copy-github',
-  'copy-full-markdown': 'detail-markdown',
+  'copy-full-markdown': 'copy-markdown',
   'open-original': 'detail-original',
   'open-in-notion': 'detail-open-notion',
   'open-in-obsidian': 'detail-open-obsidian',

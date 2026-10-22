@@ -27,6 +27,7 @@ export const IN_APP_SHORTCUT_ACTIONS = [
   { id: 'back-to-list', group: 'navigation', labelKey: 'backButton', defaultKey: 'Alt+Shift+ArrowLeft' },
   { id: 'capture-page', group: 'navigation', labelKey: 'keyboardShortcutsCaptureCurrentPage', defaultKey: '' },
   { id: 'popup-comments', group: 'navigation', labelKey: 'openInpageCommentsSidebar', defaultKey: '' },
+  { id: 'copy-markdown', group: 'navigation', labelKey: 'copyFullMarkdown', defaultKey: '' },
   { id: 'filter-source', group: 'library', labelKey: 'sourceFilterAria', defaultKey: 'Alt+Shift+F' },
   { id: 'filter-site', group: 'library', labelKey: 'insightArticleDomainsTitle', defaultKey: '' },
   { id: 'select-loaded', group: 'library', labelKey: 'selectAll', defaultKey: 'Alt+Shift+A' },
@@ -42,32 +43,21 @@ export const IN_APP_SHORTCUT_ACTIONS = [
     labelKey: 'keyboardShortcutsPreviousConversation',
     defaultKey: 'Alt+Shift+ArrowUp',
   },
-  { id: 'copy-list-markdown', group: 'library', labelKey: 'copyFullMarkdown', defaultKey: '' },
   { id: 'copy-list-link', group: 'library', labelKey: 'detailHeaderCopyLinkMenuLabel', defaultKey: '' },
   { id: 'delete-selected', group: 'library', labelKey: 'deleteButton', defaultKey: '' },
   { id: 'export-menu', group: 'library', labelKey: 'exportButton', defaultKey: '' },
-  { id: 'export-markdown', group: 'library', labelKey: 'markdownExport', defaultKey: '' },
-  { id: 'export-json', group: 'library', labelKey: 'jsonExport', defaultKey: '' },
   { id: 'sync-menu', group: 'library', labelKey: 'syncTo', defaultKey: '' },
-  { id: 'sync-notion', group: 'library', labelKey: 'notionSync', defaultKey: '' },
-  { id: 'sync-obsidian', group: 'library', labelKey: 'obsidianSync', defaultKey: '' },
-  { id: 'sync-feishu', group: 'library', labelKey: 'feishuSync', defaultKey: '' },
-  { id: 'sync-github', group: 'library', labelKey: 'githubSync', defaultKey: '' },
   { id: 'detail-copy-link', group: 'detail', labelKey: 'detailHeaderCopyLinkMenuLabel', defaultKey: 'Alt+Shift+C' },
   { id: 'detail-copy-notion', group: 'detail', labelKey: 'detailHeaderCopyNotionLink', defaultKey: '' },
   { id: 'detail-copy-feishu', group: 'detail', labelKey: 'detailHeaderCopyFeishuLink', defaultKey: '' },
   { id: 'detail-copy-github', group: 'detail', labelKey: 'detailHeaderCopyGithubLink', defaultKey: '' },
   { id: 'detail-comments', group: 'detail', labelKey: 'openCommentsSidebar', defaultKey: 'Alt+Shift+J' },
   { id: 'detail-more', group: 'detail', labelKey: 'moreButton', defaultKey: 'Alt+Shift+M' },
-  { id: 'detail-markdown', group: 'detail', labelKey: 'copyFullMarkdown', defaultKey: '' },
   { id: 'detail-original', group: 'detail', labelKey: 'openOriginalChat', defaultKey: 'Alt+Shift+O' },
   { id: 'detail-open-notion', group: 'detail', labelKey: 'detailHeaderOpenInNotion', defaultKey: '' },
   { id: 'detail-open-obsidian', group: 'detail', labelKey: 'detailHeaderOpenInObsidian', defaultKey: '' },
   { id: 'detail-open-feishu', group: 'detail', labelKey: 'detailHeaderOpenInFeishu', defaultKey: '' },
   { id: 'detail-open-github', group: 'detail', labelKey: 'detailHeaderOpenInGithub', defaultKey: '' },
-  { id: 'reader-layout', group: 'reader', labelKey: 'readerTextLayoutButton', defaultKey: '' },
-  { id: 'reader-theme', group: 'reader', labelKey: 'readerThemeButton', defaultKey: '' },
-  { id: 'reader-narration', group: 'reader', labelKey: 'readerNarrationButton', defaultKey: '' },
   { id: 'reader-play-pause', group: 'reader', labelKey: 'keyboardShortcutsReaderPlayPause', defaultKey: '' },
   { id: 'reader-stop', group: 'reader', labelKey: 'readerNarrationStop', defaultKey: '' },
 ] as const satisfies ReadonlyArray<{
@@ -134,7 +124,10 @@ export async function updateInAppShortcutBinding(
     ({ id }) => id !== action && parsed && inAppShortcutsConflict(bindings[id], parsed),
   );
   if (conflict) throw new InAppShortcutBindingError('conflict', conflict.id);
-  const next = { ...previous };
+  const next: Record<string, string> = {};
+  for (const item of IN_APP_SHORTCUT_ACTIONS) {
+    if (bindings[item.id] !== item.defaultKey) next[item.id] = bindings[item.id];
+  }
   const defaultKey = IN_APP_SHORTCUT_ACTIONS.find(({ id }) => id === action)!.defaultKey;
   if (parsed === defaultKey) delete next[action];
   else next[action] = parsed;
