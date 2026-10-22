@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   IN_APP_SHORTCUT_STORAGE_KEY,
@@ -88,4 +88,6 @@ export function useInAppShortcuts(handlers: Partial<Record<InAppShortcutAction, 
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [bindings, enabled, ready]);
+
+  return useCallback((action: InAppShortcutAction) => (ready ? bindings[action] : ''), [bindings, ready]);
 }

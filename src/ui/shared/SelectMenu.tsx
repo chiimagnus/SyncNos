@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { buttonMenuItemClassName, buttonTintClassName, menuChevronClassName } from '@ui/shared/button-styles';
 import { MenuPopover } from '@ui/shared/MenuPopover';
+import { tooltipAttrs } from '@ui/shared/AppTooltip';
 
 export type SelectMenuOption<T extends string> = {
   value: T;
@@ -16,6 +17,7 @@ export type SelectMenuProps<T extends string> = {
   options: Array<SelectMenuOption<T>>;
   disabled?: boolean;
   ariaLabel: string;
+  tooltip?: string;
   minWidth?: number;
   maxHeight?: number;
   adaptiveMaxHeight?: boolean;
@@ -89,6 +91,7 @@ export function SelectMenu<T extends string>(props: SelectMenuProps<T>) {
     options,
     disabled,
     ariaLabel,
+    tooltip,
     minWidth,
     maxHeight,
     adaptiveMaxHeight = false,
@@ -267,6 +270,7 @@ export function SelectMenu<T extends string>(props: SelectMenuProps<T>) {
           id={buttonId}
           className={[resolvedTriggerLayoutClassName, triggerButtonClassName].join(' ')}
           aria-label={ariaLabel}
+          {...tooltipAttrs(tooltip)}
           onKeyDown={onTriggerKeyDown}
         >
           <span className={resolvedTriggerLabelClassName}>{triggerLabel}</span>

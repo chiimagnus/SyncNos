@@ -437,7 +437,7 @@ export function ArticleReaderView({
     [getFirstVisibleSentenceIndex, narration],
   );
 
-  useInAppShortcuts({
+  const shortcut = useInAppShortcuts({
     'reader-play-pause': () => {
       if (features.narration) toolbarNarration.toggle();
     },
@@ -460,6 +460,7 @@ export function ArticleReaderView({
         updateThemeMode={updateThemeMode}
         narration={toolbarNarration}
         requestedPanel={requestedReaderPanel}
+        getShortcut={shortcut}
       />,
       readerToolbarPortalTarget,
     );
@@ -470,6 +471,7 @@ export function ArticleReaderView({
     preview,
     readerToolbarPortalTarget,
     requestedReaderPanel,
+    shortcut,
     themeMode,
     toolbarNarration,
     update,

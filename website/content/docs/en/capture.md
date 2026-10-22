@@ -28,6 +28,8 @@ Open **SyncNos → Settings → Keyboard shortcuts** to configure actions in the
 - Unassigned actions can be configured too. Duplicate shortcuts are rejected.
 - These keys work only inside the SyncNos popup or app, not across browser tabs. They do not trigger while typing in inputs or editors. Browser/system-reserved shortcuts may be unavailable.
 
+Hover over icon-only actions to see their names and active shortcuts. Menu items already labeled with text show only an assigned key; the Settings gear does not repeat “Open settings”.
+
 ## Images
 
 AI chats and web articles can cache content images. Image failures do not block text capture; existing items can retry from **More → Cache images**.

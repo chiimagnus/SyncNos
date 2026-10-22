@@ -275,6 +275,50 @@ describe('ReaderHeaderToolbar', () => {
     expect(mocks.commitPreview).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps text menus free of redundant tips while explaining icon-only narration controls', () => {
+    act(() => {
+      root!.render(
+        createElement(ReaderHeaderToolbar, {
+          features: { textLayout: true, theme: true, narration: true },
+          prefs: DEFAULT_READER_PREFS,
+          update: mocks.update,
+          preview: mocks.preview,
+          commitPreview: mocks.commitPreview,
+          themeMode: 'system',
+          updateThemeMode: mocks.updateThemeMode,
+          getShortcut: (action) =>
+            ({
+              'reader-theme': 'Alt+Shift+T',
+              'reader-play-pause': 'Ctrl+Alt+P',
+            })[action] || '',
+          narration: {
+            state: 'paused',
+            isPlaying: false,
+            error: null,
+            webSpeechAvailable: true,
+            stop: mocks.stop,
+            toggle: mocks.toggle,
+          },
+        }),
+      );
+    });
+
+    const textTrigger = document.querySelector('[data-reader-header-trigger="text"]');
+    const themeTrigger = document.querySelector('[data-reader-header-trigger="theme"]');
+    expect(textTrigger?.getAttribute('data-tooltip-id')).toBeNull();
+    expect(themeTrigger?.getAttribute('data-tooltip-content')).toBe('Alt+Shift+T');
+
+    act(() => {
+      (document.querySelector('[data-reader-header-trigger="narration"]') as HTMLButtonElement).click();
+    });
+    const play = document.querySelector('[aria-label="readerNarrationPlay"]');
+    const stop = document.querySelector('[aria-label="readerNarrationStop"]');
+    expect(play?.getAttribute('data-tooltip-content')).toBe('readerNarrationPlay · Ctrl+Alt+P');
+    expect(play?.getAttribute('title')).toBeNull();
+    expect(stop?.getAttribute('data-tooltip-content')).toBe('readerNarrationStop');
+    expect(stop?.getAttribute('title')).toBeNull();
+  });
+
   it('commits dirty-capable panels on every exit and skips theme-only transitions', () => {
     act(() => {
       root!.render(

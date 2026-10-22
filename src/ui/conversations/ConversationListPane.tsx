@@ -15,6 +15,7 @@ import {
   resolveConversationSourceOptionLabel,
 } from '@ui/conversations/conversation-list-tags';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
+import type { InAppShortcutAction } from '@services/shortcuts/in-app-shortcuts';
 import { useInAppShortcuts } from '@viewmodels/shortcuts/useInAppShortcuts';
 import { ConversationSyncFeedbackNotice } from '@ui/conversations/ConversationSyncFeedbackNotice';
 import { navItemClassName } from '@ui/shared/nav-styles';
@@ -29,7 +30,7 @@ import {
 } from '@ui/shared/button-styles';
 import { MenuPopover } from '@ui/shared/MenuPopover';
 import { SelectMenu } from '@ui/shared/SelectMenu';
-import { tooltipAttrs } from '@ui/shared/AppTooltip';
+import { tooltipAttrs, tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
 
 const SITE_FILTER_ALL_KEY = 'all';
 const SITE_FILTER_UNKNOWN_KEY = 'unknown';
@@ -61,6 +62,13 @@ function syncMenuItemLabel(provider: SyncProvider, syncing: boolean) {
   };
   return syncing ? labels[provider].busy : labels[provider].idle;
 }
+
+const SYNC_MENU_SHORTCUT_IDS: Record<SyncProvider, InAppShortcutAction> = {
+  obsidian: 'sync-obsidian',
+  notion: 'sync-notion',
+  feishu: 'sync-feishu',
+  github: 'sync-github',
+};
 
 const SYNC_MENU_ITEM_IDS: Record<SyncProvider, string> = {
   obsidian: 'menuSyncToObsidian',
@@ -612,7 +620,7 @@ export function ConversationListPane({
     if (index >= 0 && index < visibleIds.length) activateRow(visibleIds[index]!);
   };
 
-  useInAppShortcuts({
+  const shortcut = useInAppShortcuts({
     'filter-source': () => {
       if (!hasSelection) clickButton('sourceFilterSelect');
     },
@@ -794,6 +802,10 @@ export function ConversationListPane({
                       className={buttonMiniIconClassName(isActive)}
                       type="button"
                       aria-label={t('copyFullMarkdown')}
+                      {...tooltipAttrsWithShortcut(
+                        t('copyFullMarkdown'),
+                        isActive ? shortcut('copy-list-markdown') : '',
+                      )}
                       data-list-copy-markdown="true"
                       onClick={(e) => void onCopyConversation(conversation as any, e)}
                     >
@@ -804,6 +816,10 @@ export function ConversationListPane({
                       type="button"
                       className={[buttonCompactMutedClassName(), 'tw-relative'].join(' ')}
                       aria-label={`${t('detailHeaderCopyLinkMenuLabel')}: ${sourceTag.label}`}
+                      {...tooltipAttrsWithShortcut(
+                        `${t('detailHeaderCopyLinkMenuLabel')}: ${sourceTag.label}`,
+                        isActive && safeUrl ? shortcut('copy-list-link') : '',
+                      )}
                       data-conversation-source-link={String(id)}
                       disabled={!safeUrl}
                       onClick={(e) => void onCopyConversationUrl(conversation as any, e)}
@@ -889,7 +905,10 @@ export function ConversationListPane({
             <label
               className="tw-inline-flex tw-items-center tw-justify-center tw-text-[var(--text-secondary)]"
               aria-label={t('selectAll')}
-              {...tooltipAttrs(hasSelection ? loadedSelectionTooltip : '')}
+              {...tooltipAttrsWithShortcut(
+                hasSelection ? loadedSelectionTooltip : t('selectAll'),
+                shortcut('select-loaded'),
+              )}
             >
               <input
                 ref={selectAllRef}
@@ -910,6 +929,7 @@ export function ConversationListPane({
               onChange={(next) => onSetFilterKey(next)}
               disabled={hasSelection}
               ariaLabel={t('sourceFilterAria')}
+              tooltip={[t('sourceFilterAria'), shortcut('filter-source')].filter(Boolean).join(' · ')}
               side="top"
               align="start"
               minWidth={150}
@@ -933,6 +953,7 @@ export function ConversationListPane({
                 onChange={(next) => onSetSiteFilterKey(next)}
                 disabled={hasSelection}
                 ariaLabel={t('insightArticleDomainsTitle')}
+                tooltip={[t('insightArticleDomainsTitle'), shortcut('filter-site')].filter(Boolean).join(' · ')}
                 side="top"
                 align="start"
                 minWidth={160}
@@ -957,7 +978,10 @@ export function ConversationListPane({
                   : 'tw-max-w-0 tw-opacity-0 tw-translate-x-2 tw-scale-[0.98] tw-pointer-events-none',
               ].join(' ')}
             >
-              <span className="tw-inline-flex" {...tooltipAttrs(hasSelection ? deleteTooltip : '')}>
+              <span
+                className="tw-inline-flex"
+                {...tooltipAttrsWithShortcut(hasSelection ? deleteTooltip : '', shortcut('delete-selected'))}
+              >
                 <button
                   id="btnDelete"
                   type="button"
@@ -999,7 +1023,13 @@ export function ConversationListPane({
                 align="end"
                 panelMinWidth={150}
                 trigger={(triggerProps) => (
-                  <span className="tw-inline-flex" {...tooltipAttrs(hasSelection ? exportTooltip : '')}>
+                  <span
+                    className="tw-inline-flex"
+                    {...tooltipAttrsWithShortcut(
+                      hasSelection ? exportTooltip : '',
+                      hasSelection ? shortcut('export-menu') : '',
+                    )}
+                  >
                     <button {...triggerProps} id="btnExport" className={actionButton}>
                       <span className="tw-leading-none">{t('exportButton')}</span>
                       <span
@@ -1015,6 +1045,7 @@ export function ConversationListPane({
                 <button
                   id="menuExportMarkdown"
                   className={menuItemButtonClassName}
+                  {...tooltipAttrs(shortcut('export-markdown'))}
                   type="button"
                   role="menuitem"
                   onClick={() => {
@@ -1027,6 +1058,7 @@ export function ConversationListPane({
                 <button
                   id="menuExportJson"
                   className={menuItemButtonClassName}
+                  {...tooltipAttrs(shortcut('export-json'))}
                   type="button"
                   role="menuitem"
                   onClick={() => {
@@ -1039,7 +1071,13 @@ export function ConversationListPane({
               </MenuPopover>
 
               {singleSyncProvider ? (
-                <span className="tw-inline-flex" {...tooltipAttrs(hasSelection ? singleSyncTooltip : '')}>
+                <span
+                  className="tw-inline-flex"
+                  {...tooltipAttrsWithShortcut(
+                    hasSelection ? singleSyncTooltip : '',
+                    hasSelection ? shortcut('sync-menu') || shortcut(SYNC_MENU_SHORTCUT_IDS[singleSyncProvider]) : '',
+                  )}
+                >
                   <button
                     id="btnSyncProvider"
                     className={actionButton}
@@ -1060,7 +1098,13 @@ export function ConversationListPane({
                   align="end"
                   panelMinWidth={170}
                   trigger={(triggerProps) => (
-                    <span className="tw-inline-flex" {...tooltipAttrs(hasSelection ? syncMenuTooltip : '')}>
+                    <span
+                      className="tw-inline-flex"
+                      {...tooltipAttrsWithShortcut(
+                        hasSelection ? syncMenuTooltip : '',
+                        hasSelection ? shortcut('sync-menu') : '',
+                      )}
+                    >
                       <button {...triggerProps} id="btnSyncTo" className={actionButton}>
                         <span className="tw-leading-none">{syncMenuButtonLabel}</span>
                         <span
@@ -1078,6 +1122,7 @@ export function ConversationListPane({
                       key={provider}
                       id={SYNC_MENU_ITEM_IDS[provider]}
                       className={menuItemButtonClassName}
+                      {...tooltipAttrs(shortcut(SYNC_MENU_SHORTCUT_IDS[provider]))}
                       type="button"
                       role="menuitem"
                       onClick={() => {
@@ -1121,7 +1166,7 @@ export function ConversationListPane({
                 type="button"
                 id="stats"
                 aria-label={t('section_aboutyou_label')}
-                title={t('section_aboutyou_label')}
+                {...tooltipAttrsWithShortcut(t('section_aboutyou_label'), shortcut('open-insights'))}
                 onClick={() => onOpenInsightsSection()}
                 disabled={hasSelection}
                 className={[

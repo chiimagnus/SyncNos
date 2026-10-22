@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronRight, Palette, Pause, Play, Square, Type, Volume2 } from 'lucide-react';
 
 import { t } from '@i18n';
+import type { InAppShortcutAction } from '@services/shortcuts/in-app-shortcuts';
+import { tooltipAttrs, tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
 import {
   buttonFilledClassName,
   buttonMenuItemClassName,
@@ -32,6 +34,7 @@ type ReaderHeaderToolbarProps = {
   updateThemeMode: (mode: AppThemeMode) => void | Promise<void>;
   narration: ReaderHeaderNarration;
   requestedPanel?: 'text' | 'theme' | 'narration' | null;
+  getShortcut?: (action: InAppShortcutAction) => string;
   className?: string;
 };
 
@@ -54,6 +57,7 @@ export function ReaderHeaderToolbar({
   updateThemeMode,
   narration,
   requestedPanel,
+  getShortcut,
   className,
 }: ReaderHeaderToolbarProps) {
   const [openPanel, setOpenPanel] = useState<OpenPanel>(null);
@@ -116,6 +120,7 @@ export function ReaderHeaderToolbar({
               {...triggerProps}
               data-reader-header-trigger="text"
               aria-label={labels.text}
+              {...tooltipAttrs(getShortcut?.('reader-layout'))}
               className={readerTriggerClassName()}
             >
               <span className="tw-inline-flex tw-items-center tw-gap-2">
@@ -147,6 +152,7 @@ export function ReaderHeaderToolbar({
               {...triggerProps}
               data-reader-header-trigger="theme"
               aria-label={labels.theme}
+              {...tooltipAttrs(getShortcut?.('reader-theme'))}
               className={readerTriggerClassName()}
             >
               <span className="tw-inline-flex tw-items-center tw-gap-2">
@@ -178,6 +184,7 @@ export function ReaderHeaderToolbar({
               {...triggerProps}
               data-reader-header-trigger="narration"
               aria-label={labels.narration}
+              {...tooltipAttrs(getShortcut?.('reader-narration'))}
               className={readerTriggerClassName()}
             >
               <span className="tw-inline-flex tw-items-center tw-gap-2">
@@ -194,7 +201,7 @@ export function ReaderHeaderToolbar({
                 type="button"
                 className={headerNarrationTransportButtonClassName(true)}
                 aria-label={narrationActionLabel}
-                title={narrationActionLabel}
+                {...tooltipAttrsWithShortcut(narrationActionLabel, getShortcut?.('reader-play-pause'))}
                 aria-pressed={narration.isPlaying || narration.state === 'loading'}
                 onClick={() => narration.toggle()}
               >
@@ -204,7 +211,7 @@ export function ReaderHeaderToolbar({
                 type="button"
                 className={headerNarrationTransportButtonClassName(false)}
                 aria-label={labels.stop}
-                title={labels.stop}
+                {...tooltipAttrsWithShortcut(labels.stop, getShortcut?.('reader-stop'))}
                 onClick={narration.stop}
                 disabled={narration.state === 'idle'}
               >

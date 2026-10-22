@@ -11,7 +11,7 @@ import { t } from '@i18n';
 import { useConversationsApp, ConversationsProvider } from '@viewmodels/conversations/conversations-context';
 import { ConversationsScene } from '@ui/conversations/ConversationsScene';
 import { buttonFilledClassName, buttonTintClassName, headerButtonClassName } from '@ui/shared/button-styles';
-import { AppTooltipHost, tooltipAttrs } from '@ui/shared/AppTooltip';
+import { AppTooltipHost, tooltipAttrs, tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
 import { usePopupCurrentPageCapture } from '@viewmodels/popup/usePopupCurrentPageCapture';
 import { usePopupOpenCurrentTabInpageCommentsSidebar } from '@viewmodels/popup/usePopupOpenCurrentTabInpageCommentsSidebar';
 import { useAppThemeMode } from '@viewmodels/theme/useAppThemeMode';
@@ -165,7 +165,7 @@ function PopupShellFrame() {
     window.close();
   }, []);
 
-  useInAppShortcuts({
+  const shortcut = useInAppShortcuts({
     'open-settings': () => {
       void onOpenSettings().catch(() => {});
     },
@@ -251,7 +251,10 @@ function PopupShellFrame() {
                   <>
                     <span
                       className="tw-inline-flex"
-                      {...tooltipAttrs(buttonDisabled ? status?.message || buttonLabel : buttonLabel)}
+                      {...tooltipAttrsWithShortcut(
+                        buttonDisabled ? status?.message || buttonLabel : buttonLabel,
+                        buttonDisabled ? '' : shortcut('capture-page'),
+                      )}
                     >
                       <button
                         type="button"
@@ -264,7 +267,13 @@ function PopupShellFrame() {
                       </button>
                     </span>
 
-                    <span className="tw-inline-flex" {...tooltipAttrs(commentsButton.tooltip)}>
+                    <span
+                      className="tw-inline-flex"
+                      {...tooltipAttrsWithShortcut(
+                        commentsButton.tooltip,
+                        commentsButton.disabled ? '' : shortcut('popup-comments'),
+                      )}
+                    >
                       <button
                         type="button"
                         onClick={() => {
@@ -282,7 +291,7 @@ function PopupShellFrame() {
 
                     <button
                       type="button"
-                      {...tooltipAttrs(t('openSettings'))}
+                      {...tooltipAttrs(shortcut('open-settings'))}
                       onClick={() => onOpenSettings().catch(() => {})}
                       className={headerButtonClassName()}
                       aria-label={t('openSettingsAria')}

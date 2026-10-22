@@ -12,6 +12,7 @@ const publishPopupSyncSelectionHandoffMock = vi.fn();
 const storageGetMock = vi.fn();
 const storageSetMock = vi.fn();
 const storageOnChangedMock = vi.fn();
+const storageListeners = new Set<(changes: Record<string, unknown>, area: string) => void>();
 
 vi.mock('../../src/platform/runtime/runtime', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/platform/runtime/runtime')>();
@@ -262,11 +263,15 @@ describe('PopupShell header actions', () => {
     storageGetMock.mockReset();
     storageSetMock.mockReset();
     storageOnChangedMock.mockReset();
+    storageListeners.clear();
     ensureExtensionAppTabMock.mockResolvedValue({ id: 9, url: 'chrome-extension://syncnos/app.html#/' });
     publishPopupSyncSelectionHandoffMock.mockResolvedValue(undefined);
     storageGetMock.mockResolvedValue({});
     storageSetMock.mockResolvedValue(undefined);
-    storageOnChangedMock.mockReturnValue(() => {});
+    storageOnChangedMock.mockImplementation((listener) => {
+      storageListeners.add(listener);
+      return () => storageListeners.delete(listener);
+    });
     root = ReactDOM.createRoot(document.getElementById('root')!);
   });
 
@@ -283,7 +288,9 @@ describe('PopupShell header actions', () => {
     await renderPopupShell(root!);
 
     expect(document.querySelector('[aria-label="Fetch AI Chat"]')).toBeTruthy();
-    expect(document.querySelector('[aria-label="Open Settings"]')).toBeTruthy();
+    const settings = document.querySelector('[aria-label="Open Settings"]');
+    expect(settings).toBeTruthy();
+    expect(settings?.getAttribute('data-tooltip-content')).toBe('Alt+Shift+P');
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
 
     const detailButton = Array.from(document.querySelectorAll('button')).find(
@@ -299,6 +306,44 @@ describe('PopupShell header actions', () => {
     expect(document.querySelector('[aria-label="Open Settings"]')).toBeFalsy();
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="More actions coming soon"]')).toBeFalsy();
+  });
+
+  it('removes redundant settings tooltips when unassigned and shows a configured capture shortcut', async () => {
+    storageGetMock.mockResolvedValue({
+      in_app_shortcuts_v1: {
+        'open-settings': '',
+        'capture-page': 'Alt+Shift+K',
+      },
+    });
+    await renderPopupShell(root!);
+
+    expect(document.querySelector('[aria-label="Open Settings"]')?.getAttribute('data-tooltip-content')).toBeNull();
+    expect(document.querySelector('[aria-label="Open Settings"]')?.getAttribute('aria-label')).toBe('Open Settings');
+    const capture = document.querySelector('[aria-label="Fetch AI Chat"]') as HTMLButtonElement;
+    expect(capture?.parentElement?.getAttribute('data-tooltip-content')).toBe('Fetch AI Chat · Alt+Shift+K');
+  });
+
+  it('updates settings shortcut hints immediately when another window rebinds or clears a key', async () => {
+    await renderPopupShell(root!);
+    const settings = document.querySelector('[aria-label="Open Settings"]') as HTMLButtonElement;
+    expect(settings.getAttribute('data-tooltip-content')).toBe('Alt+Shift+P');
+    expect(settings.getAttribute('data-tooltip-content')).not.toContain('Open Settings');
+
+    await act(async () => {
+      for (const listener of storageListeners) {
+        listener({ in_app_shortcuts_v1: { newValue: { 'open-settings': 'Ctrl+Alt+9' } } }, 'local');
+      }
+      await Promise.resolve();
+    });
+    expect(settings.getAttribute('data-tooltip-content')).toBe('Ctrl+Alt+9');
+
+    await act(async () => {
+      for (const listener of storageListeners) {
+        listener({ in_app_shortcuts_v1: { newValue: { 'open-settings': '' } } }, 'local');
+      }
+      await Promise.resolve();
+    });
+    expect(settings.getAttribute('data-tooltip-content')).toBeNull();
   });
 
   it('keeps the popup detail header action area empty when no actions are available', async () => {

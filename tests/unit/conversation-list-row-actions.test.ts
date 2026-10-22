@@ -6,6 +6,7 @@ import { act, createElement } from 'react';
 import { ConversationListPane } from '../../src/ui/conversations/ConversationListPane';
 
 const writeTextToClipboardMock = vi.fn();
+let shortcutBindings: Record<string, string> = {};
 let currentState: any = null;
 
 vi.mock('../../src/ui/i18n', () => ({
@@ -24,6 +25,10 @@ vi.mock('../../src/services/shared/webext', () => ({
 
 vi.mock('../../src/services/sync/sync-provider-registry', () => ({
   getSyncProviderDefinition: (provider: string) => ({ id: provider, labelKey: `provider.${provider}` }),
+}));
+
+vi.mock('../../src/viewmodels/shortcuts/useInAppShortcuts', () => ({
+  useInAppShortcuts: () => (action: string) => shortcutBindings[action] || '',
 }));
 
 vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
@@ -130,6 +135,7 @@ describe('ConversationListPane row actions', () => {
     vi.useFakeTimers();
     setupDom();
     vi.clearAllMocks();
+    shortcutBindings = {};
     const built = buildState();
     conversation = built.conversation;
     currentState = built.state;
@@ -161,7 +167,7 @@ describe('ConversationListPane row actions', () => {
     expect(copyButton).toBeTruthy();
     expect(document.querySelector('[data-conversation-source-link="11"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="openOriginalChat"]')).toBeNull();
-    expect(copyButton?.getAttribute('data-tooltip-id')).toBeNull();
+    expect(copyButton?.getAttribute('data-tooltip-content')).toBe('copyFullMarkdown');
     expect(copyButton?.textContent).toBe('⧉');
 
     await act(async () => {
@@ -181,6 +187,53 @@ describe('ConversationListPane row actions', () => {
       await flushMicrotasks();
     });
     expect(copyButton?.textContent).toBe('⧉');
+  });
+
+  it('shows bound shortcuts on their matching controls, but not on inactive conversation row actions', async () => {
+    shortcutBindings = {
+      'filter-source': 'Alt+Shift+F',
+      'select-loaded': 'Alt+Shift+A',
+      'copy-list-markdown': 'Ctrl+Alt+M',
+      'copy-list-link': 'Ctrl+Alt+L',
+      'open-insights': 'Ctrl+Alt+I',
+      'export-menu': 'Ctrl+Alt+E',
+      'export-json': 'Ctrl+Alt+J',
+    };
+    currentState.items.push({ ...conversation, id: 12, conversationKey: 'conv-12' });
+    currentState.listSummary.totalCount = 2;
+    currentState.selectedIds = [11];
+    await renderPane();
+
+    expect(document.querySelector('#sourceFilterSelect')?.getAttribute('data-tooltip-content')).toContain(
+      'Alt+Shift+F',
+    );
+    expect(document.querySelector('#chkSelectAll')?.parentElement?.getAttribute('data-tooltip-content')).toContain(
+      'Alt+Shift+A',
+    );
+    expect(
+      document
+        .querySelector('[data-conversation-id="11"] [data-list-copy-markdown]')
+        ?.getAttribute('data-tooltip-content'),
+    ).toBe('copyFullMarkdown · Ctrl+Alt+M');
+    expect(
+      document
+        .querySelector('[data-conversation-id="12"] [data-list-copy-markdown]')
+        ?.getAttribute('data-tooltip-content'),
+    ).toBe('copyFullMarkdown');
+    expect(
+      document.querySelector('[data-conversation-source-link="11"]')?.getAttribute('data-tooltip-content'),
+    ).toContain('Ctrl+Alt+L');
+    expect(document.querySelector('#btnExport')?.parentElement?.getAttribute('data-tooltip-content')).toContain(
+      'Ctrl+Alt+E',
+    );
+
+    await act(async () => {
+      (document.querySelector('#btnExport') as HTMLButtonElement).click();
+      await flushMicrotasks();
+    });
+    const json = document.querySelector('#menuExportJson') as HTMLButtonElement;
+    expect(json.textContent).toBe('jsonExport');
+    expect(json.getAttribute('data-tooltip-content')).toBe('Ctrl+Alt+J');
   });
 
   it('copies the exact trimmed original https URL from the source badge without activating the row', async () => {

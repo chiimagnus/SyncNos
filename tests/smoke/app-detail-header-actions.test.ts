@@ -383,6 +383,47 @@ describe('ConversationDetailPane header actions', () => {
     expect(document.body.textContent || '').not.toContain('Copied Notion link');
   });
 
+  it('shows active copy and More key bindings while keeping worded menu items concise', async () => {
+    currentState.detailHeaderActions = [
+      {
+        id: 'copy-notion-link',
+        label: 'Copy Notion link',
+        kind: 'copy-text',
+        provider: 'notion',
+        slot: 'copy',
+        onTrigger: vi.fn(async () => {}),
+      },
+      {
+        id: 'open-original',
+        label: 'Open original',
+        kind: 'external-link',
+        provider: 'source',
+        slot: 'tools',
+        onTrigger: vi.fn(async () => {}),
+      },
+    ];
+
+    await act(async () => {
+      root!.render(createElement(ConversationDetailPane));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const copy = document.querySelector('[data-detail-header-primary-copy="true"]');
+    expect(copy?.getAttribute('data-tooltip-content')).toBe('Copy Notion link · Alt+Shift+C');
+    const more = document.querySelector('[data-detail-header-more-trigger="true"]') as HTMLButtonElement;
+    expect(more?.getAttribute('data-tooltip-content')).toBe('moreButton · Alt+Shift+M');
+
+    await act(async () => {
+      more.click();
+      await Promise.resolve();
+    });
+    const original = Array.from(document.querySelectorAll('[role="menuitem"]')).find((item) =>
+      item.textContent?.includes('Open original'),
+    );
+    expect(original?.getAttribute('data-tooltip-content')).toBe('Alt+Shift+O');
+  });
+
   it('renders one Copy dropdown for multiple providers and routes each item correctly', async () => {
     const notionCopy = vi.fn(async () => {});
     const feishuCopy = vi.fn(async () => {});
@@ -426,8 +467,8 @@ describe('ConversationDetailPane header actions', () => {
     const primaryButton = document.querySelector('[aria-label="Copy Notion link"]') as HTMLButtonElement | null;
     expect(trigger).toBeTruthy();
     expect(primaryButton).toBeTruthy();
-    expect(trigger?.getAttribute('data-tooltip-id')).toBeNull();
-    expect(primaryButton?.getAttribute('data-tooltip-id')).toBeNull();
+    expect(trigger?.getAttribute('data-tooltip-content')).toBe('Copy link');
+    expect(primaryButton?.getAttribute('data-tooltip-content')).toContain('Copy Notion link');
     expect(document.querySelectorAll('[aria-label="Copy destinations"][aria-haspopup="menu"]')).toHaveLength(1);
     expect(trigger?.closest('.tw-order-1')).toBeTruthy();
 

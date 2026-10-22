@@ -9,7 +9,7 @@ import { LazyArticleCommentsSection, LazyConversationDetailPane } from '@ui/conv
 import type { CommentLocatorSurfaceRoots } from '@ui/comments';
 import { createAppCommentSelectionSource } from '@ui/comments/app-comment-selection-source';
 import { buttonIconCircleGhostClassName, headerButtonClassName } from '@ui/shared/button-styles';
-import { AppTooltipHost, tooltipAttrs } from '@ui/shared/AppTooltip';
+import { AppTooltipHost, tooltipAttrs, tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
 import { useResponsiveTier } from '@ui/shared/hooks/useResponsiveTier';
 import { useArticleCommentsSidebarRuntime } from '@viewmodels/comments/useArticleCommentsSidebarRuntime';
 import { usePopupSyncSelectionHandoff } from '@viewmodels/conversations/usePopupSyncSelectionHandoff';
@@ -245,7 +245,7 @@ export default function AppShell() {
       });
     };
 
-    useInAppShortcuts({
+    const shortcut = useInAppShortcuts({
       'toggle-sidebar': () => {
         if (!isNarrow) setCollapsed(!sidebarCollapsed);
       },
@@ -478,7 +478,7 @@ export default function AppShell() {
                               onClick={openSettings}
                               className={headerButtonClassName()}
                               aria-label={t('openSettingsAria')}
-                              {...tooltipAttrs(t('openSettings'))}
+                              {...tooltipAttrs(shortcut('open-settings'))}
                             >
                               <span className="tw-sr-only">{t('settingsLabel')}</span>
                               <SettingsIcon size={16} strokeWidth={1.6} aria-hidden="true" />
@@ -540,7 +540,7 @@ export default function AppShell() {
                                 onClick={openSettings}
                                 className={headerButtonClassName()}
                                 aria-label={t('openSettingsAria')}
-                                {...tooltipAttrs(t('openSettings'))}
+                                {...tooltipAttrs(shortcut('open-settings'))}
                               >
                                 <span className="tw-sr-only">{t('settingsLabel')}</span>
                                 <SettingsIcon size={16} strokeWidth={1.6} aria-hidden="true" />
@@ -551,6 +551,7 @@ export default function AppShell() {
                                 onClick={() => setCollapsed(true)}
                                 className={headerButtonClassName()}
                                 aria-label={t('collapseSidebar')}
+                                {...tooltipAttrsWithShortcut(t('collapseSidebar'), shortcut('toggle-sidebar'))}
                               >
                                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                                   <path

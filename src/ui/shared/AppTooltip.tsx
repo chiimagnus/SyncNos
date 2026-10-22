@@ -21,6 +21,16 @@ export function tooltipAttrs(content: string | null | undefined, place: TooltipP
   };
 }
 
+export function tooltipAttrsWithShortcut(
+  label: string,
+  shortcut: string | null | undefined,
+  place: TooltipPlace = 'top',
+) {
+  const key = String(shortcut || '').trim();
+  const content = String(label || '').trim();
+  return tooltipAttrs(key ? [content, key].filter(Boolean).join(' · ') : content, place);
+}
+
 export function AppTooltipHost() {
   const [ready, setReady] = useState(false);
 

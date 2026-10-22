@@ -17,7 +17,7 @@ import {
   headerButtonClassName,
 } from '@ui/shared/button-styles';
 import { MenuPopover } from '@ui/shared/MenuPopover';
-import { tooltipAttrs } from '@ui/shared/AppTooltip';
+import { tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { countConversationMessageImages } from '@services/conversations/domain/image-count';
 import { countConversationMessageTextUnits } from '@services/conversations/domain/text-count';
@@ -323,7 +323,7 @@ export function ConversationDetailPane({
     setRequestedReaderPanel(panel);
   };
 
-  useInAppShortcuts({
+  const shortcut = useInAppShortcuts({
     'back-to-list': () => onBack?.(),
     'detail-copy-link': () => {
       const button = document.querySelector<HTMLButtonElement>('[data-detail-header-primary-copy]');
@@ -473,6 +473,7 @@ export function ConversationDetailPane({
                   onClick={onExpandSidebar}
                   className={headerIconButtonClass}
                   aria-label={expandSidebarLabel}
+                  {...tooltipAttrsWithShortcut(expandSidebarLabel, shortcut('toggle-sidebar'))}
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                     <path
@@ -489,7 +490,13 @@ export function ConversationDetailPane({
               ) : null}
 
               {onBack ? (
-                <button type="button" onClick={onBack} className={headerIconButtonClass} aria-label={t('backButton')}>
+                <button
+                  type="button"
+                  onClick={onBack}
+                  className={headerIconButtonClass}
+                  aria-label={t('backButton')}
+                  {...tooltipAttrsWithShortcut(t('backButton'), shortcut('back-to-list'))}
+                >
                   <ChevronLeft size={14} strokeWidth={2} aria-hidden="true" />
                   <span className="tw-sr-only">{t('backButton')}</span>
                 </button>
@@ -512,6 +519,7 @@ export function ConversationDetailPane({
                 menuTriggerLabel={t('detailHeaderCopyLinkMenuLabel')}
                 menuTriggerAriaLabel={t('detailHeaderCopyLinkMenuAria')}
                 menuAriaLabel={t('detailHeaderCopyLinkMenuAria')}
+                getShortcut={shortcut}
                 className="tw-order-1"
               />
 
@@ -523,7 +531,7 @@ export function ConversationDetailPane({
                   }}
                   className={[headerButtonClassName(), 'tw-order-2'].join(' ')}
                   aria-label={commentsSidebarLabel}
-                  {...tooltipAttrs(commentsSidebarLabel)}
+                  {...tooltipAttrsWithShortcut(commentsSidebarLabel, shortcut('detail-comments'))}
                   aria-pressed={commentsSidebarOpen ? 'true' : 'false'}
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -556,6 +564,7 @@ export function ConversationDetailPane({
                       {...triggerProps}
                       data-detail-header-more-trigger="true"
                       aria-label={t('moreButton')}
+                      {...tooltipAttrsWithShortcut(t('moreButton'), shortcut('detail-more'))}
                       className={headerIconButtonClass}
                     >
                       <MoreHorizontal size={14} strokeWidth={2} aria-hidden="true" />
@@ -586,6 +595,7 @@ export function ConversationDetailPane({
                             actions={moreActions}
                             buttonClassName={buttonMenuItemClassName()}
                             inlineMenuItems
+                            getShortcut={shortcut}
                             closeMenuOnActionTrigger={closeMoreMenu}
                             className="tw-w-full"
                           />
