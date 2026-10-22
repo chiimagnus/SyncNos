@@ -30,6 +30,15 @@ const currentState = {
       onTrigger: vi.fn(async () => {}),
     },
   ] as any[],
+  exporting: false,
+  deleting: false,
+  enabledSyncProviders: [] as string[],
+  syncFeedback: { phase: 'idle', provider: null },
+  copyConversationSourceLink: vi.fn(async () => {}),
+  exportConversationMarkdown: vi.fn(async () => {}),
+  exportConversationJson: vi.fn(async () => {}),
+  syncConversation: vi.fn(async () => {}),
+  deleteConversation: vi.fn(async () => {}),
   updateSelectedConversationUrl: vi.fn(async () => {}),
 };
 
@@ -169,6 +178,7 @@ describe('ConversationDetailPane header actions', () => {
   beforeEach(() => {
     setupDom();
     currentState.activeId = 11;
+    currentState.enabledSyncProviders = [];
     currentState.loadingDetail = false;
     currentState.detailError = null;
     currentState.selectedConversation = {
@@ -1190,6 +1200,10 @@ describe('ConversationDetailPane header actions', () => {
       'Cache images',
       'Copy full Markdown',
       'Open original',
+      'keyboardShortcutsCopyOriginalLink',
+      'exportButton · markdownExport',
+      'exportButton · jsonExport',
+      'deleteButton',
     ]);
     expect(moreMenu!.querySelector('[aria-haspopup="menu"]')).toBeFalsy();
     expect(items[2]?.disabled).toBe(true);
@@ -1202,6 +1216,77 @@ describe('ConversationDetailPane header actions', () => {
     expect(cacheTrigger).not.toHaveBeenCalled();
     expect(openTrigger).not.toHaveBeenCalled();
     expect(document.querySelector('[role="menu"][aria-label="moreButton"]')?.hasAttribute('hidden')).toBe(true);
+  });
+
+  it('executes single-item menu actions without touching batch selection and confirms deletion', async () => {
+    const confirm = vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true);
+    Object.defineProperty(window, 'confirm', { configurable: true, value: confirm });
+    currentState.enabledSyncProviders = ['notion'];
+    currentState.selectedConversation = {
+      ...currentState.selectedConversation,
+      url: 'https://example.com/story',
+    } as any;
+    currentState.copyConversationSourceLink.mockClear();
+    currentState.exportConversationMarkdown.mockClear();
+    currentState.exportConversationJson.mockClear();
+    currentState.syncConversation.mockClear();
+    currentState.deleteConversation.mockClear();
+
+    await act(async () => {
+      root!.render(createElement(ConversationDetailPane));
+      await Promise.resolve();
+    });
+    const open = async () => {
+      await act(async () => {
+        (document.querySelector('[data-detail-header-more-trigger="true"]') as HTMLButtonElement).click();
+        await Promise.resolve();
+      });
+    };
+    await open();
+    await act(async () => {
+      (document.querySelector('[data-item-copy-original-link="11"]') as HTMLButtonElement).click();
+      await Promise.resolve();
+    });
+    expect(currentState.copyConversationSourceLink).toHaveBeenCalledWith(11);
+
+    await open();
+    await act(async () => {
+      (document.querySelector('[data-item-export-markdown="11"]') as HTMLButtonElement).click();
+      await Promise.resolve();
+    });
+    expect(currentState.exportConversationMarkdown).toHaveBeenCalledWith(11);
+
+    await open();
+    await act(async () => {
+      (document.querySelector('[data-item-export-json="11"]') as HTMLButtonElement).click();
+      await Promise.resolve();
+    });
+    expect(currentState.exportConversationJson).toHaveBeenCalledWith(11);
+
+    await open();
+    expect(document.querySelector('[data-item-sync-provider="11:notion"]')).toBeNull();
+    await act(async () => {
+      (document.querySelector('[data-item-sync-toggle="11"]') as HTMLButtonElement).click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      (document.querySelector('[data-item-sync-provider="11:notion"]') as HTMLButtonElement).click();
+      await Promise.resolve();
+    });
+    expect(currentState.syncConversation).toHaveBeenCalledWith(11, 'notion');
+
+    await open();
+    await act(async () => {
+      (document.querySelector('[data-item-delete="11"]') as HTMLButtonElement).click();
+      await Promise.resolve();
+    });
+    expect(currentState.deleteConversation).not.toHaveBeenCalled();
+    await act(async () => {
+      (document.querySelector('[data-item-delete="11"]') as HTMLButtonElement).click();
+      await Promise.resolve();
+    });
+    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(currentState.deleteConversation).toHaveBeenCalledWith(11);
   });
 
   it('shows a comments sidebar toggle in article detail mode', async () => {

@@ -100,7 +100,10 @@ vi.mock('../../src/viewmodels/popup/usePopupCurrentPageCapture', () => ({
 vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
   ConversationsScene: (props: {
     listShell?: { rightSlot: ReactNode };
-    onPopupSyncPreparing?: (provider: 'notion' | 'obsidian' | 'feishu' | 'github') => void | Promise<void>;
+    onPopupSyncPreparing?: (
+      provider: 'notion' | 'obsidian' | 'feishu' | 'github',
+      handoffIds?: readonly number[],
+    ) => void | Promise<void>;
   }) => {
     const [mode, setMode] = useState<'list' | 'detail' | 'detail-empty' | 'detail-menu'>('list');
     const toList = () => {
@@ -152,6 +155,14 @@ vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
         'button',
         { type: 'button', onClick: () => void Promise.resolve(props.onPopupSyncPreparing?.('github')).catch(() => {}) },
         'sync-github',
+      ),
+      createElement(
+        'button',
+        {
+          type: 'button',
+          onClick: () => void Promise.resolve(props.onPopupSyncPreparing?.('github', [])).catch(() => {}),
+        },
+        'sync-single-github',
       ),
       createElement(
         'button',
@@ -308,7 +319,7 @@ describe('PopupShell header actions', () => {
     expect(document.querySelector('[aria-label="More actions coming soon"]')).toBeFalsy();
   });
 
-  it('removes redundant settings tooltips when unassigned and shows a configured capture shortcut', async () => {
+  it('keeps browser capture controls free of legacy in-app shortcut hints', async () => {
     storageGetMock.mockResolvedValue({
       in_app_shortcuts_v1: {
         'open-settings': '',
@@ -320,7 +331,7 @@ describe('PopupShell header actions', () => {
     expect(document.querySelector('[aria-label="Open Settings"]')?.getAttribute('data-tooltip-content')).toBeNull();
     expect(document.querySelector('[aria-label="Open Settings"]')?.getAttribute('aria-label')).toBe('Open Settings');
     const capture = document.querySelector('[aria-label="Fetch AI Chat"]') as HTMLButtonElement;
-    expect(capture?.parentElement?.getAttribute('data-tooltip-content')).toBe('Fetch AI Chat\nAlt + Shift + K');
+    expect(capture?.parentElement?.getAttribute('data-tooltip-content')).toBe('Fetch AI Chat');
   });
 
   it('updates settings shortcut hints immediately when another window rebinds or clears a key', async () => {
@@ -404,6 +415,21 @@ describe('PopupShell header actions', () => {
       expect(ensureExtensionAppTabMock).toHaveBeenCalledTimes(1);
     });
     expect(openOrFocusExtensionAppTabMock).not.toHaveBeenCalled();
+  });
+
+  it('prepares an app tab for one item without handing off unrelated bulk selections', async () => {
+    await renderPopupShell(root!);
+    const button = Array.from(document.querySelectorAll('button')).find(
+      (el) => el.textContent === 'sync-single-github',
+    )!;
+    await act(async () => {
+      button.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+    await waitForPopupUi(() => {
+      expect(ensureExtensionAppTabMock).toHaveBeenCalledTimes(1);
+    });
+    expect(publishPopupSyncSelectionHandoffMock).not.toHaveBeenCalled();
   });
 
   it('does not ensure the App tab when the popup selection handoff cannot be published', async () => {

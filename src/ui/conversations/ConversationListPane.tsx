@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { MoreHorizontal } from 'lucide-react';
 
 import type { Conversation } from '@services/conversations/domain/models';
-import { writeTextToClipboard } from '@services/shared/clipboard';
 import { createTwoStepConfirmController } from '@services/shared/two-step-confirm';
 import { sanitizeHttpUrl } from '@services/url-cleaning/http-url';
 import { openOrFocusExtensionAppTab } from '@services/shared/webext';
@@ -17,6 +17,7 @@ import {
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { useInAppShortcuts } from '@viewmodels/shortcuts/useInAppShortcuts';
 import { ConversationSyncFeedbackNotice } from '@ui/conversations/ConversationSyncFeedbackNotice';
+import { ConversationItemMenuActions } from '@ui/conversations/ConversationItemMenuActions';
 import { navItemClassName } from '@ui/shared/nav-styles';
 import {
   buttonDangerClassName,
@@ -29,7 +30,7 @@ import {
 } from '@ui/shared/button-styles';
 import { MenuPopover } from '@ui/shared/MenuPopover';
 import { SelectMenu } from '@ui/shared/SelectMenu';
-import { tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
+import { tooltipAttrs, tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
 
 const SITE_FILTER_ALL_KEY = 'all';
 const SITE_FILTER_UNKNOWN_KEY = 'unknown';
@@ -74,7 +75,7 @@ type ConversationListPaneProps = {
   onOpenInsightsSection?: () => void;
   onOpenSettingsSection?: (section: string) => void;
   activeRowId?: number | null;
-  onPopupSyncPreparing?: (provider: SyncProvider) => void | Promise<void>;
+  onPopupSyncPreparing?: (provider: SyncProvider, handoffIds?: readonly number[]) => void | Promise<void>;
   initialScrollTop?: number;
   scrollRestoreKey?: number;
   onListScrollTopChange?: (scrollTop: number) => void;
@@ -117,6 +118,7 @@ export function ConversationListPane({
     consumeListLocate,
     loadMoreList,
     copyConversationMarkdown,
+    copyConversationSourceLink,
     exportSelectedMarkdown,
     exportSelectedJson,
     syncSelected,
@@ -129,6 +131,7 @@ export function ConversationListPane({
   const deleteButtonRef = useRef<HTMLButtonElement | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [syncOpen, setSyncOpen] = useState(false);
+  const [rowMenu, setRowMenu] = useState<{ id: number; side: 'top' | 'bottom'; maxHeight: number } | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
   const locateLoadRoundRef = useRef<{ id: number; rounds: number }>({ id: 0, rounds: 0 });
@@ -471,15 +474,10 @@ export function ConversationListPane({
     }
   };
 
-  const onCopyConversationUrl = async (conversation: Conversation, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const safe = sanitizeHttpUrl((conversation as any).url || '');
-    if (!safe) return;
+  const onCopyConversationUrl = async (conversation: Conversation) => {
     const id = Number((conversation as any).id);
     try {
-      const copied = await writeTextToClipboard(safe);
-      if (!copied) throw new Error(t('copyFailed'));
+      await copyConversationSourceLink(id);
       setCopiedLinkId(id);
       if (copiedLinkTimerRef.current) window.clearTimeout(copiedLinkTimerRef.current);
       copiedLinkTimerRef.current = window.setTimeout(() => {
@@ -601,9 +599,19 @@ export function ConversationListPane({
     const button = document.getElementById(id);
     if (button instanceof HTMLElement && !button.matches(':disabled')) button.click();
   };
-  const activeListRow = () => {
-    const id = Number(effectiveActiveRowId);
-    return filteredItems.find((item) => Number(item.id) === id) || null;
+
+  const updateRowMenu = (id: number, open: boolean) => {
+    if (!open) {
+      setRowMenu(null);
+      return;
+    }
+    const trigger = scrollRef.current?.querySelector<HTMLElement>('[data-item-more-trigger="' + id + '"]');
+    const rect = trigger?.getBoundingClientRect();
+    const scrollBounds = scrollRef.current?.getBoundingClientRect();
+    const above = rect && scrollBounds ? rect.top - scrollBounds.top - 12 : 200;
+    const below = rect && scrollBounds ? scrollBounds.bottom - rect.bottom - 12 : 200;
+    const side = below >= above ? 'bottom' : 'top';
+    setRowMenu({ id, side, maxHeight: Math.max(70, Math.floor(Math.max(above, below) - 8)) });
   };
   const moveSelection = (step: -1 | 1) => {
     if (!visibleIds.length) return;
@@ -614,31 +622,15 @@ export function ConversationListPane({
 
   const shortcut = useInAppShortcuts({
     'filter-source': () => {
-      if (!hasSelection) clickButton('sourceFilterSelect');
+      if (hasSelection) return false;
+      clickButton('sourceFilterSelect');
     },
     'filter-site': () => {
-      if (!hasSelection && listSourceFilterKey === 'web') clickButton('siteFilterSelect');
+      if (hasSelection || listSourceFilterKey !== 'web') return false;
+      clickButton('siteFilterSelect');
     },
-    'select-loaded': () => clickButton('chkSelectAll'),
     'next-conversation': () => moveSelection(1),
     'previous-conversation': () => moveSelection(-1),
-    'copy-list-link': () => {
-      const row = activeListRow();
-      if (!row) return;
-      document.querySelector<HTMLButtonElement>(`[data-conversation-source-link="${row.id}"]`)?.click();
-    },
-    'delete-selected': () => {
-      if (hasSelection && !actionBusy && !syncingAny) clickButton('btnDelete');
-    },
-    'export-menu': () => {
-      if (hasSelection && !actionBusy) clickButton('btnExport');
-    },
-    'sync-menu': () => {
-      if (!actionBusy && hasSelection) clickButton(singleSyncProvider ? 'btnSyncProvider' : 'btnSyncTo');
-    },
-    'open-insights': () => {
-      if (!hasSelection) onOpenInsightsSection?.();
-    },
   });
 
   const sourceFilterActive =
@@ -725,6 +717,7 @@ export function ConversationListPane({
             const rowClass = [
               navItemClassName(isActive),
               'tw-group tw-relative tw-items-start tw-gap-2.5 tw-rounded-[var(--radius-card)]',
+              rowMenu?.id === id ? 'tw-z-40' : '',
               rowSurfaceClass,
             ].join(' ');
 
@@ -755,9 +748,39 @@ export function ConversationListPane({
 
                 <div className="tw-min-w-0 tw-flex-1">
                   <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
-                    <div className="tw-min-w-0 tw-flex-1 tw-overflow-hidden tw-font-semibold tw-leading-5 tw-break-words [overflow-wrap:anywhere] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3]">
+                    <div className="tw-min-w-0 tw-flex-1 tw-overflow-hidden tw-font-semibold tw-leading-5 tw-break-words [overflow-wrap:anywhere] [display:-webkit-box] [-webkit-line-clamp:3]">
                       {formatConversationTitle((conversation as any).title)}
                     </div>
+                    <MenuPopover
+                      open={rowMenu?.id === id}
+                      onOpenChange={(open) => updateRowMenu(id, open)}
+                      disabled={actionBusy || syncingAny}
+                      ariaLabel={t('moreButton')}
+                      side={rowMenu?.id === id ? rowMenu.side : 'bottom'}
+                      align="end"
+                      panelMinWidth={190}
+                      panelMaxHeight={rowMenu?.id === id ? rowMenu.maxHeight : undefined}
+                      trigger={(triggerProps) => (
+                        <button
+                          {...triggerProps}
+                          data-item-more-trigger={id}
+                          className={buttonMiniIconClassName(isActive)}
+                          aria-label={t('moreButton') + ': ' + formatConversationTitle((conversation as any).title)}
+                        >
+                          <MoreHorizontal size={14} strokeWidth={2} aria-hidden="true" />
+                        </button>
+                      )}
+                    >
+                      {rowMenu?.id === id ? (
+                        <ConversationItemMenuActions
+                          conversationId={id}
+                          originalUrl={safeUrl}
+                          getShortcut={isActive ? shortcut : undefined}
+                          onClose={() => setRowMenu(null)}
+                          onPopupSyncPreparing={onPopupSyncPreparing}
+                        />
+                      ) : null}
+                    </MenuPopover>
                   </div>
 
                   <div className="tw-mt-1 tw-flex tw-flex-wrap tw-items-center tw-gap-2 tw-text-[11px] tw-font-semibold tw-text-inherit tw-opacity-80">
@@ -775,14 +798,18 @@ export function ConversationListPane({
                     <button
                       type="button"
                       className={[buttonCompactMutedClassName(), 'tw-relative'].join(' ')}
-                      aria-label={`${t('detailHeaderCopyLinkMenuLabel')}: ${sourceTag.label}`}
+                      aria-label={`${t('keyboardShortcutsCopyOriginalLink')}: ${sourceTag.label}`}
                       {...tooltipAttrsWithShortcut(
-                        `${t('detailHeaderCopyLinkMenuLabel')}: ${sourceTag.label}`,
+                        `${t('keyboardShortcutsCopyOriginalLink')}: ${sourceTag.label}`,
                         isActive && safeUrl ? shortcut('copy-list-link') : '',
                       )}
                       data-conversation-source-link={String(id)}
                       disabled={!safeUrl}
-                      onClick={(e) => void onCopyConversationUrl(conversation as any, e)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        void onCopyConversationUrl(conversation as Conversation);
+                      }}
                     >
                       <span className={copiedLinkId === id ? 'tw-invisible' : undefined}>{sourceTag.label}</span>
                       {copiedLinkId === id ? (
@@ -865,10 +892,7 @@ export function ConversationListPane({
             <label
               className="tw-inline-flex tw-items-center tw-justify-center tw-text-[var(--text-secondary)]"
               aria-label={t('selectAll')}
-              {...tooltipAttrsWithShortcut(
-                hasSelection ? loadedSelectionTooltip : t('selectAll'),
-                shortcut('select-loaded'),
-              )}
+              {...tooltipAttrs(hasSelection ? loadedSelectionTooltip : t('selectAll'))}
             >
               <input
                 ref={selectAllRef}
@@ -940,10 +964,7 @@ export function ConversationListPane({
                   : 'tw-max-w-0 tw-opacity-0 tw-translate-x-2 tw-scale-[0.98] tw-pointer-events-none',
               ].join(' ')}
             >
-              <span
-                className="tw-inline-flex"
-                {...tooltipAttrsWithShortcut(hasSelection ? deleteTooltip : '', shortcut('delete-selected'))}
-              >
+              <span className="tw-inline-flex" {...tooltipAttrs(hasSelection ? deleteTooltip : '')}>
                 <button
                   id="btnDelete"
                   type="button"
@@ -985,13 +1006,7 @@ export function ConversationListPane({
                 align="end"
                 panelMinWidth={150}
                 trigger={(triggerProps) => (
-                  <span
-                    className="tw-inline-flex"
-                    {...tooltipAttrsWithShortcut(
-                      hasSelection ? exportTooltip : '',
-                      hasSelection ? shortcut('export-menu') : '',
-                    )}
-                  >
+                  <span className="tw-inline-flex" {...tooltipAttrs(hasSelection ? exportTooltip : '')}>
                     <button {...triggerProps} id="btnExport" className={actionButton}>
                       <span className="tw-leading-none">{t('exportButton')}</span>
                       <span
@@ -1031,13 +1046,7 @@ export function ConversationListPane({
               </MenuPopover>
 
               {singleSyncProvider ? (
-                <span
-                  className="tw-inline-flex"
-                  {...tooltipAttrsWithShortcut(
-                    hasSelection ? singleSyncTooltip : '',
-                    hasSelection ? shortcut('sync-menu') : '',
-                  )}
-                >
+                <span className="tw-inline-flex" {...tooltipAttrs(hasSelection ? singleSyncTooltip : '')}>
                   <button
                     id="btnSyncProvider"
                     className={actionButton}
@@ -1058,13 +1067,7 @@ export function ConversationListPane({
                   align="end"
                   panelMinWidth={170}
                   trigger={(triggerProps) => (
-                    <span
-                      className="tw-inline-flex"
-                      {...tooltipAttrsWithShortcut(
-                        hasSelection ? syncMenuTooltip : '',
-                        hasSelection ? shortcut('sync-menu') : '',
-                      )}
-                    >
+                    <span className="tw-inline-flex" {...tooltipAttrs(hasSelection ? syncMenuTooltip : '')}>
                       <button {...triggerProps} id="btnSyncTo" className={actionButton}>
                         <span className="tw-leading-none">{syncMenuButtonLabel}</span>
                         <span
@@ -1125,7 +1128,7 @@ export function ConversationListPane({
                 type="button"
                 id="stats"
                 aria-label={t('section_aboutyou_label')}
-                {...tooltipAttrsWithShortcut(t('section_aboutyou_label'), shortcut('open-insights'))}
+                {...tooltipAttrs(t('section_aboutyou_label'))}
                 onClick={() => onOpenInsightsSection()}
                 disabled={hasSelection}
                 className={[

@@ -261,6 +261,46 @@ describe('ConversationsProvider data revisions', () => {
     });
   }
 
+  it('copies the original HTTP link for the requested item, never an unrelated selected item', async () => {
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    getConversationListBootstrap.mockResolvedValue(makePage([makeConversation(11), makeConversation(12)]));
+    getConversationById.mockResolvedValueOnce({
+      ...makeConversation(12),
+      url: '  https://example.com/article?id=12#original  ',
+    });
+    await renderProvider();
+    await act(async () => {
+      latestState.replaceSelectedIds([11]);
+      await flushMicrotasks();
+    });
+    await latestState.copyConversationSourceLink(12);
+    expect(getConversationById).toHaveBeenCalledWith(12);
+    expect(writeTextToClipboard).toHaveBeenCalledWith('https://example.com/article?id=12#original');
+    expect(latestState.selectedIds).toEqual([11]);
+  });
+
+  it('rejects missing, mismatched, unsafe and uncopyable source links', async () => {
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    getConversationListBootstrap.mockResolvedValue(makePage([makeConversation(11)]));
+    await renderProvider();
+    await expect(latestState.copyConversationSourceLink(0)).rejects.toThrow('invalid conversationId');
+    expect(getConversationById).not.toHaveBeenCalled();
+
+    getConversationById.mockResolvedValueOnce(null);
+    await expect(latestState.copyConversationSourceLink(11)).rejects.toThrow('conversation not found');
+
+    getConversationById.mockResolvedValueOnce(makeConversation(12));
+    await expect(latestState.copyConversationSourceLink(11)).rejects.toThrow('conversation not found');
+
+    getConversationById.mockResolvedValueOnce({ ...makeConversation(11), url: 'javascript:alert(1)' });
+    await expect(latestState.copyConversationSourceLink(11)).rejects.toThrow();
+    expect(writeTextToClipboard).not.toHaveBeenCalled();
+
+    getConversationById.mockResolvedValueOnce(makeConversation(11));
+    writeTextToClipboard.mockResolvedValueOnce(false);
+    await expect(latestState.copyConversationSourceLink(11)).rejects.toThrow();
+  });
+
   it('subscribes before the first list read and allows a degraded readiness baseline', async () => {
     const readiness = deferred<{ baselineAvailable: boolean }>();
     whenDataRevisionObserverReady.mockReturnValue(readiness.promise);

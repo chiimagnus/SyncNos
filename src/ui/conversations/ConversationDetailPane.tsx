@@ -10,6 +10,7 @@ import { t, formatConversationTitle } from '@i18n';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { useInAppShortcuts } from '@viewmodels/shortcuts/useInAppShortcuts';
 import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
+import { ConversationItemMenuActions } from '@ui/conversations/ConversationItemMenuActions';
 import {
   buttonFilledClassName,
   buttonMenuItemClassName,
@@ -17,7 +18,7 @@ import {
   headerButtonClassName,
 } from '@ui/shared/button-styles';
 import { MenuPopover } from '@ui/shared/MenuPopover';
-import { tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
+import { tooltipAttrs, tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { countConversationMessageImages } from '@services/conversations/domain/image-count';
 import { countConversationMessageTextUnits } from '@services/conversations/domain/text-count';
@@ -46,6 +47,10 @@ type ConversationDetailPaneProps = {
   onTriggerCommentsSidebar?: () => void;
   onCommentsLocatorRootsChange?: (roots: CommentLocatorSurfaceRoots | null) => void;
   commentsSidebarOpen?: boolean;
+  onPopupSyncPreparing?: (
+    provider: import('@services/sync/models').SyncProvider,
+    handoffIds?: readonly number[],
+  ) => void | Promise<void>;
 };
 
 export function ConversationDetailPane({
@@ -54,6 +59,7 @@ export function ConversationDetailPane({
   onTriggerCommentsSidebar,
   onCommentsLocatorRootsChange,
   commentsSidebarOpen = false,
+  onPopupSyncPreparing,
 }: ConversationDetailPaneProps) {
   const {
     activeId,
@@ -203,8 +209,12 @@ export function ConversationDetailPane({
     : '';
   const hasReaderMoreMenuContent = readerFeatures.textLayout || readerFeatures.theme || readerFeatures.narration;
   const hasMoreMenuContent =
-    Boolean(textCountText || imageCountText) || moreActions.length > 0 || hasReaderMoreMenuContent;
-  const moreMenuPanelClassName = 'tw-w-[214px] tw-max-w-[min(214px,calc(100vw-28px))] tw-text-[var(--text-primary)]';
+    !!selected || Boolean(textCountText || imageCountText) || moreActions.length > 0 || hasReaderMoreMenuContent;
+  const moreMenuPanelClassName = [
+    'tw-w-[214px] tw-max-w-[min(214px,calc(100vw-28px))]',
+    'tw-max-h-[calc(100dvh-76px)] tw-overflow-y-auto tw-overscroll-contain',
+    'tw-text-[var(--text-primary)]',
+  ].join(' ');
   const floatingIslandClassName = [
     'tw-pointer-events-auto tw-flex tw-w-fit tw-items-center tw-gap-1 tw-rounded-[var(--radius-inline)] tw-border tw-border-[var(--border)] tw-p-1',
     'tw-bg-[color-mix(in_srgb,var(--bg-card)_88%,transparent)] tw-backdrop-blur-[10px] tw-backdrop-saturate-150',
@@ -313,10 +323,9 @@ export function ConversationDetailPane({
   };
 
   const shortcut = useInAppShortcuts({
-    'back-to-list': () => onBack?.(),
     'detail-copy-link': () => {
-      const button = document.querySelector<HTMLButtonElement>('[data-detail-header-primary-copy]');
-      if (button && !button.disabled) button.click();
+      const action = copyActions.find((entry) => !entry.disabled);
+      if (action) triggerDetailAction(action.id);
     },
     'detail-copy-notion': () => triggerDetailAction('copy-notion-link'),
     'detail-copy-feishu': () => triggerDetailAction('copy-feishu-link'),
@@ -480,7 +489,7 @@ export function ConversationDetailPane({
                   onClick={onBack}
                   className={headerIconButtonClass}
                   aria-label={t('backButton')}
-                  {...tooltipAttrsWithShortcut(t('backButton'), shortcut('back-to-list'))}
+                  {...tooltipAttrs(t('backButton'))}
                 >
                   <ChevronLeft size={14} strokeWidth={2} aria-hidden="true" />
                   <span className="tw-sr-only">{t('backButton')}</span>
@@ -583,6 +592,18 @@ export function ConversationDetailPane({
                             getShortcut={shortcut}
                             closeMenuOnActionTrigger={closeMoreMenu}
                             className="tw-w-full"
+                          />
+                        </div>
+                      ) : null}
+
+                      {selected ? (
+                        <div className="tw-border-t tw-border-[var(--border)] tw-pt-1">
+                          <ConversationItemMenuActions
+                            conversationId={Number(selected.id)}
+                            originalUrl={selected.url}
+                            getShortcut={shortcut}
+                            onClose={closeMoreMenu}
+                            onPopupSyncPreparing={onPopupSyncPreparing}
                           />
                         </div>
                       ) : null}

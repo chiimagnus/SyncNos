@@ -11,7 +11,7 @@ import { t } from '@i18n';
 import { useConversationsApp, ConversationsProvider } from '@viewmodels/conversations/conversations-context';
 import { ConversationsScene } from '@ui/conversations/ConversationsScene';
 import { buttonFilledClassName, buttonTintClassName, headerButtonClassName } from '@ui/shared/button-styles';
-import { AppTooltipHost, tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
+import { AppTooltipHost, tooltipAttrs, tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
 import { usePopupCurrentPageCapture } from '@viewmodels/popup/usePopupCurrentPageCapture';
 import { usePopupOpenCurrentTabInpageCommentsSidebar } from '@viewmodels/popup/usePopupOpenCurrentTabInpageCommentsSidebar';
 import { useAppThemeMode } from '@viewmodels/theme/useAppThemeMode';
@@ -169,9 +169,6 @@ function PopupShellFrame() {
     'open-settings': () => {
       void onOpenSettings().catch(() => {});
     },
-    'capture-page': () => {
-      if (!buttonDisabled) void capture().catch(() => {});
-    },
     'popup-comments': () => {
       if (commentsButton.disabled) return;
       void commentsButton.open().then((ok) => {
@@ -215,8 +212,8 @@ function PopupShellFrame() {
     })().catch(() => {});
   };
 
-  const onPopupSyncPreparing = async (provider: SyncProvider) => {
-    await publishPopupSyncSelectionHandoff(selectedIds);
+  const onPopupSyncPreparing = async (provider: SyncProvider, handoffIds: readonly number[] = selectedIds) => {
+    if (handoffIds.length) await publishPopupSyncSelectionHandoff(handoffIds);
     const appTab = await ensureExtensionAppTab();
     if (!appTab) throw new Error('extension_app_tab_unavailable');
     if (provider === 'notion' || provider === 'feishu') await showPopupSyncNudgeIfNeeded(provider);
@@ -251,10 +248,7 @@ function PopupShellFrame() {
                   <>
                     <span
                       className="tw-inline-flex"
-                      {...tooltipAttrsWithShortcut(
-                        buttonDisabled ? status?.message || buttonLabel : buttonLabel,
-                        buttonDisabled ? '' : shortcut('capture-page'),
-                      )}
+                      {...tooltipAttrs(buttonDisabled ? status?.message || buttonLabel : buttonLabel)}
                     >
                       <button
                         type="button"

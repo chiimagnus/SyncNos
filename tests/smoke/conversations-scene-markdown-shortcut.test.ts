@@ -6,7 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConversationsScene } from '../../src/ui/conversations/ConversationsScene';
 
 const mocks = vi.hoisted(() => ({
-  listCopy: vi.fn(),
+  listCopy: vi.fn(async () => {}),
+  originalCopy: vi.fn(async () => {}),
+  rowButtonClick: vi.fn(),
+  exportItem: vi.fn(async () => {}),
+  deleteItem: vi.fn(async () => {}),
   detailCopy: vi.fn(async () => {}),
   narrow: true,
   route: 'list' as 'list' | 'detail',
@@ -15,7 +19,14 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../src/services/shared/storage', () => ({
-  storageGet: async () => ({ in_app_shortcuts_v1: { 'copy-markdown': 'Ctrl+Alt+M' } }),
+  storageGet: async () => ({
+    in_app_shortcuts_v1: {
+      'copy-markdown': 'Ctrl+Alt+M',
+      'copy-list-link': 'Ctrl+Alt+L',
+      'export-item': 'Ctrl+Alt+E',
+      'delete-item': 'Ctrl+Alt+D',
+    },
+  }),
   storageOnChanged: () => () => {},
 }));
 vi.mock('../../src/ui/shared/hooks/useIsNarrowScreen', () => ({
@@ -39,7 +50,7 @@ vi.mock('../../src/ui/conversations/ConversationListPane', () => ({
       createElement(
         'div',
         { 'data-conversation-id': '11' },
-        createElement('button', { 'data-list-copy-markdown': 'true', onClick: mocks.listCopy }, 'Copy list'),
+        createElement('button', { 'data-list-copy-markdown': 'true', onClick: mocks.rowButtonClick }, 'Copy list'),
       ),
     ),
 }));
@@ -50,6 +61,13 @@ vi.mock('../../src/ui/conversations/LazyConversationSurfaces', () => ({
 vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
   useConversationsApp: () => ({
     activeId: mocks.activeId,
+    items: [{ id: 11, title: 'First', source: 'chatgpt', conversationKey: 'example', url: 'https://example.com' }],
+    exporting: false,
+    deleting: false,
+    copyConversationMarkdown: mocks.listCopy,
+    copyConversationSourceLink: mocks.originalCopy,
+    exportConversationMarkdown: mocks.exportItem,
+    deleteConversation: mocks.deleteItem,
     selectedConversation: { id: 11, source: 'chatgpt', conversationKey: 'example', url: 'https://example.com' },
     detailHeaderActions: mocks.detailAvailable
       ? [{ id: 'copy-full-markdown', disabled: false, onTrigger: mocks.detailCopy }]
@@ -63,10 +81,10 @@ vi.mock('../../src/viewmodels/conversations/conversations-context', () => ({
 let dom: JSDOM;
 let root: ReactDOM.Root;
 
-function pressCopy(target: EventTarget = document) {
+function pressShortcut(code: string, target: EventTarget = document) {
   const event = new window.KeyboardEvent('keydown', {
-    key: 'm',
-    code: 'KeyM',
+    key: code.slice(-1).toLowerCase(),
+    code,
     ctrlKey: true,
     altKey: true,
     bubbles: true,
@@ -75,6 +93,7 @@ function pressCopy(target: EventTarget = document) {
   act(() => target.dispatchEvent(event));
   return event;
 }
+const pressCopy = (target: EventTarget = document) => pressShortcut('KeyM', target);
 
 async function render() {
   await act(async () => {
@@ -99,7 +118,11 @@ beforeEach(() => {
   mocks.route = 'list';
   mocks.activeId = 11;
   mocks.detailAvailable = true;
-  mocks.listCopy.mockReset();
+  mocks.listCopy.mockReset().mockResolvedValue(undefined);
+  mocks.originalCopy.mockReset().mockResolvedValue(undefined);
+  mocks.rowButtonClick.mockReset();
+  mocks.exportItem.mockReset().mockResolvedValue(undefined);
+  mocks.deleteItem.mockReset().mockResolvedValue(undefined);
   mocks.detailCopy.mockReset().mockResolvedValue(undefined);
   root = ReactDOM.createRoot(document.getElementById('root')!);
 });
@@ -116,7 +139,13 @@ describe('one markdown shortcut across list and detail', () => {
   it('copies the list row on the narrow list route and the detail on the narrow detail route', async () => {
     await render();
     expect(pressCopy().defaultPrevented).toBe(true);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(mocks.listCopy).toHaveBeenCalledWith(11);
     expect(mocks.listCopy).toHaveBeenCalledTimes(1);
+    expect(mocks.rowButtonClick).not.toHaveBeenCalled();
     expect(mocks.detailCopy).not.toHaveBeenCalled();
 
     mocks.route = 'detail';
@@ -136,7 +165,13 @@ describe('one markdown shortcut across list and detail', () => {
     const listButton = document.querySelector<HTMLButtonElement>('[data-list-copy-markdown]')!;
     listButton.focus();
     expect(pressCopy(listButton).defaultPrevented).toBe(true);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(mocks.listCopy).toHaveBeenCalledWith(11);
     expect(mocks.listCopy).toHaveBeenCalledTimes(1);
+    expect(mocks.rowButtonClick).not.toHaveBeenCalled();
     expect(mocks.detailCopy).not.toHaveBeenCalled();
 
     const detailButton = document.querySelector<HTMLButtonElement>('[data-detail-focus]')!;
@@ -196,6 +231,51 @@ describe('one markdown shortcut across list and detail', () => {
       await new Promise((resolve) => setImmediate(resolve));
     });
     expect(mocks.detailCopy).toHaveBeenCalledTimes(2);
+  });
+
+  it('copies the original link through its business action instead of clicking a row button', async () => {
+    await render();
+    expect(pressShortcut('KeyL').defaultPrevented).toBe(true);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(mocks.originalCopy).toHaveBeenCalledWith(11);
+    expect(mocks.rowButtonClick).not.toHaveBeenCalled();
+
+    mocks.route = 'detail';
+    await render();
+    expect(pressShortcut('KeyL').defaultPrevented).toBe(true);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(mocks.originalCopy).toHaveBeenCalledTimes(2);
+    expect(mocks.originalCopy).toHaveBeenLastCalledWith(11);
+  });
+
+  it('exports and deletes the current item directly without using bulk toolbar actions', async () => {
+    await render();
+    expect(pressShortcut('KeyE').defaultPrevented).toBe(true);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(mocks.exportItem).toHaveBeenCalledWith(11);
+
+    Object.defineProperty(window, 'confirm', {
+      configurable: true,
+      value: vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true),
+    });
+    expect(pressShortcut('KeyD').defaultPrevented).toBe(true);
+    expect(mocks.deleteItem).not.toHaveBeenCalled();
+    expect(pressShortcut('KeyD').defaultPrevented).toBe(true);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(mocks.deleteItem).toHaveBeenCalledWith(11);
+    expect(mocks.rowButtonClick).not.toHaveBeenCalled();
   });
 
   it('does not consume a key when neither pane has a copyable item', async () => {
