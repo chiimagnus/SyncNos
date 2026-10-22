@@ -104,9 +104,18 @@ describe('in-app shortcut editor', () => {
     expect(document.querySelectorAll('button[aria-label^="Set shortcut: "]').length).toBeGreaterThan(30);
     expect(document.querySelector(toggleSelector)?.textContent).toContain('⌥ + ⇧ + B');
     expect(document.querySelector(toggleSelector)?.querySelectorAll('kbd')).toHaveLength(1);
+    expect(document.querySelector(toggleSelector)?.classList.contains('webclipper-btn')).toBe(true);
+    expect(document.querySelector(toggleSelector)?.getAttribute('class')).not.toContain('tw-bg-transparent');
+    expect(document.querySelector(toggleSelector)?.getAttribute('aria-pressed')).toBe('false');
+    const resetButton = Array.from(document.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Restore defaults',
+    );
+    expect(resetButton?.classList.contains('webclipper-btn')).toBe(true);
 
     const button = click(toggleSelector);
     expect(button.textContent).toContain('Recording');
+    expect(button.classList.contains('webclipper-btn')).toBe(true);
+    expect(button.getAttribute('aria-pressed')).toBe('true');
     await act(async () => {
       key(button, '∫', 'KeyB', { metaKey: true, shiftKey: true });
       await Promise.resolve();

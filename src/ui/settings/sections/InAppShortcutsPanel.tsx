@@ -171,7 +171,7 @@ export function InAppShortcutsPanel() {
                       <div className="tw-flex tw-min-w-0 tw-shrink-0 tw-items-center tw-gap-1.5">
                         <button
                           type="button"
-                          className={`tw-inline-flex tw-min-h-8 tw-min-w-16 tw-max-w-[240px] tw-items-center tw-justify-end tw-rounded-[var(--radius-inline)] tw-border tw-px-2 tw-py-1 tw-text-xs tw-transition-colors focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)] disabled:tw-opacity-50 ${isRecording ? 'tw-border-[var(--accent)] tw-bg-transparent tw-text-[var(--text-primary)]' : 'tw-border-transparent tw-bg-transparent tw-text-[var(--text-secondary)] hover:tw-border-[var(--border)] hover:tw-text-[var(--text-primary)]'}`}
+                          className={`${buttonClassName} tw-min-w-16 tw-max-w-[240px]`}
                           disabled={!ready || saving || storageError}
                           onClick={(event) => {
                             if (isRecording) {
@@ -194,7 +194,7 @@ export function InAppShortcutsPanel() {
                         >
                           {displayed ? (
                             <kbd
-                              className="tw-block tw-max-w-full tw-truncate tw-font-mono tw-font-medium tw-leading-5"
+                              className="tw-block tw-max-w-full tw-truncate tw-font-mono tw-leading-5"
                               aria-hidden="true"
                             >
                               {displayInAppShortcut(displayed, platform)}
