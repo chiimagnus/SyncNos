@@ -5,9 +5,8 @@ export {
   shortcutFromKeyEvent,
   inAppShortcutMatches,
   inAppShortcutsConflict,
-  setHeldShortcutModifier,
-  heldShortcutModifiers,
-  physicalModifierKey,
+  isShortcutModifierKey,
+  shortcutModifiersFromKeyEvent,
   shortcutPlatform,
   displayInAppShortcut,
   displayInAppShortcutParts,
@@ -96,7 +95,7 @@ export function resolveInAppShortcutBindings(value: unknown): InAppShortcutBindi
   for (const action of IN_APP_SHORTCUT_ACTIONS) {
     const key = bindings[action.id];
     if (key && used.some((previous) => inAppShortcutsConflict(previous, key))) bindings[action.id] = '';
-    if (key) used.push(key);
+    else if (key) used.push(key);
   }
   return bindings;
 }

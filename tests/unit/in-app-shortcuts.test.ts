@@ -18,11 +18,10 @@ import {
   InAppShortcutBindingError,
   displayInAppShortcut,
   displayInAppShortcutParts,
-  heldShortcutModifiers,
-  physicalModifierKey,
+  shortcutModifiersFromKeyEvent,
+  isShortcutModifierKey,
   inAppShortcutMatches,
   inAppShortcutsConflict,
-  setHeldShortcutModifier,
   shortcutPlatform,
   defaultInAppShortcutBindings,
   normalizeInAppShortcut,
@@ -56,7 +55,7 @@ describe('in-app shortcut contract', () => {
     expect(ids.length).toBeGreaterThan(30);
   });
 
-  it('accepts common physical keys, numpad, punctuation, bare keys, and modifier sides', () => {
+  it('accepts full keyboard keys and normalizes old left/right modifier bindings', () => {
     expect(normalizeInAppShortcut('Alt+Shift+b')).toBe('Alt+Shift+B');
     expect(normalizeInAppShortcut('Shift+Mod+1')).toBe('Mod+Shift+1');
     expect(normalizeInAppShortcut('Alt+ArrowDown')).toBe('Alt+ArrowDown');
@@ -68,8 +67,8 @@ describe('in-app shortcut contract', () => {
       'Ctrl+BracketLeft',
       'Shift+Tab',
       'Numpad0',
-      'AltRight+NumpadAdd',
-      'ControlRight+MetaLeft+F24',
+      'Alt+NumpadAdd',
+      'Ctrl+Meta+F24',
       'Ctrl+IntlYen',
       'PageDown',
       'Alt+Backspace',
@@ -87,12 +86,18 @@ describe('in-app shortcut contract', () => {
       'Tab',
       'Escape',
       'Fn+X',
+      '__proto__+X',
+      'constructor+X',
       null,
     ]) {
       expect(normalizeInAppShortcut(invalid)).toBeNull();
     }
     expect(normalizeInAppShortcut('Mod+W')).toBeNull();
     expect(normalizeInAppShortcut('Mod+C')).toBeNull();
+    expect(normalizeInAppShortcut('AltLeft+NumpadAdd')).toBe('Alt+NumpadAdd');
+    expect(normalizeInAppShortcut('ControlRight+MetaLeft+F24')).toBe('Ctrl+Meta+F24');
+    expect(normalizeInAppShortcut('AltLeft+AltRight+X')).toBe('Alt+X');
+    expect(normalizeInAppShortcut('Alt+AltLeft+X')).toBeNull();
     expect(normalizeInAppShortcut('Alt+ArrowLeft')).toBeNull();
     expect(normalizeInAppShortcut('AltLeft+ArrowLeft')).toBeNull();
     expect(normalizeInAppShortcut('ControlRight+W')).toBeNull();
@@ -102,14 +107,14 @@ describe('in-app shortcut contract', () => {
 
   it('captures the same logical key on macOS and Windows, including shifted digits', () => {
     const event = { key: 'B', code: 'KeyB', metaKey: true, ctrlKey: false, altKey: false, shiftKey: true };
-    expect(shortcutFromKeyEvent(event, true)).toBe('Mod+Shift+B');
-    expect(shortcutFromKeyEvent({ ...event, metaKey: false, ctrlKey: true }, false)).toBe('Mod+Shift+B');
-    expect(shortcutFromKeyEvent({ ...event, key: '!', code: 'Digit1' }, true)).toBe('Mod+Shift+1');
-    expect(shortcutFromKeyEvent({ ...event, key: '∫', code: 'KeyB', metaKey: false, altKey: true }, true)).toBe(
+    expect(shortcutFromKeyEvent(event, 'mac')).toBe('Mod+Shift+B');
+    expect(shortcutFromKeyEvent({ ...event, metaKey: false, ctrlKey: true }, 'windows')).toBe('Mod+Shift+B');
+    expect(shortcutFromKeyEvent({ ...event, key: '!', code: 'Digit1' }, 'mac')).toBe('Mod+Shift+1');
+    expect(shortcutFromKeyEvent({ ...event, key: '∫', code: 'KeyB', metaKey: false, altKey: true }, 'mac')).toBe(
       'Alt+Shift+B',
     );
-    expect(shortcutFromKeyEvent({ ...event, key: 'Dead', code: 'KeyA' }, true)).toBe('Mod+Shift+A');
-    expect(shortcutFromKeyEvent({ ...event, key: 'Dead', code: 'Unidentified' }, true)).toBeNull();
+    expect(shortcutFromKeyEvent({ ...event, key: 'Dead', code: 'KeyA' }, 'mac')).toBe('Mod+Shift+A');
+    expect(shortcutFromKeyEvent({ ...event, key: 'Dead', code: 'Unidentified' }, 'mac')).toBeNull();
   });
 
   it('merges overrides, preserving explicit blank values and dropping unknown or malformed entries', () => {
@@ -168,6 +173,17 @@ describe('in-app shortcut contract', () => {
     expect(result['toggle-sidebar']).toBe('Alt+Shift+P');
     expect(result['open-settings']).toBe('');
   });
+  it('drops only conflicting stored assignments, not keys overlapping an already rejected entry', () => {
+    const bindings = resolveInAppShortcutBindings({
+      'toggle-sidebar': 'Mod+Ctrl+Y', // usable on macOS
+      'filter-source': 'Ctrl+Meta+Y', // overlaps the first on macOS
+      'filter-site': 'Mod+Meta+Y', // usable on Windows, not overlapping the first
+    });
+    expect(bindings['toggle-sidebar']).toBe('Mod+Ctrl+Y');
+    expect(bindings['filter-source']).toBe('');
+    expect(bindings['filter-site']).toBe('Mod+Meta+Y');
+  });
+
   it('identifies macOS, Windows, Linux, ChromeOS and unknown systems and displays their own keyboard names', () => {
     const platform = (name: string) => shortcutPlatform({ platform: name, userAgent: '' });
     expect(platform('MacIntel')).toBe('mac');
@@ -175,41 +191,45 @@ describe('in-app shortcut contract', () => {
     expect(platform('Linux x86_64')).toBe('linux');
     expect(platform('CrOS x86_64')).toBe('chromeos');
     expect(platform('UnknownOS')).toBe('other');
-    expect(displayInAppShortcut('Mod+AltLeft+ShiftRight+BracketLeft', 'mac')).toBe('⌘ + L ⌥ + R ⇧ + [');
-    expect(displayInAppShortcut('Mod+AltLeft+ShiftRight+BracketLeft', 'windows')).toBe('Ctrl + L Alt + R Shift + [');
-    expect(displayInAppShortcut('MetaLeft+ControlRight+Space', 'linux')).toBe('L Super + R Ctrl + Space');
-    expect(displayInAppShortcut('MetaRight+NumpadEnter', 'chromeos')).toBe('R Search + Num Enter');
-    expect(displayInAppShortcut('MetaRight+NumpadEnter', 'other')).toBe('R Super + Num Enter');
+    expect(displayInAppShortcut('Mod+AltLeft+ShiftRight+BracketLeft', 'mac')).toBe('⌘ + ⌥ + ⇧ + [');
+    expect(displayInAppShortcut('Mod+AltLeft+ShiftRight+BracketLeft', 'windows')).toBe('Ctrl + Alt + Shift + [');
+    expect(displayInAppShortcut('MetaLeft+ControlRight+Space', 'linux')).toBe('Super + Ctrl + Space');
+    expect(displayInAppShortcut('MetaRight+NumpadEnter', 'chromeos')).toBe('Search + Num Enter');
+    expect(displayInAppShortcut('MetaRight+NumpadEnter', 'other')).toBe('Super + Num Enter');
     expect(displayInAppShortcut('Ctrl+Backspace', 'mac')).toBe('⌃ + ⌫');
     expect(displayInAppShortcut('Alt+Delete', 'mac')).toBe('⌥ + ⌦');
     expect(displayInAppShortcut('Alt+Delete', 'windows')).toBe('Alt + Delete');
-    expect(displayInAppShortcutParts('AltLeft+ShiftRight', 'mac')).toEqual(['L ⌥', 'R ⇧']);
+    expect(displayInAppShortcutParts('AltLeft+ShiftRight', 'mac')).toEqual(['⌥', '⇧']);
   });
 
-  it('uses physical key codes and distinguishes left and right of every modifier family', () => {
-    const held = new Set<string>();
-    for (const [key, code] of [
-      ['Control', 'ControlLeft'],
-      ['Alt', 'AltRight'],
-      ['Shift', 'ShiftLeft'],
-      ['Meta', 'MetaRight'],
-    ]) {
-      expect(physicalModifierKey({ key, code })).toBe(code);
-      expect(setHeldShortcutModifier(held, { key, code }, true)).toBe(true);
+  it('uses logical modifier flags and treats left and right keys identically', () => {
+    const modifiers = ['Control', 'Alt', 'Shift', 'Meta'];
+    for (const key of modifiers) {
+      expect(isShortcutModifierKey({ key, code: `${key}Left` })).toBe(true);
+      expect(isShortcutModifierKey({ key, code: `${key}Right` })).toBe(true);
     }
-    expect(heldShortcutModifiers(held)).toBe('ControlLeft+MetaRight+AltRight+ShiftLeft');
-    const event = { key: '+', code: 'NumpadAdd', metaKey: true, ctrlKey: true, altKey: true, shiftKey: true };
-    const binding = shortcutFromKeyEvent(event, 'mac', held);
-    expect(binding).toBe('ControlLeft+MetaRight+AltRight+ShiftLeft+NumpadAdd');
+    expect(isShortcutModifierKey({ key: 'OS', code: 'OSRight' })).toBe(true);
+    expect(isShortcutModifierKey({ key: 'B', code: 'KeyB' })).toBe(false);
+    const base = { key: '+', code: 'NumpadAdd', metaKey: true, ctrlKey: true, altKey: true, shiftKey: true };
+    const binding = shortcutFromKeyEvent(base, 'mac');
+    expect(binding).toBe('Mod+Ctrl+Alt+Shift+NumpadAdd');
     expect(inAppShortcutMatches(binding!, binding!, 'mac')).toBe(true);
-    expect(inAppShortcutMatches('ControlRight+MetaRight+AltRight+ShiftLeft+NumpadAdd', binding!, 'mac')).toBe(false);
+    expect(inAppShortcutMatches('ControlRight+MetaLeft+AltRight+ShiftLeft+NumpadAdd', binding!, 'mac')).toBe(false); // Must normalize stored keys first.
+    expect(
+      inAppShortcutMatches(
+        normalizeInAppShortcut('ControlRight+MetaLeft+AltRight+ShiftLeft+NumpadAdd')!,
+        binding!,
+        'mac',
+      ),
+    ).toBe(true);
     expect(inAppShortcutMatches('Ctrl+Mod+Alt+Shift+NumpadAdd', binding!, 'mac')).toBe(true);
     expect(inAppShortcutMatches('Ctrl+Mod+Alt+Shift+NumpadAdd', binding!, 'windows')).toBe(false);
-    expect(setHeldShortcutModifier(held, { key: 'Alt', code: 'AltRight' }, false)).toBe(true);
-    expect(held.has('AltRight')).toBe(false);
-    expect(physicalModifierKey({ key: 'Control', code: '', location: 2 })).toBe('ControlRight');
-    expect(physicalModifierKey({ key: 'Meta', code: '', location: 1 })).toBe('MetaLeft');
-    expect(physicalModifierKey({ key: 'Shift', code: '', location: 0 })).toBe('Shift');
+    expect(shortcutModifiersFromKeyEvent({ ...base, key: 'Alt', code: 'AltLeft' }, 'mac')).toBe('Mod+Ctrl+Alt+Shift');
+    expect(shortcutModifiersFromKeyEvent({ ...base, key: 'Alt', code: 'AltRight' }, 'mac')).toBe('Mod+Ctrl+Alt+Shift');
+    expect(shortcutModifiersFromKeyEvent({ ...base, ctrlKey: false, metaKey: false, shiftKey: false }, 'linux')).toBe(
+      'Alt',
+    );
+    expect(shortcutFromKeyEvent({ ...base, key: 'B', code: 'KeyB' }, 'mac')).toBe('Mod+Ctrl+Alt+Shift+B');
   });
 
   it('allows all standard physical key families while protecting browser navigation and overlapping bindings', () => {
@@ -222,26 +242,39 @@ describe('in-app shortcut contract', () => {
     expect(shortcutFromKeyEvent({ ...base, key: 'F24', code: 'F24' }, 'mac')).toBe('F24');
     expect(shortcutFromKeyEvent({ ...base, key: 'Fn', code: 'Fn' }, 'mac')).toBeNull();
     expect(inAppShortcutsConflict('Alt+Shift+B', 'AltLeft+ShiftRight+B')).toBe(true);
-    expect(inAppShortcutsConflict('AltLeft+ShiftRight+B', 'AltRight+ShiftRight+B')).toBe(false);
+    expect(inAppShortcutsConflict('AltLeft+ShiftRight+B', 'AltRight+ShiftRight+B')).toBe(true);
     expect(inAppShortcutsConflict('Mod+Shift+K', 'ControlLeft+ShiftLeft+K')).toBe(true);
-    expect(inAppShortcutsConflict('MetaLeft+Space', 'MetaRight+Space')).toBe(false);
+    expect(inAppShortcutsConflict('MetaLeft+Space', 'MetaRight+Space')).toBe(true);
     expect(normalizeInAppShortcut('AltLeft+Tab')).toBeNull();
   });
 
-  it('protects assigned physical variants during writes and preserves independent left/right bindings', async () => {
-    await updateInAppShortcutBinding('toggle-sidebar', 'AltLeft+ShiftLeft+B');
-    await expect(updateInAppShortcutBinding('filter-source', 'Alt+Shift+B')).rejects.toMatchObject({
+  it('consolidates legacy persisted sides, keeps one owner for collisions, and saves generic modifiers', async () => {
+    persisted = {
+      'toggle-sidebar': 'AltLeft+ShiftLeft+Y',
+      'filter-source': 'AltRight+ShiftRight+Y',
+      'open-settings': 'MetaRight+Slash',
+    };
+    const migrated = await readInAppShortcutBindings();
+    expect(migrated['toggle-sidebar']).toBe('Alt+Shift+Y');
+    expect(migrated['filter-source']).toBe('');
+    expect(migrated['open-settings']).toBe('Meta+Slash');
+
+    await expect(updateInAppShortcutBinding('filter-source', 'Alt+Shift+Y')).rejects.toMatchObject({
       code: 'conflict',
       conflictingAction: 'toggle-sidebar',
     });
-    await updateInAppShortcutBinding('filter-source', 'AltRight+ShiftLeft+B');
-    const bindings = await readInAppShortcutBindings();
-    expect(bindings['toggle-sidebar']).toBe('AltLeft+ShiftLeft+B');
-    expect(bindings['filter-source']).toBe('AltRight+ShiftLeft+B');
-    expect(
-      resolveInAppShortcutBindings({ 'toggle-sidebar': 'AltLeft+ShiftLeft+B', 'filter-source': 'Alt+Shift+B' })[
-        'filter-source'
-      ],
-    ).toBe('');
+    await updateInAppShortcutBinding('filter-source', 'AltRight+ShiftLeft+F24');
+    const result = await readInAppShortcutBindings();
+    expect(result['filter-source']).toBe('Alt+Shift+F24');
+    expect(persisted['filter-source']).toBe('Alt+Shift+F24');
+    expect(result['toggle-sidebar']).toBe('Alt+Shift+Y');
+    expect(result['open-settings']).toBe('Meta+Slash');
+  });
+
+  it('rejects protected browser shortcuts even when imported with old physical-side names', () => {
+    expect(normalizeInAppShortcut('AltRight+ArrowLeft')).toBeNull();
+    expect(normalizeInAppShortcut('MetaLeft+W')).toBeNull();
+    expect(normalizeInAppShortcut('ControlLeft+W')).toBeNull();
+    expect(normalizeInAppShortcut('ShiftLeft+ShiftRight+W')).toBe('Shift+W');
   });
 });

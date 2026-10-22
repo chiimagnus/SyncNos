@@ -173,7 +173,7 @@ describe('in-app keydown dispatch', () => {
     expect(handlers['toggle-sidebar']).not.toHaveBeenCalled();
   });
 
-  it('executes only the configured modifier sides and clears held keys when the window loses focus', async () => {
+  it('executes migrated old-side bindings with either hand and generic browser modifier flags', async () => {
     await render();
     act(() =>
       listener?.(
@@ -181,19 +181,19 @@ describe('in-app keydown dispatch', () => {
         'local',
       ),
     );
-    const both = { altKey: true, shiftKey: true };
-    sendKey('B', 'KeyB', both); // Generic flags cannot prove a right-side press.
-    expect(handlers['toggle-sidebar']).not.toHaveBeenCalled();
+    const chord = { altKey: true, shiftKey: true };
+    sendKey('B', 'KeyB', chord);
+    expect(handlers['toggle-sidebar']).toHaveBeenCalledTimes(1);
     sendKey('Alt', 'AltRight', { altKey: true, location: 2 });
-    sendKey('Shift', 'ShiftLeft', { ...both, location: 1 });
-    sendKey('B', 'KeyB', both);
-    expect(handlers['toggle-sidebar']).toHaveBeenCalledTimes(1);
+    sendKey('Shift', 'ShiftLeft', { ...chord, location: 1 });
+    sendKey('B', 'KeyB', chord);
+    expect(handlers['toggle-sidebar']).toHaveBeenCalledTimes(2);
     act(() => window.dispatchEvent(new window.Event('blur')));
-    sendKey('B', 'KeyB', both);
-    expect(handlers['toggle-sidebar']).toHaveBeenCalledTimes(1);
     sendKey('Alt', 'AltLeft', { altKey: true, location: 1 });
-    sendKey('Shift', 'ShiftLeft', { ...both, location: 1 });
-    sendKey('B', 'KeyB', both);
-    expect(handlers['toggle-sidebar']).toHaveBeenCalledTimes(1);
+    sendKey('Shift', 'ShiftRight', { ...chord, location: 2 });
+    sendKey('B', 'KeyB', chord);
+    expect(handlers['toggle-sidebar']).toHaveBeenCalledTimes(3);
+    sendKey('B', 'KeyB', { altKey: true });
+    expect(handlers['toggle-sidebar']).toHaveBeenCalledTimes(3);
   });
 });

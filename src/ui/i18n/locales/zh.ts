@@ -47,7 +47,7 @@ export const zh: { [K in TranslationKey]: string } = {
   keyboardShortcutsUnsupported: '当前浏览器无法读取扩展快捷键。',
   keyboardShortcutsBrowserHeading: '浏览器快捷键',
   keyboardShortcutsInAppHeading: 'SyncNos 内部快捷键',
-  keyboardShortcutsInAppHint: '点击键位录制；按下时会实时显示组合键。组合键可区分左右修饰键，Esc 取消录制，× 清空。仅在 SyncNos 内生效。',
+  keyboardShortcutsInAppHint: '点击键位录制；按下时会实时显示组合键。左右修饰键无需区分，Esc 取消录制，× 清空。仅在 SyncNos 内生效。',
   keyboardShortcutsNavigationGroup: '导航',
   keyboardShortcutsLibraryGroup: '收藏列表',
   keyboardShortcutsDetailGroup: '详情',
@@ -64,7 +64,7 @@ export const zh: { [K in TranslationKey]: string } = {
   keyboardShortcutsInvalid: '无法使用这个按键组合：请尝试其他键位，浏览器或系统快捷键不可覆盖。',
   keyboardShortcutsSearch: '搜索操作或快捷键',
   keyboardShortcutsNoResults: '没有匹配的操作',
-  keyboardShortcutsPhysicalKeysHint: '支持标点、空格、导航键、数字键盘及左右修饰键；部分按键可能被系统拦截。',
+  keyboardShortcutsPhysicalKeysHint: '支持标点、空格、导航键、数字键盘及常用修饰键；部分按键可能被系统拦截。',
   keyboardShortcutsSaveFailed: '保存快捷键失败，请检查扩展存储权限。',
   keyboardShortcutsStorageFailed: '无法读取已保存的键位，暂时不可编辑。',
 

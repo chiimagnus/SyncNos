@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 
 import { t } from '@i18n';
 import {
   IN_APP_SHORTCUT_ACTIONS,
   InAppShortcutBindingError,
   displayInAppShortcut,
-  heldShortcutModifiers,
-  setHeldShortcutModifier,
+  isShortcutModifierKey,
+  shortcutModifiersFromKeyEvent,
   shortcutFromKeyEvent,
   shortcutPlatform,
   type InAppShortcutAction,
@@ -26,7 +26,6 @@ export function InAppShortcutsPanel() {
   const [search, setSearch] = useState('');
   const [recording, setRecording] = useState<InAppShortcutAction | null>(null);
   const [pressed, setPressed] = useState('');
-  const held = useRef(new Set<string>());
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const platform = shortcutPlatform();
@@ -35,7 +34,6 @@ export function InAppShortcutsPanel() {
   ];
 
   const endRecording = () => {
-    held.current.clear();
     setPressed('');
     setRecording(null);
   };
@@ -43,7 +41,6 @@ export function InAppShortcutsPanel() {
   useEffect(() => {
     if (!recording) return;
     const onWindowBlur = () => {
-      held.current.clear();
       setPressed('');
       setRecording(null);
     };
@@ -84,11 +81,11 @@ export function InAppShortcutsPanel() {
       return;
     }
     setMessage('');
-    if (setHeldShortcutModifier(held.current, event.nativeEvent, true)) {
-      setPressed(heldShortcutModifiers(held.current));
+    if (isShortcutModifierKey(event.nativeEvent)) {
+      setPressed(shortcutModifiersFromKeyEvent(event.nativeEvent, platform));
       return;
     }
-    const chord = shortcutFromKeyEvent(event.nativeEvent, platform, held.current);
+    const chord = shortcutFromKeyEvent(event.nativeEvent, platform);
     if (!chord) {
       setMessage(t('keyboardShortcutsInvalid'));
       return;
@@ -98,9 +95,9 @@ export function InAppShortcutsPanel() {
   };
 
   const releaseKey = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
-    if (setHeldShortcutModifier(held.current, event.nativeEvent, false)) {
+    if (isShortcutModifierKey(event.nativeEvent)) {
       event.stopPropagation();
-      setPressed(heldShortcutModifiers(held.current));
+      setPressed(shortcutModifiersFromKeyEvent(event.nativeEvent, platform));
     }
   };
 
@@ -181,7 +178,6 @@ export function InAppShortcutsPanel() {
                               endRecording();
                               return;
                             }
-                            held.current.clear();
                             setPressed('');
                             setMessage('');
                             setRecording(action.id);

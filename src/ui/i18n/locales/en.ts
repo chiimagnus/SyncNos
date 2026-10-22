@@ -45,7 +45,7 @@ export const en = {
   keyboardShortcutsUnsupported: 'This browser cannot read extension keyboard shortcuts.',
   keyboardShortcutsBrowserHeading: 'Browser shortcuts',
   keyboardShortcutsInAppHeading: 'Inside SyncNos',
-  keyboardShortcutsInAppHint: 'Click a binding to record a shortcut with live key feedback. Left and right modifiers are distinguished within combinations. Esc cancels; × clears. Works inside SyncNos only.',
+  keyboardShortcutsInAppHint: 'Click a binding to record a shortcut with live key feedback. Left and right modifiers are equivalent. Esc cancels; × clears. Works inside SyncNos only.',
   keyboardShortcutsNavigationGroup: 'Navigation',
   keyboardShortcutsLibraryGroup: 'Library',
   keyboardShortcutsDetailGroup: 'Details',
@@ -62,7 +62,7 @@ export const en = {
   keyboardShortcutsInvalid: 'This key combination cannot be used. System and browser shortcuts cannot be overridden.',
   keyboardShortcutsSearch: 'Search actions or shortcuts',
   keyboardShortcutsNoResults: 'No matching actions',
-  keyboardShortcutsPhysicalKeysHint: 'Punctuation, space, navigation keys, numpad and left/right modifiers are supported when delivered by the OS.',
+  keyboardShortcutsPhysicalKeysHint: 'Punctuation, space, navigation keys, numpad and standard modifiers are supported when delivered by the OS.',
   keyboardShortcutsSaveFailed: 'Could not save shortcuts. Check extension storage permissions.',
   keyboardShortcutsStorageFailed: 'Unable to load saved keys; editing is unavailable.',
 

@@ -1,34 +1,18 @@
-/** Physical keyboard shortcuts shared by the recorder and the event dispatcher. */
+/** Logical shortcuts shared by the recorder and the event dispatcher. */
 export type ShortcutPlatform = 'mac' | 'windows' | 'linux' | 'chromeos' | 'other';
 
-type PhysicalFamily = 'Control' | 'Meta' | 'Alt' | 'Shift';
-type ModifierRequirement = { any: boolean; sides: Set<'Left' | 'Right'> };
-type Requirements = Map<PhysicalFamily, ModifierRequirement>;
-
-const MODIFIER_ORDER = [
-  'Mod',
-  'Ctrl',
-  'Meta',
-  'Alt',
-  'Shift',
-  'ControlLeft',
-  'ControlRight',
-  'MetaLeft',
-  'MetaRight',
-  'AltLeft',
-  'AltRight',
-  'ShiftLeft',
-  'ShiftRight',
-] as const;
-const MODIFIER_CODES = new Set<string>([
-  'ControlLeft',
-  'ControlRight',
-  'MetaLeft',
-  'MetaRight',
-  'AltLeft',
-  'AltRight',
-  'ShiftLeft',
-  'ShiftRight',
+type ModifierFamily = 'Ctrl' | 'Meta' | 'Alt' | 'Shift';
+const MODIFIER_ORDER = ['Mod', 'Ctrl', 'Meta', 'Alt', 'Shift'] as const;
+// Existing stored shortcuts may contain physical-side tokens from older builds.
+const LEGACY_MODIFIERS = new Map([
+  ['controlleft', 'Ctrl'],
+  ['controlright', 'Ctrl'],
+  ['metaleft', 'Meta'],
+  ['metaright', 'Meta'],
+  ['altleft', 'Alt'],
+  ['altright', 'Alt'],
+  ['shiftleft', 'Shift'],
+  ['shiftright', 'Shift'],
 ]);
 const KEY_CODES = [
   'Space',
@@ -131,7 +115,6 @@ const KEY_CODES = [
 ] as const;
 const KEY_NAMES = new Map(KEY_CODES.map((code) => [code.toLowerCase(), code]));
 const MODIFIER_NAMES = new Map<string, string>(MODIFIER_ORDER.map((key) => [key.toLowerCase(), key]));
-const MODIFIER_FAMILIES = ['Control', 'Meta', 'Alt', 'Shift'] as const;
 const FALLBACK_KEYS: Record<string, string> = {
   ' ': 'Space',
   '+': 'Equal',
@@ -243,60 +226,28 @@ function normalizeKey(key: string): string | null {
   return KEY_NAMES.get(key.toLowerCase()) || null;
 }
 
-function physicalFamily(
-  modifier: string,
-  platform: ShortcutPlatform,
-): { family: PhysicalFamily; side: 'Left' | 'Right' | null } | null {
-  if (modifier === 'Mod') return { family: platform === 'mac' ? 'Meta' : 'Control', side: null };
-  if (modifier === 'Ctrl') return { family: 'Control', side: null };
-  if (modifier === 'Meta') return { family: 'Meta', side: null };
-  if (modifier === 'Alt' || modifier === 'Shift') return { family: modifier, side: null };
-  const match = /^(Control|Meta|Alt|Shift)(Left|Right)$/.exec(modifier);
-  return match ? { family: match[1] as PhysicalFamily, side: match[2] as 'Left' | 'Right' } : null;
-}
-
-function requirements(shortcut: string, platform: ShortcutPlatform): { key: string; mods: Requirements } | null {
-  const pieces = shortcut.split('+');
-  const key = pieces.pop();
+function requirements(shortcut: string, platform: ShortcutPlatform): { key: string; mods: Set<ModifierFamily> } | null {
+  const parts = shortcut.split('+');
+  const key = parts.pop();
   if (!key) return null;
-  const mods: Requirements = new Map();
-  for (const modifier of pieces) {
-    const physical = physicalFamily(modifier, platform);
-    if (!physical) return null;
-    const { family, side } = physical;
-    let requirement = mods.get(family);
-    if (!requirement) {
-      requirement = { any: false, sides: new Set() };
-      mods.set(family, requirement);
-    }
-    if (side) {
-      if (requirement.any) return null;
-      requirement.sides.add(side);
-    } else {
-      if (requirement.any || requirement.sides.size) return null;
-      requirement.any = true;
-    }
+  const mods = new Set<ModifierFamily>();
+  for (const modifier of parts) {
+    const family = modifier === 'Mod' ? (platform === 'mac' ? 'Meta' : 'Ctrl') : modifier;
+    if (!['Ctrl', 'Meta', 'Alt', 'Shift'].includes(family) || mods.has(family as ModifierFamily)) return null;
+    mods.add(family as ModifierFamily);
   }
   return { key, mods };
 }
 
-function modifiersIntersect(a: Requirements, b: Requirements): boolean {
-  for (const family of MODIFIER_FAMILIES) {
-    const left = a.get(family);
-    const right = b.get(family);
-    if ((left == null) !== (right == null)) return false;
-    if (!left || !right || left.any || right.any) continue;
-    if (left.sides.size !== right.sides.size) return false;
-    for (const side of left.sides) if (!right.sides.has(side)) return false;
-  }
-  return true;
+function sameModifiers(a: Set<ModifierFamily>, b: Set<ModifierFamily>): boolean {
+  return a.size === b.size && [...a].every((modifier) => b.has(modifier));
 }
 
 function shortcutOverlap(a: string, b: string): boolean {
   for (const platform of ['mac', 'windows', 'linux'] as const) {
     const left = requirements(a, platform);
     const right = requirements(b, platform);
-    if (left && right && left.key === right.key && modifiersIntersect(left.mods, right.mods)) return true;
+    if (left && right && left.key === right.key && sameModifiers(left.mods, right.mods)) return true;
   }
   return false;
 }
@@ -313,8 +264,21 @@ export function normalizeInAppShortcut(value: unknown): string | null {
   const pieces = value.split('+').map((piece) => piece.trim());
   const key = normalizeKey(pieces.pop() || '');
   if (!key || new Set(pieces).size !== pieces.length) return null;
-  const modifiers = pieces.map((piece) => MODIFIER_NAMES.get(piece.toLowerCase()));
-  if (modifiers.some((modifier) => !modifier) || new Set(modifiers).size !== modifiers.length) return null;
+  const modifiers: string[] = [];
+  const originalByModifier = new Map<string, string>();
+  for (const piece of pieces) {
+    const source = piece.toLowerCase();
+    const modifier = MODIFIER_NAMES.get(source) || LEGACY_MODIFIERS.get(source);
+    if (!modifier) return null;
+    const previous = originalByModifier.get(modifier);
+    if (previous) {
+      // Both physical sides formerly formed a valid chord; they now mean the same modifier.
+      if (!LEGACY_MODIFIERS.has(source) || !LEGACY_MODIFIERS.has(previous)) return null;
+      continue;
+    }
+    originalByModifier.set(modifier, source);
+    modifiers.push(modifier);
+  }
   const sorted = MODIFIER_ORDER.filter((modifier) => modifiers.includes(modifier));
   const shortcut = [...sorted, key].join('+');
   if (shortcut === 'Tab' || shortcut === 'Escape') return null; // Keyboard accessibility.
@@ -322,51 +286,26 @@ export function normalizeInAppShortcut(value: unknown): string | null {
   return shortcut;
 }
 
-export type ShortcutKeyEvent = Pick<KeyboardEvent, 'key' | 'code' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey'> & {
-  location?: number;
-};
+export type ShortcutKeyEvent = Pick<KeyboardEvent, 'key' | 'code' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey'>;
 
-export function physicalModifierKey(event: Pick<KeyboardEvent, 'key' | 'code'> & { location?: number }): string | null {
-  if (MODIFIER_CODES.has(event.code)) return event.code;
-  if (event.code === 'OSLeft') return 'MetaLeft';
-  if (event.code === 'OSRight') return 'MetaRight';
-  const family =
-    event.key === 'Control'
-      ? 'Control'
-      : event.key === 'OS' || event.key === 'Meta' || event.key === 'Super'
-        ? 'Meta'
-        : event.key === 'Alt' || event.key === 'AltGraph'
-          ? 'Alt'
-          : event.key === 'Shift'
-            ? 'Shift'
-            : null;
-  if (!family) return null;
-  if (event.location !== 1 && event.location !== 2) return family === 'Control' ? 'Ctrl' : family;
-  return `${family}${event.location === 1 ? 'Left' : 'Right'}`;
+export function isShortcutModifierKey(event: Pick<KeyboardEvent, 'key' | 'code'>): boolean {
+  return (
+    /^(?:Control|Meta|Alt|Shift)(?:Left|Right)$|^OS(?:Left|Right)$/.test(event.code) ||
+    ['Control', 'Meta', 'Alt', 'AltGraph', 'Shift', 'OS', 'Super'].includes(event.key)
+  );
 }
 
-export function setHeldShortcutModifier(
-  held: Set<string>,
-  event: Pick<KeyboardEvent, 'key' | 'code'> & { location?: number },
-  down: boolean,
-) {
-  const modifier = physicalModifierKey(event);
-  if (!modifier) return false;
-  if (down) held.add(modifier);
-  else held.delete(modifier);
-  return true;
-}
-
-export function heldShortcutModifiers(held: ReadonlySet<string>): string {
-  return MODIFIER_ORDER.filter((code) => held.has(code)).join('+');
+export function shortcutModifiersFromKeyEvent(event: ShortcutKeyEvent, platform: ShortcutPlatform): string {
+  const modifiers: string[] = [];
+  if (platform === 'mac' ? event.metaKey : event.ctrlKey) modifiers.push('Mod');
+  if (platform === 'mac' ? event.ctrlKey : event.metaKey) modifiers.push(platform === 'mac' ? 'Ctrl' : 'Meta');
+  if (event.altKey) modifiers.push('Alt');
+  if (event.shiftKey) modifiers.push('Shift');
+  return modifiers.join('+');
 }
 
 function eventMainKey(event: ShortcutKeyEvent): string | null {
-  if (
-    physicalModifierKey(event) ||
-    ['Control', 'Meta', 'Alt', 'AltGraph', 'Shift', 'OS', 'Super', 'Fn', 'FnLock'].includes(event.key)
-  )
-    return null;
+  if (isShortcutModifierKey(event) || ['Fn', 'FnLock'].includes(event.key)) return null;
   if (['Process', 'Unidentified'].includes(event.key)) return null;
   if (event.key === 'Dead' && !/^Key[A-Z]$|^Digit[0-9]$/.test(event.code) && !normalizeKey(event.code)) return null;
   if (/^Key[A-Z]$/.test(event.code)) return event.code.slice(3);
@@ -374,70 +313,23 @@ function eventMainKey(event: ShortcutKeyEvent): string | null {
   return normalizeKey(event.code) || normalizeKey(event.key) || FALLBACK_KEYS[event.key] || null;
 }
 
-export function shortcutFromKeyEvent(
-  event: ShortcutKeyEvent,
-  platform: ShortcutPlatform | boolean,
-  held: ReadonlySet<string> = new Set(),
-): string | null {
+export function shortcutFromKeyEvent(event: ShortcutKeyEvent, platform: ShortcutPlatform): string | null {
   const key = eventMainKey(event);
   if (!key) return null;
-  const resolvedPlatform = typeof platform === 'boolean' ? (platform ? 'mac' : 'windows') : platform;
-  const modifiers: string[] = [];
-  for (const family of MODIFIER_FAMILIES) {
-    const active =
-      family === 'Control'
-        ? event.ctrlKey
-        : family === 'Meta'
-          ? event.metaKey
-          : family === 'Alt'
-            ? event.altKey
-            : event.shiftKey;
-    if (!active) continue;
-    const left = `${family}Left`;
-    const right = `${family}Right`;
-    if (held.has(left)) modifiers.push(left);
-    if (held.has(right)) modifiers.push(right);
-    if (!held.has(left) && !held.has(right)) {
-      modifiers.push(
-        family === 'Control' && resolvedPlatform !== 'mac'
-          ? 'Mod'
-          : family === 'Meta' && resolvedPlatform === 'mac'
-            ? 'Mod'
-            : family === 'Control'
-              ? 'Ctrl'
-              : family,
-      );
-    }
-  }
-  return normalizeInAppShortcut([...modifiers, key].join('+'));
-}
-
-function modifiersMatchExactly(configured: Requirements, actual: Requirements): boolean {
-  for (const family of MODIFIER_FAMILIES) {
-    const expected = configured.get(family);
-    const received = actual.get(family);
-    if (!expected !== !received) return false;
-    if (!expected || !received || expected.any) continue;
-    if (received.any || expected.sides.size !== received.sides.size) return false;
-    for (const side of expected.sides) if (!received.sides.has(side)) return false;
-  }
-  return true;
+  return normalizeInAppShortcut([shortcutModifiersFromKeyEvent(event, platform), key].filter(Boolean).join('+'));
 }
 
 export function inAppShortcutMatches(binding: string, pressed: string, platform: ShortcutPlatform): boolean {
   if (!binding || !pressed) return false;
-  // Both strings are normalized when saved / captured; avoid re-validating the entire shortcut registry on each keydown.
   const expected = requirements(binding, platform);
   const received = requirements(pressed, platform);
-  if (!expected || !received || expected.key !== received.key) return false;
-  return modifiersMatchExactly(expected.mods, received.mods);
+  return !!expected && !!received && expected.key === received.key && sameModifiers(expected.mods, received.mods);
 }
 
 function displayModifier(modifier: string, platform: ShortcutPlatform): string {
   const mac = platform === 'mac';
   const meta = mac ? '⌘' : platform === 'windows' ? 'Win' : platform === 'chromeos' ? 'Search' : 'Super';
-  const physical = /^((?:Control|Meta|Alt|Shift))(Left|Right)$/.exec(modifier);
-  const part = physical?.[1] || modifier;
+  const part = modifier;
   const glyph =
     part === 'Mod'
       ? mac
@@ -458,12 +350,15 @@ function displayModifier(modifier: string, platform: ShortcutPlatform): string {
                 ? '⇧'
                 : 'Shift'
               : part;
-  return physical ? `${physical[2] === 'Left' ? 'L' : 'R'} ${glyph}` : glyph;
+  return glyph;
 }
 
 export function displayInAppShortcutParts(value: string, platform: ShortcutPlatform): string[] {
   if (!value) return [];
-  const pieces = value.split('+');
+  const parts = value
+    .split('+')
+    .map((piece) => MODIFIER_NAMES.get(piece.toLowerCase()) || LEGACY_MODIFIERS.get(piece.toLowerCase()) || piece);
+  const pieces = [...new Set(parts)];
   return pieces.map((piece) => {
     if (MODIFIER_NAMES.has(piece.toLowerCase())) return displayModifier(piece, platform);
     if (/^Numpad[0-9]$/.test(piece)) return `Num ${piece.at(-1)}`;

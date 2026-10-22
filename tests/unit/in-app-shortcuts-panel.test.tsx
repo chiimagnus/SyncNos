@@ -165,21 +165,22 @@ describe('in-app shortcut editor', () => {
     expect(document.querySelector(toggleSelector)?.textContent).toContain('⌥ + ⇧ + B');
   });
 
-  it('shows left/right modifiers as they are pressed, then saves punctuation or Backspace instead of silently clearing', async () => {
+  it('shows logical modifiers live, then saves punctuation or Backspace without left/right labels', async () => {
     await mount();
     const button = click(toggleSelector);
     expect(button.textContent).toContain('Recording');
     key(button, 'Meta', 'MetaRight', { metaKey: true, location: 2 });
-    expect(document.querySelector(toggleSelector)?.textContent).toContain('R ⌘');
+    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌘');
+    expect(document.querySelector(toggleSelector)?.textContent).not.toMatch(/[LR] ⌘/);
     key(button, 'Alt', 'AltLeft', { metaKey: true, altKey: true, location: 1 });
-    expect(document.querySelector(toggleSelector)?.textContent).toContain('L ⌥');
+    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌘ + ⌥');
     await act(async () => {
       key(button, '?', 'Slash', { metaKey: true, altKey: true });
       await Promise.resolve();
       await Promise.resolve();
     });
-    expect(persisted['toggle-sidebar']).toBe('MetaRight+AltLeft+Slash');
-    expect(document.querySelector(toggleSelector)?.textContent).toContain('R ⌘ + L ⌥ + /');
+    expect(persisted['toggle-sidebar']).toBe('Mod+Alt+Slash');
+    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌘ + ⌥ + /');
 
     const replace = click(toggleSelector);
     await act(async () => {
@@ -222,7 +223,8 @@ describe('in-app shortcut editor', () => {
     });
     const record = click(toggleSelector);
     key(record, 'Alt', 'AltRight', { altKey: true, location: 2 });
-    expect(document.querySelector(toggleSelector)?.textContent).toContain('R ⌥');
+    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌥');
+    expect(document.querySelector(toggleSelector)?.textContent).not.toContain('R ⌥');
     act(() => window.dispatchEvent(new window.Event('blur')));
     expect(document.querySelector(toggleSelector)?.getAttribute('data-shortcut-recording')).toBeNull();
     expect(persisted['toggle-sidebar']).toBeUndefined();
