@@ -24,10 +24,12 @@ const GROUPS = [
 export function InAppShortcutsPanel() {
   const { bindings, ready, error: storageError, update, reset } = useInAppShortcutBindings();
   const [search, setSearch] = useState('');
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ navigation: true });
   const [recording, setRecording] = useState<InAppShortcutAction | null>(null);
   const [pressed, setPressed] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [messageAction, setMessageAction] = useState<InAppShortcutAction | null>(null);
   const platform = shortcutPlatform();
   const platformLabel = { mac: 'macOS', windows: 'Windows', linux: 'Linux', chromeos: 'ChromeOS', other: 'Other' }[
     platform
@@ -51,17 +53,23 @@ export function InAppShortcutsPanel() {
   const save = async (action: InAppShortcutAction, shortcut: string) => {
     setSaving(true);
     setMessage('');
+    setMessageAction(null);
     try {
       await update(action, shortcut);
       endRecording();
     } catch (error) {
       if (error instanceof InAppShortcutBindingError && error.code === 'conflict') {
+        setPressed('');
+        setMessageAction(action);
         const other = IN_APP_SHORTCUT_ACTIONS.find(({ id }) => id === error.conflictingAction);
         setMessage(`${t('keyboardShortcutsConflict')} ${other ? t(other.labelKey) : ''}`);
       } else if (error instanceof InAppShortcutBindingError && error.code === 'invalid') {
+        setPressed('');
+        setMessageAction(action);
         setMessage(t('keyboardShortcutsInvalid'));
       } else {
         endRecording();
+        setMessageAction(action);
         setMessage(t('keyboardShortcutsSaveFailed'));
       }
     } finally {
@@ -78,15 +86,23 @@ export function InAppShortcutsPanel() {
     if (event.key === 'Escape' && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
       endRecording();
       setMessage('');
+      setMessageAction(null);
       return;
     }
     setMessage('');
+    setMessageAction(null);
+    if (event.getModifierState('AltGraph')) {
+      setMessageAction(action);
+      setMessage(t('keyboardShortcutsInvalid'));
+      return;
+    }
     if (isShortcutModifierKey(event.nativeEvent)) {
       setPressed(shortcutModifiersFromKeyEvent(event.nativeEvent, platform));
       return;
     }
     const chord = shortcutFromKeyEvent(event.nativeEvent, platform);
     if (!chord) {
+      setMessageAction(action);
       setMessage(t('keyboardShortcutsInvalid'));
       return;
     }
@@ -138,7 +154,7 @@ export function InAppShortcutsPanel() {
           {t('keyboardShortcutsStorageFailed')}
         </p>
       ) : null}
-      {message ? (
+      {message && !messageAction ? (
         <p role="alert" className="tw-text-sm tw-text-[var(--error)]">
           {message}
         </p>
@@ -149,7 +165,12 @@ export function InAppShortcutsPanel() {
           groups.map(({ key, label, items }) => (
             <details
               key={query ? `${key}:search` : key}
-              open={!!query || key === 'navigation'}
+              open={!!query || !!expandedGroups[key]}
+              onToggle={(event) => {
+                if (query) return;
+                const open = event.currentTarget.open;
+                setExpandedGroups((previous) => (previous[key] === open ? previous : { ...previous, [key]: open }));
+              }}
               className="tw-border-b tw-border-[var(--border)]"
             >
               <summary className="tw-flex tw-cursor-pointer tw-items-center tw-justify-between tw-gap-2 tw-py-2 tw-text-sm tw-font-bold tw-text-[var(--text-primary)]">
@@ -163,11 +184,16 @@ export function InAppShortcutsPanel() {
                   return (
                     <div
                       key={action.id}
-                      className="tw-group tw-flex tw-min-h-12 tw-items-center tw-justify-between tw-gap-3 tw-py-2"
+                      className="tw-flex tw-min-h-12 tw-items-center tw-justify-between tw-gap-3 tw-py-2"
                     >
-                      <span className="tw-min-w-0 tw-flex-1 tw-text-sm tw-text-[var(--text-secondary)]">
-                        {t(action.labelKey)}
-                      </span>
+                      <div className="tw-min-w-0 tw-flex-1">
+                        <span className="tw-text-sm tw-text-[var(--text-secondary)]">{t(action.labelKey)}</span>
+                        {message && messageAction === action.id ? (
+                          <p role="alert" className="tw-m-0 tw-mt-1 tw-text-xs tw-text-[var(--error)]">
+                            {message}
+                          </p>
+                        ) : null}
+                      </div>
                       <div className="tw-flex tw-min-w-0 tw-shrink-0 tw-items-center tw-gap-1.5">
                         <button
                           type="button"
@@ -180,6 +206,7 @@ export function InAppShortcutsPanel() {
                             }
                             setPressed('');
                             setMessage('');
+                            setMessageAction(null);
                             setRecording(action.id);
                             event.currentTarget.focus({ preventScroll: true });
                           }}
@@ -210,7 +237,7 @@ export function InAppShortcutsPanel() {
                         {bindings[action.id] ? (
                           <button
                             type="button"
-                            className="tw-flex tw-size-7 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-[var(--radius-inline)] tw-border-0 tw-bg-transparent tw-text-lg tw-text-[var(--text-secondary)] tw-opacity-0 hover:tw-bg-[var(--bg-sunken)] hover:tw-text-[var(--text-primary)] group-hover:tw-opacity-70 group-focus-within:tw-opacity-70 focus-visible:tw-opacity-100 focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--focus-ring)] disabled:tw-opacity-50"
+                            className="tw-flex tw-size-7 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-[var(--radius-inline)] tw-border-0 tw-bg-transparent tw-text-lg tw-text-[var(--text-secondary)] hover:tw-bg-[var(--bg-sunken)] hover:tw-text-[var(--text-primary)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--focus-ring)] disabled:tw-opacity-50"
                             disabled={!ready || saving || storageError}
                             onClick={() => {
                               void save(action.id, '');
@@ -219,7 +246,9 @@ export function InAppShortcutsPanel() {
                           >
                             ×
                           </button>
-                        ) : null}
+                        ) : (
+                          <span className="tw-size-7 tw-shrink-0" aria-hidden="true" />
+                        )}
                       </div>
                     </div>
                   );
@@ -242,6 +271,7 @@ export function InAppShortcutsPanel() {
           onClick={() => {
             setSaving(true);
             setMessage('');
+            setMessageAction(null);
             void reset()
               .then(endRecording)
               .catch(() => setMessage(t('keyboardShortcutsSaveFailed')))

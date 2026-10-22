@@ -102,9 +102,18 @@ describe('in-app shortcut editor', () => {
     await mount();
     expect(document.querySelectorAll('details').length).toBe(4);
     expect(document.querySelectorAll('button[aria-label^="Set shortcut: "]').length).toBeGreaterThan(30);
-    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌥ + ⇧ + B');
+    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌘ + \\');
     expect(document.querySelector(toggleSelector)?.querySelectorAll('kbd')).toHaveLength(1);
     expect(document.querySelector(toggleSelector)?.classList.contains('webclipper-btn')).toBe(true);
+    const clear = document.querySelector<HTMLButtonElement>(clearSelector);
+    expect(clear).toBeTruthy();
+    expect(clear?.className).not.toContain('tw-opacity-0');
+    expect(clear?.className).not.toContain('tw-opacity-75');
+    expect(clear?.className).not.toContain('group-hover');
+    const unassigned = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('button[aria-label^="Set shortcut:"]'),
+    ).find((button) => button.textContent?.includes('Unassigned'));
+    expect(unassigned?.parentElement?.querySelector('span[aria-hidden="true"]')).toBeTruthy();
     expect(document.querySelector(toggleSelector)?.getAttribute('class')).not.toContain('tw-bg-transparent');
     expect(document.querySelector(toggleSelector)?.getAttribute('aria-pressed')).toBe('false');
     const resetButton = Array.from(document.querySelectorAll('button')).find(
@@ -129,7 +138,7 @@ describe('in-app shortcut editor', () => {
     await mount();
     const button = click(toggleSelector);
     key(button, 'Escape', 'Escape');
-    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌥ + ⇧ + B');
+    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌘ + \\');
 
     const conflicting = click(toggleSelector);
     await act(async () => {
@@ -138,6 +147,8 @@ describe('in-app shortcut editor', () => {
       await Promise.resolve();
     });
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('Settings');
+    expect(conflicting.closest('div.tw-min-h-12')?.querySelector('[role="alert"]')?.textContent).toContain('Settings');
+    expect(conflicting.textContent).toContain('Recording');
     expect(persisted['toggle-sidebar']).toBeUndefined();
 
     await act(async () => {
@@ -157,7 +168,7 @@ describe('in-app shortcut editor', () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌥ + ⇧ + B');
+    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌘ + \\');
     expect(storage.remove).toHaveBeenCalledWith([IN_APP_SHORTCUT_STORAGE_KEY]);
   });
 
@@ -171,7 +182,7 @@ describe('in-app shortcut editor', () => {
       await Promise.resolve();
     });
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('Could not save');
-    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌥ + ⇧ + B');
+    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌘ + \\');
   });
 
   it('shows logical modifiers live, then saves punctuation or Backspace without left/right labels', async () => {
@@ -207,6 +218,31 @@ describe('in-app shortcut editor', () => {
     });
     expect(persisted['toggle-sidebar']).toBe('');
     expect(document.querySelector(toggleSelector)?.textContent).toContain('Unassigned');
+  });
+
+  it('keeps manually expanded groups open across rerenders and restores them after search', async () => {
+    await mount();
+    const groups = Array.from(document.querySelectorAll('details'));
+    expect(groups[0].open).toBe(true);
+    expect(groups[1].open).toBe(false);
+    await act(async () => {
+      groups[1].open = true;
+      groups[1].dispatchEvent(new window.Event('toggle'));
+      await Promise.resolve();
+    });
+    expect(groups[1].open).toBe(true);
+    const search = document.querySelector<HTMLInputElement>('input[type="search"]')!;
+    const setValue = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value')!.set!;
+    await act(async () => {
+      setValue.call(search, 'copy');
+      search.dispatchEvent(new window.Event('input', { bubbles: true }));
+    });
+    expect(Array.from(document.querySelectorAll('details')).every((group) => group.open)).toBe(true);
+    await act(async () => {
+      setValue.call(search, '');
+      search.dispatchEvent(new window.Event('input', { bubbles: true }));
+    });
+    expect(Array.from(document.querySelectorAll('details'))[1].open).toBe(true);
   });
 
   it('filters the operation list and cancels recording on browser focus loss', async () => {

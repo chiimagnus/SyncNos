@@ -52,6 +52,7 @@ describe('in-app shortcut contract', () => {
     const defaults = defaultInAppShortcutBindings();
     const assigned = Object.values(defaults).filter(Boolean);
     expect(new Set(assigned).size).toBe(assigned.length);
+    expect(defaults['toggle-sidebar']).toBe('Mod+Backslash');
     expect(ids.length).toBeGreaterThan(30);
   });
 
@@ -132,9 +133,15 @@ describe('in-app shortcut contract', () => {
     expect(Object.keys(result)).toHaveLength(IN_APP_SHORTCUT_ACTIONS.length);
   });
 
+  it('keeps previously saved shortcut choices while changing the default sidebar key', async () => {
+    persisted = { 'toggle-sidebar': 'Alt+Shift+B' };
+    expect((await readInAppShortcutBindings())['toggle-sidebar']).toBe('Alt+Shift+B');
+    expect(defaultInAppShortcutBindings()['toggle-sidebar']).toBe('Mod+Backslash');
+  });
+
   it('allows rebinding and clearing default keys, blocks conflicts without writing', async () => {
     const initial = await readInAppShortcutBindings();
-    expect(initial['toggle-sidebar']).toBe('Alt+Shift+B');
+    expect(initial['toggle-sidebar']).toBe('Mod+Backslash');
 
     await updateInAppShortcutBinding('toggle-sidebar', '');
     expect((await readInAppShortcutBindings())['toggle-sidebar']).toBe('');
@@ -148,7 +155,7 @@ describe('in-app shortcut contract', () => {
     } satisfies Partial<InAppShortcutBindingError>);
     expect(storage.set).toHaveBeenCalledTimes(callsBefore);
 
-    await updateInAppShortcutBinding('toggle-sidebar', 'Alt+Shift+B');
+    await updateInAppShortcutBinding('toggle-sidebar', 'Mod+Backslash');
     expect(persisted['toggle-sidebar']).toBeUndefined();
   });
 

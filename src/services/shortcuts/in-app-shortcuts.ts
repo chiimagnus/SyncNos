@@ -16,7 +16,12 @@ export type { ShortcutPlatform, ShortcutKeyEvent } from './shortcut-keys';
 export const IN_APP_SHORTCUT_STORAGE_KEY = 'in_app_shortcuts_v1';
 
 export const IN_APP_SHORTCUT_ACTIONS = [
-  { id: 'toggle-sidebar', group: 'navigation', labelKey: 'keyboardShortcutsToggleSidebar', defaultKey: 'Alt+Shift+B' },
+  {
+    id: 'toggle-sidebar',
+    group: 'navigation',
+    labelKey: 'keyboardShortcutsToggleSidebar',
+    defaultKey: 'Mod+Backslash',
+  },
   { id: 'open-settings', group: 'navigation', labelKey: 'settingsLabel', defaultKey: 'Alt+Shift+P' },
   { id: 'open-insights', group: 'navigation', labelKey: 'section_aboutyou_label', defaultKey: '' },
   { id: 'back-to-list', group: 'navigation', labelKey: 'backButton', defaultKey: 'Alt+Shift+ArrowLeft' },

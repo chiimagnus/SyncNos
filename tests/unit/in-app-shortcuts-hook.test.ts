@@ -84,12 +84,12 @@ afterEach(async () => {
 describe('in-app keydown dispatch', () => {
   it('dispatches a default binding once, prevents browser default and ignores repeat', async () => {
     await render();
-    const first = sendKey('B', 'KeyB', { altKey: true, shiftKey: true });
+    const first = sendKey('\\', 'Backslash', { ctrlKey: true });
     expect(first.defaultPrevented).toBe(true);
     expect(handlers['toggle-sidebar']).toHaveBeenCalledTimes(1);
 
-    sendKey('B', 'KeyB', { altKey: true, shiftKey: true, repeat: true });
-    sendKey('b', 'KeyB', { altKey: true });
+    sendKey('\\', 'Backslash', { ctrlKey: true, repeat: true });
+    sendKey('\\', 'Backslash', { altKey: true });
     expect(handlers['toggle-sidebar']).toHaveBeenCalledTimes(1);
     expect(handlers['filter-source']).not.toHaveBeenCalled();
   });
@@ -98,23 +98,23 @@ describe('in-app keydown dispatch', () => {
     await render();
     const input = document.createElement('input');
     document.body.append(input);
-    expect(sendKey('B', 'KeyB', { altKey: true, shiftKey: true }, input).defaultPrevented).toBe(false);
+    expect(sendKey('\\', 'Backslash', { ctrlKey: true }, input).defaultPrevented).toBe(false);
 
     const editable = document.createElement('div');
     editable.setAttribute('contenteditable', 'plaintext-only');
     document.body.append(editable);
-    sendKey('B', 'KeyB', { altKey: true, shiftKey: true }, editable);
-    sendKey('B', 'KeyB', { altKey: true, shiftKey: true, isComposing: true });
+    sendKey('\\', 'Backslash', { ctrlKey: true }, editable);
+    sendKey('\\', 'Backslash', { ctrlKey: true, isComposing: true });
     expect(handlers['toggle-sidebar']).not.toHaveBeenCalled();
 
     const modal = document.createElement('div');
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
     document.body.append(modal);
-    sendKey('B', 'KeyB', { altKey: true, shiftKey: true });
+    sendKey('\\', 'Backslash', { ctrlKey: true });
     expect(handlers['toggle-sidebar']).not.toHaveBeenCalled();
     modal.remove();
-    sendKey('B', 'KeyB', { altKey: true, shiftKey: true });
+    sendKey('\\', 'Backslash', { ctrlKey: true });
     expect(handlers['toggle-sidebar']).toHaveBeenCalledTimes(1);
   });
 
@@ -134,7 +134,7 @@ describe('in-app keydown dispatch', () => {
       ),
     );
 
-    sendKey('B', 'KeyB', { altKey: true, shiftKey: true });
+    sendKey('\\', 'Backslash', { ctrlKey: true });
     expect(handlers['toggle-sidebar']).not.toHaveBeenCalled();
     sendKey('q', 'KeyQ', { altKey: true, ctrlKey: true });
     expect(handlers['filter-source']).toHaveBeenCalledTimes(1);
@@ -142,17 +142,17 @@ describe('in-app keydown dispatch', () => {
 
   it('stays disabled when requested and removes listeners on unmount', async () => {
     await render(false);
-    sendKey('B', 'KeyB', { altKey: true, shiftKey: true });
+    sendKey('\\', 'Backslash', { ctrlKey: true });
     expect(handlers['toggle-sidebar']).not.toHaveBeenCalled();
     await render(true);
-    sendKey('B', 'KeyB', { altKey: true, shiftKey: true });
+    sendKey('\\', 'Backslash', { ctrlKey: true });
     expect(handlers['toggle-sidebar']).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       root!.unmount();
     });
     root = null;
-    sendKey('B', 'KeyB', { altKey: true, shiftKey: true });
+    sendKey('\\', 'Backslash', { ctrlKey: true });
     expect(handlers['toggle-sidebar']).toHaveBeenCalledTimes(1);
     expect(listener).toBeNull();
   });
@@ -169,7 +169,7 @@ describe('in-app keydown dispatch', () => {
     await act(async () => {
       resolveRead({ [IN_APP_SHORTCUT_STORAGE_KEY]: {} });
     });
-    sendKey('B', 'KeyB', { altKey: true, shiftKey: true });
+    sendKey('\\', 'Backslash', { ctrlKey: true });
     expect(handlers['toggle-sidebar']).not.toHaveBeenCalled();
   });
 
