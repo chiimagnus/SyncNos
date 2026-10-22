@@ -102,7 +102,8 @@ describe('in-app shortcut editor', () => {
     await mount();
     expect(document.querySelectorAll('details').length).toBe(4);
     expect(document.querySelectorAll('button[aria-label^="Set shortcut: "]').length).toBeGreaterThan(30);
-    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌥⇧B');
+    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌥ + ⇧ + B');
+    expect(document.querySelector(toggleSelector)?.querySelectorAll('kbd')).toHaveLength(1);
 
     const button = click(toggleSelector);
     expect(button.textContent).toContain('Recording');
@@ -112,14 +113,14 @@ describe('in-app shortcut editor', () => {
       await Promise.resolve();
     });
     expect(persisted['toggle-sidebar']).toBe('Mod+Shift+B');
-    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌘⇧B');
+    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌘ + ⇧ + B');
   });
 
   it('rejects conflicts, cancels Escape and allows clearing and resetting a binding', async () => {
     await mount();
     const button = click(toggleSelector);
     key(button, 'Escape', 'Escape');
-    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌥⇧B');
+    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌥ + ⇧ + B');
 
     const conflicting = click(toggleSelector);
     await act(async () => {
@@ -147,7 +148,7 @@ describe('in-app shortcut editor', () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌥⇧B');
+    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌥ + ⇧ + B');
     expect(storage.remove).toHaveBeenCalledWith([IN_APP_SHORTCUT_STORAGE_KEY]);
   });
 
@@ -161,7 +162,7 @@ describe('in-app shortcut editor', () => {
       await Promise.resolve();
     });
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('Could not save');
-    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌥⇧B');
+    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌥ + ⇧ + B');
   });
 
   it('shows left/right modifiers as they are pressed, then saves punctuation or Backspace instead of silently clearing', async () => {
@@ -178,7 +179,7 @@ describe('in-app shortcut editor', () => {
       await Promise.resolve();
     });
     expect(persisted['toggle-sidebar']).toBe('MetaRight+AltLeft+Slash');
-    expect(document.querySelector(toggleSelector)?.textContent).toContain('R ⌘L ⌥/');
+    expect(document.querySelector(toggleSelector)?.textContent).toContain('R ⌘ + L ⌥ + /');
 
     const replace = click(toggleSelector);
     await act(async () => {

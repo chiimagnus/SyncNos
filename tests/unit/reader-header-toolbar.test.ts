@@ -313,7 +313,7 @@ describe('ReaderHeaderToolbar', () => {
     });
     const play = document.querySelector('[aria-label="readerNarrationPlay"]');
     const stop = document.querySelector('[aria-label="readerNarrationStop"]');
-    expect(play?.getAttribute('data-tooltip-content')).toBe('readerNarrationPlay · Ctrl+Alt+P');
+    expect(play?.getAttribute('data-tooltip-content')).toBe('readerNarrationPlay\nCtrl+Alt+P');
     expect(play?.getAttribute('title')).toBeNull();
     expect(stop?.getAttribute('data-tooltip-content')).toBe('readerNarrationStop');
     expect(stop?.getAttribute('title')).toBeNull();

@@ -30,7 +30,7 @@ import {
 } from '@ui/shared/button-styles';
 import { MenuPopover } from '@ui/shared/MenuPopover';
 import { SelectMenu } from '@ui/shared/SelectMenu';
-import { tooltipAttrs, tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
+import { tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
 
 const SITE_FILTER_ALL_KEY = 'all';
 const SITE_FILTER_UNKNOWN_KEY = 'unknown';
@@ -929,7 +929,8 @@ export function ConversationListPane({
               onChange={(next) => onSetFilterKey(next)}
               disabled={hasSelection}
               ariaLabel={t('sourceFilterAria')}
-              tooltip={[t('sourceFilterAria'), shortcut('filter-source')].filter(Boolean).join(' · ')}
+              tooltip={t('sourceFilterAria')}
+              tooltipShortcut={shortcut('filter-source')}
               side="top"
               align="start"
               minWidth={150}
@@ -953,7 +954,8 @@ export function ConversationListPane({
                 onChange={(next) => onSetSiteFilterKey(next)}
                 disabled={hasSelection}
                 ariaLabel={t('insightArticleDomainsTitle')}
-                tooltip={[t('insightArticleDomainsTitle'), shortcut('filter-site')].filter(Boolean).join(' · ')}
+                tooltip={t('insightArticleDomainsTitle')}
+                tooltipShortcut={shortcut('filter-site')}
                 side="top"
                 align="start"
                 minWidth={160}
@@ -1045,7 +1047,7 @@ export function ConversationListPane({
                 <button
                   id="menuExportMarkdown"
                   className={menuItemButtonClassName}
-                  {...tooltipAttrs(shortcut('export-markdown'))}
+                  {...tooltipAttrsWithShortcut('', shortcut('export-markdown'))}
                   type="button"
                   role="menuitem"
                   onClick={() => {
@@ -1058,7 +1060,7 @@ export function ConversationListPane({
                 <button
                   id="menuExportJson"
                   className={menuItemButtonClassName}
-                  {...tooltipAttrs(shortcut('export-json'))}
+                  {...tooltipAttrsWithShortcut('', shortcut('export-json'))}
                   type="button"
                   role="menuitem"
                   onClick={() => {
@@ -1122,7 +1124,7 @@ export function ConversationListPane({
                       key={provider}
                       id={SYNC_MENU_ITEM_IDS[provider]}
                       className={menuItemButtonClassName}
-                      {...tooltipAttrs(shortcut(SYNC_MENU_SHORTCUT_IDS[provider]))}
+                      {...tooltipAttrsWithShortcut('', shortcut(SYNC_MENU_SHORTCUT_IDS[provider]))}
                       type="button"
                       role="menuitem"
                       onClick={() => {

@@ -214,7 +214,7 @@ describe('ConversationListPane row actions', () => {
       document
         .querySelector('[data-conversation-id="11"] [data-list-copy-markdown]')
         ?.getAttribute('data-tooltip-content'),
-    ).toBe('copyFullMarkdown · Ctrl+Alt+M');
+    ).toBe('copyFullMarkdown\nCtrl+Alt+M');
     expect(
       document
         .querySelector('[data-conversation-id="12"] [data-list-copy-markdown]')

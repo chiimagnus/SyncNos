@@ -9,7 +9,7 @@ import { LazyArticleCommentsSection, LazyConversationDetailPane } from '@ui/conv
 import type { CommentLocatorSurfaceRoots } from '@ui/comments';
 import { createAppCommentSelectionSource } from '@ui/comments/app-comment-selection-source';
 import { buttonIconCircleGhostClassName, headerButtonClassName } from '@ui/shared/button-styles';
-import { AppTooltipHost, tooltipAttrs, tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
+import { AppTooltipHost, tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
 import { useResponsiveTier } from '@ui/shared/hooks/useResponsiveTier';
 import { useArticleCommentsSidebarRuntime } from '@viewmodels/comments/useArticleCommentsSidebarRuntime';
 import { usePopupSyncSelectionHandoff } from '@viewmodels/conversations/usePopupSyncSelectionHandoff';
@@ -478,7 +478,7 @@ export default function AppShell() {
                               onClick={openSettings}
                               className={headerButtonClassName()}
                               aria-label={t('openSettingsAria')}
-                              {...tooltipAttrs(shortcut('open-settings'))}
+                              {...tooltipAttrsWithShortcut('', shortcut('open-settings'))}
                             >
                               <span className="tw-sr-only">{t('settingsLabel')}</span>
                               <SettingsIcon size={16} strokeWidth={1.6} aria-hidden="true" />
@@ -540,7 +540,7 @@ export default function AppShell() {
                                 onClick={openSettings}
                                 className={headerButtonClassName()}
                                 aria-label={t('openSettingsAria')}
-                                {...tooltipAttrs(shortcut('open-settings'))}
+                                {...tooltipAttrsWithShortcut('', shortcut('open-settings'))}
                               >
                                 <span className="tw-sr-only">{t('settingsLabel')}</span>
                                 <SettingsIcon size={16} strokeWidth={1.6} aria-hidden="true" />

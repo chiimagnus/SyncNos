@@ -162,7 +162,7 @@ export function DetailHeaderActionBar({
             type="button"
             role="menuitem"
             aria-label={action.label}
-            {...tooltipAttrs(actionShortcut(action))}
+            {...tooltipAttrsWithShortcut('', actionShortcut(action))}
             aria-disabled={action.disabled ? 'true' : undefined}
             disabled={busy || !!action.disabled}
             onClick={() => {
@@ -272,7 +272,7 @@ export function DetailHeaderActionBar({
               className={menuButtonClass}
               type="button"
               role="menuitem"
-              {...tooltipAttrs(actionShortcut(action))}
+              {...tooltipAttrsWithShortcut('', actionShortcut(action))}
               onClick={() => {
                 void handleTrigger(action);
                 setMenuOpen(false);

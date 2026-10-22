@@ -3,7 +3,7 @@ import { ChevronRight, Palette, Pause, Play, Square, Type, Volume2 } from 'lucid
 
 import { t } from '@i18n';
 import type { InAppShortcutAction } from '@services/shortcuts/in-app-shortcuts';
-import { tooltipAttrs, tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
+import { tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
 import {
   buttonFilledClassName,
   buttonMenuItemClassName,
@@ -120,7 +120,7 @@ export function ReaderHeaderToolbar({
               {...triggerProps}
               data-reader-header-trigger="text"
               aria-label={labels.text}
-              {...tooltipAttrs(getShortcut?.('reader-layout'))}
+              {...tooltipAttrsWithShortcut('', getShortcut?.('reader-layout'))}
               className={readerTriggerClassName()}
             >
               <span className="tw-inline-flex tw-items-center tw-gap-2">
@@ -152,7 +152,7 @@ export function ReaderHeaderToolbar({
               {...triggerProps}
               data-reader-header-trigger="theme"
               aria-label={labels.theme}
-              {...tooltipAttrs(getShortcut?.('reader-theme'))}
+              {...tooltipAttrsWithShortcut('', getShortcut?.('reader-theme'))}
               className={readerTriggerClassName()}
             >
               <span className="tw-inline-flex tw-items-center tw-gap-2">
@@ -184,7 +184,7 @@ export function ReaderHeaderToolbar({
               {...triggerProps}
               data-reader-header-trigger="narration"
               aria-label={labels.narration}
-              {...tooltipAttrs(getShortcut?.('reader-narration'))}
+              {...tooltipAttrsWithShortcut('', getShortcut?.('reader-narration'))}
               className={readerTriggerClassName()}
             >
               <span className="tw-inline-flex tw-items-center tw-gap-2">

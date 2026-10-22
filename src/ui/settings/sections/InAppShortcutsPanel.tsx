@@ -5,7 +5,6 @@ import {
   IN_APP_SHORTCUT_ACTIONS,
   InAppShortcutBindingError,
   displayInAppShortcut,
-  displayInAppShortcutParts,
   heldShortcutModifiers,
   setHeldShortcutModifier,
   shortcutFromKeyEvent,
@@ -21,22 +20,6 @@ const GROUPS = [
   { key: 'detail', label: 'keyboardShortcutsDetailGroup' },
   { key: 'reader', label: 'keyboardShortcutsReaderGroup' },
 ] as const;
-
-function Keycaps({ shortcut }: { shortcut: string }) {
-  const platform = shortcutPlatform();
-  return (
-    <span className="tw-flex tw-max-w-full tw-flex-wrap tw-items-center tw-justify-end tw-gap-1" aria-hidden="true">
-      {displayInAppShortcutParts(shortcut, platform).map((key, index) => (
-        <kbd
-          key={index}
-          className="tw-inline-flex tw-min-h-6 tw-min-w-6 tw-items-center tw-justify-center tw-whitespace-nowrap tw-rounded-[var(--radius-inline)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-1.5 tw-py-0.5 tw-font-mono tw-text-xs tw-font-semibold tw-text-[var(--text-primary)]"
-        >
-          {key}
-        </kbd>
-      ))}
-    </span>
-  );
-}
 
 export function InAppShortcutsPanel() {
   const { bindings, ready, error: storageError, update, reset } = useInAppShortcutBindings();
@@ -183,7 +166,7 @@ export function InAppShortcutsPanel() {
                   return (
                     <div
                       key={action.id}
-                      className="tw-flex tw-min-h-12 tw-items-center tw-justify-between tw-gap-3 tw-py-2"
+                      className="tw-group tw-flex tw-min-h-12 tw-items-center tw-justify-between tw-gap-3 tw-py-2"
                     >
                       <span className="tw-min-w-0 tw-flex-1 tw-text-sm tw-text-[var(--text-secondary)]">
                         {t(action.labelKey)}
@@ -191,7 +174,7 @@ export function InAppShortcutsPanel() {
                       <div className="tw-flex tw-min-w-0 tw-shrink-0 tw-items-center tw-gap-1.5">
                         <button
                           type="button"
-                          className={`tw-flex tw-min-h-8 tw-min-w-16 tw-max-w-[260px] tw-items-center tw-justify-end tw-rounded-[var(--radius-inline)] tw-border tw-p-1 tw-text-xs tw-transition-colors focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)] disabled:tw-opacity-50 ${isRecording ? 'tw-border-[var(--accent)] tw-bg-[var(--bg-sunken)]' : 'tw-border-transparent hover:tw-border-[var(--border)]'}`}
+                          className={`tw-inline-flex tw-min-h-8 tw-min-w-16 tw-max-w-[240px] tw-items-center tw-justify-end tw-rounded-[var(--radius-inline)] tw-border tw-px-2 tw-py-1 tw-text-xs tw-transition-colors focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)] disabled:tw-opacity-50 ${isRecording ? 'tw-border-[var(--accent)] tw-bg-transparent tw-text-[var(--text-primary)]' : 'tw-border-transparent tw-bg-transparent tw-text-[var(--text-secondary)] hover:tw-border-[var(--border)] hover:tw-text-[var(--text-primary)]'}`}
                           disabled={!ready || saving || storageError}
                           onClick={(event) => {
                             if (isRecording) {
@@ -214,7 +197,12 @@ export function InAppShortcutsPanel() {
                           data-shortcut-recording={isRecording ? 'true' : undefined}
                         >
                           {displayed ? (
-                            <Keycaps shortcut={displayed} />
+                            <kbd
+                              className="tw-block tw-max-w-full tw-truncate tw-font-mono tw-font-medium tw-leading-5"
+                              aria-hidden="true"
+                            >
+                              {displayInAppShortcut(displayed, platform)}
+                            </kbd>
                           ) : (
                             <span
                               className={isRecording ? 'tw-text-[var(--accent)]' : 'tw-text-[var(--text-secondary)]'}
@@ -226,7 +214,7 @@ export function InAppShortcutsPanel() {
                         {bindings[action.id] ? (
                           <button
                             type="button"
-                            className="tw-flex tw-size-7 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-[var(--radius-inline)] tw-border-0 tw-bg-transparent tw-text-lg tw-text-[var(--text-secondary)] tw-opacity-60 hover:tw-bg-[var(--bg-sunken)] hover:tw-text-[var(--text-primary)] hover:tw-opacity-100 focus-visible:tw-opacity-100 focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--focus-ring)] disabled:tw-opacity-50"
+                            className="tw-flex tw-size-7 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-[var(--radius-inline)] tw-border-0 tw-bg-transparent tw-text-lg tw-text-[var(--text-secondary)] tw-opacity-0 hover:tw-bg-[var(--bg-sunken)] hover:tw-text-[var(--text-primary)] group-hover:tw-opacity-70 group-focus-within:tw-opacity-70 focus-visible:tw-opacity-100 focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--focus-ring)] disabled:tw-opacity-50"
                             disabled={!ready || saving || storageError}
                             onClick={() => {
                               void save(action.id, '');

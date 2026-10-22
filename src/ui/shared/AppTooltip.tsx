@@ -8,6 +8,7 @@ type TooltipPlace = 'top' | 'right' | 'bottom' | 'left';
 type TooltipAnchorAttrs = {
   'data-tooltip-id'?: string;
   'data-tooltip-content'?: string;
+  'data-tooltip-shortcut'?: string;
   'data-tooltip-place'?: TooltipPlace;
 };
 
@@ -28,7 +29,8 @@ export function tooltipAttrsWithShortcut(
 ) {
   const key = String(shortcut || '').trim();
   const content = String(label || '').trim();
-  return tooltipAttrs(key ? [content, key].filter(Boolean).join(' · ') : content, place);
+  if (!key) return tooltipAttrs(content, place);
+  return { ...tooltipAttrs([content, key].filter(Boolean).join('\n'), place), 'data-tooltip-shortcut': key };
 }
 
 export function AppTooltipHost() {

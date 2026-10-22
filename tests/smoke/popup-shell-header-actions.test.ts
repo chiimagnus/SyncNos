@@ -320,7 +320,7 @@ describe('PopupShell header actions', () => {
     expect(document.querySelector('[aria-label="Open Settings"]')?.getAttribute('data-tooltip-content')).toBeNull();
     expect(document.querySelector('[aria-label="Open Settings"]')?.getAttribute('aria-label')).toBe('Open Settings');
     const capture = document.querySelector('[aria-label="Fetch AI Chat"]') as HTMLButtonElement;
-    expect(capture?.parentElement?.getAttribute('data-tooltip-content')).toBe('Fetch AI Chat · Alt + Shift + K');
+    expect(capture?.parentElement?.getAttribute('data-tooltip-content')).toBe('Fetch AI Chat\nAlt + Shift + K');
   });
 
   it('updates settings shortcut hints immediately when another window rebinds or clears a key', async () => {

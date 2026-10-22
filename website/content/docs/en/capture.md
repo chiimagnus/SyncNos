@@ -29,7 +29,7 @@ Open **SyncNos → Settings → Keyboard shortcuts** to configure actions in the
 - Key names adapt to macOS (`⌘`, `⌥`, `⌃`, `⇧`), Windows (`Ctrl`, `Alt`, `Win`) and Linux (`Ctrl`, `Alt`, `Super`), with `L` and `R` identifying the physical side. The primary `Mod` key means Command on macOS and Control on Windows/Linux.
 - Common defaults remain available, including `Alt+Shift+B` to toggle the sidebar, `Alt+Shift+F` for the source filter, and `Alt+Shift+M` for the detail More menu. Bindings work only inside the SyncNos popup/app, not in inputs, editors or modal dialogs. System/browser-reserved combinations cannot be intercepted, and keys such as Fn, power or some media keys may never reach a webpage.
 
-Hover over icon-only actions to see their names and active shortcuts. Menu items already labeled with text show only an assigned key; the Settings gear does not repeat “Open settings”.
+Hover over icon-only actions to see their names, with active shortcuts on a separate, subtler line. Menu items already labeled with text show only an assigned key; the Settings gear does not repeat “Open settings”.
 
 ## Images
 

@@ -11,7 +11,7 @@ import { t } from '@i18n';
 import { useConversationsApp, ConversationsProvider } from '@viewmodels/conversations/conversations-context';
 import { ConversationsScene } from '@ui/conversations/ConversationsScene';
 import { buttonFilledClassName, buttonTintClassName, headerButtonClassName } from '@ui/shared/button-styles';
-import { AppTooltipHost, tooltipAttrs, tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
+import { AppTooltipHost, tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
 import { usePopupCurrentPageCapture } from '@viewmodels/popup/usePopupCurrentPageCapture';
 import { usePopupOpenCurrentTabInpageCommentsSidebar } from '@viewmodels/popup/usePopupOpenCurrentTabInpageCommentsSidebar';
 import { useAppThemeMode } from '@viewmodels/theme/useAppThemeMode';
@@ -291,7 +291,7 @@ function PopupShellFrame() {
 
                     <button
                       type="button"
-                      {...tooltipAttrs(shortcut('open-settings'))}
+                      {...tooltipAttrsWithShortcut('', shortcut('open-settings'))}
                       onClick={() => onOpenSettings().catch(() => {})}
                       className={headerButtonClassName()}
                       aria-label={t('openSettingsAria')}

@@ -381,7 +381,7 @@ describe('DetailHeaderActionBar', () => {
 
     render();
     const primary = document.querySelector('[data-detail-header-primary-copy="true"]') as HTMLButtonElement;
-    expect(primary.getAttribute('data-tooltip-content')).toBe('Copy Notion link · Alt+Shift+C');
+    expect(primary.getAttribute('data-tooltip-content')).toBe('Copy Notion link\nAlt+Shift+C');
     const dropdown = document.querySelector('[aria-haspopup="menu"]') as HTMLButtonElement;
     expect(dropdown.getAttribute('data-tooltip-content')).toBe('Copy link');
 
@@ -397,7 +397,7 @@ describe('DetailHeaderActionBar', () => {
     keys['detail-copy-link'] = '';
     keys['detail-copy-notion'] = 'Ctrl+Alt+R';
     render();
-    expect(primary.getAttribute('data-tooltip-content')).toBe('Copy Notion link · Ctrl+Alt+R');
+    expect(primary.getAttribute('data-tooltip-content')).toBe('Copy Notion link\nCtrl+Alt+R');
   });
 
   it('clears stale success feedback before a later action that fails', async () => {

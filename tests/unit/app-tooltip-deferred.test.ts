@@ -71,10 +71,14 @@ describe('AppTooltip deferred implementation', () => {
     expect(tooltipAttrs('')).toEqual({});
     expect(tooltipAttrsWithShortcut('Copy Notion link', 'Alt+Shift+C')).toMatchObject({
       'data-tooltip-id': 'webclipper-tooltip',
-      'data-tooltip-content': 'Copy Notion link · Alt+Shift+C',
+      'data-tooltip-content': 'Copy Notion link\nAlt+Shift+C',
+      'data-tooltip-shortcut': 'Alt+Shift+C',
     });
     expect(tooltipAttrsWithShortcut('Copy Notion link', '')['data-tooltip-content']).toBe('Copy Notion link');
-    expect(tooltipAttrsWithShortcut('', 'Alt+Shift+P')['data-tooltip-content']).toBe('Alt+Shift+P');
+    expect(tooltipAttrsWithShortcut('', 'Alt+Shift+P')).toMatchObject({
+      'data-tooltip-content': 'Alt+Shift+P',
+      'data-tooltip-shortcut': 'Alt+Shift+P',
+    });
     expect(tooltipAttrsWithShortcut('', '')).toEqual({});
     expect(mocks.implementationLoads).not.toHaveBeenCalled();
   });
