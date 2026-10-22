@@ -7,6 +7,10 @@ import {
   resolveInAppShortcutBindings,
   resetInAppShortcutBindings,
   shortcutFromKeyEvent,
+  shortcutPlatform,
+  inAppShortcutMatches,
+  setHeldShortcutModifier,
+  displayInAppShortcut,
   updateInAppShortcutBinding,
   type InAppShortcutAction,
   type InAppShortcutBindings,
@@ -65,8 +69,10 @@ export function useInAppShortcuts(handlers: Partial<Record<InAppShortcutAction, 
 
   useEffect(() => {
     if (!enabled || !ready) return;
+    const held = new Set<string>();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.repeat || event.isComposing) return;
+      if (setHeldShortcutModifier(held, event, true)) return;
+      if (event.defaultPrevented || event.repeat || event.isComposing || event.getModifierState('AltGraph')) return;
       if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
       const target = event.target;
       if (
@@ -74,20 +80,33 @@ export function useInAppShortcuts(handlers: Partial<Record<InAppShortcutAction, 
         target.closest('input, textarea, select, [contenteditable], [role="textbox"], [role="combobox"]')
       )
         return;
-      const isMac = /Mac/i.test(String(globalThis.navigator?.platform || ''));
-      const pressed = shortcutFromKeyEvent(event, isMac);
+      const platform = shortcutPlatform();
+      const pressed = shortcutFromKeyEvent(event, platform, held);
       if (!pressed) return;
       const action = (Object.keys(handlersRef.current) as InAppShortcutAction[]).find(
-        (id) => bindings[id] === pressed && typeof handlersRef.current[id] === 'function',
+        (id) => inAppShortcutMatches(bindings[id], pressed, platform) && typeof handlersRef.current[id] === 'function',
       );
       if (!action) return;
       event.preventDefault();
       event.stopPropagation();
       handlersRef.current[action]?.();
     };
+    const onKeyUp = (event: KeyboardEvent) => {
+      setHeldShortcutModifier(held, event, false);
+    };
+    const clearHeld = () => held.clear();
     document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
+    document.addEventListener('keyup', onKeyUp, true);
+    window.addEventListener('blur', clearHeld);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('keyup', onKeyUp, true);
+      window.removeEventListener('blur', clearHeld);
+    };
   }, [bindings, enabled, ready]);
 
-  return useCallback((action: InAppShortcutAction) => (ready ? bindings[action] : ''), [bindings, ready]);
+  return useCallback(
+    (action: InAppShortcutAction) => displayInAppShortcut(ready ? bindings[action] : '', shortcutPlatform()),
+    [bindings, ready],
+  );
 }

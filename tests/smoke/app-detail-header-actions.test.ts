@@ -410,9 +410,9 @@ describe('ConversationDetailPane header actions', () => {
     });
 
     const copy = document.querySelector('[data-detail-header-primary-copy="true"]');
-    expect(copy?.getAttribute('data-tooltip-content')).toBe('Copy Notion link · Alt+Shift+C');
+    expect(copy?.getAttribute('data-tooltip-content')).toBe('Copy Notion link · Alt + Shift + C');
     const more = document.querySelector('[data-detail-header-more-trigger="true"]') as HTMLButtonElement;
-    expect(more?.getAttribute('data-tooltip-content')).toBe('moreButton · Alt+Shift+M');
+    expect(more?.getAttribute('data-tooltip-content')).toBe('moreButton · Alt + Shift + M');
 
     await act(async () => {
       more.click();
@@ -421,7 +421,7 @@ describe('ConversationDetailPane header actions', () => {
     const original = Array.from(document.querySelectorAll('[role="menuitem"]')).find((item) =>
       item.textContent?.includes('Open original'),
     );
-    expect(original?.getAttribute('data-tooltip-content')).toBe('Alt+Shift+O');
+    expect(original?.getAttribute('data-tooltip-content')).toBe('Alt + Shift + O');
   });
 
   it('renders one Copy dropdown for multiple providers and routes each item correctly', async () => {

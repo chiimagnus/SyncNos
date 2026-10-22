@@ -172,4 +172,28 @@ describe('in-app keydown dispatch', () => {
     sendKey('B', 'KeyB', { altKey: true, shiftKey: true });
     expect(handlers['toggle-sidebar']).not.toHaveBeenCalled();
   });
+
+  it('executes only the configured modifier sides and clears held keys when the window loses focus', async () => {
+    await render();
+    act(() =>
+      listener?.(
+        { [IN_APP_SHORTCUT_STORAGE_KEY]: { newValue: { 'toggle-sidebar': 'AltRight+ShiftLeft+B' } } },
+        'local',
+      ),
+    );
+    const both = { altKey: true, shiftKey: true };
+    sendKey('B', 'KeyB', both); // Generic flags cannot prove a right-side press.
+    expect(handlers['toggle-sidebar']).not.toHaveBeenCalled();
+    sendKey('Alt', 'AltRight', { altKey: true, location: 2 });
+    sendKey('Shift', 'ShiftLeft', { ...both, location: 1 });
+    sendKey('B', 'KeyB', both);
+    expect(handlers['toggle-sidebar']).toHaveBeenCalledTimes(1);
+    act(() => window.dispatchEvent(new window.Event('blur')));
+    sendKey('B', 'KeyB', both);
+    expect(handlers['toggle-sidebar']).toHaveBeenCalledTimes(1);
+    sendKey('Alt', 'AltLeft', { altKey: true, location: 1 });
+    sendKey('Shift', 'ShiftLeft', { ...both, location: 1 });
+    sendKey('B', 'KeyB', both);
+    expect(handlers['toggle-sidebar']).toHaveBeenCalledTimes(1);
+  });
 });

@@ -1,4 +1,18 @@
 import { storageGet, storageRemove, storageSet } from '@services/shared/storage';
+import { inAppShortcutsConflict, normalizeInAppShortcut } from './shortcut-keys';
+export {
+  normalizeInAppShortcut,
+  shortcutFromKeyEvent,
+  inAppShortcutMatches,
+  inAppShortcutsConflict,
+  setHeldShortcutModifier,
+  heldShortcutModifiers,
+  physicalModifierKey,
+  shortcutPlatform,
+  displayInAppShortcut,
+  displayInAppShortcutParts,
+} from './shortcut-keys';
+export type { ShortcutPlatform, ShortcutKeyEvent } from './shortcut-keys';
 
 export const IN_APP_SHORTCUT_STORAGE_KEY = 'in_app_shortcuts_v1';
 
@@ -63,70 +77,6 @@ export type InAppShortcutAction = (typeof IN_APP_SHORTCUT_ACTIONS)[number]['id']
 export type InAppShortcutBindings = Record<InAppShortcutAction, string>;
 
 const ACTION_IDS = new Set<string>(IN_APP_SHORTCUT_ACTIONS.map(({ id }) => id));
-const RESERVED_SHORTCUTS = new Set([
-  'Mod+A',
-  'Mod+C',
-  'Mod+V',
-  'Mod+X',
-  'Mod+Z',
-  'Mod+F',
-  'Mod+L',
-  'Mod+R',
-  'Mod+W',
-  'Mod+T',
-  'Mod+N',
-  'Mod+Q',
-  'Mod+P',
-  'Mod+S',
-  'Mod+Shift+Z',
-  'Mod+Shift+W',
-  'Mod+Shift+T',
-  'Mod+Shift+R',
-  'Alt+ArrowLeft',
-  'Alt+ArrowRight',
-]);
-const MODIFIER_ORDER = ['Mod', 'Ctrl', 'Meta', 'Alt', 'Shift'] as const;
-
-function normalizedKey(key: string): string | null {
-  if (/^[a-z0-9]$/i.test(key)) return key.toUpperCase();
-  if (/^F(?:[1-9]|1[0-2])$/i.test(key)) return key.toUpperCase();
-  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key)) return key;
-  return null;
-}
-
-export function normalizeInAppShortcut(value: unknown): string | null {
-  if (value === '') return '';
-  if (typeof value !== 'string') return null;
-  const parts = value.split('+').map((part) => part.trim());
-  const key = normalizedKey(parts.pop() || '');
-  if (!key || parts.length === 0) return null;
-  if (new Set(parts).size !== parts.length || parts.some((part) => !MODIFIER_ORDER.includes(part as any))) {
-    return null;
-  }
-  if (!parts.some((part) => part !== 'Shift')) return null;
-  const shortcut = [...MODIFIER_ORDER.filter((modifier) => parts.includes(modifier)), key].join('+');
-  return RESERVED_SHORTCUTS.has(shortcut) ? null : shortcut;
-}
-
-export function shortcutFromKeyEvent(
-  event: Pick<KeyboardEvent, 'key' | 'code' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey'>,
-  isMac: boolean,
-): string | null {
-  if (['Dead', 'Process', 'Unidentified'].includes(event.key)) return null;
-  const modifiers = [
-    ...(event.metaKey ? [isMac ? 'Mod' : 'Meta'] : []),
-    ...(event.ctrlKey ? [isMac ? 'Ctrl' : 'Mod'] : []),
-    ...(event.altKey ? ['Alt'] : []),
-    ...(event.shiftKey ? ['Shift'] : []),
-  ];
-  const key = /^Key[A-Z]$/.test(event.code)
-    ? event.code.slice(3)
-    : /^Digit[0-9]$/.test(event.code)
-      ? event.code.slice(-1)
-      : event.key;
-  return normalizeInAppShortcut([...modifiers, key].join('+'));
-}
-
 export function defaultInAppShortcutBindings(): InAppShortcutBindings {
   return Object.fromEntries(
     IN_APP_SHORTCUT_ACTIONS.map(({ id, defaultKey }) => [id, defaultKey]),
@@ -142,11 +92,11 @@ export function resolveInAppShortcutBindings(value: unknown): InAppShortcutBindi
     const parsed = normalizeInAppShortcut(overrides[action.id]);
     if (parsed != null) bindings[action.id] = parsed;
   }
-  const used = new Set<string>();
+  const used: string[] = [];
   for (const action of IN_APP_SHORTCUT_ACTIONS) {
     const key = bindings[action.id];
-    if (key && used.has(key)) bindings[action.id] = '';
-    if (key) used.add(key);
+    if (key && used.some((previous) => inAppShortcutsConflict(previous, key))) bindings[action.id] = '';
+    if (key) used.push(key);
   }
   return bindings;
 }
@@ -176,7 +126,9 @@ export async function updateInAppShortcutBinding(
   const raw = current[IN_APP_SHORTCUT_STORAGE_KEY];
   const previous = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
   const bindings = resolveInAppShortcutBindings(previous);
-  const conflict = IN_APP_SHORTCUT_ACTIONS.find(({ id }) => id !== action && parsed && bindings[id] === parsed);
+  const conflict = IN_APP_SHORTCUT_ACTIONS.find(
+    ({ id }) => id !== action && parsed && inAppShortcutsConflict(bindings[id], parsed),
+  );
   if (conflict) throw new InAppShortcutBindingError('conflict', conflict.id);
   const next = { ...previous };
   const defaultKey = IN_APP_SHORTCUT_ACTIONS.find(({ id }) => id === action)!.defaultKey;

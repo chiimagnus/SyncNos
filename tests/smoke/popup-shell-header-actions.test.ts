@@ -290,7 +290,7 @@ describe('PopupShell header actions', () => {
     expect(document.querySelector('[aria-label="Fetch AI Chat"]')).toBeTruthy();
     const settings = document.querySelector('[aria-label="Open Settings"]');
     expect(settings).toBeTruthy();
-    expect(settings?.getAttribute('data-tooltip-content')).toBe('Alt+Shift+P');
+    expect(settings?.getAttribute('data-tooltip-content')).toBe('Alt + Shift + P');
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
 
     const detailButton = Array.from(document.querySelectorAll('button')).find(
@@ -320,13 +320,13 @@ describe('PopupShell header actions', () => {
     expect(document.querySelector('[aria-label="Open Settings"]')?.getAttribute('data-tooltip-content')).toBeNull();
     expect(document.querySelector('[aria-label="Open Settings"]')?.getAttribute('aria-label')).toBe('Open Settings');
     const capture = document.querySelector('[aria-label="Fetch AI Chat"]') as HTMLButtonElement;
-    expect(capture?.parentElement?.getAttribute('data-tooltip-content')).toBe('Fetch AI Chat · Alt+Shift+K');
+    expect(capture?.parentElement?.getAttribute('data-tooltip-content')).toBe('Fetch AI Chat · Alt + Shift + K');
   });
 
   it('updates settings shortcut hints immediately when another window rebinds or clears a key', async () => {
     await renderPopupShell(root!);
     const settings = document.querySelector('[aria-label="Open Settings"]') as HTMLButtonElement;
-    expect(settings.getAttribute('data-tooltip-content')).toBe('Alt+Shift+P');
+    expect(settings.getAttribute('data-tooltip-content')).toBe('Alt + Shift + P');
     expect(settings.getAttribute('data-tooltip-content')).not.toContain('Open Settings');
 
     await act(async () => {
@@ -335,7 +335,7 @@ describe('PopupShell header actions', () => {
       }
       await Promise.resolve();
     });
-    expect(settings.getAttribute('data-tooltip-content')).toBe('Ctrl+Alt+9');
+    expect(settings.getAttribute('data-tooltip-content')).toBe('Ctrl + Alt + 9');
 
     await act(async () => {
       for (const listener of storageListeners) {

@@ -47,7 +47,7 @@ function key(button: HTMLButtonElement, value: string, code: string, mods: Keybo
   return event;
 }
 
-const toggleSelector = 'button[aria-label="Set shortcut: Toggle library sidebar"]';
+const toggleSelector = 'button[aria-label^="Set shortcut: Toggle library sidebar"]';
 const clearSelector = 'button[aria-label="Clear: Toggle library sidebar"]';
 
 beforeEach(() => {
@@ -102,24 +102,24 @@ describe('in-app shortcut editor', () => {
     await mount();
     expect(document.querySelectorAll('details').length).toBe(4);
     expect(document.querySelectorAll('button[aria-label^="Set shortcut: "]').length).toBeGreaterThan(30);
-    expect(document.querySelector(toggleSelector)?.textContent).toContain('Alt+Shift+B');
+    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌥⇧B');
 
     const button = click(toggleSelector);
-    expect(button.textContent).toContain('Press a shortcut');
+    expect(button.textContent).toContain('Recording');
     await act(async () => {
       key(button, '∫', 'KeyB', { metaKey: true, shiftKey: true });
       await Promise.resolve();
       await Promise.resolve();
     });
     expect(persisted['toggle-sidebar']).toBe('Mod+Shift+B');
-    expect(document.querySelector(toggleSelector)?.textContent).toContain('Mod+Shift+B');
+    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌘⇧B');
   });
 
   it('rejects conflicts, cancels Escape and allows clearing and resetting a binding', async () => {
     await mount();
     const button = click(toggleSelector);
     key(button, 'Escape', 'Escape');
-    expect(document.querySelector(toggleSelector)?.textContent).toContain('Alt+Shift+B');
+    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌥⇧B');
 
     const conflicting = click(toggleSelector);
     await act(async () => {
@@ -147,7 +147,7 @@ describe('in-app shortcut editor', () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-    expect(document.querySelector(toggleSelector)?.textContent).toContain('Alt+Shift+B');
+    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌥⇧B');
     expect(storage.remove).toHaveBeenCalledWith([IN_APP_SHORTCUT_STORAGE_KEY]);
   });
 
@@ -161,6 +161,69 @@ describe('in-app shortcut editor', () => {
       await Promise.resolve();
     });
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('Could not save');
-    expect(document.querySelector(toggleSelector)?.textContent).toContain('Alt+Shift+B');
+    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌥⇧B');
+  });
+
+  it('shows left/right modifiers as they are pressed, then saves punctuation or Backspace instead of silently clearing', async () => {
+    await mount();
+    const button = click(toggleSelector);
+    expect(button.textContent).toContain('Recording');
+    key(button, 'Meta', 'MetaRight', { metaKey: true, location: 2 });
+    expect(document.querySelector(toggleSelector)?.textContent).toContain('R ⌘');
+    key(button, 'Alt', 'AltLeft', { metaKey: true, altKey: true, location: 1 });
+    expect(document.querySelector(toggleSelector)?.textContent).toContain('L ⌥');
+    await act(async () => {
+      key(button, '?', 'Slash', { metaKey: true, altKey: true });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(persisted['toggle-sidebar']).toBe('MetaRight+AltLeft+Slash');
+    expect(document.querySelector(toggleSelector)?.textContent).toContain('R ⌘L ⌥/');
+
+    const replace = click(toggleSelector);
+    await act(async () => {
+      key(replace, 'Backspace', 'Backspace');
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(persisted['toggle-sidebar']).toBe('Backspace');
+    expect(document.querySelector(toggleSelector)?.textContent).toContain('⌫');
+
+    await act(async () => {
+      click(clearSelector);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(persisted['toggle-sidebar']).toBe('');
+    expect(document.querySelector(toggleSelector)?.textContent).toContain('Unassigned');
+  });
+
+  it('filters the operation list and cancels recording on browser focus loss', async () => {
+    await mount();
+    const search = document.querySelector<HTMLInputElement>('input[type="search"]')!;
+    const nativeSetter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value')!.set!;
+    await act(async () => {
+      nativeSetter.call(search, 'narration');
+      search.dispatchEvent(new window.Event('input', { bubbles: true }));
+    });
+    expect(document.querySelectorAll('details')).toHaveLength(1);
+    expect(document.querySelector('details')?.open).toBe(true);
+    expect(document.querySelector(toggleSelector)).toBeNull();
+    await act(async () => {
+      nativeSetter.call(search, 'no-such-operation');
+      search.dispatchEvent(new window.Event('input', { bubbles: true }));
+    });
+    expect(document.querySelector('details')).toBeNull();
+    expect(document.body.textContent).toContain('No matching actions');
+    await act(async () => {
+      nativeSetter.call(search, '');
+      search.dispatchEvent(new window.Event('input', { bubbles: true }));
+    });
+    const record = click(toggleSelector);
+    key(record, 'Alt', 'AltRight', { altKey: true, location: 2 });
+    expect(document.querySelector(toggleSelector)?.textContent).toContain('R ⌥');
+    act(() => window.dispatchEvent(new window.Event('blur')));
+    expect(document.querySelector(toggleSelector)?.getAttribute('data-shortcut-recording')).toBeNull();
+    expect(persisted['toggle-sidebar']).toBeUndefined();
   });
 });
