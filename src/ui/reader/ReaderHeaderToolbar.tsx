@@ -192,7 +192,7 @@ export function ReaderHeaderToolbar({
                 type="button"
                 className={headerNarrationTransportButtonClassName(false)}
                 aria-label={labels.stop}
-                {...tooltipAttrsWithShortcut(labels.stop, getShortcut?.('reader-stop'))}
+                {...tooltipAttrsWithShortcut(labels.stop, '')}
                 onClick={narration.stop}
                 disabled={narration.state === 'idle'}
               >

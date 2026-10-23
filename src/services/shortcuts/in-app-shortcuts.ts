@@ -13,53 +13,31 @@ export {
 } from './shortcut-keys';
 export type { ShortcutPlatform, ShortcutKeyEvent } from './shortcut-keys';
 
-export const IN_APP_SHORTCUT_STORAGE_KEY = 'in_app_shortcuts_v1';
+export const IN_APP_SHORTCUT_STORAGE_KEY = 'in_app_shortcuts_v2';
 
 export const IN_APP_SHORTCUT_ACTIONS = [
+  { id: 'open-settings', group: 'navigation', labelKey: 'settingsLabel', defaultKey: 'Mod+Shift+Comma' },
   {
     id: 'toggle-sidebar',
     group: 'navigation',
     labelKey: 'keyboardShortcutsToggleSidebar',
     defaultKey: 'Mod+Backslash',
   },
-  { id: 'open-settings', group: 'navigation', labelKey: 'settingsLabel', defaultKey: 'Alt+Shift+P' },
-  { id: 'open-insights', group: 'navigation', labelKey: 'section_aboutyou_label', defaultKey: '' },
-  { id: 'back-to-list', group: 'navigation', labelKey: 'backButton', defaultKey: 'Alt+Shift+ArrowLeft' },
-  { id: 'capture-page', group: 'navigation', labelKey: 'keyboardShortcutsCaptureCurrentPage', defaultKey: '' },
-  { id: 'popup-comments', group: 'navigation', labelKey: 'openInpageCommentsSidebar', defaultKey: '' },
   { id: 'copy-markdown', group: 'navigation', labelKey: 'copyFullMarkdown', defaultKey: '' },
-  { id: 'filter-source', group: 'library', labelKey: 'sourceFilterAria', defaultKey: 'Alt+Shift+F' },
-  { id: 'filter-site', group: 'library', labelKey: 'insightArticleDomainsTitle', defaultKey: '' },
-  { id: 'select-loaded', group: 'library', labelKey: 'selectAll', defaultKey: 'Alt+Shift+A' },
-  {
-    id: 'next-conversation',
-    group: 'library',
-    labelKey: 'keyboardShortcutsNextConversation',
-    defaultKey: 'Alt+Shift+ArrowDown',
-  },
-  {
-    id: 'previous-conversation',
-    group: 'library',
-    labelKey: 'keyboardShortcutsPreviousConversation',
-    defaultKey: 'Alt+Shift+ArrowUp',
-  },
-  { id: 'copy-list-link', group: 'library', labelKey: 'detailHeaderCopyLinkMenuLabel', defaultKey: '' },
-  { id: 'delete-selected', group: 'library', labelKey: 'deleteButton', defaultKey: '' },
-  { id: 'export-menu', group: 'library', labelKey: 'exportButton', defaultKey: '' },
-  { id: 'sync-menu', group: 'library', labelKey: 'syncTo', defaultKey: '' },
-  { id: 'detail-copy-link', group: 'detail', labelKey: 'detailHeaderCopyLinkMenuLabel', defaultKey: 'Alt+Shift+C' },
+  { id: 'next-conversation', group: 'library', labelKey: 'keyboardShortcutsNextConversation', defaultKey: '' },
+  { id: 'previous-conversation', group: 'library', labelKey: 'keyboardShortcutsPreviousConversation', defaultKey: '' },
+  { id: 'copy-original-link', group: 'library', labelKey: 'keyboardShortcutsCopyOriginalLink', defaultKey: '' },
+  { id: 'export-item', group: 'library', labelKey: 'keyboardShortcutsExportItem', defaultKey: '' },
+  { id: 'delete-item', group: 'library', labelKey: 'keyboardShortcutsDeleteItem', defaultKey: '' },
   { id: 'detail-copy-notion', group: 'detail', labelKey: 'detailHeaderCopyNotionLink', defaultKey: '' },
   { id: 'detail-copy-feishu', group: 'detail', labelKey: 'detailHeaderCopyFeishuLink', defaultKey: '' },
   { id: 'detail-copy-github', group: 'detail', labelKey: 'detailHeaderCopyGithubLink', defaultKey: '' },
-  { id: 'detail-comments', group: 'detail', labelKey: 'openCommentsSidebar', defaultKey: 'Alt+Shift+J' },
-  { id: 'detail-more', group: 'detail', labelKey: 'moreButton', defaultKey: 'Alt+Shift+M' },
-  { id: 'detail-original', group: 'detail', labelKey: 'openOriginalChat', defaultKey: 'Alt+Shift+O' },
+  { id: 'detail-open-original', group: 'detail', labelKey: 'openOriginalChat', defaultKey: '' },
   { id: 'detail-open-notion', group: 'detail', labelKey: 'detailHeaderOpenInNotion', defaultKey: '' },
   { id: 'detail-open-obsidian', group: 'detail', labelKey: 'detailHeaderOpenInObsidian', defaultKey: '' },
   { id: 'detail-open-feishu', group: 'detail', labelKey: 'detailHeaderOpenInFeishu', defaultKey: '' },
   { id: 'detail-open-github', group: 'detail', labelKey: 'detailHeaderOpenInGithub', defaultKey: '' },
   { id: 'reader-play-pause', group: 'reader', labelKey: 'keyboardShortcutsReaderPlayPause', defaultKey: '' },
-  { id: 'reader-stop', group: 'reader', labelKey: 'readerNarrationStop', defaultKey: '' },
 ] as const satisfies ReadonlyArray<{
   id: string;
   group: 'navigation' | 'library' | 'detail' | 'reader';
@@ -68,6 +46,18 @@ export const IN_APP_SHORTCUT_ACTIONS = [
 }>;
 
 export type InAppShortcutAction = (typeof IN_APP_SHORTCUT_ACTIONS)[number]['id'];
+
+export const DETAIL_ACTION_SHORTCUTS = {
+  'copy-full-markdown': 'copy-markdown',
+  'copy-notion-link': 'detail-copy-notion',
+  'copy-feishu-link': 'detail-copy-feishu',
+  'copy-github-link': 'detail-copy-github',
+  'open-original': 'detail-open-original',
+  'open-in-notion': 'detail-open-notion',
+  'open-in-obsidian': 'detail-open-obsidian',
+  'open-in-feishu': 'detail-open-feishu',
+  'open-in-github': 'detail-open-github',
+} as const satisfies Record<string, InAppShortcutAction>;
 export type InAppShortcutBindings = Record<InAppShortcutAction, string>;
 
 const ACTION_IDS = new Set<string>(IN_APP_SHORTCUT_ACTIONS.map(({ id }) => id));

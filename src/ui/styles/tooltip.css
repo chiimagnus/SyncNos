@@ -20,10 +20,19 @@
   display: block;
 }
 
-.webclipper-tooltip__shortcut {
-  color: rgb(244 247 252 / 62%);
+.webclipper-tooltip__shortcut,
+.webclipper-menu-shortcut {
   font-size: 11px;
   font-weight: 450;
+}
+
+.webclipper-tooltip__shortcut {
+  color: rgb(244 247 252 / 62%);
+}
+
+.webclipper-menu-shortcut {
+  color: var(--text-secondary);
+  white-space: nowrap;
 }
 
 .webclipper-tooltip__label + .webclipper-tooltip__shortcut {

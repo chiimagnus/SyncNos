@@ -247,7 +247,8 @@ export default function AppShell() {
 
     const shortcut = useInAppShortcuts({
       'toggle-sidebar': () => {
-        if (!isNarrow) setCollapsed(!sidebarCollapsed);
+        if (isNarrow) return false;
+        setCollapsed(!sidebarCollapsed);
       },
       'open-settings': openSettings,
     });

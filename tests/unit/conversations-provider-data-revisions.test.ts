@@ -14,6 +14,8 @@ const mergeConversations = vi.fn();
 const backfillConversationImages = vi.fn();
 const formatConversationMarkdownForExternalOutput = vi.fn();
 const writeTextToClipboard = vi.fn();
+const downloadBlobFile = vi.fn();
+const buildConversationsMarkdownZipExport = vi.fn();
 const resolveDetailHeaderActions = vi.fn(async () => [] as any[]);
 const getEnabledSyncProviders = vi.fn();
 const subscribeDataRevisionChanges = vi.fn();
@@ -62,6 +64,13 @@ vi.mock('@services/conversations/external-markdown', () => ({
 
 vi.mock('@services/shared/clipboard', () => ({
   writeTextToClipboard: (...args: any[]) => writeTextToClipboard(...args),
+}));
+vi.mock('@services/shared/webext', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@services/shared/webext')>()),
+  downloadBlobFile: (...args: any[]) => downloadBlobFile(...args),
+}));
+vi.mock('@services/sync/local/markdown-export', () => ({
+  buildConversationsMarkdownZipExport: (...args: any[]) => buildConversationsMarkdownZipExport(...args),
 }));
 
 vi.mock('@services/data-revisions/observer', () => ({
@@ -222,6 +231,9 @@ describe('ConversationsProvider data revisions', () => {
     formatConversationMarkdownForExternalOutput.mockResolvedValue('# fresh markdown\n');
     writeTextToClipboard.mockReset();
     writeTextToClipboard.mockResolvedValue(true);
+    downloadBlobFile.mockReset();
+    buildConversationsMarkdownZipExport.mockReset();
+    buildConversationsMarkdownZipExport.mockResolvedValue({ zipBlob: new Blob(['export']), filename: 'single.zip' });
     resolveDetailHeaderActions.mockReset();
     resolveDetailHeaderActions.mockResolvedValue([]);
     getEnabledSyncProviders.mockReset();
@@ -260,6 +272,65 @@ describe('ConversationsProvider data revisions', () => {
       await flushMicrotasks();
     });
   }
+
+  it('copies a selected item original URL without copying any other item', async () => {
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    getConversationListBootstrap.mockResolvedValue(makePage([makeConversation(11), makeConversation(12)]));
+    getConversationById.mockResolvedValue({
+      ...makeConversation(12),
+      url: ' https://example.com/path?id=12#original ',
+    });
+    await renderProvider();
+    await act(async () => {
+      latestState.replaceSelectedIds([11]);
+      await flushMicrotasks();
+    });
+    await latestState.copyConversationSourceLink(12);
+    expect(getConversationById).toHaveBeenCalledWith(12);
+    expect(writeTextToClipboard).toHaveBeenCalledWith('https://example.com/path?id=12#original');
+    expect(latestState.selectedIds).toEqual([11]);
+  });
+
+  it('rejects missing, mismatched, unsafe and uncopiable original URLs', async () => {
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    getConversationListBootstrap.mockResolvedValue(makePage([makeConversation(11)]));
+    await renderProvider();
+    await expect(latestState.copyConversationSourceLink(-1)).rejects.toThrow('invalid conversationId');
+    getConversationById.mockResolvedValueOnce(null);
+    await expect(latestState.copyConversationSourceLink(11)).rejects.toThrow('conversation not found');
+    getConversationById.mockResolvedValueOnce(makeConversation(12));
+    await expect(latestState.copyConversationSourceLink(11)).rejects.toThrow('conversation not found');
+    getConversationById.mockResolvedValueOnce({ ...makeConversation(11), url: 'javascript:alert(1)' });
+    await expect(latestState.copyConversationSourceLink(11)).rejects.toThrow('copyFailed');
+    expect(writeTextToClipboard).not.toHaveBeenCalled();
+    getConversationById.mockResolvedValueOnce(makeConversation(11));
+    writeTextToClipboard.mockResolvedValueOnce(false);
+    await expect(latestState.copyConversationSourceLink(11)).rejects.toThrow('copyFailed');
+  });
+
+  it('exports and deletes a specific item without mutating unrelated multi-selection', async () => {
+    whenDataRevisionObserverReady.mockResolvedValue({ baselineAvailable: true });
+    getConversationListBootstrap.mockResolvedValue(makePage([makeConversation(11), makeConversation(12)]));
+    await renderProvider();
+    await act(async () => {
+      latestState.replaceSelectedIds([11]);
+      await flushMicrotasks();
+    });
+
+    await act(async () => {
+      await latestState.exportConversationMarkdown(12);
+    });
+    expect(buildConversationsMarkdownZipExport).toHaveBeenCalledWith({ conversations: [makeConversation(12)] });
+    expect(downloadBlobFile).toHaveBeenCalledWith(expect.any(Blob), 'single.zip');
+    expect(latestState.selectedIds).toEqual([11]);
+
+    await act(async () => {
+      await latestState.deleteConversation(12);
+      await flushMicrotasks();
+    });
+    expect(deleteConversations).toHaveBeenCalledWith([12]);
+    expect(latestState.selectedIds).toEqual([11]);
+  });
 
   it('subscribes before the first list read and allows a degraded readiness baseline', async () => {
     const readiness = deferred<{ baselineAvailable: boolean }>();

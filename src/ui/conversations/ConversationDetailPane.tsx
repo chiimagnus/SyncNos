@@ -9,6 +9,7 @@ import { useChatOutlineActiveIndex } from '@ui/conversations/chat-outline/useCha
 import { t, formatConversationTitle } from '@i18n';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { useInAppShortcuts } from '@viewmodels/shortcuts/useInAppShortcuts';
+import { DETAIL_ACTION_SHORTCUTS, type InAppShortcutAction } from '@services/shortcuts/in-app-shortcuts';
 import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
 import {
   buttonFilledClassName,
@@ -166,8 +167,8 @@ export function ConversationDetailPane({
   const [urlEditing, setUrlEditing] = useState(false);
   const [urlDraft, setUrlDraft] = useState('');
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
-  const shortcutActionBusyRef = useRef(false);
   const urlInputRef = useRef<HTMLInputElement | null>(null);
+  const detailShortcutBusyRef = useRef(false);
   const displayedUrl = String((selected as any)?.url || '').trim();
   const isVideo = String((selected as any)?.sourceType || '') === 'video';
   const videoDescription = isVideo ? String((selected as any)?.videoDescription || '').trim() : '';
@@ -204,7 +205,7 @@ export function ConversationDetailPane({
   const hasReaderMoreMenuContent = readerFeatures.textLayout || readerFeatures.theme || readerFeatures.narration;
   const hasMoreMenuContent =
     Boolean(textCountText || imageCountText) || moreActions.length > 0 || hasReaderMoreMenuContent;
-  const moreMenuPanelClassName = 'tw-w-[214px] tw-max-w-[min(214px,calc(100vw-28px))] tw-text-[var(--text-primary)]';
+  const moreMenuPanelClassName = 'tw-w-[260px] tw-max-w-[min(260px,calc(100vw-28px))] tw-text-[var(--text-primary)]';
   const floatingIslandClassName = [
     'tw-pointer-events-auto tw-flex tw-w-fit tw-items-center tw-gap-1 tw-rounded-[var(--radius-inline)] tw-border tw-border-[var(--border)] tw-p-1',
     'tw-bg-[color-mix(in_srgb,var(--bg-card)_88%,transparent)] tw-backdrop-blur-[10px] tw-backdrop-saturate-150',
@@ -296,43 +297,29 @@ export function ConversationDetailPane({
     });
   };
 
-  const triggerDetailAction = (id: string) => {
-    const action = safeActions.find((item) => item.id === id && !item.disabled);
-    if (!action || shortcutActionBusyRef.current) return;
-    shortcutActionBusyRef.current = true;
+  const triggerDetailShortcut = (actionId: string) => {
+    if (!selected || Number(selected.id) !== Number(activeId) || detailShortcutBusyRef.current) return false;
+    const action = safeActions.find((item) => item.id === actionId && !item.disabled);
+    if (!action) return false;
+    detailShortcutBusyRef.current = true;
+    closeMoreMenu();
     void Promise.resolve()
       .then(() => action.onTrigger())
-      .catch((error) => {
-        const message = error instanceof Error && error.message ? error.message : t('actionFailedFallback');
-        window.alert(message);
+      .catch((error: unknown) => {
+        window.alert(error instanceof Error ? error.message : String(error));
       })
       .finally(() => {
-        shortcutActionBusyRef.current = false;
+        detailShortcutBusyRef.current = false;
       });
-    closeMoreMenu();
+    return true;
   };
-
-  const shortcut = useInAppShortcuts({
-    'back-to-list': () => onBack?.(),
-    'detail-copy-link': () => {
-      const button = document.querySelector<HTMLButtonElement>('[data-detail-header-primary-copy]');
-      if (button && !button.disabled) button.click();
-    },
-    'detail-copy-notion': () => triggerDetailAction('copy-notion-link'),
-    'detail-copy-feishu': () => triggerDetailAction('copy-feishu-link'),
-    'detail-copy-github': () => triggerDetailAction('copy-github-link'),
-    'detail-comments': () => {
-      if (canOpenCommentsSidebar) onTriggerCommentsSidebar?.();
-    },
-    'detail-more': () => {
-      if (hasMoreMenuContent) handleMoreMenuOpenChange(!moreMenuOpen);
-    },
-    'detail-original': () => triggerDetailAction('open-original'),
-    'detail-open-notion': () => triggerDetailAction('open-in-notion'),
-    'detail-open-obsidian': () => triggerDetailAction('open-in-obsidian'),
-    'detail-open-feishu': () => triggerDetailAction('open-in-feishu'),
-    'detail-open-github': () => triggerDetailAction('open-in-github'),
-  });
+  const shortcut = useInAppShortcuts(
+    Object.fromEntries(
+      Object.entries(DETAIL_ACTION_SHORTCUTS)
+        .filter(([, shortcutId]) => shortcutId !== 'copy-markdown')
+        .map(([actionId, shortcutId]) => [shortcutId, () => triggerDetailShortcut(actionId)]),
+    ) as Partial<Record<InAppShortcutAction, () => boolean>>,
+  );
 
   const detailMetadata = (
     <div className="tw-mb-1 tw-min-w-0" data-detail-metadata="true">
@@ -480,7 +467,7 @@ export function ConversationDetailPane({
                   onClick={onBack}
                   className={headerIconButtonClass}
                   aria-label={t('backButton')}
-                  {...tooltipAttrsWithShortcut(t('backButton'), shortcut('back-to-list'))}
+                  {...tooltipAttrsWithShortcut(t('backButton'), '')}
                 >
                   <ChevronLeft size={14} strokeWidth={2} aria-hidden="true" />
                   <span className="tw-sr-only">{t('backButton')}</span>
@@ -516,7 +503,7 @@ export function ConversationDetailPane({
                   }}
                   className={[headerButtonClassName(), 'tw-order-2'].join(' ')}
                   aria-label={commentsSidebarLabel}
-                  {...tooltipAttrsWithShortcut(commentsSidebarLabel, shortcut('detail-comments'))}
+                  {...tooltipAttrsWithShortcut(commentsSidebarLabel, '')}
                   aria-pressed={commentsSidebarOpen ? 'true' : 'false'}
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -541,7 +528,7 @@ export function ConversationDetailPane({
                   ariaLabel={t('moreButton')}
                   side="bottom"
                   align="end"
-                  panelMinWidth={214}
+                  panelMinWidth={260}
                   panelClassName={moreMenuPanelClassName}
                   className="tw-order-3"
                   trigger={(triggerProps) => (
@@ -549,7 +536,7 @@ export function ConversationDetailPane({
                       {...triggerProps}
                       data-detail-header-more-trigger="true"
                       aria-label={t('moreButton')}
-                      {...tooltipAttrsWithShortcut(t('moreButton'), shortcut('detail-more'))}
+                      {...tooltipAttrsWithShortcut(t('moreButton'), '')}
                       className={headerIconButtonClass}
                     >
                       <MoreHorizontal size={14} strokeWidth={2} aria-hidden="true" />

@@ -169,15 +169,6 @@ function PopupShellFrame() {
     'open-settings': () => {
       void onOpenSettings().catch(() => {});
     },
-    'capture-page': () => {
-      if (!buttonDisabled) void capture().catch(() => {});
-    },
-    'popup-comments': () => {
-      if (commentsButton.disabled) return;
-      void commentsButton.open().then((ok) => {
-        if (ok) window.close();
-      });
-    },
   });
 
   const onOpenInsightSettings = useCallback(async () => {
@@ -251,10 +242,7 @@ function PopupShellFrame() {
                   <>
                     <span
                       className="tw-inline-flex"
-                      {...tooltipAttrsWithShortcut(
-                        buttonDisabled ? status?.message || buttonLabel : buttonLabel,
-                        buttonDisabled ? '' : shortcut('capture-page'),
-                      )}
+                      {...tooltipAttrsWithShortcut(buttonDisabled ? status?.message || buttonLabel : buttonLabel, '')}
                     >
                       <button
                         type="button"
@@ -267,13 +255,7 @@ function PopupShellFrame() {
                       </button>
                     </span>
 
-                    <span
-                      className="tw-inline-flex"
-                      {...tooltipAttrsWithShortcut(
-                        commentsButton.tooltip,
-                        commentsButton.disabled ? '' : shortcut('popup-comments'),
-                      )}
-                    >
+                    <span className="tw-inline-flex" {...tooltipAttrsWithShortcut(commentsButton.tooltip, '')}>
                       <button
                         type="button"
                         onClick={() => {

@@ -5,7 +5,8 @@ import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
 import { useNarrowListDetailCommentsRoute } from '@ui/shared/hooks/useNarrowListDetailCommentsRoute';
 import type { ArticleCommentsSidebarRuntime } from '@viewmodels/comments/useArticleCommentsSidebarRuntime';
 
-import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
+import { canonicalizeArticleUrl, sanitizeHttpUrl } from '@services/url-cleaning/http-url';
+import { t, formatConversationTitle } from '@i18n';
 import type { CommentLocatorSurfaceRoots } from '@ui/comments';
 import { ConversationListPane } from '@ui/conversations/ConversationListPane';
 import { LazyArticleCommentsSection, LazyConversationDetailPane } from '@ui/conversations/LazyConversationSurfaces';
@@ -61,7 +62,13 @@ export function ConversationsScene({
   const {
     selectedConversation,
     activeId,
-    detailHeaderActions,
+    items,
+    exporting,
+    deleting,
+    copyConversationMarkdown,
+    copyConversationSourceLink,
+    exportConversationMarkdown,
+    deleteConversation,
     openConversationExternalBySourceKey,
     openConversationExternalById,
     setDetailSurfaceActive,
@@ -86,35 +93,58 @@ export function ConversationsScene({
     commentsSidebarEnabled &&
     Boolean(selectedConversationCanonicalUrl);
   const detailSurfaceVisible = !isNarrow || narrowRoute === 'detail';
-  const copyingMarkdownRef = useRef(false);
+  const shortcutBusyRef = useRef(false);
+  const currentShortcutItem = () => {
+    if (isNarrow && narrowRoute !== 'list' && narrowRoute !== 'detail') return null;
+    const list = document.querySelector<HTMLElement>('[data-conversation-list-pane]');
+    const focus = document.activeElement;
+    const listFocused = focus instanceof Element && !!list?.contains(focus);
+    const listIsActive = isNarrow ? narrowRoute === 'list' : listFocused || !selectedConversation;
+    const focusedId =
+      listFocused && focus instanceof Element
+        ? Number(focus.closest<HTMLElement>('[data-conversation-id]')?.dataset.conversationId)
+        : 0;
+    const id = listIsActive ? focusedId || Number(activeId) : Number(selectedConversation?.id);
+    if (!Number.isSafeInteger(id) || id <= 0) return null;
+    const item =
+      items.find((entry) => Number(entry.id) === id) ||
+      (Number(selectedConversation?.id) === id ? selectedConversation : null);
+    return item ? { id, item } : null;
+  };
+  const runShortcut = (operation: () => Promise<void>) => {
+    if (shortcutBusyRef.current) return false;
+    shortcutBusyRef.current = true;
+    void Promise.resolve()
+      .then(operation)
+      .catch((error: unknown) => {
+        window.alert(error instanceof Error ? error.message : String(error));
+      })
+      .finally(() => {
+        shortcutBusyRef.current = false;
+      });
+    return true;
+  };
   useInAppShortcuts({
     'copy-markdown': () => {
-      const list = document.querySelector<HTMLElement>('[data-conversation-list-pane]');
-      const focus = document.activeElement;
-      const listFocused = focus instanceof Element && !!list?.contains(focus);
-      const listIsActive = isNarrow ? narrowRoute === 'list' : listFocused || !selectedConversation;
-      if (listIsActive) {
-        const focusedRow = focus instanceof Element ? focus.closest<HTMLElement>('[data-conversation-id]') : null;
-        const id = Number(focusedRow?.dataset.conversationId || activeId);
-        if (!Number.isFinite(id) || id <= 0) return false;
-        const button = list?.querySelector<HTMLButtonElement>(
-          `[data-conversation-id="${id}"] [data-list-copy-markdown]`,
-        );
-        if (!button || button.disabled) return false;
-        button.click();
-        return true;
+      const target = currentShortcutItem();
+      return target ? runShortcut(() => copyConversationMarkdown(target.id)) : false;
+    },
+    'copy-original-link': () => {
+      const target = currentShortcutItem();
+      return target && sanitizeHttpUrl(target.item.url)
+        ? runShortcut(() => copyConversationSourceLink(target.id))
+        : false;
+    },
+    'export-item': () => {
+      const target = currentShortcutItem();
+      return target && !exporting && !deleting ? runShortcut(() => exportConversationMarkdown(target.id)) : false;
+    },
+    'delete-item': () => {
+      const target = currentShortcutItem();
+      if (!target || exporting || deleting || shortcutBusyRef.current) return false;
+      if (window.confirm(`${t('keyboardShortcutsDeleteConfirm')}\n${formatConversationTitle(target.item.title)}`)) {
+        return runShortcut(() => deleteConversation(target.id));
       }
-      const action = detailHeaderActions?.find((entry) => entry.id === 'copy-full-markdown' && !entry.disabled);
-      if (!action || copyingMarkdownRef.current) return false;
-      copyingMarkdownRef.current = true;
-      void Promise.resolve()
-        .then(() => action.onTrigger())
-        .catch((error: unknown) => {
-          window.alert(error instanceof Error ? error.message : String(error));
-        })
-        .finally(() => {
-          copyingMarkdownRef.current = false;
-        });
       return true;
     },
   });

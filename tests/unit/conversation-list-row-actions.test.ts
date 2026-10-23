@@ -189,24 +189,20 @@ describe('ConversationListPane row actions', () => {
     expect(copyButton?.textContent).toBe('⧉');
   });
 
-  it('shows bound shortcuts on their matching controls, but not on inactive conversation row actions', async () => {
+  it('shows only function-bound copy shortcuts, not bulk controls or filters', async () => {
     shortcutBindings = {
-      'filter-source': 'Alt+Shift+F',
-      'select-loaded': 'Alt+Shift+A',
       'copy-markdown': 'Ctrl+Alt+M',
-      'copy-list-link': 'Ctrl+Alt+L',
-      'open-insights': 'Ctrl+Alt+I',
-      'export-menu': 'Ctrl+Alt+E',
+      'copy-original-link': 'Ctrl+Alt+L',
     };
     currentState.items.push({ ...conversation, id: 12, conversationKey: 'conv-12' });
     currentState.listSummary.totalCount = 2;
     currentState.selectedIds = [11];
     await renderPane();
 
-    expect(document.querySelector('#sourceFilterSelect')?.getAttribute('data-tooltip-content')).toContain(
+    expect(document.querySelector('#sourceFilterSelect')?.getAttribute('data-tooltip-content')).not.toContain(
       'Alt+Shift+F',
     );
-    expect(document.querySelector('#chkSelectAll')?.parentElement?.getAttribute('data-tooltip-content')).toContain(
+    expect(document.querySelector('#chkSelectAll')?.parentElement?.getAttribute('data-tooltip-content')).not.toContain(
       'Alt+Shift+A',
     );
     expect(
@@ -222,17 +218,16 @@ describe('ConversationListPane row actions', () => {
     expect(
       document.querySelector('[data-conversation-source-link="11"]')?.getAttribute('data-tooltip-content'),
     ).toContain('Ctrl+Alt+L');
-    expect(document.querySelector('#btnExport')?.parentElement?.getAttribute('data-tooltip-content')).toContain(
+    expect(document.querySelector('#btnExport')?.parentElement?.getAttribute('data-tooltip-content')).not.toContain(
       'Ctrl+Alt+E',
     );
+    expect(document.querySelector('[data-item-more-trigger]')).toBeNull();
 
     await act(async () => {
       (document.querySelector('#btnExport') as HTMLButtonElement).click();
       await flushMicrotasks();
     });
-    const json = document.querySelector('#menuExportJson') as HTMLButtonElement;
-    expect(json.textContent).toBe('jsonExport');
-    expect(json.getAttribute('data-tooltip-content')).toBeNull();
+    expect(document.querySelector('#menuExportJson')?.textContent).toBe('jsonExport');
   });
 
   it('keeps export formats and sync destinations clickable without individual key bindings', async () => {

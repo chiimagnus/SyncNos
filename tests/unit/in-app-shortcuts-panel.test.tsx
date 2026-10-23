@@ -101,7 +101,7 @@ describe('in-app shortcut editor', () => {
   it('shows all actions in groups and can record a new Mac binding', async () => {
     await mount();
     expect(document.querySelectorAll('details').length).toBe(4);
-    expect(document.querySelectorAll('button[aria-label^="Set shortcut: "]').length).toBe(29);
+    expect(document.querySelectorAll('button[aria-label^="Set shortcut: "]').length).toBe(17);
     expect(document.querySelector(toggleSelector)?.textContent).toContain('⌘ + \\');
     expect(document.querySelector(toggleSelector)?.querySelectorAll('kbd')).toHaveLength(1);
     expect(document.querySelector(toggleSelector)?.classList.contains('webclipper-btn')).toBe(true);
@@ -142,7 +142,7 @@ describe('in-app shortcut editor', () => {
 
     const conflicting = click(toggleSelector);
     await act(async () => {
-      key(conflicting, 'P', 'KeyP', { altKey: true, shiftKey: true });
+      key(conflicting, '<', 'Comma', { metaKey: true, shiftKey: true });
       await Promise.resolve();
       await Promise.resolve();
     });

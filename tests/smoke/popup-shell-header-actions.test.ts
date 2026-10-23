@@ -290,7 +290,7 @@ describe('PopupShell header actions', () => {
     expect(document.querySelector('[aria-label="Fetch AI Chat"]')).toBeTruthy();
     const settings = document.querySelector('[aria-label="Open Settings"]');
     expect(settings).toBeTruthy();
-    expect(settings?.getAttribute('data-tooltip-content')).toBe('Alt + Shift + P');
+    expect(settings?.getAttribute('data-tooltip-content')).toBe('Ctrl + Shift + ,');
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
 
     const detailButton = Array.from(document.querySelectorAll('button')).find(
@@ -308,11 +308,11 @@ describe('PopupShell header actions', () => {
     expect(document.querySelector('[aria-label="More actions coming soon"]')).toBeFalsy();
   });
 
-  it('removes redundant settings tooltips when unassigned and shows a configured capture shortcut', async () => {
+  it('keeps capture controls independent of retired in-app shortcut bindings', async () => {
     storageGetMock.mockResolvedValue({
-      in_app_shortcuts_v1: {
+      in_app_shortcuts_v2: {
         'open-settings': '',
-        'capture-page': 'Alt+Shift+K',
+        'capture-page': 'Alt+Shift+K', // Not registered; ignored.
       },
     });
     await renderPopupShell(root!);
@@ -320,18 +320,18 @@ describe('PopupShell header actions', () => {
     expect(document.querySelector('[aria-label="Open Settings"]')?.getAttribute('data-tooltip-content')).toBeNull();
     expect(document.querySelector('[aria-label="Open Settings"]')?.getAttribute('aria-label')).toBe('Open Settings');
     const capture = document.querySelector('[aria-label="Fetch AI Chat"]') as HTMLButtonElement;
-    expect(capture?.parentElement?.getAttribute('data-tooltip-content')).toBe('Fetch AI Chat\nAlt + Shift + K');
+    expect(capture?.parentElement?.getAttribute('data-tooltip-content')).toBe('Fetch AI Chat');
   });
 
   it('updates settings shortcut hints immediately when another window rebinds or clears a key', async () => {
     await renderPopupShell(root!);
     const settings = document.querySelector('[aria-label="Open Settings"]') as HTMLButtonElement;
-    expect(settings.getAttribute('data-tooltip-content')).toBe('Alt + Shift + P');
+    expect(settings.getAttribute('data-tooltip-content')).toBe('Ctrl + Shift + ,');
     expect(settings.getAttribute('data-tooltip-content')).not.toContain('Open Settings');
 
     await act(async () => {
       for (const listener of storageListeners) {
-        listener({ in_app_shortcuts_v1: { newValue: { 'open-settings': 'Ctrl+Alt+9' } } }, 'local');
+        listener({ in_app_shortcuts_v2: { newValue: { 'open-settings': 'Ctrl+Alt+9' } } }, 'local');
       }
       await Promise.resolve();
     });
@@ -339,7 +339,7 @@ describe('PopupShell header actions', () => {
 
     await act(async () => {
       for (const listener of storageListeners) {
-        listener({ in_app_shortcuts_v1: { newValue: { 'open-settings': '' } } }, 'local');
+        listener({ in_app_shortcuts_v2: { newValue: { 'open-settings': '' } } }, 'local');
       }
       await Promise.resolve();
     });

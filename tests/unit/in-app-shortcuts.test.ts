@@ -14,6 +14,7 @@ vi.mock('@services/shared/storage', () => ({
 
 import {
   IN_APP_SHORTCUT_ACTIONS,
+  DETAIL_ACTION_SHORTCUTS,
   IN_APP_SHORTCUT_STORAGE_KEY,
   InAppShortcutBindingError,
   displayInAppShortcut,
@@ -53,7 +54,29 @@ describe('in-app shortcut contract', () => {
     const assigned = Object.values(defaults).filter(Boolean);
     expect(new Set(assigned).size).toBe(assigned.length);
     expect(defaults['toggle-sidebar']).toBe('Mod+Backslash');
-    expect(ids).toHaveLength(29);
+    expect(ids).toHaveLength(17);
+    expect(ids.filter((id) => id.startsWith('detail-'))).toHaveLength(8);
+    expect(defaults['detail-copy-notion']).toBe('');
+    expect(ids).toContain('detail-copy-feishu');
+    expect(ids).toContain('detail-copy-github');
+    expect(ids).toContain('detail-open-original');
+    expect(ids).toContain('detail-open-obsidian');
+    expect(DETAIL_ACTION_SHORTCUTS).toEqual({
+      'copy-full-markdown': 'copy-markdown',
+      'copy-notion-link': 'detail-copy-notion',
+      'copy-feishu-link': 'detail-copy-feishu',
+      'copy-github-link': 'detail-copy-github',
+      'open-original': 'detail-open-original',
+      'open-in-notion': 'detail-open-notion',
+      'open-in-obsidian': 'detail-open-obsidian',
+      'open-in-feishu': 'detail-open-feishu',
+      'open-in-github': 'detail-open-github',
+    });
+    expect(Object.values(DETAIL_ACTION_SHORTCUTS).every((id) => ids.includes(id))).toBe(true);
+    expect(defaults['open-settings']).toBe('Mod+Shift+Comma');
+    expect(defaults['export-item']).toBe('');
+    expect(defaults['delete-item']).toBe('');
+    expect(defaults['copy-original-link']).toBe('');
     expect(ids).toContain('copy-markdown');
     for (const removed of [
       'copy-list-markdown',
@@ -67,6 +90,19 @@ describe('in-app shortcut contract', () => {
       'reader-layout',
       'reader-theme',
       'reader-narration',
+      'open-insights',
+      'back-to-list',
+      'capture-page',
+      'filter-source',
+      'filter-site',
+      'select-loaded',
+      'delete-selected',
+      'export-menu',
+      'sync-menu',
+      'detail-more',
+      'detail-copy-link',
+      'popup-comments',
+      'reader-stop',
     ]) {
       expect(ids).not.toContain(removed);
     }
@@ -124,6 +160,12 @@ describe('in-app shortcut contract', () => {
     expect(shortcutFromKeyEvent(event, 'mac')).toBe('Mod+Shift+B');
     expect(shortcutFromKeyEvent({ ...event, metaKey: false, ctrlKey: true }, 'windows')).toBe('Mod+Shift+B');
     expect(shortcutFromKeyEvent({ ...event, key: '!', code: 'Digit1' }, 'mac')).toBe('Mod+Shift+1');
+    expect(shortcutFromKeyEvent({ ...event, key: '<', code: 'Comma' }, 'mac')).toBe('Mod+Shift+Comma');
+    expect(shortcutFromKeyEvent({ ...event, key: '<', code: 'Comma', metaKey: false, ctrlKey: true }, 'windows')).toBe(
+      'Mod+Shift+Comma',
+    );
+    expect(displayInAppShortcut('Mod+Shift+Comma', 'mac')).toBe('⌘ + ⇧ + ,');
+    expect(displayInAppShortcut('Mod+Shift+Comma', 'windows')).toBe('Ctrl + Shift + ,');
     expect(shortcutFromKeyEvent({ ...event, key: '∫', code: 'KeyB', metaKey: false, altKey: true }, 'mac')).toBe(
       'Alt+Shift+B',
     );
@@ -136,20 +178,24 @@ describe('in-app shortcut contract', () => {
     const result = resolveInAppShortcutBindings({
       'toggle-sidebar': '',
       'open-settings': 'Ctrl+Alt+9',
-      'filter-source': 'bad',
+      'copy-original-link': 'bad',
       __proto__: 'Alt+B',
       'future-action': 'Alt+F',
     });
     expect(result['toggle-sidebar']).toBe('');
     expect(result['open-settings']).toBe('Ctrl+Alt+9');
-    expect(result['filter-source']).toBe(defaults['filter-source']);
+    expect(result['copy-original-link']).toBe(defaults['copy-original-link']);
     expect(Object.keys(result)).toHaveLength(IN_APP_SHORTCUT_ACTIONS.length);
   });
 
-  it('keeps previously saved shortcut choices while changing the default sidebar key', async () => {
-    persisted = { 'toggle-sidebar': 'Alt+Shift+B' };
-    expect((await readInAppShortcutBindings())['toggle-sidebar']).toBe('Alt+Shift+B');
-    expect(defaultInAppShortcutBindings()['toggle-sidebar']).toBe('Mod+Backslash');
+  it('does not import old experimental in-app bindings', async () => {
+    storage.get.mockResolvedValueOnce({
+      in_app_shortcuts_v1: { 'open-settings': 'Alt+Shift+P' },
+    });
+    const current = await readInAppShortcutBindings();
+    expect(current['open-settings']).toBe('Mod+Shift+Comma');
+    expect(current['toggle-sidebar']).toBe('Mod+Backslash');
+    expect(IN_APP_SHORTCUT_STORAGE_KEY).toBe('in_app_shortcuts_v2');
   });
 
   it('allows rebinding and clearing default keys, blocks conflicts without writing', async () => {
@@ -158,13 +204,13 @@ describe('in-app shortcut contract', () => {
 
     await updateInAppShortcutBinding('toggle-sidebar', '');
     expect((await readInAppShortcutBindings())['toggle-sidebar']).toBe('');
-    await updateInAppShortcutBinding('filter-site', 'Ctrl+Alt+Q');
-    expect((await readInAppShortcutBindings())['filter-site']).toBe('Ctrl+Alt+Q');
+    await updateInAppShortcutBinding('copy-original-link', 'Ctrl+Alt+Q');
+    expect((await readInAppShortcutBindings())['copy-original-link']).toBe('Ctrl+Alt+Q');
 
     const callsBefore = storage.set.mock.calls.length;
     await expect(updateInAppShortcutBinding('open-settings', 'Ctrl+Alt+Q')).rejects.toMatchObject({
       code: 'conflict',
-      conflictingAction: 'filter-site',
+      conflictingAction: 'copy-original-link',
     } satisfies Partial<InAppShortcutBindingError>);
     expect(storage.set).toHaveBeenCalledTimes(callsBefore);
 
@@ -173,35 +219,35 @@ describe('in-app shortcut contract', () => {
   });
 
   it('rejects malformed keys and handles storage failures without fictitious success', async () => {
-    await expect(updateInAppShortcutBinding('filter-source', 'Ctrl+Control')).rejects.toMatchObject({
+    await expect(updateInAppShortcutBinding('copy-original-link', 'Ctrl+Control')).rejects.toMatchObject({
       code: 'invalid',
     });
     expect(storage.set).not.toHaveBeenCalled();
 
     storage.set.mockRejectedValueOnce(new Error('storage denied'));
-    await expect(updateInAppShortcutBinding('filter-source', 'Ctrl+Alt+Q')).rejects.toThrow('storage denied');
+    await expect(updateInAppShortcutBinding('copy-original-link', 'Ctrl+Alt+Q')).rejects.toThrow('storage denied');
   });
 
   it('restores defaults by removing only the in-app setting', async () => {
-    await updateInAppShortcutBinding('filter-source', '');
+    await updateInAppShortcutBinding('copy-original-link', '');
     await expect(resetInAppShortcutBindings()).resolves.toEqual(defaultInAppShortcutBindings());
     expect(storage.remove).toHaveBeenCalledWith([IN_APP_SHORTCUT_STORAGE_KEY]);
   });
 
   it('does not execute duplicate imported values when storage is corrupted', () => {
-    const result = resolveInAppShortcutBindings({ 'toggle-sidebar': 'Alt+Shift+P' });
-    expect(result['toggle-sidebar']).toBe('Alt+Shift+P');
-    expect(result['open-settings']).toBe('');
+    const result = resolveInAppShortcutBindings({ 'toggle-sidebar': 'Mod+Shift+Comma' });
+    expect(result['open-settings']).toBe('Mod+Shift+Comma');
+    expect(result['toggle-sidebar']).toBe('');
   });
   it('drops only conflicting stored assignments, not keys overlapping an already rejected entry', () => {
     const bindings = resolveInAppShortcutBindings({
-      'toggle-sidebar': 'Mod+Ctrl+Y', // usable on macOS
-      'filter-source': 'Ctrl+Meta+Y', // overlaps the first on macOS
-      'filter-site': 'Mod+Meta+Y', // usable on Windows, not overlapping the first
+      'open-settings': 'Mod+Ctrl+Y', // usable on macOS
+      'toggle-sidebar': 'Ctrl+Meta+Y', // overlaps the first on macOS
+      'copy-markdown': 'Mod+Meta+Y', // usable on Windows, not overlapping the first
     });
-    expect(bindings['toggle-sidebar']).toBe('Mod+Ctrl+Y');
-    expect(bindings['filter-source']).toBe('');
-    expect(bindings['filter-site']).toBe('Mod+Meta+Y');
+    expect(bindings['open-settings']).toBe('Mod+Ctrl+Y');
+    expect(bindings['toggle-sidebar']).toBe('');
+    expect(bindings['copy-markdown']).toBe('Mod+Meta+Y');
   });
 
   it('identifies macOS, Windows, Linux, ChromeOS and unknown systems and displays their own keyboard names', () => {
@@ -264,20 +310,20 @@ describe('in-app shortcut contract', () => {
   it('drops removed shortcut entries when saving and rejects conflicting bindings', async () => {
     persisted = {
       'toggle-sidebar': 'Alt+Shift+Y',
-      'filter-source': 'Alt+Shift+Y',
+      'copy-original-link': 'Alt+Shift+Y',
       'sync-github': 'Ctrl+Alt+X',
       'reader-theme': 'Ctrl+Alt+T',
     };
     const current = await readInAppShortcutBindings();
     expect(current['toggle-sidebar']).toBe('Alt+Shift+Y');
-    expect(current['filter-source']).toBe('');
-    expect(Object.keys(current)).toHaveLength(29);
-    await expect(updateInAppShortcutBinding('filter-source', 'Alt+Shift+Y')).rejects.toMatchObject({
+    expect(current['copy-original-link']).toBe('');
+    expect(Object.keys(current)).toHaveLength(17);
+    await expect(updateInAppShortcutBinding('copy-original-link', 'Alt+Shift+Y')).rejects.toMatchObject({
       code: 'conflict',
       conflictingAction: 'toggle-sidebar',
     });
-    await updateInAppShortcutBinding('filter-source', 'Alt+Shift+F24');
-    expect(persisted).toEqual({ 'toggle-sidebar': 'Alt+Shift+Y', 'filter-source': 'Alt+Shift+F24' });
+    await updateInAppShortcutBinding('copy-original-link', 'Alt+Shift+F24');
+    expect(persisted).toEqual({ 'toggle-sidebar': 'Alt+Shift+Y', 'copy-original-link': 'Alt+Shift+F24' });
     await expect(updateInAppShortcutBinding('sync-github' as any, 'Ctrl+Alt+X')).rejects.toMatchObject({
       code: 'invalid',
     });

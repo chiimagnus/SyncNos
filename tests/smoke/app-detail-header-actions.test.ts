@@ -3,6 +3,8 @@ import { act, createElement } from 'react';
 import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 
+const shortcutFixture = vi.hoisted(() => ({ bindings: {} as Record<string, string> }));
+
 const currentState = {
   activeId: 11,
   listError: null,
@@ -42,7 +44,7 @@ vi.mock('../../src/ui/conversations/ArticleCommentsSection', () => ({
 }));
 
 vi.mock('../../src/services/shared/storage', () => ({
-  storageGet: vi.fn(async () => ({})),
+  storageGet: vi.fn(async () => ({ in_app_shortcuts_v2: shortcutFixture.bindings })),
   storageOnChanged: () => () => {},
   storageSet: vi.fn(async () => undefined),
 }));
@@ -93,6 +95,7 @@ function setupDom() {
   Object.defineProperty(globalThis, 'window', { configurable: true, value: dom.window });
   Object.defineProperty(globalThis, 'document', { configurable: true, value: dom.window.document });
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: dom.window.navigator });
+  Object.defineProperty(globalThis, 'Element', { configurable: true, value: dom.window.Element });
   Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: dom.window.HTMLElement });
   Object.defineProperty(globalThis, 'Node', { configurable: true, value: dom.window.Node });
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: dom.window.localStorage });
@@ -168,6 +171,7 @@ describe('ConversationDetailPane header actions', () => {
 
   beforeEach(() => {
     setupDom();
+    shortcutFixture.bindings = {};
     currentState.activeId = 11;
     currentState.loadingDetail = false;
     currentState.detailError = null;
@@ -383,7 +387,297 @@ describe('ConversationDetailPane header actions', () => {
     expect(document.body.textContent || '').not.toContain('Copied Notion link');
   });
 
-  it('shows active copy and More key bindings while keeping worded menu items concise', async () => {
+  it('executes all eight available detail shortcuts as business actions, not button clicks', async () => {
+    const cases = [
+      { id: 'copy-notion-link', binding: 'detail-copy-notion', key: 'N', slot: 'copy', provider: 'notion' },
+      { id: 'copy-feishu-link', binding: 'detail-copy-feishu', key: 'F', slot: 'copy', provider: 'feishu' },
+      { id: 'copy-github-link', binding: 'detail-copy-github', key: 'G', slot: 'copy', provider: 'github' },
+      { id: 'open-original', binding: 'detail-open-original', key: 'O', slot: 'tools', provider: 'source' },
+      { id: 'open-in-notion', binding: 'detail-open-notion', key: 'P', slot: 'open', provider: 'notion' },
+      { id: 'open-in-obsidian', binding: 'detail-open-obsidian', key: 'B', slot: 'open', provider: 'obsidian' },
+      { id: 'open-in-feishu', binding: 'detail-open-feishu', key: 'Q', slot: 'open', provider: 'feishu' },
+      { id: 'open-in-github', binding: 'detail-open-github', key: 'H', slot: 'open', provider: 'github' },
+    ] as const;
+    shortcutFixture.bindings = Object.fromEntries(cases.map(({ binding, key }) => [binding, 'Alt+Shift+' + key]));
+    const calls = new Map(cases.map(({ id }) => [id, vi.fn(async () => {})]));
+    currentState.detailHeaderActions = cases.map(({ id, slot, provider }) => ({
+      id,
+      label: id,
+      provider,
+      slot,
+      kind: slot === 'copy' ? 'copy-text' : 'external-link',
+      onTrigger: calls.get(id)!,
+    }));
+    await act(async () => {
+      root!.render(createElement(ConversationDetailPane));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const click = vi.fn();
+    document.addEventListener('click', click);
+    for (const { id, key } of cases) {
+      const event = new window.KeyboardEvent('keydown', {
+        key: key.toLowerCase(),
+        code: 'Key' + key,
+        altKey: true,
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      await act(async () => {
+        document.dispatchEvent(event);
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(event.defaultPrevented, id).toBe(true);
+      expect(calls.get(id), id).toHaveBeenCalledTimes(1);
+    }
+    expect(click).not.toHaveBeenCalled();
+    document.removeEventListener('click', click);
+  });
+
+  it('ignores disabled/missing detail targets and never executes a stale conversation action', async () => {
+    shortcutFixture.bindings = {
+      'detail-copy-notion': 'Alt+Shift+N',
+      'detail-open-obsidian': 'Alt+Shift+B',
+      'detail-copy-feishu': 'Alt+Shift+F',
+    };
+    const notion = vi.fn(async () => {});
+    const obsidian = vi.fn(async () => {});
+    currentState.detailHeaderActions = [
+      {
+        id: 'copy-notion-link',
+        label: 'Notion',
+        slot: 'copy',
+        provider: 'notion',
+        kind: 'copy-text',
+        onTrigger: notion,
+      },
+      {
+        id: 'open-in-obsidian',
+        label: 'Obsidian',
+        slot: 'open',
+        provider: 'obsidian',
+        kind: 'open-target',
+        disabled: true,
+        onTrigger: obsidian,
+      },
+    ];
+    const dispatch = (letter: string) => {
+      const event = new window.KeyboardEvent('keydown', {
+        key: letter.toLowerCase(),
+        code: 'Key' + letter,
+        altKey: true,
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      act(() => document.dispatchEvent(event));
+      return event;
+    };
+    await act(async () => {
+      root!.render(createElement(ConversationDetailPane));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(dispatch('B').defaultPrevented).toBe(false);
+    expect(dispatch('F').defaultPrevented).toBe(false);
+    expect(obsidian).not.toHaveBeenCalled();
+    expect(dispatch('N').defaultPrevented).toBe(true);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(notion).toHaveBeenCalledTimes(1);
+
+    currentState.activeId = 12;
+    await act(async () => {
+      root!.render(createElement(ConversationDetailPane));
+      await Promise.resolve();
+    });
+    expect(dispatch('N').defaultPrevented).toBe(false);
+    expect(notion).toHaveBeenCalledTimes(1);
+
+    const nextNotion = vi.fn(async () => {});
+    currentState.selectedConversation = { ...currentState.selectedConversation, id: 12 } as any;
+    currentState.detailHeaderActions = [
+      {
+        id: 'copy-notion-link',
+        label: 'Notion for second item',
+        slot: 'copy',
+        provider: 'notion',
+        kind: 'copy-text',
+        onTrigger: nextNotion,
+      },
+    ];
+    await act(async () => {
+      root!.render(createElement(ConversationDetailPane));
+      await Promise.resolve();
+    });
+    expect(dispatch('N').defaultPrevented).toBe(true);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(nextNotion).toHaveBeenCalledTimes(1);
+    expect(notion).toHaveBeenCalledTimes(1);
+  });
+
+  it('serializes detail shortcuts, reports failure, and keeps editing focused inputs safe', async () => {
+    shortcutFixture.bindings = {
+      'detail-copy-notion': 'Alt+Shift+N',
+      'detail-copy-feishu': 'Alt+Shift+F',
+    };
+    let finish!: () => void;
+    const notion = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finish = resolve;
+          }),
+      )
+      .mockRejectedValueOnce(new Error('copy failed'))
+      .mockResolvedValue(undefined);
+    const feishu = vi.fn(async () => {});
+    currentState.detailHeaderActions = [
+      {
+        id: 'copy-notion-link',
+        label: 'Notion',
+        slot: 'copy',
+        provider: 'notion',
+        kind: 'copy-text',
+        onTrigger: notion,
+      },
+      {
+        id: 'copy-feishu-link',
+        label: 'Feishu',
+        slot: 'copy',
+        provider: 'feishu',
+        kind: 'copy-text',
+        onTrigger: feishu,
+      },
+    ];
+    const alertSpy = vi.fn();
+    Object.defineProperty(window, 'alert', { configurable: true, value: alertSpy });
+    const dispatch = (key: string, target: EventTarget = document) => {
+      const event = new window.KeyboardEvent('keydown', {
+        key: key.toLowerCase(),
+        code: 'Key' + key,
+        altKey: true,
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      act(() => target.dispatchEvent(event));
+      return event;
+    };
+    await act(async () => {
+      root!.render(createElement(ConversationDetailPane));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(dispatch('N').defaultPrevented).toBe(true);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(notion).toHaveBeenCalledTimes(1);
+    expect(dispatch('F').defaultPrevented).toBe(false);
+    expect(feishu).not.toHaveBeenCalled();
+    await act(async () => {
+      finish();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.focus();
+    expect(dispatch('N', input).defaultPrevented).toBe(false);
+    expect(notion).toHaveBeenCalledTimes(1);
+    input.remove();
+
+    expect(dispatch('N').defaultPrevented).toBe(true);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(alertSpy).toHaveBeenCalledWith('copy failed');
+    expect(dispatch('F').defaultPrevented).toBe(true);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(feishu).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows bound keys on the right of the existing Detail More menu, without a More-trigger shortcut', async () => {
+    shortcutFixture.bindings = {
+      'detail-copy-notion': 'Alt+Shift+N',
+      'detail-open-original': 'Alt+Shift+O',
+      'detail-open-notion': 'Alt+Shift+P',
+      'copy-markdown': 'Alt+Shift+M',
+    };
+    currentState.detailHeaderActions = [
+      {
+        id: 'copy-notion-link',
+        label: 'Copy Notion link',
+        slot: 'copy',
+        provider: 'notion',
+        kind: 'copy-text',
+        onTrigger: vi.fn(async () => {}),
+      },
+      {
+        id: 'open-in-notion',
+        label: 'Open in Notion',
+        slot: 'open',
+        provider: 'notion',
+        kind: 'external-link',
+        onTrigger: vi.fn(async () => {}),
+      },
+      {
+        id: 'copy-full-markdown',
+        label: 'Copy full Markdown',
+        slot: 'tools',
+        provider: 'local',
+        kind: 'copy-text',
+        onTrigger: vi.fn(async () => {}),
+      },
+      {
+        id: 'open-original',
+        label: 'Open original',
+        slot: 'tools',
+        provider: 'source',
+        kind: 'external-link',
+        onTrigger: vi.fn(async () => {}),
+      },
+    ];
+    await act(async () => {
+      root!.render(createElement(ConversationDetailPane));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(document.querySelector('[data-detail-header-primary-copy]')?.getAttribute('data-tooltip-content')).toContain(
+      'Alt + Shift + N',
+    );
+    const more = document.querySelector<HTMLButtonElement>('[data-detail-header-more-trigger="true"]')!;
+    expect(more.getAttribute('data-tooltip-content')).toBe('moreButton');
+    await act(async () => {
+      more.click();
+      await Promise.resolve();
+    });
+    const entries = Array.from(document.querySelectorAll('[role="menuitem"]')) as HTMLButtonElement[];
+    const value = (label: string) => entries.find((el) => el.textContent?.includes(label));
+    expect(value('Open in Notion')?.querySelector('.webclipper-menu-shortcut')?.textContent).toBe('Alt + Shift + P');
+    expect(value('Copy full Markdown')?.querySelector('.webclipper-menu-shortcut')?.textContent).toBe(
+      'Alt + Shift + M',
+    );
+    expect(value('Open original')?.querySelector('.webclipper-menu-shortcut')?.textContent).toBe('Alt + Shift + O');
+    expect(value('Open original')?.querySelector('.webclipper-menu-shortcut')?.className).toContain('tw-ml-auto');
+    expect(entries.every((item) => !item.hasAttribute('data-tooltip-content'))).toBe(true);
+  });
+
+  it('keeps existing copy and More controls but removes their retired shortcut hints', async () => {
     currentState.detailHeaderActions = [
       {
         id: 'copy-notion-link',
@@ -410,9 +704,9 @@ describe('ConversationDetailPane header actions', () => {
     });
 
     const copy = document.querySelector('[data-detail-header-primary-copy="true"]');
-    expect(copy?.getAttribute('data-tooltip-content')).toBe('Copy Notion link\nAlt + Shift + C');
+    expect(copy?.getAttribute('data-tooltip-content')).toBe('Copy Notion link');
     const more = document.querySelector('[data-detail-header-more-trigger="true"]') as HTMLButtonElement;
-    expect(more?.getAttribute('data-tooltip-content')).toBe('moreButton\nAlt + Shift + M');
+    expect(more?.getAttribute('data-tooltip-content')).toBe('moreButton');
 
     await act(async () => {
       more.click();
@@ -421,7 +715,7 @@ describe('ConversationDetailPane header actions', () => {
     const original = Array.from(document.querySelectorAll('[role="menuitem"]')).find((item) =>
       item.textContent?.includes('Open original'),
     );
-    expect(original?.getAttribute('data-tooltip-content')).toBe('Alt + Shift + O');
+    expect(original?.getAttribute('data-tooltip-content')).toBeNull();
   });
 
   it('renders one Copy dropdown for multiple providers and routes each item correctly', async () => {
@@ -965,7 +1259,7 @@ describe('ConversationDetailPane header actions', () => {
     expect(cacheButton).toBeTruthy();
     const moreMenu = document.querySelector('[role="menu"][aria-label="moreButton"]') as HTMLElement | null;
     expect(moreMenu).toBeTruthy();
-    expect(moreMenu?.className || '').toContain('tw-w-[214px]');
+    expect(moreMenu?.className || '').toContain('tw-w-[260px]');
     const textCountRow = document.querySelector('[data-detail-text-count-row="true"]') as HTMLElement | null;
     const imageCountRow = document.querySelector('[data-detail-image-count-row="true"]') as HTMLElement | null;
     expect(textCountRow).toBeTruthy();

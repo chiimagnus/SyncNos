@@ -351,7 +351,7 @@ describe('DetailHeaderActionBar', () => {
     }
   });
 
-  it('shows the current primary-copy shortcut and individual target bindings without duplicating visible menu labels', async () => {
+  it('shows each copy destination shortcut in its tooltip and right-aligned menu hint', async () => {
     const notion = {
       id: 'copy-notion-link',
       label: 'Copy Notion link',
@@ -362,9 +362,8 @@ describe('DetailHeaderActionBar', () => {
     };
     const feishu = { ...notion, id: 'copy-feishu-link', label: 'Copy Feishu link', provider: 'feishu' as const };
     const keys: Record<string, string> = {
-      'detail-copy-link': 'Alt+Shift+C',
-      'detail-copy-notion': 'Ctrl+Alt+N',
-      'detail-copy-feishu': '',
+      'detail-copy-notion': 'Alt + Shift + N',
+      'detail-copy-feishu': 'Alt + Shift + F',
     };
     const render = () => {
       act(() => {
@@ -381,7 +380,8 @@ describe('DetailHeaderActionBar', () => {
 
     render();
     const primary = document.querySelector('[data-detail-header-primary-copy="true"]') as HTMLButtonElement;
-    expect(primary.getAttribute('data-tooltip-content')).toBe('Copy Notion link\nAlt+Shift+C');
+    expect(primary.getAttribute('data-tooltip-content')).toBe('Copy Notion link\nAlt + Shift + N');
+    expect(primary.getAttribute('data-tooltip-shortcut')).toBe('Alt + Shift + N');
     const dropdown = document.querySelector('[aria-haspopup="menu"]') as HTMLButtonElement;
     expect(dropdown.getAttribute('data-tooltip-content')).toBe('Copy link');
 
@@ -391,13 +391,18 @@ describe('DetailHeaderActionBar', () => {
     });
     const items = Array.from(document.querySelectorAll('[role="menuitem"]')) as HTMLButtonElement[];
     expect(items[0]?.textContent).toContain('Copy Notion link');
-    expect(items[0]?.getAttribute('data-tooltip-content')).toBe('Ctrl+Alt+N');
+    expect(items[0]?.getAttribute('data-tooltip-content')).toBeNull();
     expect(items[1]?.getAttribute('data-tooltip-content')).toBeNull();
+    expect(items[0]?.querySelector('.webclipper-menu-shortcut')?.textContent).toBe('Alt + Shift + N');
+    expect(items[1]?.querySelector('.webclipper-menu-shortcut')?.textContent).toBe('Alt + Shift + F');
+    expect(items[0]?.querySelector('.webclipper-menu-shortcut')?.className).toContain('tw-ml-auto');
 
-    keys['detail-copy-link'] = '';
-    keys['detail-copy-notion'] = 'Ctrl+Alt+R';
+    keys['detail-copy-notion'] = 'Ctrl + Alt + R';
+    delete keys['detail-copy-feishu'];
     render();
-    expect(primary.getAttribute('data-tooltip-content')).toBe('Copy Notion link\nCtrl+Alt+R');
+    expect(primary.getAttribute('data-tooltip-content')).toBe('Copy Notion link\nCtrl + Alt + R');
+    expect(items[0]?.querySelector('.webclipper-menu-shortcut')?.textContent).toBe('Ctrl + Alt + R');
+    expect(items[1]?.querySelector('.webclipper-menu-shortcut')).toBeNull();
   });
 
   it('clears stale success feedback before a later action that fails', async () => {

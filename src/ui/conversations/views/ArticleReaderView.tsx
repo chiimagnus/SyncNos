@@ -437,10 +437,8 @@ export function ArticleReaderView({
 
   const shortcut = useInAppShortcuts({
     'reader-play-pause': () => {
-      if (features.narration) toolbarNarration.toggle();
-    },
-    'reader-stop': () => {
-      if (features.narration && narration.state !== 'idle') narration.stop();
+      if (!features.narration) return false;
+      toolbarNarration.toggle();
     },
   });
 

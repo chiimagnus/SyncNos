@@ -597,48 +597,18 @@ export function ConversationListPane({
     };
   }, [armedDeleteKey, deleteConfirm]);
 
-  const clickButton = (id: string) => {
-    const button = document.getElementById(id);
-    if (button instanceof HTMLElement && !button.matches(':disabled')) button.click();
-  };
-  const activeListRow = () => {
-    const id = Number(effectiveActiveRowId);
-    return filteredItems.find((item) => Number(item.id) === id) || null;
-  };
   const moveSelection = (step: -1 | 1) => {
-    if (!visibleIds.length) return;
+    if (!visibleIds.length) return false;
     const current = visibleIds.indexOf(Number(effectiveActiveRowId));
     const index = current < 0 ? (step > 0 ? 0 : visibleIds.length - 1) : current + step;
-    if (index >= 0 && index < visibleIds.length) activateRow(visibleIds[index]!);
+    if (index < 0 || index >= visibleIds.length) return false;
+    activateRow(visibleIds[index]!);
+    return true;
   };
 
   const shortcut = useInAppShortcuts({
-    'filter-source': () => {
-      if (!hasSelection) clickButton('sourceFilterSelect');
-    },
-    'filter-site': () => {
-      if (!hasSelection && listSourceFilterKey === 'web') clickButton('siteFilterSelect');
-    },
-    'select-loaded': () => clickButton('chkSelectAll'),
     'next-conversation': () => moveSelection(1),
     'previous-conversation': () => moveSelection(-1),
-    'copy-list-link': () => {
-      const row = activeListRow();
-      if (!row) return;
-      document.querySelector<HTMLButtonElement>(`[data-conversation-source-link="${row.id}"]`)?.click();
-    },
-    'delete-selected': () => {
-      if (hasSelection && !actionBusy && !syncingAny) clickButton('btnDelete');
-    },
-    'export-menu': () => {
-      if (hasSelection && !actionBusy) clickButton('btnExport');
-    },
-    'sync-menu': () => {
-      if (!actionBusy && hasSelection) clickButton(singleSyncProvider ? 'btnSyncProvider' : 'btnSyncTo');
-    },
-    'open-insights': () => {
-      if (!hasSelection) onOpenInsightsSection?.();
-    },
   });
 
   const sourceFilterActive =
@@ -778,7 +748,7 @@ export function ConversationListPane({
                       aria-label={`${t('detailHeaderCopyLinkMenuLabel')}: ${sourceTag.label}`}
                       {...tooltipAttrsWithShortcut(
                         `${t('detailHeaderCopyLinkMenuLabel')}: ${sourceTag.label}`,
-                        isActive && safeUrl ? shortcut('copy-list-link') : '',
+                        isActive && safeUrl ? shortcut('copy-original-link') : '',
                       )}
                       data-conversation-source-link={String(id)}
                       disabled={!safeUrl}
@@ -865,10 +835,7 @@ export function ConversationListPane({
             <label
               className="tw-inline-flex tw-items-center tw-justify-center tw-text-[var(--text-secondary)]"
               aria-label={t('selectAll')}
-              {...tooltipAttrsWithShortcut(
-                hasSelection ? loadedSelectionTooltip : t('selectAll'),
-                shortcut('select-loaded'),
-              )}
+              {...tooltipAttrsWithShortcut(hasSelection ? loadedSelectionTooltip : t('selectAll'), '')}
             >
               <input
                 ref={selectAllRef}
@@ -890,7 +857,7 @@ export function ConversationListPane({
               disabled={hasSelection}
               ariaLabel={t('sourceFilterAria')}
               tooltip={t('sourceFilterAria')}
-              tooltipShortcut={shortcut('filter-source')}
+              tooltipShortcut={''}
               side="top"
               align="start"
               minWidth={150}
@@ -915,7 +882,7 @@ export function ConversationListPane({
                 disabled={hasSelection}
                 ariaLabel={t('insightArticleDomainsTitle')}
                 tooltip={t('insightArticleDomainsTitle')}
-                tooltipShortcut={shortcut('filter-site')}
+                tooltipShortcut={''}
                 side="top"
                 align="start"
                 minWidth={160}
@@ -940,10 +907,7 @@ export function ConversationListPane({
                   : 'tw-max-w-0 tw-opacity-0 tw-translate-x-2 tw-scale-[0.98] tw-pointer-events-none',
               ].join(' ')}
             >
-              <span
-                className="tw-inline-flex"
-                {...tooltipAttrsWithShortcut(hasSelection ? deleteTooltip : '', shortcut('delete-selected'))}
-              >
+              <span className="tw-inline-flex" {...tooltipAttrsWithShortcut(hasSelection ? deleteTooltip : '', '')}>
                 <button
                   id="btnDelete"
                   type="button"
@@ -987,10 +951,7 @@ export function ConversationListPane({
                 trigger={(triggerProps) => (
                   <span
                     className="tw-inline-flex"
-                    {...tooltipAttrsWithShortcut(
-                      hasSelection ? exportTooltip : '',
-                      hasSelection ? shortcut('export-menu') : '',
-                    )}
+                    {...tooltipAttrsWithShortcut(hasSelection ? exportTooltip : '', hasSelection ? '' : '')}
                   >
                     <button {...triggerProps} id="btnExport" className={actionButton}>
                       <span className="tw-leading-none">{t('exportButton')}</span>
@@ -1033,10 +994,7 @@ export function ConversationListPane({
               {singleSyncProvider ? (
                 <span
                   className="tw-inline-flex"
-                  {...tooltipAttrsWithShortcut(
-                    hasSelection ? singleSyncTooltip : '',
-                    hasSelection ? shortcut('sync-menu') : '',
-                  )}
+                  {...tooltipAttrsWithShortcut(hasSelection ? singleSyncTooltip : '', hasSelection ? '' : '')}
                 >
                   <button
                     id="btnSyncProvider"
@@ -1060,10 +1018,7 @@ export function ConversationListPane({
                   trigger={(triggerProps) => (
                     <span
                       className="tw-inline-flex"
-                      {...tooltipAttrsWithShortcut(
-                        hasSelection ? syncMenuTooltip : '',
-                        hasSelection ? shortcut('sync-menu') : '',
-                      )}
+                      {...tooltipAttrsWithShortcut(hasSelection ? syncMenuTooltip : '', hasSelection ? '' : '')}
                     >
                       <button {...triggerProps} id="btnSyncTo" className={actionButton}>
                         <span className="tw-leading-none">{syncMenuButtonLabel}</span>
@@ -1125,7 +1080,7 @@ export function ConversationListPane({
                 type="button"
                 id="stats"
                 aria-label={t('section_aboutyou_label')}
-                {...tooltipAttrsWithShortcut(t('section_aboutyou_label'), shortcut('open-insights'))}
+                {...tooltipAttrsWithShortcut(t('section_aboutyou_label'), '')}
                 onClick={() => onOpenInsightsSection()}
                 disabled={hasSelection}
                 className={[

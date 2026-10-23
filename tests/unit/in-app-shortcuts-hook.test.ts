@@ -16,7 +16,7 @@ import { useInAppShortcuts } from '@viewmodels/shortcuts/useInAppShortcuts';
 let dom: JSDOM;
 let root: ReactDOM.Root | null;
 let listener: ((changes: Record<string, unknown>, area: string) => void) | null;
-const handlers = { 'toggle-sidebar': vi.fn(), 'filter-source': vi.fn(), 'open-settings': vi.fn() };
+const handlers = { 'toggle-sidebar': vi.fn(), 'copy-original-link': vi.fn(), 'open-settings': vi.fn() };
 
 function Harness({ enabled = true }: { enabled?: boolean }) {
   useInAppShortcuts(handlers as Partial<Record<InAppShortcutAction, () => void>>, enabled);
@@ -91,7 +91,10 @@ describe('in-app keydown dispatch', () => {
     sendKey('\\', 'Backslash', { ctrlKey: true, repeat: true });
     sendKey('\\', 'Backslash', { altKey: true });
     expect(handlers['toggle-sidebar']).toHaveBeenCalledTimes(1);
-    expect(handlers['filter-source']).not.toHaveBeenCalled();
+    expect(handlers['copy-original-link']).not.toHaveBeenCalled();
+    const settings = sendKey('<', 'Comma', { ctrlKey: true, shiftKey: true });
+    expect(settings.defaultPrevented).toBe(true);
+    expect(handlers['open-settings']).toHaveBeenCalledTimes(1);
   });
 
   it('ignores editable fields, composition and any modal, without stealing keydown', async () => {
@@ -126,7 +129,7 @@ describe('in-app keydown dispatch', () => {
           [IN_APP_SHORTCUT_STORAGE_KEY]: {
             newValue: {
               'toggle-sidebar': '',
-              'filter-source': 'Mod+Alt+Q',
+              'copy-original-link': 'Mod+Alt+Q',
             },
           },
         },
@@ -137,7 +140,7 @@ describe('in-app keydown dispatch', () => {
     sendKey('\\', 'Backslash', { ctrlKey: true });
     expect(handlers['toggle-sidebar']).not.toHaveBeenCalled();
     sendKey('q', 'KeyQ', { altKey: true, ctrlKey: true });
-    expect(handlers['filter-source']).toHaveBeenCalledTimes(1);
+    expect(handlers['copy-original-link']).toHaveBeenCalledTimes(1);
   });
 
   it('stays disabled when requested and removes listeners on unmount', async () => {

@@ -21,13 +21,15 @@ Control the sidebar, local library, detail actions, reader, and more. These keys
 
 An assigned binding always has a visible **×** button to clear it. Press **Esc** to cancel recording, or **Restore defaults** to reset all in-app shortcuts.
 
-For example, the sidebar defaults to `⌘ + \` on macOS and `Ctrl + \` on Windows/Linux. Key labels follow the operating system, without separate left/right modifiers. **Backspace** and **Delete** can also be assigned.
+Default keys: **Settings `⌘ + ⇧ + ,`** and sidebar `⌘ + \` on macOS (`Ctrl + Shift + ,` and `Ctrl + \` on Windows/Linux). Other in-app actions are unassigned by default. Key labels adapt to the system without left/right modifier distinctions.
 
-**Copy full Markdown** has one shortcut. It copies the current library entry in the list, or the open content in the detail pane; in a two-column layout, keyboard focus determines the target.
+There are **17 configurable in-app actions**: nine general, library, and reader actions, plus eight detail actions. The detail actions copy Notion / Feishu / GitHub links, or open the original URL or a Notion / Obsidian / Feishu / GitHub target. A detail shortcut works only when its destination is available for the current conversation. Unassigned actions never consume keys.
 
-**Export** and **Sync** have shortcuts for opening their menus; select the format or destination in the menu. Reader typography, theme, and narration settings stay in the More menu, while play/pause and stop can still have shortcuts.
+Item shortcuts directly perform the action on the current list or detail item, **not the multi-select toolbar**. In two-column mode, keyboard focus determines the target. Unavailable actions do not capture keys; deletion requires confirmation. Bulk export, sync, and delete stay in the multi-select toolbar. The existing detail **More** menu remains; no per-item menus are added.
 
-Hover over icon controls to see active shortcuts on a separate, subtler line below their descriptions.
+Insights, Back, domain distribution, and **More** buttons have no in-app shortcuts. Saving the current page is a browser-level shortcut only.
+
+Icon tooltips show assigned shortcuts on a separate, subtler line. The Copy destinations dropdown and the existing detail **More** menu show assigned keys at the right of each action in the same subdued style; unassigned actions show no key hint.
 
 ## A shortcut does not work?
 
