@@ -20,7 +20,7 @@ Buttons such as **More**, Back, Insights, batch-selection actions, and reader la
 2. Click the binding button and press your key combination.
 3. Resolve conflicts beside the action, use **×** to clear a binding, **Esc** to cancel recording, or **Restore defaults** to reset.
 
-Defaults: **Settings `⌘ + ⇧ + ,`**, **sidebar `⌘ + \\`** on macOS; use Ctrl in place of ⌘ on Windows/Linux. Other actions start unassigned.
+Defaults on macOS: **Settings `⌘ + ⇧ + ,`**, **sidebar `⌘ + \\`**, **previous `⌘ + ⌥ + ↑`**, **next `⌘ + ⌥ + ↓`**, **copy original link `⌥ + ⇧ + L`**, and **export as JSON `⌥ + ⇧ + J`**. Use Ctrl instead of ⌘ and Alt instead of ⌥ on Windows/Linux. Other actions start unassigned.
 
 Icon tooltips show assigned keys in a subtler second line. The copy destination menu and detail **More** menu show keys on the right of each action. Unassigned keys are hidden. Copy shortcuts provide success feedback.
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Copy, ExternalLink, FileJson, FileText, ImageDown } from 'lucide-react';
+import { Copy, FileJson, FileText, Link2 } from 'lucide-react';
 
 import type { DetailHeaderAction } from '@services/integrations/detail-header-action-types';
 import { DETAIL_ACTION_SHORTCUTS, type InAppShortcutAction } from '@services/shortcuts/in-app-shortcuts';
@@ -133,12 +133,11 @@ export function DetailHeaderActionBar({
     }
     const logo = providerLogo(action);
     if (logo) return logo;
-    if (action.kind === 'copy-text') return <Copy size={16} strokeWidth={2} aria-hidden="true" />;
+    if (action.id === 'copy-original-link') return <Link2 size={16} strokeWidth={2} aria-hidden="true" />;
     if (action.id === 'export-markdown') return <FileText size={16} strokeWidth={2} aria-hidden="true" />;
     if (action.id === 'export-json') return <FileJson size={16} strokeWidth={2} aria-hidden="true" />;
-    if (action.provider === 'source' && action.kind === 'external-link')
-      return <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />;
-    return <ImageDown size={16} strokeWidth={2} aria-hidden="true" />;
+    if (action.kind === 'copy-text') return <Copy size={16} strokeWidth={2} aria-hidden="true" />;
+    return null;
   };
 
   if (inlineMenuItems) {
@@ -158,8 +157,13 @@ export function DetailHeaderActionBar({
               closeMenuOnActionTrigger?.();
             }}
           >
-            <span className="tw-inline-flex tw-items-center tw-gap-1.5">
-              {resolveActionIcon(action)}
+            <span className="tw-inline-flex tw-items-center tw-gap-2">
+              <span
+                className="tw-inline-flex tw-h-4 tw-w-4 tw-shrink-0 tw-items-center tw-justify-center"
+                aria-hidden="true"
+              >
+                {resolveActionIcon(action)}
+              </span>
               <span className="tw-whitespace-normal tw-break-words">{action.label}</span>
             </span>
             {actionShortcut(action) ? (

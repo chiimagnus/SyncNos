@@ -611,13 +611,10 @@ describe('ConversationDetailPane header actions', () => {
     expect(feishu).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps original-link copy exclusively in More, with export format icons and configurable shortcuts', async () => {
-    shortcutFixture.bindings = {
-      'detail-copy-original': 'Alt+Shift+L',
-      'detail-export-markdown': 'Alt+Shift+E',
-      'detail-export-json': 'Alt+Shift+J',
-    };
+  it('uses default keys for original-link copy and JSON export in More', async () => {
+    shortcutFixture.bindings = { 'detail-export-markdown': 'Alt+Shift+E' };
     const copyOriginal = vi.fn(async () => {});
+    const exportJson = vi.fn(async () => {});
     currentState.detailHeaderActions = [
       {
         id: 'copy-original-link',
@@ -641,7 +638,7 @@ describe('ConversationDetailPane header actions', () => {
         slot: 'tools',
         provider: 'local',
         kind: 'open-target',
-        onTrigger: vi.fn(async () => {}),
+        onTrigger: exportJson,
       },
     ];
 
@@ -661,7 +658,9 @@ describe('ConversationDetailPane header actions', () => {
     const original = document.querySelector<HTMLButtonElement>('[role="menuitem"][aria-label="Copy original link"]')!;
     const markdown = document.querySelector<HTMLButtonElement>('[role="menuitem"][aria-label="Export as Markdown"]')!;
     const json = document.querySelector<HTMLButtonElement>('[role="menuitem"][aria-label="Export as JSON"]')!;
-    expect(original?.querySelector('.lucide-copy')).toBeTruthy();
+    expect(original?.querySelector('.lucide-link-2')).toBeTruthy();
+    expect(original?.querySelector('.lucide-copy')).toBeFalsy();
+    expect(original?.querySelector('span[aria-hidden="true"]')?.className).toContain('tw-w-4');
     expect(original?.querySelector('.webclipper-menu-shortcut')?.textContent).toBe('Alt + Shift + L');
     expect(markdown?.querySelector('.lucide-file-text')).toBeTruthy();
     expect(json?.querySelector('.lucide-file-json')).toBeTruthy();
@@ -691,6 +690,22 @@ describe('ConversationDetailPane header actions', () => {
     expect(keyEvent.defaultPrevented).toBe(true);
     expect(copyOriginal).toHaveBeenCalledTimes(2);
     expect(document.querySelector('[role="status"]')?.textContent).toBe('Copied');
+
+    const jsonShortcut = new window.KeyboardEvent('keydown', {
+      key: 'j',
+      code: 'KeyJ',
+      altKey: true,
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => document.dispatchEvent(jsonShortcut));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(jsonShortcut.defaultPrevented).toBe(true);
+    expect(exportJson).toHaveBeenCalledTimes(1);
   });
 
   it('keeps provider copy in the top toolbar while moving original copy to More', async () => {

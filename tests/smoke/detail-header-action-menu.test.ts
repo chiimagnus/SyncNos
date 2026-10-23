@@ -262,6 +262,61 @@ describe('DetailHeaderActionBar', () => {
     expect(disabledTrigger).not.toHaveBeenCalled();
   });
 
+  it('distinguishes link and Markdown copying while keeping low-frequency actions icon-free', () => {
+    const create = (
+      id: string,
+      label: string,
+      provider: string,
+      kind: 'copy-text' | 'open-target' | 'external-link',
+      slot: 'copy' | 'open' | 'tools' = 'tools',
+    ) => ({
+      id,
+      label,
+      provider,
+      kind,
+      slot,
+      onTrigger: vi.fn(async () => {}),
+    });
+    act(() => {
+      root!.render(
+        createElement(DetailHeaderActionBar, {
+          actions: [
+            create('open-in-notion', 'Open in Notion', 'notion', 'external-link', 'open'),
+            create('cache-images', 'Cache images', 'local', 'open-target'),
+            create('copy-original-link', 'Copy original link', 'source', 'copy-text'),
+            create('copy-full-markdown', 'Copy full Markdown', 'local', 'copy-text'),
+            create('export-markdown', 'Export as Markdown', 'local', 'open-target'),
+            create('export-json', 'Export as JSON', 'local', 'open-target'),
+            create('open-original', 'Open original', 'source', 'external-link'),
+            create('future-utility', 'Other action', 'local', 'open-target'),
+          ],
+          buttonClassName,
+          inlineMenuItems: true,
+        }),
+      );
+    });
+
+    const items = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
+    const entry = (label: string) => items.find((item) => item.getAttribute('aria-label') === label)!;
+    for (const label of ['Cache images', 'Open original', 'Other action']) {
+      const button = entry(label);
+      expect(button.querySelector('svg, img')).toBeFalsy();
+      const iconSlot = button.querySelector('span[aria-hidden="true"]');
+      expect(iconSlot?.className).toContain('tw-w-4');
+      expect(iconSlot?.className).toContain('tw-shrink-0');
+    }
+    expect(entry('Copy original link').querySelector('.lucide-link-2')).toBeTruthy();
+    expect(entry('Copy original link').querySelector('.lucide-copy')).toBeFalsy();
+    expect(entry('Copy full Markdown').querySelector('.lucide-copy')).toBeTruthy();
+    expect(entry('Copy full Markdown').querySelector('.lucide-link-2')).toBeFalsy();
+    expect(entry('Open in Notion').querySelector('[data-provider-logo="notion"]')).toBeTruthy();
+    expect(entry('Export as Markdown').querySelector('.lucide-file-text')).toBeTruthy();
+    expect(entry('Export as JSON').querySelector('.lucide-file-json')).toBeTruthy();
+    expect(items.every((item) => item.querySelector('span[aria-hidden="true"]')?.className.includes('tw-w-4'))).toBe(
+      true,
+    );
+  });
+
   it('reports an error instead of swallowing a failed action trigger', async () => {
     const alertSpy = vi.fn();
     Object.defineProperty(globalThis.window, 'alert', {

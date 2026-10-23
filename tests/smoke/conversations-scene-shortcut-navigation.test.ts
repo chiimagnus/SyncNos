@@ -40,12 +40,7 @@ vi.mock('@viewmodels/conversations/conversations-context', () => ({
   }),
 }));
 vi.mock('@services/shared/storage', () => ({
-  storageGet: async () => ({
-    in_app_shortcuts_v3: {
-      'previous-conversation': 'Alt+Shift+K',
-      'next-conversation': 'Alt+Shift+J',
-    },
-  }),
+  storageGet: async () => ({ in_app_shortcuts_v3: {} }),
   storageOnChanged: () => () => {},
 }));
 
@@ -54,12 +49,12 @@ import { ConversationsScene } from '@ui/conversations/ConversationsScene';
 let dom: JSDOM;
 let root: ReactDOM.Root | null;
 
-function shortcut(key: 'j' | 'k') {
+function shortcut(key: 'ArrowUp' | 'ArrowDown') {
   const event = new window.KeyboardEvent('keydown', {
     key,
-    code: 'Key' + key.toUpperCase(),
+    code: key,
     altKey: true,
-    shiftKey: true,
+    metaKey: true,
     bubbles: true,
     cancelable: true,
   });
@@ -80,6 +75,7 @@ beforeEach(() => {
     url: 'https://example.com/',
     pretendToBeVisual: true,
   });
+  Object.defineProperty(dom.window.navigator, 'platform', { configurable: true, value: 'MacIntel' });
   for (const [name, value] of Object.entries({
     window: dom.window,
     document: dom.window.document,
@@ -119,41 +115,51 @@ afterEach(async () => {
 describe('previous and next conversation shortcuts', () => {
   it('navigates the current loaded list in order, without wrapping at its edges', async () => {
     await render();
-    expect(shortcut('k').defaultPrevented).toBe(false);
+    const altOnly = new window.KeyboardEvent('keydown', {
+      key: 'ArrowDown',
+      code: 'ArrowDown',
+      altKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => document.dispatchEvent(altOnly));
+    expect(altOnly.defaultPrevented).toBe(false);
     expect(activateLoadedConversation).not.toHaveBeenCalled();
-    expect(shortcut('j').defaultPrevented).toBe(true);
+    expect(shortcut('ArrowUp').defaultPrevented).toBe(false);
+    expect(activateLoadedConversation).not.toHaveBeenCalled();
+    expect(shortcut('ArrowDown').defaultPrevented).toBe(true);
     expect(activateLoadedConversation).toHaveBeenLastCalledWith(22);
 
     fixture.activeId = 22;
     await render();
-    expect(shortcut('k').defaultPrevented).toBe(true);
+    expect(shortcut('ArrowUp').defaultPrevented).toBe(true);
     expect(activateLoadedConversation).toHaveBeenLastCalledWith(11);
-    expect(shortcut('j').defaultPrevented).toBe(true);
+    expect(shortcut('ArrowDown').defaultPrevented).toBe(true);
     expect(activateLoadedConversation).toHaveBeenLastCalledWith(33);
 
     fixture.activeId = 33;
     await render();
-    expect(shortcut('j').defaultPrevented).toBe(false);
+    expect(shortcut('ArrowDown').defaultPrevented).toBe(false);
     expect(activateLoadedConversation).toHaveBeenCalledTimes(3);
   });
 
   it('does not navigate when selecting multiple rows or when the active item is outside the list', async () => {
     fixture.selectedIds = [11, 22];
     await render();
-    expect(shortcut('j').defaultPrevented).toBe(false);
+    expect(shortcut('ArrowDown').defaultPrevented).toBe(false);
     fixture.selectedIds = [];
     fixture.activeId = 999;
     await render();
-    expect(shortcut('k').defaultPrevented).toBe(false);
+    expect(shortcut('ArrowUp').defaultPrevented).toBe(false);
     expect(activateLoadedConversation).not.toHaveBeenCalled();
   });
 
   it('starts at the first or last loaded item when there is no active conversation', async () => {
     fixture.activeId = null;
     await render();
-    expect(shortcut('j').defaultPrevented).toBe(true);
+    expect(shortcut('ArrowDown').defaultPrevented).toBe(true);
     expect(activateLoadedConversation).toHaveBeenLastCalledWith(11);
-    expect(shortcut('k').defaultPrevented).toBe(true);
+    expect(shortcut('ArrowUp').defaultPrevented).toBe(true);
     expect(activateLoadedConversation).toHaveBeenLastCalledWith(33);
   });
 
@@ -161,12 +167,12 @@ describe('previous and next conversation shortcuts', () => {
     narrow.value = true;
     await render();
     expect(document.querySelector('[data-test-list]')).toBeTruthy();
-    expect(shortcut('j').defaultPrevented).toBe(true);
+    expect(shortcut('ArrowDown').defaultPrevented).toBe(true);
     expect(activateLoadedConversation).toHaveBeenLastCalledWith(22);
     expect(document.querySelector('[data-test-detail]')).toBeTruthy();
     fixture.activeId = 22;
     await render();
-    expect(shortcut('k').defaultPrevented).toBe(true);
+    expect(shortcut('ArrowUp').defaultPrevented).toBe(true);
     expect(activateLoadedConversation).toHaveBeenLastCalledWith(11);
     expect(document.querySelector('[data-test-detail]')).toBeTruthy();
   });

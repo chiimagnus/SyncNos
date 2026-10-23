@@ -78,8 +78,10 @@ describe('in-app shortcut contract', () => {
     expect(Object.values(DETAIL_ACTION_SHORTCUTS).every((id) => ids.includes(id))).toBe(true);
     expect(defaults['open-settings']).toBe('Mod+Shift+Comma');
     expect(defaults['detail-export-markdown']).toBe('');
-    expect(defaults['detail-export-json']).toBe('');
-    expect(defaults['detail-copy-original']).toBe('');
+    expect(defaults['previous-conversation']).toBe('Mod+Alt+ArrowUp');
+    expect(defaults['next-conversation']).toBe('Mod+Alt+ArrowDown');
+    expect(defaults['detail-copy-original']).toBe('Alt+Shift+L');
+    expect(defaults['detail-export-json']).toBe('Alt+Shift+J');
     expect(ids).toContain('detail-copy-markdown');
     expect(ids).toContain('detail-comments');
     expect(ids).toContain('reader-play-pause');
@@ -177,6 +179,10 @@ describe('in-app shortcut contract', () => {
     expect(shortcutFromKeyEvent({ ...event, key: '<', code: 'Comma', metaKey: false, ctrlKey: true }, 'windows')).toBe(
       'Mod+Shift+Comma',
     );
+    expect(displayInAppShortcut('Mod+Alt+ArrowUp', 'mac')).toBe('⌘ + ⌥ + ↑');
+    expect(displayInAppShortcut('Mod+Alt+ArrowDown', 'windows')).toBe('Ctrl + Alt + ↓');
+    expect(displayInAppShortcut('Alt+Shift+L', 'mac')).toBe('⌥ + ⇧ + L');
+    expect(displayInAppShortcut('Alt+Shift+J', 'windows')).toBe('Alt + Shift + J');
     expect(displayInAppShortcut('Mod+Shift+Comma', 'mac')).toBe('⌘ + ⇧ + ,');
     expect(displayInAppShortcut('Mod+Shift+Comma', 'windows')).toBe('Ctrl + Shift + ,');
     expect(shortcutFromKeyEvent({ ...event, key: '∫', code: 'KeyB', metaKey: false, altKey: true }, 'mac')).toBe(

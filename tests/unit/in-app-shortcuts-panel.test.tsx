@@ -103,6 +103,18 @@ describe('in-app shortcut editor', () => {
     expect(document.querySelectorAll('details').length).toBe(4);
     expect(document.querySelectorAll('button[aria-label^="Set shortcut: "]').length).toBe(20);
     expect(document.querySelector(toggleSelector)?.textContent).toContain('⌘ + \\');
+    expect(document.querySelector('button[aria-label^="Set shortcut: Previous conversation"]')?.textContent).toContain(
+      '⌘ + ⌥ + ↑',
+    );
+    expect(document.querySelector('button[aria-label^="Set shortcut: Next conversation"]')?.textContent).toContain(
+      '⌘ + ⌥ + ↓',
+    );
+    expect(document.querySelector('button[aria-label^="Set shortcut: Copy original link"]')?.textContent).toContain(
+      '⌥ + ⇧ + L',
+    );
+    expect(document.querySelector('button[aria-label^="Set shortcut: Export as JSON"]')?.textContent).toContain(
+      '⌥ + ⇧ + J',
+    );
     expect(document.querySelector(toggleSelector)?.querySelectorAll('kbd')).toHaveLength(1);
     expect(document.querySelector(toggleSelector)?.classList.contains('webclipper-btn')).toBe(true);
     const clear = document.querySelector<HTMLButtonElement>(clearSelector);
