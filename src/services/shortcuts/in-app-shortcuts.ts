@@ -42,8 +42,8 @@ export const IN_APP_SHORTCUT_ACTIONS = [
   { id: 'detail-open-feishu', group: 'detail', labelKey: 'detailHeaderOpenInFeishu', defaultKey: '' },
   { id: 'detail-open-github', group: 'detail', labelKey: 'detailHeaderOpenInGithub', defaultKey: '' },
   { id: 'detail-copy-markdown', group: 'detail', labelKey: 'copyFullMarkdown', defaultKey: '' },
-  { id: 'detail-export-markdown', group: 'detail', labelKey: 'markdownExport', defaultKey: '' },
-  { id: 'detail-export-json', group: 'detail', labelKey: 'jsonExport', defaultKey: '' },
+  { id: 'detail-export-markdown', group: 'detail', labelKey: 'detailExportAsMarkdown', defaultKey: '' },
+  { id: 'detail-export-json', group: 'detail', labelKey: 'detailExportAsJson', defaultKey: '' },
   { id: 'detail-comments', group: 'detail', labelKey: 'openCommentsSidebar', defaultKey: '' },
   { id: 'reader-play-pause', group: 'reader', labelKey: 'keyboardShortcutsReaderPlayPause', defaultKey: '' },
 ] as const satisfies ReadonlyArray<{

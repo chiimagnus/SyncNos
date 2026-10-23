@@ -611,6 +611,121 @@ describe('ConversationDetailPane header actions', () => {
     expect(feishu).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps original-link copy exclusively in More, with export format icons and configurable shortcuts', async () => {
+    shortcutFixture.bindings = {
+      'detail-copy-original': 'Alt+Shift+L',
+      'detail-export-markdown': 'Alt+Shift+E',
+      'detail-export-json': 'Alt+Shift+J',
+    };
+    const copyOriginal = vi.fn(async () => {});
+    currentState.detailHeaderActions = [
+      {
+        id: 'copy-original-link',
+        label: 'Copy original link',
+        slot: 'tools',
+        provider: 'source',
+        kind: 'copy-text',
+        onTrigger: copyOriginal,
+      },
+      {
+        id: 'export-markdown',
+        label: 'Export as Markdown',
+        slot: 'tools',
+        provider: 'local',
+        kind: 'open-target',
+        onTrigger: vi.fn(async () => {}),
+      },
+      {
+        id: 'export-json',
+        label: 'Export as JSON',
+        slot: 'tools',
+        provider: 'local',
+        kind: 'open-target',
+        onTrigger: vi.fn(async () => {}),
+      },
+    ];
+
+    await act(async () => {
+      root!.render(createElement(ConversationDetailPane));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(document.querySelector('[data-detail-header-primary-copy]')).toBeFalsy();
+    expect(document.querySelector('[aria-label="Copy original link"]')).toBeFalsy();
+    const more = document.querySelector<HTMLButtonElement>('[data-detail-header-more-trigger="true"]')!;
+    expect(more).toBeTruthy();
+    await act(async () => {
+      more.click();
+      await Promise.resolve();
+    });
+    const original = document.querySelector<HTMLButtonElement>('[role="menuitem"][aria-label="Copy original link"]')!;
+    const markdown = document.querySelector<HTMLButtonElement>('[role="menuitem"][aria-label="Export as Markdown"]')!;
+    const json = document.querySelector<HTMLButtonElement>('[role="menuitem"][aria-label="Export as JSON"]')!;
+    expect(original?.querySelector('.lucide-copy')).toBeTruthy();
+    expect(original?.querySelector('.webclipper-menu-shortcut')?.textContent).toBe('Alt + Shift + L');
+    expect(markdown?.querySelector('.lucide-file-text')).toBeTruthy();
+    expect(json?.querySelector('.lucide-file-json')).toBeTruthy();
+    expect(markdown?.querySelector('.webclipper-menu-shortcut')?.textContent).toBe('Alt + Shift + E');
+    expect(json?.querySelector('.webclipper-menu-shortcut')?.textContent).toBe('Alt + Shift + J');
+    expect(document.querySelectorAll('[role="menuitem"] .lucide-image-down')).toHaveLength(0);
+    await act(async () => {
+      original.click();
+      await Promise.resolve();
+    });
+    expect(copyOriginal).toHaveBeenCalledTimes(1);
+    expect(more.getAttribute('aria-expanded')).toBe('false');
+
+    const keyEvent = new window.KeyboardEvent('keydown', {
+      key: 'l',
+      code: 'KeyL',
+      altKey: true,
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => document.dispatchEvent(keyEvent));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(keyEvent.defaultPrevented).toBe(true);
+    expect(copyOriginal).toHaveBeenCalledTimes(2);
+    expect(document.querySelector('[role="status"]')?.textContent).toBe('Copied');
+  });
+
+  it('keeps provider copy in the top toolbar while moving original copy to More', async () => {
+    currentState.detailHeaderActions = [
+      {
+        id: 'copy-notion-link',
+        label: 'Copy Notion link',
+        slot: 'copy',
+        provider: 'notion',
+        kind: 'copy-text',
+        onTrigger: vi.fn(async () => {}),
+      },
+      {
+        id: 'copy-original-link',
+        label: 'Copy original link',
+        slot: 'tools',
+        provider: 'source',
+        kind: 'copy-text',
+        onTrigger: vi.fn(async () => {}),
+      },
+    ];
+    await act(async () => {
+      root!.render(createElement(ConversationDetailPane));
+      await Promise.resolve();
+    });
+    expect(document.querySelector('[data-detail-header-primary-copy][aria-label="Copy Notion link"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Copy destinations"]')).toBeFalsy();
+    const more = document.querySelector<HTMLButtonElement>('[data-detail-header-more-trigger="true"]')!;
+    await act(async () => {
+      more.click();
+      await Promise.resolve();
+    });
+    expect(document.querySelector('[role="menuitem"][aria-label="Copy original link"]')).toBeTruthy();
+  });
+
   it('shows bound keys on the right of the existing Detail More menu, without a More-trigger shortcut', async () => {
     shortcutFixture.bindings = {
       'detail-copy-notion': 'Alt+Shift+N',

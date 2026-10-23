@@ -75,7 +75,7 @@ function buildDetailUtilityActions({
             label: t('keyboardShortcutsCopyOriginalLink'),
             kind: 'copy-text' as const,
             provider: 'source',
-            slot: 'copy' as const,
+            slot: 'tools' as const,
             onTrigger: async () => {
               if (!(await writeTextToClipboard(copyableUrl))) throw new Error(t('copyFailed'));
             },
@@ -100,7 +100,7 @@ function buildDetailUtilityActions({
     },
     {
       id: 'export-markdown',
-      label: t('markdownExport'),
+      label: t('detailExportAsMarkdown'),
       kind: 'open-target',
       provider: 'local',
       slot: 'tools',
@@ -109,7 +109,7 @@ function buildDetailUtilityActions({
     },
     {
       id: 'export-json',
-      label: t('jsonExport'),
+      label: t('detailExportAsJson'),
       kind: 'open-target',
       provider: 'local',
       slot: 'tools',

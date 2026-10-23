@@ -275,6 +275,8 @@ export const zh: { [K in TranslationKey]: string } = {
   tooltipExportSelectFirstDetailed: '请先勾选内容，再执行导出',
   markdownExport: 'Markdown',
   jsonExport: 'JSON',
+  detailExportAsMarkdown: '导出为 Markdown',
+  detailExportAsJson: '导出为 JSON',
   obsidianSync: 'Obsidian',
   obsidianSyncing: 'Obsidian...',
   notionSync: 'Notion',

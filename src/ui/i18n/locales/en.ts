@@ -278,6 +278,8 @@ export const en = {
   tooltipExportSelectFirstDetailed: 'Select content first, then export',
   markdownExport: 'Markdown',
   jsonExport: 'JSON',
+  detailExportAsMarkdown: 'Export as Markdown',
+  detailExportAsJson: 'Export as JSON',
   obsidianSync: 'Obsidian',
   obsidianSyncing: 'Obsidian...',
   notionSync: 'Notion',

@@ -257,7 +257,11 @@ describe('detail-header-actions', () => {
       title: 'Story',
     };
     const actions = await resolveDetailHeaderActions({ conversation });
-    expect(byId(actions, 'copy-original-link')?.slot).toBe('copy');
+    expect(byId(actions, 'copy-original-link')?.slot).toBe('tools');
+    expect(bySlot(actions, 'copy')).toEqual([]);
+    expect(byId(actions, 'copy-original-link')?.label).toBe(t('keyboardShortcutsCopyOriginalLink'));
+    expect(byId(actions, 'export-markdown')?.label).toBe(t('detailExportAsMarkdown'));
+    expect(byId(actions, 'export-json')?.label).toBe(t('detailExportAsJson'));
     await byId(actions, 'copy-original-link')?.onTrigger();
     expect(writeTextToClipboardMock).toHaveBeenCalledWith('https://example.com/story');
 

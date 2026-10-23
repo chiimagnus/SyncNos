@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Copy, ExternalLink, ImageDown } from 'lucide-react';
+import { Copy, ExternalLink, FileJson, FileText, ImageDown } from 'lucide-react';
 
 import type { DetailHeaderAction } from '@services/integrations/detail-header-action-types';
 import { DETAIL_ACTION_SHORTCUTS, type InAppShortcutAction } from '@services/shortcuts/in-app-shortcuts';
@@ -134,6 +134,8 @@ export function DetailHeaderActionBar({
     const logo = providerLogo(action);
     if (logo) return logo;
     if (action.kind === 'copy-text') return <Copy size={16} strokeWidth={2} aria-hidden="true" />;
+    if (action.id === 'export-markdown') return <FileText size={16} strokeWidth={2} aria-hidden="true" />;
+    if (action.id === 'export-json') return <FileJson size={16} strokeWidth={2} aria-hidden="true" />;
     if (action.provider === 'source' && action.kind === 'external-link')
       return <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />;
     return <ImageDown size={16} strokeWidth={2} aria-hidden="true" />;
