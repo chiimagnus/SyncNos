@@ -601,7 +601,7 @@ describe('inpage anti-hotlink advanced editor', () => {
     });
   }
 
-  async function renderShortcuts(props: Partial<Parameters<typeof KeyboardShortcutsSection>[0]> = {}) {
+  function renderShortcuts(props: Partial<Parameters<typeof KeyboardShortcutsSection>[0]> = {}) {
     const baseProps: Parameters<typeof KeyboardShortcutsSection>[0] = {
       status: 'ready',
       items: [
@@ -613,10 +613,8 @@ describe('inpage anti-hotlink advanced editor', () => {
       onOpenManager: () => {},
     };
 
-    await act(async () => {
+    act(() => {
       root!.render(createElement(KeyboardShortcutsSection, { ...baseProps, ...props }));
-      await Promise.resolve();
-      await Promise.resolve();
     });
   }
 
@@ -657,8 +655,8 @@ describe('inpage anti-hotlink advanced editor', () => {
     expect(onToggleChatgptApiCaptureEnabled).toHaveBeenCalledWith(true);
   });
 
-  it('renders browser-managed keyboard shortcuts in the dedicated section', async () => {
-    await renderShortcuts();
+  it('renders browser-managed keyboard shortcuts in the dedicated section', () => {
+    renderShortcuts();
 
     const shortcutSection = document.querySelector('section[aria-label="Keyboard shortcuts"]');
     expect(shortcutSection?.textContent).toContain('Open SyncNos popup');
@@ -668,9 +666,9 @@ describe('inpage anti-hotlink advanced editor', () => {
     expect(shortcutSection?.textContent).toContain('Unassigned');
   });
 
-  it('opens the native shortcut manager only from the dedicated section callback', async () => {
+  it('opens the native shortcut manager only from the dedicated section callback', () => {
     const onOpenManager = vi.fn();
-    await renderShortcuts({ onOpenManager });
+    renderShortcuts({ onOpenManager });
 
     const button = document.querySelector('button[aria-label="Manage shortcuts"]') as HTMLButtonElement | null;
     expect(button).toBeTruthy();
@@ -678,8 +676,8 @@ describe('inpage anti-hotlink advanced editor', () => {
     expect(onOpenManager).toHaveBeenCalledTimes(1);
   });
 
-  it('shows manual shortcut guidance without a dead manage button', async () => {
-    await renderShortcuts({ managerAccess: 'manual' });
+  it('shows manual shortcut guidance without a dead manage button', () => {
+    renderShortcuts({ managerAccess: 'manual' });
 
     expect(document.body.textContent || '').toContain(
       'Configure these actions in your browser’s extension keyboard shortcut settings.',
@@ -687,8 +685,8 @@ describe('inpage anti-hotlink advanced editor', () => {
     expect(document.querySelector('button[aria-label="Manage shortcuts"]')).toBeNull();
   });
 
-  it('shows unsupported shortcut discovery inside the dedicated page only', async () => {
-    await renderShortcuts({ status: 'unsupported', managerAccess: 'unsupported' });
+  it('shows unsupported shortcut discovery inside the dedicated page only', () => {
+    renderShortcuts({ status: 'unsupported', managerAccess: 'unsupported' });
 
     expect(document.body.textContent || '').toContain('This browser cannot read extension keyboard shortcuts.');
     expect(document.querySelector('section[aria-label="Local CLI Integration"]')).toBeNull();

@@ -8,7 +8,6 @@ import { useChatOutlineActiveIndex } from '@ui/conversations/chat-outline/useCha
 
 import { t, formatConversationTitle } from '@i18n';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
-import { useInAppShortcuts } from '@viewmodels/shortcuts/useInAppShortcuts';
 import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
 import {
   buttonFilledClassName,
@@ -17,7 +16,7 @@ import {
   headerButtonClassName,
 } from '@ui/shared/button-styles';
 import { MenuPopover } from '@ui/shared/MenuPopover';
-import { tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
+import { tooltipAttrs } from '@ui/shared/AppTooltip';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { countConversationMessageImages } from '@services/conversations/domain/image-count';
 import { countConversationMessageTextUnits } from '@services/conversations/domain/text-count';
@@ -166,8 +165,6 @@ export function ConversationDetailPane({
   const [urlEditing, setUrlEditing] = useState(false);
   const [urlDraft, setUrlDraft] = useState('');
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
-  const [requestedReaderPanel, setRequestedReaderPanel] = useState<'text' | 'theme' | 'narration' | null>(null);
-  const shortcutActionBusyRef = useRef(false);
   const urlInputRef = useRef<HTMLInputElement | null>(null);
   const displayedUrl = String((selected as any)?.url || '').trim();
   const isVideo = String((selected as any)?.sourceType || '') === 'video';
@@ -213,7 +210,6 @@ export function ConversationDetailPane({
   ].join(' ');
   const closeMoreMenu = useCallback(() => {
     setMoreMenuOpen(false);
-    setRequestedReaderPanel(null);
     setReaderToolbarPortalTarget(null);
   }, []);
   const handleMoreMenuOpenChange = useCallback(
@@ -297,57 +293,6 @@ export function ConversationDetailPane({
       else console.error(message);
     });
   };
-
-  const triggerDetailAction = (id: string) => {
-    const action = safeActions.find((item) => item.id === id && !item.disabled);
-    if (!action || shortcutActionBusyRef.current) return;
-    shortcutActionBusyRef.current = true;
-    void Promise.resolve()
-      .then(() => action.onTrigger())
-      .catch((error) => {
-        const message = error instanceof Error && error.message ? error.message : t('actionFailedFallback');
-        window.alert(message);
-      })
-      .finally(() => {
-        shortcutActionBusyRef.current = false;
-      });
-    closeMoreMenu();
-  };
-  const openReaderPanel = (panel: 'text' | 'theme' | 'narration') => {
-    if (!readerFeatures[panel === 'text' ? 'textLayout' : panel]) return;
-    if (moreMenuOpen && requestedReaderPanel === panel) {
-      closeMoreMenu();
-      return;
-    }
-    setMoreMenuOpen(true);
-    setRequestedReaderPanel(panel);
-  };
-
-  const shortcut = useInAppShortcuts({
-    'back-to-list': () => onBack?.(),
-    'detail-copy-link': () => {
-      const button = document.querySelector<HTMLButtonElement>('[data-detail-header-primary-copy]');
-      if (button && !button.disabled) button.click();
-    },
-    'detail-copy-notion': () => triggerDetailAction('copy-notion-link'),
-    'detail-copy-feishu': () => triggerDetailAction('copy-feishu-link'),
-    'detail-copy-github': () => triggerDetailAction('copy-github-link'),
-    'detail-comments': () => {
-      if (canOpenCommentsSidebar) onTriggerCommentsSidebar?.();
-    },
-    'detail-more': () => {
-      if (hasMoreMenuContent) handleMoreMenuOpenChange(!moreMenuOpen);
-    },
-    'detail-markdown': () => triggerDetailAction('copy-full-markdown'),
-    'detail-original': () => triggerDetailAction('open-original'),
-    'detail-open-notion': () => triggerDetailAction('open-in-notion'),
-    'detail-open-obsidian': () => triggerDetailAction('open-in-obsidian'),
-    'detail-open-feishu': () => triggerDetailAction('open-in-feishu'),
-    'detail-open-github': () => triggerDetailAction('open-in-github'),
-    'reader-layout': () => openReaderPanel('text'),
-    'reader-theme': () => openReaderPanel('theme'),
-    'reader-narration': () => openReaderPanel('narration'),
-  });
 
   const detailMetadata = (
     <div className="tw-mb-1 tw-min-w-0" data-detail-metadata="true">
@@ -473,7 +418,6 @@ export function ConversationDetailPane({
                   onClick={onExpandSidebar}
                   className={headerIconButtonClass}
                   aria-label={expandSidebarLabel}
-                  {...tooltipAttrsWithShortcut(expandSidebarLabel, shortcut('toggle-sidebar'))}
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                     <path
@@ -490,13 +434,7 @@ export function ConversationDetailPane({
               ) : null}
 
               {onBack ? (
-                <button
-                  type="button"
-                  onClick={onBack}
-                  className={headerIconButtonClass}
-                  aria-label={t('backButton')}
-                  {...tooltipAttrsWithShortcut(t('backButton'), shortcut('back-to-list'))}
-                >
+                <button type="button" onClick={onBack} className={headerIconButtonClass} aria-label={t('backButton')}>
                   <ChevronLeft size={14} strokeWidth={2} aria-hidden="true" />
                   <span className="tw-sr-only">{t('backButton')}</span>
                 </button>
@@ -519,7 +457,6 @@ export function ConversationDetailPane({
                 menuTriggerLabel={t('detailHeaderCopyLinkMenuLabel')}
                 menuTriggerAriaLabel={t('detailHeaderCopyLinkMenuAria')}
                 menuAriaLabel={t('detailHeaderCopyLinkMenuAria')}
-                getShortcut={shortcut}
                 className="tw-order-1"
               />
 
@@ -531,7 +468,7 @@ export function ConversationDetailPane({
                   }}
                   className={[headerButtonClassName(), 'tw-order-2'].join(' ')}
                   aria-label={commentsSidebarLabel}
-                  {...tooltipAttrsWithShortcut(commentsSidebarLabel, shortcut('detail-comments'))}
+                  {...tooltipAttrs(commentsSidebarLabel)}
                   aria-pressed={commentsSidebarOpen ? 'true' : 'false'}
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -564,7 +501,6 @@ export function ConversationDetailPane({
                       {...triggerProps}
                       data-detail-header-more-trigger="true"
                       aria-label={t('moreButton')}
-                      {...tooltipAttrsWithShortcut(t('moreButton'), shortcut('detail-more'))}
                       className={headerIconButtonClass}
                     >
                       <MoreHorizontal size={14} strokeWidth={2} aria-hidden="true" />
@@ -595,7 +531,6 @@ export function ConversationDetailPane({
                             actions={moreActions}
                             buttonClassName={buttonMenuItemClassName()}
                             inlineMenuItems
-                            getShortcut={shortcut}
                             closeMenuOnActionTrigger={closeMoreMenu}
                             className="tw-w-full"
                           />
@@ -659,7 +594,6 @@ export function ConversationDetailPane({
               metadata={detailMetadata}
               readerFeatures={readerFeatures}
               readerToolbarPortalTarget={readerToolbarPortalTarget}
-              requestedReaderPanel={requestedReaderPanel}
               outlineScrollRoot={outlineScrollRoot}
             />
           ) : (

@@ -326,8 +326,7 @@ describe('DetailHeaderActionBar', () => {
       const button = document.querySelector('[aria-label="Copy Notion link"]') as HTMLButtonElement | null;
       expect(button).toBeTruthy();
       expect(button?.textContent || '').not.toContain('Copy Notion link');
-      expect(button?.getAttribute('data-tooltip-id')).toBe('webclipper-tooltip');
-      expect(button?.getAttribute('data-tooltip-content')).toBe('Copy Notion link');
+      expect(button?.getAttribute('data-tooltip-id')).toBeNull();
       expect(button?.querySelector('[data-provider-logo="notion"]')?.className || '').toContain('tw-h-4 tw-w-4');
 
       await act(async () => {
@@ -349,55 +348,6 @@ describe('DetailHeaderActionBar', () => {
     } finally {
       vi.useRealTimers();
     }
-  });
-
-  it('shows the current primary-copy shortcut and individual target bindings without duplicating visible menu labels', async () => {
-    const notion = {
-      id: 'copy-notion-link',
-      label: 'Copy Notion link',
-      provider: 'notion' as const,
-      kind: 'copy-text' as const,
-      slot: 'copy' as const,
-      onTrigger: vi.fn(async () => {}),
-    };
-    const feishu = { ...notion, id: 'copy-feishu-link', label: 'Copy Feishu link', provider: 'feishu' as const };
-    const keys: Record<string, string> = {
-      'detail-copy-link': 'Alt+Shift+C',
-      'detail-copy-notion': 'Ctrl+Alt+N',
-      'detail-copy-feishu': '',
-    };
-    const render = () => {
-      act(() => {
-        root!.render(
-          createElement(DetailHeaderActionBar, {
-            actions: [notion, feishu],
-            buttonClassName,
-            getShortcut: (id) => keys[id] || '',
-            menuTriggerLabel: 'Copy link',
-          }),
-        );
-      });
-    };
-
-    render();
-    const primary = document.querySelector('[data-detail-header-primary-copy="true"]') as HTMLButtonElement;
-    expect(primary.getAttribute('data-tooltip-content')).toBe('Copy Notion link\nAlt+Shift+C');
-    const dropdown = document.querySelector('[aria-haspopup="menu"]') as HTMLButtonElement;
-    expect(dropdown.getAttribute('data-tooltip-content')).toBe('Copy link');
-
-    await act(async () => {
-      dropdown.click();
-      await Promise.resolve();
-    });
-    const items = Array.from(document.querySelectorAll('[role="menuitem"]')) as HTMLButtonElement[];
-    expect(items[0]?.textContent).toContain('Copy Notion link');
-    expect(items[0]?.getAttribute('data-tooltip-content')).toBe('Ctrl+Alt+N');
-    expect(items[1]?.getAttribute('data-tooltip-content')).toBeNull();
-
-    keys['detail-copy-link'] = '';
-    keys['detail-copy-notion'] = 'Ctrl+Alt+R';
-    render();
-    expect(primary.getAttribute('data-tooltip-content')).toBe('Copy Notion link\nCtrl+Alt+R');
   });
 
   it('clears stale success feedback before a later action that fails', async () => {

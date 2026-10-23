@@ -12,7 +12,7 @@ description: Start here when capture, sync, or connection does not work as expec
 
 ## A keyboard shortcut does not work
 
-Check the shortcut type under **Settings → Keyboard shortcuts**. Browser shortcuts are configured in the browser's extension shortcut manager; in-app shortcuts require focus inside SyncNos and do not run in inputs or dialogs. See [Keyboard shortcuts](/docs/en/shortcuts/) for steps and other limits.
+Open **Settings → Keyboard shortcuts** and check the browser's current binding. If it is unassigned, configure it in the browser's extension shortcut settings.
 
 ## Sync fails
 

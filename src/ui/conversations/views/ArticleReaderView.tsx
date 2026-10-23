@@ -33,7 +33,6 @@ import { ReaderToolbar } from '@ui/reader/ReaderToolbar';
 import { useReaderNarration } from '@viewmodels/reader/useReaderNarration';
 import { useSyncnosAssetSrcMap } from '@viewmodels/conversations/useSyncnosAssetSrcMap';
 import { useReaderPrefs } from '@viewmodels/reader/useReaderPrefs';
-import { useInAppShortcuts } from '@viewmodels/shortcuts/useInAppShortcuts';
 import { useAppThemeMode } from '@viewmodels/theme/useAppThemeMode';
 import { ChatMessageBubble } from '@ui/shared/ChatMessageBubble';
 
@@ -43,7 +42,6 @@ type ArticleReaderViewProps = DetailViewSharedProps & {
   metadata?: ReactNode;
   readerFeatures?: ConversationKindDefinition['view']['readerFeatures'];
   readerToolbarPortalTarget?: HTMLElement | null;
-  requestedReaderPanel?: 'text' | 'theme' | 'narration' | null;
   outlineScrollRoot?: Element | null;
 };
 
@@ -89,7 +87,6 @@ export function ArticleReaderView({
   metadata,
   readerFeatures,
   readerToolbarPortalTarget,
-  requestedReaderPanel,
   outlineScrollRoot,
 }: ArticleReaderViewProps) {
   // readerFeatures gates each toolbar piece; chat conversations pass all-false (or
@@ -437,15 +434,6 @@ export function ArticleReaderView({
     [getFirstVisibleSentenceIndex, narration],
   );
 
-  const shortcut = useInAppShortcuts({
-    'reader-play-pause': () => {
-      if (features.narration) toolbarNarration.toggle();
-    },
-    'reader-stop': () => {
-      if (features.narration && narration.state !== 'idle') narration.stop();
-    },
-  });
-
   const headerToolbar = useMemo(() => {
     if (!readerToolbarPortalTarget) return null;
     if (!features.textLayout && !features.theme && !features.narration) return null;
@@ -459,8 +447,6 @@ export function ArticleReaderView({
         themeMode={themeMode}
         updateThemeMode={updateThemeMode}
         narration={toolbarNarration}
-        requestedPanel={requestedReaderPanel}
-        getShortcut={shortcut}
       />,
       readerToolbarPortalTarget,
     );
@@ -470,8 +456,6 @@ export function ArticleReaderView({
     prefs,
     preview,
     readerToolbarPortalTarget,
-    requestedReaderPanel,
-    shortcut,
     themeMode,
     toolbarNarration,
     update,

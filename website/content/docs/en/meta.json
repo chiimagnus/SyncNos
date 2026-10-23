@@ -5,7 +5,7 @@
     { "title": "Capture", "pages": ["capture", "capture-ai-chats", "capture-articles", "capture-videos"] },
     {
       "title": "Features",
-      "pages": ["features", "library", "shortcuts", "comments", "reader", "dollar-mention", "insights", "export-backup"]
+      "pages": ["features", "library", "comments", "reader", "dollar-mention", "insights", "export-backup"]
     },
     { "title": "Sync", "pages": ["sync/index", "sync/notion", "sync/obsidian", "sync/feishu", "sync/github"] },
     { "title": "Advanced & help", "pages": ["cli", "privacy", "faq"] }

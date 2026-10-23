@@ -292,12 +292,12 @@ describe('ConversationListPane pagination behaviors', () => {
     expect(setListSiteFilterKeyPersistent).not.toHaveBeenCalled();
   });
 
-  it('explains the unlabeled select-all control but keeps inactive batch actions quiet', async () => {
+  it('does not attach selection or batch tooltips when nothing is selected', async () => {
     currentState = buildState({ selectedIds: [] });
     await renderPane();
 
     const selectAllLabel = document.querySelector('label[aria-label="selectAll"]') as HTMLLabelElement | null;
-    expect(selectAllLabel?.getAttribute('data-tooltip-content')).toBe('selectAll');
+    expect(selectAllLabel?.hasAttribute('data-tooltip-content')).toBe(false);
     for (const buttonId of ['btnDelete', 'btnExport', 'btnSyncProvider']) {
       expect(document.getElementById(buttonId)?.closest('[data-tooltip-content]')).toBeNull();
     }
