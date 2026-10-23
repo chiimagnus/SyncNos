@@ -50,6 +50,8 @@ export const en = {
   keyboardShortcutsFiltersGroup: 'Filters',
   keyboardShortcutsDetailGroup: 'Details',
   keyboardShortcutsToggleSidebar: 'Toggle library sidebar',
+  keyboardShortcutsPreviousConversation: 'Previous conversation',
+  keyboardShortcutsNextConversation: 'Next conversation',
   keyboardShortcutsCopyOriginalLink: 'Copy original link',
   keyboardShortcutsRecord: 'Set shortcut',
   keyboardShortcutsRecording: 'Recording…',

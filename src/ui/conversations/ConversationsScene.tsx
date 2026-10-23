@@ -59,6 +59,10 @@ export function ConversationsScene({
 }: ConversationsSceneProps) {
   const isNarrow = useIsNarrowScreen();
   const {
+    activeId,
+    items,
+    selectedIds,
+    activateLoadedConversation,
     selectedConversation,
     openConversationExternalBySourceKey,
     openConversationExternalById,
@@ -95,6 +99,24 @@ export function ConversationsScene({
     },
     isNarrow && narrowRoute === 'comments',
   );
+
+  const navigateConversation = (step: -1 | 1) => {
+    if (!items.length || selectedIds.length || (isNarrow && narrowRoute === 'comments')) return false;
+    const currentIndex = items.findIndex((conversation) => Number(conversation.id) === Number(activeId));
+    if (currentIndex < 0 && activeId != null) return false;
+    const nextIndex = currentIndex < 0 ? (step > 0 ? 0 : items.length - 1) : currentIndex + step;
+    const nextId = Number(items[nextIndex]?.id);
+    if (!Number.isSafeInteger(nextId) || nextId <= 0) return false;
+    activateLoadedConversation(nextId);
+    if (isNarrow) openDetail();
+    else
+      document.querySelector<HTMLElement>(`[data-conversation-id="${nextId}"]`)?.scrollIntoView?.({ block: 'nearest' });
+    return true;
+  };
+  useInAppShortcuts({
+    'previous-conversation': () => navigateConversation(-1),
+    'next-conversation': () => navigateConversation(1),
+  });
 
   useLayoutEffect(() => {
     setDetailSurfaceActive(detailSurfaceVisible);

@@ -52,6 +52,8 @@ export const zh: { [K in TranslationKey]: string } = {
   keyboardShortcutsFiltersGroup: '筛选',
   keyboardShortcutsDetailGroup: '详情',
   keyboardShortcutsToggleSidebar: '展开 / 收起侧边栏',
+  keyboardShortcutsPreviousConversation: '上一条会话',
+  keyboardShortcutsNextConversation: '下一条会话',
   keyboardShortcutsCopyOriginalLink: '复制原始链接',
   keyboardShortcutsRecord: '设置快捷键',
   keyboardShortcutsRecording: '录制中…',

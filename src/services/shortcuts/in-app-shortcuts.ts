@@ -23,6 +23,13 @@ export const IN_APP_SHORTCUT_ACTIONS = [
     labelKey: 'keyboardShortcutsToggleSidebar',
     defaultKey: 'Mod+Backslash',
   },
+  {
+    id: 'previous-conversation',
+    group: 'navigation',
+    labelKey: 'keyboardShortcutsPreviousConversation',
+    defaultKey: '',
+  },
+  { id: 'next-conversation', group: 'navigation', labelKey: 'keyboardShortcutsNextConversation', defaultKey: '' },
   { id: 'source-filter', group: 'filters', labelKey: 'sourceFilterAria', defaultKey: '' },
   { id: 'site-filter', group: 'filters', labelKey: 'insightArticleDomainsTitle', defaultKey: '' },
   { id: 'detail-copy-original', group: 'detail', labelKey: 'keyboardShortcutsCopyOriginalLink', defaultKey: '' },
