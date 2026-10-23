@@ -29,6 +29,7 @@ import {
 import { MenuPopover } from '@ui/shared/MenuPopover';
 import { SelectMenu } from '@ui/shared/SelectMenu';
 import { tooltipAttrs } from '@ui/shared/AppTooltip';
+import { useInAppShortcuts } from '@viewmodels/shortcuts/useInAppShortcuts';
 
 const SITE_FILTER_ALL_KEY = 'all';
 const SITE_FILTER_UNKNOWN_KEY = 'unknown';
@@ -128,6 +129,8 @@ export function ConversationListPane({
   const deleteButtonRef = useRef<HTMLButtonElement | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [syncOpen, setSyncOpen] = useState(false);
+  const [sourceFilterOpen, setSourceFilterOpen] = useState(false);
+  const [siteFilterOpen, setSiteFilterOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
   const locateLoadRoundRef = useRef<{ id: number; rounds: number }>({ id: 0, rounds: 0 });
@@ -596,6 +599,21 @@ export function ConversationListPane({
     };
   }, [armedDeleteKey, deleteConfirm]);
 
+  const shortcut = useInAppShortcuts({
+    'source-filter': () => {
+      if (hasSelection) return false;
+      setSiteFilterOpen(false);
+      setSourceFilterOpen((open) => !open);
+      return true;
+    },
+    'site-filter': () => {
+      if (hasSelection || listSourceFilterKey !== 'web') return false;
+      setSourceFilterOpen(false);
+      setSiteFilterOpen((open) => !open);
+      return true;
+    },
+  });
+
   const sourceFilterActive =
     String(listSourceFilterKey || 'all')
       .trim()
@@ -830,10 +848,14 @@ export function ConversationListPane({
             <SelectMenu<string>
               buttonId="sourceFilterSelect"
               className={hasSelection ? 'tw-hidden' : ''}
+              open={sourceFilterOpen}
+              onOpenChange={setSourceFilterOpen}
               value={listSourceFilterKey}
               onChange={(next) => onSetFilterKey(next)}
               disabled={hasSelection}
               ariaLabel={t('sourceFilterAria')}
+              tooltip={t('sourceFilterAria')}
+              tooltipShortcut={shortcut('source-filter')}
               side="top"
               align="start"
               minWidth={150}
@@ -853,10 +875,14 @@ export function ConversationListPane({
               <SelectMenu<string>
                 buttonId="siteFilterSelect"
                 className={hasSelection ? 'tw-hidden' : ''}
+                open={siteFilterOpen}
+                onOpenChange={setSiteFilterOpen}
                 value={listSiteFilterKey}
                 onChange={(next) => onSetSiteFilterKey(next)}
                 disabled={hasSelection}
                 ariaLabel={t('insightArticleDomainsTitle')}
+                tooltip={t('insightArticleDomainsTitle')}
+                tooltipShortcut={shortcut('site-filter')}
                 side="top"
                 align="start"
                 minWidth={160}
