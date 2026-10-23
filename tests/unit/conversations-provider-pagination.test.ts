@@ -11,12 +11,6 @@ const findConversationBySourceAndKey = vi.fn();
 const getConversationById = vi.fn();
 const getConversationDetail = vi.fn();
 const deleteConversations = vi.fn();
-const downloadBlobFile = vi.fn();
-const buildMarkdownExport = vi.fn(async (_input: unknown) => ({
-  zipBlob: new Blob(['markdown']),
-  filename: 'item-md.zip',
-}));
-const buildJsonExport = vi.fn(async (_input: unknown) => ({ zipBlob: new Blob(['json']), filename: 'item-json.zip' }));
 const updateConversationUrl = vi.fn();
 const backfillConversationImages = vi.fn();
 const resolveDetailHeaderActions = vi.fn(async () => [] as any[]);
@@ -24,17 +18,6 @@ const subscribeDataRevisionChanges = vi.fn();
 const whenDataRevisionObserverReady = vi.fn();
 const requestDataRevisionRetry = vi.fn();
 let storageChangeListener: ((changes: any, areaName: string) => void) | null = null;
-
-vi.mock('@services/shared/webext', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@services/shared/webext')>()),
-  downloadBlobFile: (...args: unknown[]) => downloadBlobFile(...args),
-}));
-vi.mock('@services/sync/local/markdown-export', () => ({
-  buildConversationsMarkdownZipExport: (...args: unknown[]) => buildMarkdownExport(...args),
-}));
-vi.mock('@services/sync/local/json-export', () => ({
-  buildConversationsJsonZipExport: (...args: unknown[]) => buildJsonExport(...args),
-}));
 
 vi.mock('@services/conversations/client/repo', () => ({
   getConversationListBootstrap: (...args: any[]) => getConversationListBootstrap(...args),
@@ -211,9 +194,6 @@ describe('ConversationsProvider pagination state', () => {
     getConversationById.mockReset();
     getConversationDetail.mockReset();
     deleteConversations.mockReset();
-    downloadBlobFile.mockReset();
-    buildMarkdownExport.mockClear();
-    buildJsonExport.mockClear();
     updateConversationUrl.mockReset();
     backfillConversationImages.mockReset();
     resolveDetailHeaderActions.mockReset();
@@ -278,47 +258,6 @@ describe('ConversationsProvider pagination state', () => {
       await flushMicrotasks();
     });
   }
-
-  it('runs single-item export, sync and delete by ID without using selected item IDs', async () => {
-    getConversationListBootstrap.mockResolvedValue(
-      makePage([makeConversation(11, 'chatgpt', 'conv-11'), makeConversation(12, 'chatgpt', 'conv-12')]),
-    );
-    await renderProvider();
-    await act(async () => {
-      latestState.replaceSelectedIds([11]);
-    });
-
-    await act(async () => {
-      await latestState.exportConversationMarkdown(12);
-    });
-    expect(buildMarkdownExport).toHaveBeenCalledTimes(1);
-    expect(buildMarkdownExport.mock.calls[0]![0]).toMatchObject({
-      conversations: [expect.objectContaining({ id: 12 })],
-    });
-    expect(downloadBlobFile).toHaveBeenCalledWith(expect.any(Blob), 'item-md.zip');
-    expect(latestState.selectedIds).toEqual([11]);
-
-    await act(async () => {
-      await latestState.exportConversationJson(99);
-    });
-    expect(getConversationById).toHaveBeenCalledWith(99);
-    expect(buildJsonExport.mock.calls[0]![0]).toMatchObject({
-      conversations: [expect.objectContaining({ id: 99 })],
-    });
-    expect(latestState.selectedIds).toEqual([11]);
-
-    await act(async () => {
-      await latestState.syncConversation(12, 'notion');
-    });
-    expect(startSync).toHaveBeenCalledWith('notion', [12]);
-    expect(latestState.selectedIds).toEqual([11]);
-
-    await act(async () => {
-      await latestState.deleteConversation(12);
-    });
-    expect(deleteConversations).toHaveBeenCalledWith([12]);
-    expect(latestState.selectedIds).toEqual([11]);
-  });
 
   it('keeps initial loading active until the first bootstrap settles', async () => {
     const firstPage = deferred<any>();

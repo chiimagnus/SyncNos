@@ -101,7 +101,7 @@ describe('in-app shortcut editor', () => {
   it('shows all actions in groups and can record a new Mac binding', async () => {
     await mount();
     expect(document.querySelectorAll('details').length).toBe(4);
-    expect(document.querySelectorAll('button[aria-label^="Set shortcut: "]').length).toBe(24);
+    expect(document.querySelectorAll('button[aria-label^="Set shortcut: "]').length).toBe(29);
     expect(document.querySelector(toggleSelector)?.textContent).toContain('⌘ + \\');
     expect(document.querySelector(toggleSelector)?.querySelectorAll('kbd')).toHaveLength(1);
     expect(document.querySelector(toggleSelector)?.classList.contains('webclipper-btn')).toBe(true);

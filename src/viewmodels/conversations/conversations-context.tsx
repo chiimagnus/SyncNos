@@ -9,7 +9,7 @@ import type {
   ConversationListSummary,
 } from '@services/conversations/domain/models';
 import { LIST_SITE_KEY_ALL, LIST_SOURCE_KEY_ALL } from '@services/conversations/domain/list-query';
-import { canonicalizeArticleUrl, sanitizeHttpUrl } from '@services/url-cleaning/http-url';
+import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import { writeTextToClipboard } from '@services/shared/clipboard';
 import { downloadBlobFile } from '@services/shared/webext';
 import {
@@ -266,15 +266,10 @@ type ConversationsAppState = {
   replaceSelectedIds: (ids: readonly number[]) => void;
 
   copyConversationMarkdown: (conversationId: number) => Promise<void>;
-  copyConversationSourceLink: (conversationId: number) => Promise<void>;
-  exportConversationMarkdown: (conversationId: number) => Promise<void>;
-  exportConversationJson: (conversationId: number) => Promise<void>;
   exportSelectedMarkdown: () => Promise<void>;
   exportSelectedJson: () => Promise<void>;
-  syncConversation: (conversationId: number, provider: SyncProvider) => Promise<void>;
   syncSelected: (provider: SyncProvider) => Promise<void>;
   clearSyncFeedback: () => void;
-  deleteConversation: (conversationId: number) => Promise<void>;
   deleteSelected: () => Promise<void>;
 
   updateSelectedConversationUrl: (nextUrl: string) => Promise<void>;
@@ -1294,29 +1289,16 @@ export function ConversationsProvider({
     if (!(await writeTextToClipboard(markdown))) throw new Error(t('copyFailed'));
   }, []);
 
-  const copyConversationSourceLink = useCallback(async (conversationId: number) => {
-    const id = Number(conversationId);
-    if (!Number.isSafeInteger(id) || id <= 0) throw new Error('invalid conversationId');
-    const conversation = await getConversationById(id);
-    if (!conversation || Number(conversation.id) !== id) throw new Error('conversation not found');
-    const url = sanitizeHttpUrl(conversation.url);
-    if (!url || !(await writeTextToClipboard(url))) throw new Error(t('copyFailed'));
-  }, []);
+  const exportSelected = useCallback(
+    async (loadBuildExport: SelectedExportBuilderLoader) => {
+      if (!selectedIds.length) return;
 
-  const exportConversations = useCallback(
-    async (ids: readonly number[], loadBuildExport: SelectedExportBuilderLoader) => {
-      const targetIds = new Set(ids.filter((id) => Number.isSafeInteger(id) && id > 0));
-      if (!targetIds.size) return;
       setExporting(true);
       try {
-        const loaded = new Map(items.map((conversation) => [Number(conversation.id), conversation]));
-        const ids = [...targetIds];
-        const target = await Promise.all(ids.map(async (id) => loaded.get(id) || (await getConversationById(id))));
-        if (target.some((conversation, index) => !conversation || Number(conversation.id) !== ids[index])) {
-          throw new Error('conversation not found');
-        }
         const buildExport = await loadBuildExport();
-        const { zipBlob, filename } = await buildExport({ conversations: target as Conversation[] });
+        const selectedIdSet = new Set(selectedIds);
+        const selectedConversations = items.filter((conversation) => selectedIdSet.has(conversation.id));
+        const { zipBlob, filename } = await buildExport({ conversations: selectedConversations });
         downloadBlobFile(zipBlob, filename);
       } catch (e) {
         alert((e as any)?.message ?? String(e ?? t('exportFailedFallback')));
@@ -1324,43 +1306,27 @@ export function ConversationsProvider({
         setExporting(false);
       }
     },
-    [items],
+    [items, selectedIds],
   );
 
-  const buildMarkdownExport = useCallback(async () => {
-    const { buildConversationsMarkdownZipExport } = await import('@services/sync/local/markdown-export');
-    return buildConversationsMarkdownZipExport;
-  }, []);
-
-  const buildJsonExport = useCallback(async () => {
-    const { buildConversationsJsonZipExport } = await import('@services/sync/local/json-export');
-    return buildConversationsJsonZipExport;
-  }, []);
-
-  const exportConversationMarkdown = useCallback(
-    (id: number) => exportConversations([id], buildMarkdownExport),
-    [exportConversations, buildMarkdownExport],
-  );
-  const exportConversationJson = useCallback(
-    (id: number) => exportConversations([id], buildJsonExport),
-    [exportConversations, buildJsonExport],
-  );
   const exportSelectedMarkdown = useCallback(
-    () => exportConversations(selectedIds, buildMarkdownExport),
-    [exportConversations, selectedIds, buildMarkdownExport],
-  );
-  const exportSelectedJson = useCallback(
-    () => exportConversations(selectedIds, buildJsonExport),
-    [exportConversations, selectedIds, buildJsonExport],
+    () =>
+      exportSelected(async () => {
+        const { buildConversationsMarkdownZipExport } = await import('@services/sync/local/markdown-export');
+        return buildConversationsMarkdownZipExport;
+      }),
+    [exportSelected],
   );
 
-  const syncConversation = useCallback(
-    async (id: number, provider: SyncProvider) => {
-      if (!Number.isSafeInteger(id) || id <= 0) return;
-      await startSync(provider, [id]);
-    },
-    [startSync],
+  const exportSelectedJson = useCallback(
+    () =>
+      exportSelected(async () => {
+        const { buildConversationsJsonZipExport } = await import('@services/sync/local/json-export');
+        return buildConversationsJsonZipExport;
+      }),
+    [exportSelected],
   );
+
   const syncSelected = useCallback(
     async (provider: SyncProvider) => {
       if (!selectedIds.length) return;
@@ -1369,27 +1335,21 @@ export function ConversationsProvider({
     [selectedIds, startSync],
   );
 
-  const deleteItems = useCallback(
-    async (ids: readonly number[]) => {
-      const target = [...new Set(ids.filter((id) => Number.isSafeInteger(id) && id > 0))];
-      if (!target.length) return;
+  const deleteSelected = useCallback(async () => {
+    const ids = selectedIds.slice();
+    if (!ids.length) return;
 
-      setDeleting(true);
-      try {
-        await deleteConversations(target);
-        const removed = new Set(target);
-        setSelectedIds((prev) => prev.filter((id) => !removed.has(id)));
-        await refreshList();
-      } catch (e) {
-        alert((e as any)?.message ?? String(e ?? t('actionFailedFallback')));
-      } finally {
-        setDeleting(false);
-      }
-    },
-    [refreshList],
-  );
-  const deleteConversation = useCallback((id: number) => deleteItems([id]), [deleteItems]);
-  const deleteSelected = useCallback(() => deleteItems(selectedIds), [deleteItems, selectedIds]);
+    setDeleting(true);
+    try {
+      await deleteConversations(ids);
+      setSelectedIds([]);
+      await refreshList();
+    } catch (e) {
+      alert((e as any)?.message ?? String(e ?? t('actionFailedFallback')));
+    } finally {
+      setDeleting(false);
+    }
+  }, [refreshList, selectedIds]);
 
   const value: ConversationsAppState = {
     loadingInitialList,
@@ -1431,15 +1391,10 @@ export function ConversationsProvider({
     clearSelected,
     replaceSelectedIds,
     copyConversationMarkdown,
-    copyConversationSourceLink,
-    exportConversationMarkdown,
-    exportConversationJson,
     exportSelectedMarkdown,
     exportSelectedJson,
-    syncConversation,
     syncSelected,
     clearSyncFeedback,
-    deleteConversation,
     deleteSelected,
     updateSelectedConversationUrl,
   };

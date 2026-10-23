@@ -53,11 +53,8 @@ describe('in-app shortcut contract', () => {
     const assigned = Object.values(defaults).filter(Boolean);
     expect(new Set(assigned).size).toBe(assigned.length);
     expect(defaults['toggle-sidebar']).toBe('Mod+Backslash');
-    expect(ids).toHaveLength(24);
+    expect(ids).toHaveLength(29);
     expect(ids).toContain('copy-markdown');
-    expect(ids).toContain('export-item');
-    expect(ids).toContain('delete-item');
-    expect(ids).toContain('copy-list-link');
     for (const removed of [
       'copy-list-markdown',
       'detail-markdown',
@@ -70,13 +67,6 @@ describe('in-app shortcut contract', () => {
       'reader-layout',
       'reader-theme',
       'reader-narration',
-      'select-loaded',
-      'delete-selected',
-      'export-menu',
-      'sync-menu',
-      'capture-page',
-      'open-insights',
-      'back-to-list',
     ]) {
       expect(ids).not.toContain(removed);
     }
@@ -281,7 +271,7 @@ describe('in-app shortcut contract', () => {
     const current = await readInAppShortcutBindings();
     expect(current['toggle-sidebar']).toBe('Alt+Shift+Y');
     expect(current['filter-source']).toBe('');
-    expect(Object.keys(current)).toHaveLength(24);
+    expect(Object.keys(current)).toHaveLength(29);
     await expect(updateInAppShortcutBinding('filter-source', 'Alt+Shift+Y')).rejects.toMatchObject({
       code: 'conflict',
       conflictingAction: 'toggle-sidebar',

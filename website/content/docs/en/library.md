@@ -16,11 +16,9 @@ The detail view shows actions that fit the item and its sync state, such as:
 - Open or copy a synced destination link
 - Enter comments, reader tools, or other relevant features
 
-## Item actions
+## Keyboard navigation
 
-Each library item and the detail view have a **More** menu to copy the original link, export Markdown/JSON, sync to an enabled provider, or confirm deletion of that item. The multi-select toolbar handles bulk operations separately.
-
-Under [Settings → Keyboard shortcuts](/docs/en/shortcuts/), you can assign copying, exporting, or deleting the current item, as well as next/previous items, source/site filters, and detail actions. Shortcuts do nothing when there is no valid target.
+Use [Settings → Keyboard shortcuts](/docs/en/shortcuts/) to edit or clear shortcuts for next/previous conversations, source/site filters, loaded-item selection, exports, sync actions, copying, opening destinations, and the detail More menu. Unavailable actions remain inactive.
 
 ## Image cache
 

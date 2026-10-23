@@ -5,8 +5,7 @@ import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
 import { useNarrowListDetailCommentsRoute } from '@ui/shared/hooks/useNarrowListDetailCommentsRoute';
 import type { ArticleCommentsSidebarRuntime } from '@viewmodels/comments/useArticleCommentsSidebarRuntime';
 
-import { canonicalizeArticleUrl, sanitizeHttpUrl } from '@services/url-cleaning/http-url';
-import { t, formatConversationTitle } from '@i18n';
+import { canonicalizeArticleUrl } from '@services/url-cleaning/http-url';
 import type { CommentLocatorSurfaceRoots } from '@ui/comments';
 import { ConversationListPane } from '@ui/conversations/ConversationListPane';
 import { LazyArticleCommentsSection, LazyConversationDetailPane } from '@ui/conversations/LazyConversationSurfaces';
@@ -27,7 +26,7 @@ type ConversationsSceneWideChrome = 'card' | 'none';
 
 type ConversationsSceneProps = {
   defaultNarrowRoute?: NarrowRoute;
-  onPopupSyncPreparing?: (provider: SyncProvider, handoffIds?: readonly number[]) => void | Promise<void>;
+  onPopupSyncPreparing?: (provider: SyncProvider) => void | Promise<void>;
   onOpenInsightsSection?: () => void;
   onOpenSettingsSection?: (section: string) => void;
   onOpenCommentsExternally?: () => void;
@@ -62,13 +61,6 @@ export function ConversationsScene({
   const {
     selectedConversation,
     activeId,
-    items,
-    exporting,
-    deleting,
-    copyConversationMarkdown,
-    copyConversationSourceLink,
-    exportConversationMarkdown,
-    deleteConversation,
     detailHeaderActions,
     openConversationExternalBySourceKey,
     openConversationExternalById,
@@ -94,58 +86,36 @@ export function ConversationsScene({
     commentsSidebarEnabled &&
     Boolean(selectedConversationCanonicalUrl);
   const detailSurfaceVisible = !isNarrow || narrowRoute === 'detail';
-  const shortcutBusyRef = useRef(false);
-  const shortcutTarget = () => {
-    const list = document.querySelector<HTMLElement>('[data-conversation-list-pane]');
-    const focused = document.activeElement;
-    const listFocused = focused instanceof Element && !!list?.contains(focused);
-    const listIsActive = isNarrow ? narrowRoute === 'list' : listFocused || !selectedConversation;
-    const focusedId =
-      listFocused && focused instanceof Element
-        ? Number(focused.closest<HTMLElement>('[data-conversation-id]')?.dataset.conversationId)
-        : 0;
-    const id = listIsActive ? focusedId || Number(activeId) : Number(selectedConversation?.id);
-    if (!Number.isSafeInteger(id) || id <= 0) return null;
-    const item = items.find((entry) => Number(entry.id) === id) || selectedConversation;
-    if (!item || Number(item.id) !== id) return null;
-    return { id, listIsActive, item };
-  };
-  const runShortcut = (operation: () => Promise<void>) => {
-    if (shortcutBusyRef.current) return false;
-    shortcutBusyRef.current = true;
-    void Promise.resolve()
-      .then(operation)
-      .catch((error: unknown) => {
-        window.alert(error instanceof Error ? error.message : String(error));
-      })
-      .finally(() => {
-        shortcutBusyRef.current = false;
-      });
-    return true;
-  };
+  const copyingMarkdownRef = useRef(false);
   useInAppShortcuts({
     'copy-markdown': () => {
-      const target = shortcutTarget();
-      if (!target) return false;
-      if (target.listIsActive) return runShortcut(() => copyConversationMarkdown(target.id));
-      const action = detailHeaderActions?.find((entry) => entry.id === 'copy-full-markdown' && !entry.disabled);
-      return action ? runShortcut(() => action.onTrigger()) : false;
-    },
-    'copy-list-link': () => {
-      const target = shortcutTarget();
-      if (!target || !sanitizeHttpUrl(target.item.url)) return false;
-      return runShortcut(() => copyConversationSourceLink(target.id));
-    },
-    'export-item': () => {
-      const target = shortcutTarget();
-      return target && !exporting && !deleting ? runShortcut(() => exportConversationMarkdown(target.id)) : false;
-    },
-    'delete-item': () => {
-      const target = shortcutTarget();
-      if (!target || exporting || deleting || shortcutBusyRef.current) return false;
-      if (!window.confirm(t('keyboardShortcutsConfirmDeleteItem') + '\n' + formatConversationTitle(target.item.title)))
+      const list = document.querySelector<HTMLElement>('[data-conversation-list-pane]');
+      const focus = document.activeElement;
+      const listFocused = focus instanceof Element && !!list?.contains(focus);
+      const listIsActive = isNarrow ? narrowRoute === 'list' : listFocused || !selectedConversation;
+      if (listIsActive) {
+        const focusedRow = focus instanceof Element ? focus.closest<HTMLElement>('[data-conversation-id]') : null;
+        const id = Number(focusedRow?.dataset.conversationId || activeId);
+        if (!Number.isFinite(id) || id <= 0) return false;
+        const button = list?.querySelector<HTMLButtonElement>(
+          `[data-conversation-id="${id}"] [data-list-copy-markdown]`,
+        );
+        if (!button || button.disabled) return false;
+        button.click();
         return true;
-      return runShortcut(() => deleteConversation(target.id));
+      }
+      const action = detailHeaderActions?.find((entry) => entry.id === 'copy-full-markdown' && !entry.disabled);
+      if (!action || copyingMarkdownRef.current) return false;
+      copyingMarkdownRef.current = true;
+      void Promise.resolve()
+        .then(() => action.onTrigger())
+        .catch((error: unknown) => {
+          window.alert(error instanceof Error ? error.message : String(error));
+        })
+        .finally(() => {
+          copyingMarkdownRef.current = false;
+        });
+      return true;
     },
   });
 
@@ -208,7 +178,6 @@ export function ConversationsScene({
           <Suspense fallback={null}>
             <LazyConversationDetailPane
               onBack={returnToList}
-              onPopupSyncPreparing={onPopupSyncPreparing}
               onTriggerCommentsSidebar={
                 canOpenCommentsFromDetail
                   ? () => {
@@ -273,7 +242,7 @@ export function ConversationsScene({
       <main className="route-scroll webclipper-detail-route-scroll tw-min-h-0 tw-flex-1 tw-bg-[var(--bg-card)] tw-overflow-auto tw-overflow-x-hidden">
         {wideDetail ?? (
           <Suspense fallback={null}>
-            <LazyConversationDetailPane onPopupSyncPreparing={onPopupSyncPreparing} />
+            <LazyConversationDetailPane />
           </Suspense>
         )}
       </main>

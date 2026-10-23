@@ -23,14 +23,6 @@ const currentState = {
     notionPageId: '01234567-89ab-cdef-0123-456789abcdef',
   },
   detailHeaderActions: [] as any[],
-  exporting: false,
-  deleting: false,
-  enabledSyncProviders: [] as string[],
-  syncFeedback: { phase: 'idle', provider: null },
-  exportConversationMarkdown: vi.fn(async () => {}),
-  exportConversationJson: vi.fn(async () => {}),
-  syncConversation: vi.fn(async () => {}),
-  deleteConversation: vi.fn(async () => {}),
 };
 
 const currentReaderPrefs = {

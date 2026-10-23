@@ -112,11 +112,6 @@ function buildState() {
       consumeListLocate: vi.fn(() => null),
       loadMoreList: vi.fn(async () => {}),
       copyConversationMarkdown: vi.fn().mockResolvedValue(undefined),
-      copyConversationSourceLink: vi.fn().mockResolvedValue(undefined),
-      exportConversationMarkdown: vi.fn(async () => {}),
-      exportConversationJson: vi.fn(async () => {}),
-      syncConversation: vi.fn(async () => {}),
-      deleteConversation: vi.fn(async () => {}),
       exportSelectedMarkdown: vi.fn(),
       exportSelectedJson: vi.fn(),
       syncSelected: vi.fn().mockResolvedValue(undefined),
@@ -197,8 +192,11 @@ describe('ConversationListPane row actions', () => {
   it('shows bound shortcuts on their matching controls, but not on inactive conversation row actions', async () => {
     shortcutBindings = {
       'filter-source': 'Alt+Shift+F',
+      'select-loaded': 'Alt+Shift+A',
       'copy-markdown': 'Ctrl+Alt+M',
       'copy-list-link': 'Ctrl+Alt+L',
+      'open-insights': 'Ctrl+Alt+I',
+      'export-menu': 'Ctrl+Alt+E',
     };
     currentState.items.push({ ...conversation, id: 12, conversationKey: 'conv-12' });
     currentState.listSummary.totalCount = 2;
@@ -208,7 +206,7 @@ describe('ConversationListPane row actions', () => {
     expect(document.querySelector('#sourceFilterSelect')?.getAttribute('data-tooltip-content')).toContain(
       'Alt+Shift+F',
     );
-    expect(document.querySelector('#chkSelectAll')?.parentElement?.getAttribute('data-tooltip-content')).not.toContain(
+    expect(document.querySelector('#chkSelectAll')?.parentElement?.getAttribute('data-tooltip-content')).toContain(
       'Alt+Shift+A',
     );
     expect(
@@ -224,7 +222,7 @@ describe('ConversationListPane row actions', () => {
     expect(
       document.querySelector('[data-conversation-source-link="11"]')?.getAttribute('data-tooltip-content'),
     ).toContain('Ctrl+Alt+L');
-    expect(document.querySelector('#btnExport')?.parentElement?.getAttribute('data-tooltip-content')).not.toContain(
+    expect(document.querySelector('#btnExport')?.parentElement?.getAttribute('data-tooltip-content')).toContain(
       'Ctrl+Alt+E',
     );
 
@@ -270,101 +268,6 @@ describe('ConversationListPane row actions', () => {
     expect(currentState.syncSelected).toHaveBeenCalledWith('notion');
   });
 
-  it('offers per-item export, sync and confirmed deletion without changing multi-selection', async () => {
-    currentState.items.push({ ...conversation, id: 12, title: 'Second', conversationKey: 'conv-12' });
-    currentState.selectedIds = [11];
-    currentState.enabledSyncProviders = ['notion'];
-    const confirm = vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true);
-    Object.defineProperty(window, 'confirm', { configurable: true, value: confirm });
-    await renderPane();
-
-    const more = document.querySelector<HTMLButtonElement>('[data-item-more-trigger="12"]')!;
-    expect(more).toBeTruthy();
-    await act(async () => {
-      more.click();
-      await flushMicrotasks();
-    });
-    const original = document.querySelector<HTMLButtonElement>('[data-item-copy-original-link="12"]')!;
-    expect(original).toBeTruthy();
-    expect(original.disabled).toBe(false);
-    await act(async () => {
-      original.click();
-      await flushMicrotasks();
-    });
-    expect(currentState.copyConversationSourceLink).toHaveBeenCalledWith(12);
-    expect(currentState.toggleSelected).not.toHaveBeenCalled();
-
-    await act(async () => {
-      more.click();
-      await flushMicrotasks();
-    });
-    const md = document.querySelector<HTMLButtonElement>('[data-item-export-markdown="12"]')!;
-    const json = document.querySelector<HTMLButtonElement>('[data-item-export-json="12"]')!;
-    const syncToggle = document.querySelector<HTMLButtonElement>('[data-item-sync-toggle="12"]')!;
-    const del = document.querySelector<HTMLButtonElement>('[data-item-delete="12"]')!;
-    expect(md).toBeTruthy();
-    expect(json).toBeTruthy();
-    expect(syncToggle).toBeTruthy();
-    expect(syncToggle.getAttribute('aria-expanded')).toBe('false');
-    expect(document.querySelector('[data-item-sync-provider="12:notion"]')).toBeNull();
-    expect(del).toBeTruthy();
-    await act(async () => {
-      md.click();
-      await flushMicrotasks();
-    });
-    expect(currentState.exportConversationMarkdown).toHaveBeenCalledWith(12);
-    expect(currentState.exportSelectedMarkdown).not.toHaveBeenCalled();
-    expect(currentState.toggleSelected).not.toHaveBeenCalled();
-
-    await act(async () => {
-      more.click();
-      await flushMicrotasks();
-    });
-    await act(async () => {
-      document.querySelector<HTMLButtonElement>('[data-item-export-json="12"]')!.click();
-      await flushMicrotasks();
-    });
-    expect(currentState.exportConversationJson).toHaveBeenCalledWith(12);
-    expect(currentState.exportSelectedJson).not.toHaveBeenCalled();
-
-    await act(async () => {
-      more.click();
-      await flushMicrotasks();
-    });
-    await act(async () => {
-      document.querySelector<HTMLButtonElement>('[data-item-sync-toggle="12"]')!.click();
-      await flushMicrotasks();
-    });
-    expect(document.querySelector('[data-item-sync-provider="12:notion"]')).toBeTruthy();
-    await act(async () => {
-      document.querySelector<HTMLButtonElement>('[data-item-sync-provider="12:notion"]')!.click();
-      await flushMicrotasks();
-    });
-    expect(currentState.syncConversation).toHaveBeenCalledWith(12, 'notion');
-    expect(currentState.syncSelected).not.toHaveBeenCalled();
-
-    await act(async () => {
-      more.click();
-      await flushMicrotasks();
-    });
-    await act(async () => {
-      document.querySelector<HTMLButtonElement>('[data-item-delete="12"]')!.click();
-      await flushMicrotasks();
-    });
-    expect(confirm).toHaveBeenCalledTimes(1);
-    expect(currentState.deleteConversation).not.toHaveBeenCalled();
-
-    await act(async () => {
-      document.querySelector<HTMLButtonElement>('[data-item-delete="12"]')!.click();
-      await flushMicrotasks();
-    });
-    expect(currentState.deleteConversation).toHaveBeenCalledWith(12);
-    expect(currentState.deleteSelected).not.toHaveBeenCalled();
-    expect(currentState.toggleSelected).not.toHaveBeenCalled();
-    expect(currentState.selectedIds).toEqual([11]);
-    expect(onOpenConversation).not.toHaveBeenCalled();
-  });
-
   it('copies the exact trimmed original https URL from the source badge without activating the row', async () => {
     currentState.items[0].url = '  https://example.com/path?x=1#section  ';
     await renderPane();
@@ -380,8 +283,7 @@ describe('ConversationListPane row actions', () => {
       await flushMicrotasks();
     });
 
-    expect(currentState.copyConversationSourceLink).toHaveBeenCalledWith(11);
-    expect(writeTextToClipboardMock).not.toHaveBeenCalled();
+    expect(writeTextToClipboardMock).toHaveBeenCalledWith('https://example.com/path?x=1#section');
     expect(sourceButton?.querySelector('[data-conversation-source-link-check="11"]')?.textContent).toBe('✓');
     const sourceLabel = sourceButton?.querySelector('span:not([data-conversation-source-link-check])');
     expect(sourceLabel?.textContent).toBe('sourceChatgpt');
@@ -407,8 +309,7 @@ describe('ConversationListPane row actions', () => {
       await flushMicrotasks();
     });
 
-    expect(currentState.copyConversationSourceLink).toHaveBeenCalledWith(11);
-    expect(writeTextToClipboardMock).not.toHaveBeenCalled();
+    expect(writeTextToClipboardMock).toHaveBeenCalledWith('http://example.com/path#hash');
   });
 
   it.each(['', 'javascript:alert(1)', 'obsidian://open?vault=x'])(
@@ -420,12 +321,6 @@ describe('ConversationListPane row actions', () => {
 
       expect(sourceButton).toBeTruthy();
       expect(sourceButton?.disabled).toBe(true);
-      await act(async () => {
-        document.querySelector<HTMLButtonElement>('[data-item-more-trigger="11"]')!.click();
-        await flushMicrotasks();
-      });
-      expect(document.querySelector<HTMLButtonElement>('[data-item-copy-original-link="11"]')?.disabled).toBe(true);
-      expect(currentState.copyConversationSourceLink).not.toHaveBeenCalled();
       expect(writeTextToClipboardMock).not.toHaveBeenCalled();
     },
   );

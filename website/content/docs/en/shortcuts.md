@@ -25,11 +25,7 @@ For example, the sidebar defaults to `⌘ + \` on macOS and `Ctrl + \` on Window
 
 **Copy full Markdown** has one shortcut. It copies the current library entry in the list, or the open content in the detail pane; in a two-column layout, keyboard focus determines the target.
 
-**Copy original link**, **Export current item**, and **Delete current item** are configurable actions. They operate on the focused library item or open detail, regardless of multi-selection. The export shortcut downloads Markdown; deletion requires confirmation. Each item's **More** menu also provides copying the original link, Markdown/JSON export, sync destinations, and deletion.
-
-**Save current page** uses only the browser-level shortcut. Insights and Back remain available through the interface without in-app shortcuts.
-
-The multi-select toolbar is for bulk deletion, export, and sync, without shortcuts. Reader typography, theme, and narration settings stay in the More menu; play/pause and stop can still have shortcuts.
+**Export** and **Sync** have shortcuts for opening their menus; select the format or destination in the menu. Reader typography, theme, and narration settings stay in the More menu, while play/pause and stop can still have shortcuts.
 
 Hover over icon controls to see active shortcuts on a separate, subtler line below their descriptions.
 
