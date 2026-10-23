@@ -11,10 +11,11 @@ import { t } from '@i18n';
 import { useConversationsApp, ConversationsProvider } from '@viewmodels/conversations/conversations-context';
 import { ConversationsScene } from '@ui/conversations/ConversationsScene';
 import { buttonFilledClassName, buttonTintClassName, headerButtonClassName } from '@ui/shared/button-styles';
-import { AppTooltipHost, tooltipAttrs } from '@ui/shared/AppTooltip';
+import { AppTooltipHost, tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
 import { usePopupCurrentPageCapture } from '@viewmodels/popup/usePopupCurrentPageCapture';
 import { usePopupOpenCurrentTabInpageCommentsSidebar } from '@viewmodels/popup/usePopupOpenCurrentTabInpageCommentsSidebar';
 import { useAppThemeMode } from '@viewmodels/theme/useAppThemeMode';
+import { useInAppShortcuts } from '@viewmodels/shortcuts/useInAppShortcuts';
 
 type PopupSyncNudgeProvider = Extract<SyncProvider, 'notion' | 'feishu'>;
 
@@ -164,6 +165,12 @@ function PopupShellFrame() {
     window.close();
   }, []);
 
+  const shortcut = useInAppShortcuts({
+    'open-settings': () => {
+      void onOpenSettings().catch(() => {});
+    },
+  });
+
   const onOpenInsightSettings = useCallback(async () => {
     await openOrFocusExtensionAppTab({ route: '/settings?section=aboutyou' });
     window.close();
@@ -235,7 +242,7 @@ function PopupShellFrame() {
                   <>
                     <span
                       className="tw-inline-flex"
-                      {...tooltipAttrs(buttonDisabled ? status?.message || buttonLabel : buttonLabel)}
+                      {...tooltipAttrsWithShortcut(buttonDisabled ? status?.message || buttonLabel : buttonLabel, '')}
                     >
                       <button
                         type="button"
@@ -248,7 +255,7 @@ function PopupShellFrame() {
                       </button>
                     </span>
 
-                    <span className="tw-inline-flex" {...tooltipAttrs(commentsButton.tooltip)}>
+                    <span className="tw-inline-flex" {...tooltipAttrsWithShortcut(commentsButton.tooltip, '')}>
                       <button
                         type="button"
                         onClick={() => {
@@ -266,7 +273,7 @@ function PopupShellFrame() {
 
                     <button
                       type="button"
-                      {...tooltipAttrs(t('openSettings'))}
+                      {...tooltipAttrsWithShortcut(t('openSettings'), shortcut('open-settings'))}
                       onClick={() => onOpenSettings().catch(() => {})}
                       className={headerButtonClassName()}
                       aria-label={t('openSettingsAria')}

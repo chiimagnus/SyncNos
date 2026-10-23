@@ -16,7 +16,7 @@ vi.mock('../../src/ui/shared/AppTooltipImpl', async () => {
   };
 });
 
-import { AppTooltipHost, tooltipAttrs } from '../../src/ui/shared/AppTooltip';
+import { AppTooltipHost, tooltipAttrs, tooltipAttrsWithShortcut } from '../../src/ui/shared/AppTooltip';
 
 function setupDom() {
   const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
@@ -69,6 +69,17 @@ describe('AppTooltip deferred implementation', () => {
       'data-tooltip-place': 'right',
     });
     expect(tooltipAttrs('')).toEqual({});
+    expect(tooltipAttrsWithShortcut('Copy Notion link', 'Alt+Shift+C')).toMatchObject({
+      'data-tooltip-id': 'webclipper-tooltip',
+      'data-tooltip-content': 'Copy Notion link\nAlt+Shift+C',
+      'data-tooltip-shortcut': 'Alt+Shift+C',
+    });
+    expect(tooltipAttrsWithShortcut('Copy Notion link', '')['data-tooltip-content']).toBe('Copy Notion link');
+    expect(tooltipAttrsWithShortcut('', 'Alt+Shift+P')).toMatchObject({
+      'data-tooltip-content': 'Alt+Shift+P',
+      'data-tooltip-shortcut': 'Alt+Shift+P',
+    });
+    expect(tooltipAttrsWithShortcut('', '')).toEqual({});
     expect(mocks.implementationLoads).not.toHaveBeenCalled();
   });
 

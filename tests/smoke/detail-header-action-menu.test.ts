@@ -262,6 +262,61 @@ describe('DetailHeaderActionBar', () => {
     expect(disabledTrigger).not.toHaveBeenCalled();
   });
 
+  it('distinguishes link and Markdown copying while keeping low-frequency actions icon-free', () => {
+    const create = (
+      id: string,
+      label: string,
+      provider: string,
+      kind: 'copy-text' | 'open-target' | 'external-link',
+      slot: 'copy' | 'open' | 'tools' = 'tools',
+    ) => ({
+      id,
+      label,
+      provider,
+      kind,
+      slot,
+      onTrigger: vi.fn(async () => {}),
+    });
+    act(() => {
+      root!.render(
+        createElement(DetailHeaderActionBar, {
+          actions: [
+            create('open-in-notion', 'Open in Notion', 'notion', 'external-link', 'open'),
+            create('cache-images', 'Cache images', 'local', 'open-target'),
+            create('copy-original-link', 'Copy original link', 'source', 'copy-text'),
+            create('copy-full-markdown', 'Copy full Markdown', 'local', 'copy-text'),
+            create('export-markdown', 'Export as Markdown', 'local', 'open-target'),
+            create('export-json', 'Export as JSON', 'local', 'open-target'),
+            create('open-original', 'Open original', 'source', 'external-link'),
+            create('future-utility', 'Other action', 'local', 'open-target'),
+          ],
+          buttonClassName,
+          inlineMenuItems: true,
+        }),
+      );
+    });
+
+    const items = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
+    const entry = (label: string) => items.find((item) => item.getAttribute('aria-label') === label)!;
+    for (const label of ['Cache images', 'Open original', 'Other action']) {
+      const button = entry(label);
+      expect(button.querySelector('svg, img')).toBeFalsy();
+      const iconSlot = button.querySelector('span[aria-hidden="true"]');
+      expect(iconSlot?.className).toContain('tw-w-4');
+      expect(iconSlot?.className).toContain('tw-shrink-0');
+    }
+    expect(entry('Copy original link').querySelector('.lucide-link-2')).toBeTruthy();
+    expect(entry('Copy original link').querySelector('.lucide-copy')).toBeFalsy();
+    expect(entry('Copy full Markdown').querySelector('.lucide-copy')).toBeTruthy();
+    expect(entry('Copy full Markdown').querySelector('.lucide-link-2')).toBeFalsy();
+    expect(entry('Open in Notion').querySelector('[data-provider-logo="notion"]')).toBeTruthy();
+    expect(entry('Export as Markdown').querySelector('.lucide-file-text')).toBeTruthy();
+    expect(entry('Export as JSON').querySelector('.lucide-file-json')).toBeTruthy();
+    expect(items.every((item) => item.querySelector('span[aria-hidden="true"]')?.className.includes('tw-w-4'))).toBe(
+      true,
+    );
+  });
+
   it('reports an error instead of swallowing a failed action trigger', async () => {
     const alertSpy = vi.fn();
     Object.defineProperty(globalThis.window, 'alert', {
@@ -326,7 +381,8 @@ describe('DetailHeaderActionBar', () => {
       const button = document.querySelector('[aria-label="Copy Notion link"]') as HTMLButtonElement | null;
       expect(button).toBeTruthy();
       expect(button?.textContent || '').not.toContain('Copy Notion link');
-      expect(button?.getAttribute('data-tooltip-id')).toBeNull();
+      expect(button?.getAttribute('data-tooltip-id')).toBe('webclipper-tooltip');
+      expect(button?.getAttribute('data-tooltip-content')).toBe('Copy Notion link');
       expect(button?.querySelector('[data-provider-logo="notion"]')?.className || '').toContain('tw-h-4 tw-w-4');
 
       await act(async () => {
@@ -348,6 +404,60 @@ describe('DetailHeaderActionBar', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('shows each copy destination shortcut in its tooltip and right-aligned menu hint', async () => {
+    const notion = {
+      id: 'copy-notion-link',
+      label: 'Copy Notion link',
+      provider: 'notion' as const,
+      kind: 'copy-text' as const,
+      slot: 'copy' as const,
+      onTrigger: vi.fn(async () => {}),
+    };
+    const feishu = { ...notion, id: 'copy-feishu-link', label: 'Copy Feishu link', provider: 'feishu' as const };
+    const keys: Record<string, string> = {
+      'detail-copy-notion': 'Alt + Shift + N',
+      'detail-copy-feishu': 'Alt + Shift + F',
+    };
+    const render = () => {
+      act(() => {
+        root!.render(
+          createElement(DetailHeaderActionBar, {
+            actions: [notion, feishu],
+            buttonClassName,
+            getShortcut: (id) => keys[id] || '',
+            menuTriggerLabel: 'Copy link',
+          }),
+        );
+      });
+    };
+
+    render();
+    const primary = document.querySelector('[data-detail-header-primary-copy="true"]') as HTMLButtonElement;
+    expect(primary.getAttribute('data-tooltip-content')).toBe('Copy Notion link\nAlt + Shift + N');
+    expect(primary.getAttribute('data-tooltip-shortcut')).toBe('Alt + Shift + N');
+    const dropdown = document.querySelector('[aria-haspopup="menu"]') as HTMLButtonElement;
+    expect(dropdown.getAttribute('data-tooltip-content')).toBe('Copy link');
+
+    await act(async () => {
+      dropdown.click();
+      await Promise.resolve();
+    });
+    const items = Array.from(document.querySelectorAll('[role="menuitem"]')) as HTMLButtonElement[];
+    expect(items[0]?.textContent).toContain('Copy Notion link');
+    expect(items[0]?.getAttribute('data-tooltip-content')).toBeNull();
+    expect(items[1]?.getAttribute('data-tooltip-content')).toBeNull();
+    expect(items[0]?.querySelector('.webclipper-menu-shortcut')?.textContent).toBe('Alt + Shift + N');
+    expect(items[1]?.querySelector('.webclipper-menu-shortcut')?.textContent).toBe('Alt + Shift + F');
+    expect(items[0]?.querySelector('.webclipper-menu-shortcut')?.className).toContain('tw-ml-auto');
+
+    keys['detail-copy-notion'] = 'Ctrl + Alt + R';
+    delete keys['detail-copy-feishu'];
+    render();
+    expect(primary.getAttribute('data-tooltip-content')).toBe('Copy Notion link\nCtrl + Alt + R');
+    expect(items[0]?.querySelector('.webclipper-menu-shortcut')?.textContent).toBe('Ctrl + Alt + R');
+    expect(items[1]?.querySelector('.webclipper-menu-shortcut')).toBeNull();
   });
 
   it('clears stale success feedback before a later action that fails', async () => {

@@ -7,6 +7,9 @@ const getSyncMappingByConversationMock = vi.fn();
 const isSyncProviderEnabledMock = vi.fn();
 const writeTextToClipboardMock = vi.fn();
 const formatConversationMarkdownMock = vi.fn();
+const markdownExportMock = vi.fn();
+const jsonExportMock = vi.fn();
+const downloadBlobFileMock = vi.fn();
 const { storageGetMock, storageSetMock } = vi.hoisted(() => ({
   storageGetMock: vi.fn(),
   storageSetMock: vi.fn(),
@@ -25,6 +28,11 @@ vi.mock('@services/integrations/openin/obsidian-open-target', () => ({
   reportObsidianOpenError: vi.fn(),
 }));
 
+vi.mock('@services/conversations/client/repo', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@services/conversations/client/repo')>()),
+  getConversationById: (...args: any[]) => getConversationByIdMock(...args),
+}));
+
 vi.mock('@services/conversations/data/storage-idb', () => ({
   getConversationById: (...args: any[]) => getConversationByIdMock(...args),
   getSyncMappingByConversation: (...args: any[]) => getSyncMappingByConversationMock(...args),
@@ -40,6 +48,18 @@ vi.mock('@services/sync/sync-provider-gate', async (importOriginal) => {
 
 vi.mock('@services/shared/clipboard', () => ({
   writeTextToClipboard: (...args: any[]) => writeTextToClipboardMock(...args),
+}));
+
+vi.mock('@services/shared/webext', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@services/shared/webext')>()),
+  downloadBlobFile: (...args: any[]) => downloadBlobFileMock(...args),
+}));
+
+vi.mock('@services/sync/local/markdown-export', () => ({
+  buildConversationsMarkdownZipExport: (...args: any[]) => markdownExportMock(...args),
+}));
+vi.mock('@services/sync/local/json-export', () => ({
+  buildConversationsJsonZipExport: (...args: any[]) => jsonExportMock(...args),
 }));
 
 vi.mock('@services/conversations/external-markdown', () => ({
@@ -146,6 +166,10 @@ describe('detail-header-actions', () => {
     writeTextToClipboardMock.mockResolvedValue(true);
     formatConversationMarkdownMock.mockReset();
     formatConversationMarkdownMock.mockResolvedValue('# exact markdown\n');
+    const zipBlob = new Blob(['test'], { type: 'application/zip' });
+    markdownExportMock.mockReset().mockResolvedValue({ zipBlob, filename: 'selected-md.zip' });
+    jsonExportMock.mockReset().mockResolvedValue({ zipBlob, filename: 'selected-json.zip' });
+    downloadBlobFileMock.mockReset();
     storageGetMock.mockReset();
     storageGetMock.mockResolvedValue({});
     storageSetMock.mockReset();
@@ -212,10 +236,48 @@ describe('detail-header-actions', () => {
 
     expect(bySlot(actions, 'open')).toEqual([]);
     expect(bySlot(actions, 'copy')).toEqual([]);
-    expect(bySlot(actions, 'tools').map((action) => action.id)).toEqual(['copy-full-markdown', 'open-original']);
+    expect(bySlot(actions, 'tools').map((action) => action.id)).toEqual([
+      'copy-full-markdown',
+      'export-markdown',
+      'export-json',
+      'open-original',
+    ]);
     expect(byId(actions, 'copy-full-markdown')?.disabled).toBe(true);
     expect(byId(actions, 'open-original')?.disabled).toBe(true);
     expect(getSyncMappingByConversationMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('copies the original URL and exports only the current item using fresh read-back', async () => {
+    const conversation = {
+      id: 42,
+      source: 'web',
+      sourceType: 'article',
+      conversationKey: 'story-42',
+      url: 'https://example.com/story',
+      title: 'Story',
+    };
+    const actions = await resolveDetailHeaderActions({ conversation });
+    expect(byId(actions, 'copy-original-link')?.slot).toBe('tools');
+    expect(bySlot(actions, 'copy')).toEqual([]);
+    expect(byId(actions, 'copy-original-link')?.label).toBe(t('keyboardShortcutsCopyOriginalLink'));
+    expect(byId(actions, 'export-markdown')?.label).toBe(t('detailExportAsMarkdown'));
+    expect(byId(actions, 'export-json')?.label).toBe(t('detailExportAsJson'));
+    await byId(actions, 'copy-original-link')?.onTrigger();
+    expect(writeTextToClipboardMock).toHaveBeenCalledWith('https://example.com/story');
+
+    getConversationByIdMock.mockResolvedValue(conversation);
+    await byId(actions, 'export-markdown')?.onTrigger();
+    expect(markdownExportMock).toHaveBeenCalledWith({ conversations: [conversation] });
+    expect(downloadBlobFileMock).toHaveBeenCalledWith(expect.any(Blob), 'selected-md.zip');
+
+    await byId(actions, 'export-json')?.onTrigger();
+    expect(jsonExportMock).toHaveBeenCalledWith({ conversations: [conversation] });
+    expect(downloadBlobFileMock).toHaveBeenCalledWith(expect.any(Blob), 'selected-json.zip');
+
+    getConversationByIdMock.mockResolvedValue(null);
+    await expect(byId(actions, 'export-markdown')?.onTrigger()).rejects.toThrow();
+    expect(markdownExportMock).toHaveBeenCalledTimes(1);
+    expect(downloadBlobFileMock).toHaveBeenCalledTimes(2);
   });
 
   it('keeps Open in Notion and derives a copy action with the exact same href', async () => {

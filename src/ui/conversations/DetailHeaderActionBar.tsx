@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Copy, ExternalLink, ImageDown } from 'lucide-react';
+import { Copy, FileJson, FileText, Link2 } from 'lucide-react';
 
 import type { DetailHeaderAction } from '@services/integrations/detail-header-action-types';
+import { DETAIL_ACTION_SHORTCUTS, type InAppShortcutAction } from '@services/shortcuts/in-app-shortcuts';
 import { t } from '@i18n';
 import { buttonMenuItemClassName } from '@ui/shared/button-styles';
 import { MenuPopover } from '@ui/shared/MenuPopover';
-import { tooltipAttrs } from '@ui/shared/AppTooltip';
+import { tooltipAttrs, tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
 
 type DetailHeaderActionBarProps = {
   actions: DetailHeaderAction[];
@@ -15,6 +16,8 @@ type DetailHeaderActionBarProps = {
   menuTriggerLabel?: string;
   menuTriggerAriaLabel?: string;
   menuAriaLabel?: string;
+  getShortcut?: (action: InAppShortcutAction) => string;
+  shortcutCopiedActionId?: string;
   className?: string;
 };
 
@@ -52,6 +55,8 @@ export function DetailHeaderActionBar({
   menuTriggerLabel,
   menuTriggerAriaLabel,
   menuAriaLabel,
+  getShortcut,
+  shortcutCopiedActionId,
   className,
 }: DetailHeaderActionBarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -107,12 +112,15 @@ export function DetailHeaderActionBar({
 
   if (!actions.length) return null;
 
-  const copyOnly = actions.every((action) => action.kind === 'copy-text');
+  const actionShortcut = (action: DetailHeaderAction) => {
+    const id = DETAIL_ACTION_SHORTCUTS[action.id as keyof typeof DETAIL_ACTION_SHORTCUTS];
+    return id ? getShortcut?.(id) || '' : '';
+  };
   const resolveActionTooltipAttrs = (action: DetailHeaderAction) =>
-    action.kind === 'copy-text' ? {} : tooltipAttrs(action.label);
+    tooltipAttrsWithShortcut(action.label, actionShortcut(action));
 
   const resolveActionIcon = (action: DetailHeaderAction) => {
-    if (action.kind === 'copy-text' && copiedActionId === action.id) {
+    if (action.kind === 'copy-text' && (copiedActionId === action.id || shortcutCopiedActionId === action.id)) {
       return (
         <span
           className="tw-inline-flex tw-h-4 tw-w-4 tw-items-center tw-justify-center"
@@ -125,10 +133,11 @@ export function DetailHeaderActionBar({
     }
     const logo = providerLogo(action);
     if (logo) return logo;
+    if (action.id === 'copy-original-link') return <Link2 size={16} strokeWidth={2} aria-hidden="true" />;
+    if (action.id === 'export-markdown') return <FileText size={16} strokeWidth={2} aria-hidden="true" />;
+    if (action.id === 'export-json') return <FileJson size={16} strokeWidth={2} aria-hidden="true" />;
     if (action.kind === 'copy-text') return <Copy size={16} strokeWidth={2} aria-hidden="true" />;
-    if (action.provider === 'source' && action.kind === 'external-link')
-      return <ExternalLink size={16} strokeWidth={2} aria-hidden="true" />;
-    return <ImageDown size={16} strokeWidth={2} aria-hidden="true" />;
+    return null;
   };
 
   if (inlineMenuItems) {
@@ -148,10 +157,20 @@ export function DetailHeaderActionBar({
               closeMenuOnActionTrigger?.();
             }}
           >
-            <span className="tw-inline-flex tw-items-center tw-gap-1.5">
-              {resolveActionIcon(action)}
+            <span className="tw-inline-flex tw-items-center tw-gap-2">
+              <span
+                className="tw-inline-flex tw-h-4 tw-w-4 tw-shrink-0 tw-items-center tw-justify-center"
+                aria-hidden="true"
+              >
+                {resolveActionIcon(action)}
+              </span>
               <span className="tw-whitespace-normal tw-break-words">{action.label}</span>
             </span>
+            {actionShortcut(action) ? (
+              <span className="webclipper-menu-shortcut tw-ml-auto tw-shrink-0" aria-hidden="true">
+                {actionShortcut(action)}
+              </span>
+            ) : null}
           </button>
         ))}
       </div>
@@ -175,6 +194,7 @@ export function DetailHeaderActionBar({
         <button
           key={action.id}
           type="button"
+          data-detail-header-primary-copy={action.slot === 'copy' ? 'true' : undefined}
           {...resolveActionTooltipAttrs(action)}
           onClick={() => {
             void handleTrigger(action);
@@ -205,6 +225,7 @@ export function DetailHeaderActionBar({
         <button
           key={primaryAction.id}
           type="button"
+          data-detail-header-primary-copy={primaryAction.slot === 'copy' ? 'true' : undefined}
           {...resolveActionTooltipAttrs(primaryAction)}
           onClick={() => {
             void handleTrigger(primaryAction);
@@ -229,7 +250,7 @@ export function DetailHeaderActionBar({
           trigger={(triggerProps) => (
             <button
               {...triggerProps}
-              {...(copyOnly ? {} : tooltipAttrs(resolvedMenuTriggerLabel))}
+              {...tooltipAttrs(resolvedMenuTriggerLabel)}
               aria-label={resolvedMenuTriggerAriaLabel}
               className={buttonClassName}
             >
@@ -260,6 +281,11 @@ export function DetailHeaderActionBar({
                 {providerLogo(action)}
                 <span className="tw-whitespace-normal tw-break-words">{action.label}</span>
               </span>
+              {actionShortcut(action) ? (
+                <span className="webclipper-menu-shortcut tw-ml-auto tw-shrink-0" aria-hidden="true">
+                  {actionShortcut(action)}
+                </span>
+              ) : null}
             </button>
           ))}
         </MenuPopover>

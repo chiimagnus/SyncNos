@@ -169,6 +169,7 @@ describe('ReaderHeaderToolbar', () => {
           commitPreview: mocks.commitPreview,
           themeMode: 'system',
           updateThemeMode: mocks.updateThemeMode,
+          narrationShortcut: '⌥ + ⇧ + R',
           narration: {
             state: 'paused',
             isPlaying: false,
@@ -233,6 +234,9 @@ describe('ReaderHeaderToolbar', () => {
     expect(mocks.update).toHaveBeenCalledWith({ tts: { rate: 1.5 } });
     expect(mocks.toggle).toHaveBeenCalledTimes(1);
     expect(mocks.stop).toHaveBeenCalledTimes(1);
+    const playPause = document.querySelector('[data-reader-narration-play-pause="true"]');
+    expect(playPause?.getAttribute('data-tooltip-content')).toBe('readerNarrationPlay\n⌥ + ⇧ + R');
+    expect(playPause?.getAttribute('data-tooltip-shortcut')).toBe('⌥ + ⇧ + R');
   });
 
   it('commits dirty-capable panels on every exit and skips theme-only transitions', () => {
@@ -246,6 +250,7 @@ describe('ReaderHeaderToolbar', () => {
           commitPreview: mocks.commitPreview,
           themeMode: 'system',
           updateThemeMode: mocks.updateThemeMode,
+          narrationShortcut: '⌥ + ⇧ + R',
           narration: {
             state: 'paused',
             isPlaying: false,

@@ -1,6 +1,8 @@
 import type { Conversation, ConversationDetail } from '@services/conversations/domain/models';
 import { t } from '@i18n';
 import { writeTextToClipboard } from '@services/shared/clipboard';
+import { downloadBlobFile } from '@services/shared/webext';
+import { getConversationById } from '@services/conversations/client/repo';
 import {
   prioritizeDetailHeaderCopyLinkActions,
   readLastDetailHeaderCopyLinkActionId,
@@ -30,6 +32,19 @@ async function openDetailHeaderProtocolUrl(url: string): Promise<boolean> {
   return launchObsidianApp(safeUrl);
 }
 
+async function exportDetailConversation(conversation: Conversation | null | undefined, format: 'markdown' | 'json') {
+  const id = Number(conversation?.id);
+  if (!Number.isSafeInteger(id) || id <= 0) throw new Error(t('exportFailedFallback'));
+  const fresh = await getConversationById(id);
+  if (!fresh || Number(fresh.id) !== id) throw new Error(t('exportFailedFallback'));
+  const build =
+    format === 'markdown'
+      ? (await import('@services/sync/local/markdown-export')).buildConversationsMarkdownZipExport
+      : (await import('@services/sync/local/json-export')).buildConversationsJsonZipExport;
+  const { zipBlob, filename } = await build({ conversations: [fresh] });
+  downloadBlobFile(zipBlob, filename);
+}
+
 const defaultDetailHeaderActionPort: DetailHeaderActionPort = {
   openExternalUrl,
   launchProtocolUrl: openDetailHeaderProtocolUrl,
@@ -50,8 +65,23 @@ function buildDetailUtilityActions({
     conversation && detail && Number(detail.conversationId) === Number(conversation.id) ? detail : null;
   const sourceTarget = resolveSourceOpenTarget(conversation);
   const safeOriginalUrl = sourceTarget.available ? String(sourceTarget.target || '') : '';
+  const copyableUrl = normalizeHttpUrl(safeOriginalUrl);
 
   return [
+    ...(copyableUrl
+      ? [
+          {
+            id: 'copy-original-link',
+            label: t('keyboardShortcutsCopyOriginalLink'),
+            kind: 'copy-text' as const,
+            provider: 'source',
+            slot: 'tools' as const,
+            onTrigger: async () => {
+              if (!(await writeTextToClipboard(copyableUrl))) throw new Error(t('copyFailed'));
+            },
+          },
+        ]
+      : []),
     {
       id: 'copy-full-markdown',
       label: t('copyFullMarkdown'),
@@ -67,6 +97,24 @@ function buildDetailUtilityActions({
         const copied = await writeTextToClipboard(markdown);
         if (!copied) throw new Error(t('copyFailed'));
       },
+    },
+    {
+      id: 'export-markdown',
+      label: t('detailExportAsMarkdown'),
+      kind: 'open-target',
+      provider: 'local',
+      slot: 'tools',
+      disabled: !conversation,
+      onTrigger: () => exportDetailConversation(conversation, 'markdown'),
+    },
+    {
+      id: 'export-json',
+      label: t('detailExportAsJson'),
+      kind: 'open-target',
+      provider: 'local',
+      slot: 'tools',
+      disabled: !conversation,
+      onTrigger: () => exportDetailConversation(conversation, 'json'),
     },
     {
       id: 'open-original',

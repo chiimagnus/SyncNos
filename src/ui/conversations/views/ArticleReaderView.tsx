@@ -31,6 +31,7 @@ import { publishReaderPerformanceStats, readReaderPerformanceClock } from '@ui/r
 import { ReaderHeaderToolbar } from '@ui/reader/ReaderHeaderToolbar';
 import { ReaderToolbar } from '@ui/reader/ReaderToolbar';
 import { useReaderNarration } from '@viewmodels/reader/useReaderNarration';
+import { useInAppShortcuts } from '@viewmodels/shortcuts/useInAppShortcuts';
 import { useSyncnosAssetSrcMap } from '@viewmodels/conversations/useSyncnosAssetSrcMap';
 import { useReaderPrefs } from '@viewmodels/reader/useReaderPrefs';
 import { useAppThemeMode } from '@viewmodels/theme/useAppThemeMode';
@@ -434,6 +435,15 @@ export function ArticleReaderView({
     [getFirstVisibleSentenceIndex, narration],
   );
 
+  const narrationShortcutReady =
+    features.narration &&
+    !loadingDetail &&
+    !detailError &&
+    !!narrationSource.trim() &&
+    Number(selected?.id) === Number(activeId) &&
+    (!detail?.conversationId || Number(detail.conversationId) === Number(activeId));
+  const shortcut = useInAppShortcuts({ 'reader-play-pause': () => toolbarNarration.toggle() }, narrationShortcutReady);
+
   const headerToolbar = useMemo(() => {
     if (!readerToolbarPortalTarget) return null;
     if (!features.textLayout && !features.theme && !features.narration) return null;
@@ -447,6 +457,7 @@ export function ArticleReaderView({
         themeMode={themeMode}
         updateThemeMode={updateThemeMode}
         narration={toolbarNarration}
+        narrationShortcut={shortcut('reader-play-pause')}
       />,
       readerToolbarPortalTarget,
     );
@@ -458,6 +469,7 @@ export function ArticleReaderView({
     readerToolbarPortalTarget,
     themeMode,
     toolbarNarration,
+    shortcut,
     update,
     updateThemeMode,
   ]);

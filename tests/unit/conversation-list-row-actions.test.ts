@@ -6,6 +6,12 @@ import { act, createElement } from 'react';
 import { ConversationListPane } from '../../src/ui/conversations/ConversationListPane';
 
 const writeTextToClipboardMock = vi.fn();
+const shortcutStorage = vi.hoisted(() => ({ get: vi.fn(), onChanged: vi.fn() }));
+
+vi.mock('../../src/services/shared/storage', () => ({
+  storageGet: (...args: any[]) => shortcutStorage.get(...args),
+  storageOnChanged: (...args: any[]) => shortcutStorage.onChanged(...args),
+}));
 let currentState: any = null;
 
 vi.mock('../../src/ui/i18n', () => ({
@@ -39,6 +45,7 @@ function setupDom() {
   Object.defineProperty(globalThis, 'document', { configurable: true, value: dom.window.document });
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: dom.window.navigator });
   Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: dom.window.HTMLElement });
+  Object.defineProperty(globalThis, 'Element', { configurable: true, value: dom.window.Element });
   Object.defineProperty(globalThis, 'Node', { configurable: true, value: dom.window.Node });
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: dom.window.localStorage });
   Object.defineProperty(globalThis, 'getComputedStyle', {
@@ -53,6 +60,7 @@ function cleanupDom() {
   delete (globalThis as any).document;
   delete (globalThis as any).navigator;
   delete (globalThis as any).HTMLElement;
+  delete (globalThis as any).Element;
   delete (globalThis as any).Node;
   delete (globalThis as any).localStorage;
   delete (globalThis as any).getComputedStyle;
@@ -130,6 +138,10 @@ describe('ConversationListPane row actions', () => {
     vi.useFakeTimers();
     setupDom();
     vi.clearAllMocks();
+    shortcutStorage.get.mockResolvedValue({
+      in_app_shortcuts_v3: { 'source-filter': 'Alt+Shift+F', 'site-filter': 'Alt+Shift+D' },
+    });
+    shortcutStorage.onChanged.mockReturnValue(() => {});
     const built = buildState();
     conversation = built.conversation;
     currentState = built.state;
@@ -154,6 +166,58 @@ describe('ConversationListPane row actions', () => {
       await flushMicrotasks();
     });
   }
+
+  it('opens source and domain filters through configurable keys without changing filters prematurely', async () => {
+    await renderPane();
+
+    const source = document.querySelector<HTMLButtonElement>('#sourceFilterSelect')!;
+    expect(source.getAttribute('aria-expanded')).toBe('false');
+    expect(source.getAttribute('data-tooltip-shortcut')).toBe('Alt + Shift + F');
+
+    const press = (key: string, code: string) => {
+      const event = new window.KeyboardEvent('keydown', {
+        key,
+        code,
+        altKey: true,
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      act(() => document.dispatchEvent(event));
+      return event;
+    };
+
+    expect(press('f', 'KeyF').defaultPrevented).toBe(true);
+    expect(source.getAttribute('aria-expanded')).toBe('true');
+    expect(currentState.setListSourceFilterKeyPersistent).not.toHaveBeenCalled();
+
+    const chatgpt = document.querySelector<HTMLButtonElement>(
+      '[role="menu"][aria-label="sourceFilterAria"] [role="menuitemradio"]',
+    );
+    expect(chatgpt).toBeTruthy();
+    await act(async () => {
+      chatgpt!.click();
+      await flushMicrotasks();
+    });
+    expect(currentState.setListSourceFilterKeyPersistent).toHaveBeenCalled();
+    expect(source.getAttribute('aria-expanded')).toBe('false');
+
+    currentState.listSourceFilterKey = 'web';
+    currentState.listFacets = {
+      sources: [{ key: 'web', label: 'Web', count: 1 }],
+      sites: [{ key: 'example.com', label: 'example.com', count: 1 }],
+    };
+    await renderPane();
+    const site = document.querySelector<HTMLButtonElement>('#siteFilterSelect')!;
+    expect(site.getAttribute('data-tooltip-shortcut')).toBe('Alt + Shift + D');
+    expect(press('d', 'KeyD').defaultPrevented).toBe(true);
+    expect(site.getAttribute('aria-expanded')).toBe('true');
+
+    currentState.selectedIds = [11];
+    await renderPane();
+    expect(press('d', 'KeyD').defaultPrevented).toBe(false);
+    expect(press('f', 'KeyF').defaultPrevented).toBe(false);
+  });
 
   it('copies full markdown through the shared clipboard and keeps row activation isolated', async () => {
     await renderPane();
