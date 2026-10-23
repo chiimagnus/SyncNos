@@ -45,9 +45,10 @@ export const IN_APP_SHORTCUT_ACTIONS = [
   { id: 'detail-export-markdown', group: 'detail', labelKey: 'markdownExport', defaultKey: '' },
   { id: 'detail-export-json', group: 'detail', labelKey: 'jsonExport', defaultKey: '' },
   { id: 'detail-comments', group: 'detail', labelKey: 'openCommentsSidebar', defaultKey: '' },
+  { id: 'reader-play-pause', group: 'reader', labelKey: 'keyboardShortcutsReaderPlayPause', defaultKey: '' },
 ] as const satisfies ReadonlyArray<{
   id: string;
-  group: 'navigation' | 'filters' | 'detail';
+  group: 'navigation' | 'filters' | 'detail' | 'reader';
   labelKey: string;
   defaultKey: string;
 }>;

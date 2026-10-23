@@ -49,6 +49,8 @@ export const en = {
   keyboardShortcutsNavigationGroup: 'General',
   keyboardShortcutsFiltersGroup: 'Filters',
   keyboardShortcutsDetailGroup: 'Details',
+  keyboardShortcutsReaderGroup: 'Reader',
+  keyboardShortcutsReaderPlayPause: 'Play / pause narration',
   keyboardShortcutsToggleSidebar: 'Toggle library sidebar',
   keyboardShortcutsPreviousConversation: 'Previous conversation',
   keyboardShortcutsNextConversation: 'Next conversation',

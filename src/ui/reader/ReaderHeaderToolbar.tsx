@@ -9,6 +9,7 @@ import {
   menuChevronClassName,
 } from '@ui/shared/button-styles';
 import { MenuPopover } from '@ui/shared/MenuPopover';
+import { tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
 import { NarrationPanel } from '@ui/reader/NarrationPanel';
 import { TextLayoutPanel } from '@ui/reader/TextLayoutPanel';
 import { ThemePanel } from '@ui/reader/ThemePanel';
@@ -31,6 +32,7 @@ type ReaderHeaderToolbarProps = {
   themeMode: AppThemeMode;
   updateThemeMode: (mode: AppThemeMode) => void | Promise<void>;
   narration: ReaderHeaderNarration;
+  narrationShortcut?: string;
   className?: string;
 };
 
@@ -52,6 +54,7 @@ export function ReaderHeaderToolbar({
   themeMode,
   updateThemeMode,
   narration,
+  narrationShortcut,
   className,
 }: ReaderHeaderToolbarProps) {
   const [openPanel, setOpenPanel] = useState<OpenPanel>(null);
@@ -178,7 +181,8 @@ export function ReaderHeaderToolbar({
                 type="button"
                 className={headerNarrationTransportButtonClassName(true)}
                 aria-label={narrationActionLabel}
-                title={narrationActionLabel}
+                data-reader-narration-play-pause="true"
+                {...tooltipAttrsWithShortcut(narrationActionLabel, narrationShortcut, 'bottom')}
                 aria-pressed={narration.isPlaying || narration.state === 'loading'}
                 onClick={() => narration.toggle()}
               >

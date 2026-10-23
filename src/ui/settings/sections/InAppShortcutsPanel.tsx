@@ -18,6 +18,7 @@ const GROUPS = [
   { key: 'navigation', label: 'keyboardShortcutsNavigationGroup' },
   { key: 'filters', label: 'keyboardShortcutsFiltersGroup' },
   { key: 'detail', label: 'keyboardShortcutsDetailGroup' },
+  { key: 'reader', label: 'keyboardShortcutsReaderGroup' },
 ] as const;
 
 export function InAppShortcutsPanel() {

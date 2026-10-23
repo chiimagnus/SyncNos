@@ -54,7 +54,7 @@ describe('in-app shortcut contract', () => {
     const assigned = Object.values(defaults).filter(Boolean);
     expect(new Set(assigned).size).toBe(assigned.length);
     expect(defaults['toggle-sidebar']).toBe('Mod+Backslash');
-    expect(ids).toHaveLength(19);
+    expect(ids).toHaveLength(20);
     expect(ids.filter((id) => id.startsWith('detail-'))).toHaveLength(13);
     expect(defaults['detail-copy-notion']).toBe('');
     expect(ids).toContain('detail-copy-feishu');
@@ -82,6 +82,7 @@ describe('in-app shortcut contract', () => {
     expect(defaults['detail-copy-original']).toBe('');
     expect(ids).toContain('detail-copy-markdown');
     expect(ids).toContain('detail-comments');
+    expect(ids).toContain('reader-play-pause');
     expect(ids).toContain('previous-conversation');
     expect(ids).toContain('next-conversation');
     expect(ids).toContain('source-filter');
@@ -115,7 +116,6 @@ describe('in-app shortcut contract', () => {
       'copy-markdown',
       'export-item',
       'delete-item',
-      'reader-play-pause',
     ]) {
       expect(ids).not.toContain(removed);
     }
@@ -330,7 +330,7 @@ describe('in-app shortcut contract', () => {
     const current = await readInAppShortcutBindings();
     expect(current['toggle-sidebar']).toBe('Alt+Shift+Y');
     expect(current['detail-copy-original']).toBe('');
-    expect(Object.keys(current)).toHaveLength(19);
+    expect(Object.keys(current)).toHaveLength(20);
     await expect(updateInAppShortcutBinding('detail-copy-original', 'Alt+Shift+Y')).rejects.toMatchObject({
       code: 'conflict',
       conflictingAction: 'toggle-sidebar',

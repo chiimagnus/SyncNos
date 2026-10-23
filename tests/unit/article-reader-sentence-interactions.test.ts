@@ -44,6 +44,12 @@ vi.mock('../../src/ui/reader/ArticleOutlineMinimap', () => ({
   useArticleOutlineMinimap: () => outlineState,
 }));
 
+vi.mock('../../src/services/shared/storage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/services/shared/storage')>()),
+  storageGet: async () => ({ in_app_shortcuts_v3: { 'reader-play-pause': 'Alt+Shift+R' } }),
+  storageOnChanged: () => () => {},
+}));
+
 vi.mock('../../src/viewmodels/reader/useReaderNarration', () => ({
   useReaderNarration: (source: string) => {
     mocks.sources.push(source);
@@ -236,6 +242,7 @@ function normalizeText(value: string): string {
 function renderArticle(
   root: ReactDOM.Root,
   markdown = 'Alpha sentence with [link](https://example.com). Beta sentence.',
+  overrides: Partial<Parameters<typeof ArticleReaderView>[0]> = {},
 ) {
   const detail = {
     messages: [{ id: 1, role: 'assistant', contentMarkdown: markdown, conversationId: 42 }],
@@ -251,6 +258,7 @@ function renderArticle(
         detailError: null,
         setMessagesRootRef: () => {},
         readerFeatures: { textLayout: true, theme: true, narration: true },
+        ...overrides,
       }),
     );
   });
@@ -300,6 +308,47 @@ describe('ArticleReaderView sentence interactions', () => {
     });
     root = null;
     cleanupDom();
+  });
+
+  it('toggles actual narration via the configured shortcut only for ready article content', async () => {
+    const press = () => {
+      const event = new window.KeyboardEvent('keydown', {
+        key: 'r',
+        code: 'KeyR',
+        altKey: true,
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      act(() => document.dispatchEvent(event));
+      return event;
+    };
+
+    renderArticle(root!);
+    await flushDom();
+    expect(press().defaultPrevented).toBe(true);
+    expect(mocks.toggle).toHaveBeenCalledTimes(1);
+    expect(mocks.toggle).toHaveBeenCalledWith(0);
+
+    Object.assign(narrationState, { state: 'paused', isPlaying: false });
+    renderArticle(root!);
+    await flushDom();
+    expect(press().defaultPrevented).toBe(true);
+    expect(mocks.toggle).toHaveBeenCalledTimes(2);
+
+    renderArticle(root!, 'Another paragraph.', { loadingDetail: true });
+    await flushDom();
+    expect(press().defaultPrevented).toBe(false);
+    renderArticle(root!, 'Another paragraph.', { loadingDetail: false, activeId: 99 });
+    await flushDom();
+    expect(press().defaultPrevented).toBe(false);
+    renderArticle(root!, 'Another paragraph.', {
+      activeId: 42,
+      readerFeatures: { textLayout: true, theme: true, narration: false },
+    });
+    await flushDom();
+    expect(press().defaultPrevented).toBe(false);
+    expect(mocks.toggle).toHaveBeenCalledTimes(2);
   });
 
   it('decorates sentences only after narration is engaged and keeps spans stable across rerender', async () => {

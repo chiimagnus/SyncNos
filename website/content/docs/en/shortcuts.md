@@ -11,6 +11,7 @@ You can configure shortcuts for:
 
 - **Navigation:** Settings, toggling the sidebar, and switching to the previous or next conversation.
 - **Filters:** Open the source filter, or the domain filter when browsing web sources.
+- **Reader:** Play or pause narration when reading article or video content.
 - **Conversation details:** Copy the original, Notion, Feishu, or GitHub link; open the original, Notion, Obsidian, Feishu, or GitHub destination; copy full Markdown; export Markdown or JSON; and toggle the comments sidebar.
 
 Buttons such as **More**, Back, Insights, batch-selection actions, and reader layout controls have no separate shortcuts. Detail actions target **the open conversation**, never the multi-selection toolbar. Unavailable actions do not intercept key presses. Previous/Next follows the current list order among loaded conversations; it stops at the first/last loaded entry without wrapping or automatically fetching another page.
