@@ -22,6 +22,11 @@ npm run dev
 
 Safari/Xcode 集成使用 `npm run setup:safari:xcode`。排障见 [`troubleshooting.md`](troubleshooting.md)。
 
+## Git 提交
+
+- 一个提交只包含一项可独立理解、验证和回退的逻辑改动，以及相应的测试和必要文档；每完成并验证一项就提交，不把多项功能攒成一次大提交。
+- 只暂存该项相关文件，并检查 `git diff --cached`；中文标题概括结果，正文说明改动、原因和实际验证。`git commit` 不代表获得 `git push` 授权。
+
 ## Pull Request
 
 - 说明问题、实际范围和明确非目标，不只列文件名。
