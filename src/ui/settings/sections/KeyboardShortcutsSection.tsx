@@ -1,6 +1,7 @@
 import { t } from '@i18n';
 import type { TranslationKey } from '@i18n/locales/en';
 import { buttonClassName, cardClassName } from '@ui/settings/ui';
+import { InAppShortcutsPanel } from '@ui/settings/sections/InAppShortcutsPanel';
 import type {
   KeyboardShortcutAction,
   KeyboardShortcutsControllerItem,
@@ -28,66 +29,69 @@ export function KeyboardShortcutsSection(props: KeyboardShortcutsSectionProps) {
   const shortcutByAction = new Map(items.map((item) => [item.action, item.shortcut]));
 
   return (
-    <section className={cardClassName} aria-label={t('keyboardShortcutsHeading')}>
-      <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
-        {t('keyboardShortcutsHeading')}
-      </h2>
-      <div className="tw-mt-3 tw-grid tw-divide-y tw-divide-[var(--border)]">
-        {ACTION_ROWS.map(({ action, labelKey }) => {
-          const shortcut = shortcutByAction.get(action) || '';
-          return (
-            <div
-              key={action}
-              className="tw-flex tw-min-w-0 tw-items-center tw-justify-between tw-gap-3 tw-py-2 first:tw-pt-0 last:tw-pb-0"
-            >
-              <span className="tw-min-w-0 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
-                {t(labelKey)}
-              </span>
-              {loading ? (
-                <span className="tw-shrink-0 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-70">
-                  {t('loadingDots')}
+    <div className="tw-grid tw-gap-4">
+      <section className={cardClassName} aria-label={t('keyboardShortcutsHeading')}>
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
+          {t('keyboardShortcutsBrowserHeading')}
+        </h2>
+        <div className="tw-mt-3 tw-grid tw-divide-y tw-divide-[var(--border)]">
+          {ACTION_ROWS.map(({ action, labelKey }) => {
+            const shortcut = shortcutByAction.get(action) || '';
+            return (
+              <div
+                key={action}
+                className="tw-flex tw-min-w-0 tw-items-center tw-justify-between tw-gap-3 tw-py-2 first:tw-pt-0 last:tw-pb-0"
+              >
+                <span className="tw-min-w-0 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
+                  {t(labelKey)}
                 </span>
-              ) : unsupported ? (
-                <span
-                  className="tw-shrink-0 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]"
-                  aria-hidden="true"
-                >
-                  —
-                </span>
-              ) : shortcut ? (
-                <kbd className="tw-max-w-[55%] tw-shrink-0 tw-overflow-hidden tw-text-ellipsis tw-whitespace-nowrap tw-rounded-[var(--radius-inline)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-2 tw-py-1 tw-font-mono tw-text-xs tw-font-bold tw-text-[var(--text-primary)]">
-                  {shortcut}
-                </kbd>
-              ) : (
-                <span className="tw-shrink-0 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-80">
-                  {t('keyboardShortcutsUnassigned')}
-                </span>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {!loading && unsupported ? (
-        <p className="tw-mb-0 tw-mt-3 tw-text-xs tw-font-semibold tw-leading-relaxed tw-text-[var(--text-secondary)]">
-          {t('keyboardShortcutsUnsupported')}
-        </p>
-      ) : !loading && managerAccess === 'manual' ? (
-        <p className="tw-mb-0 tw-mt-3 tw-text-xs tw-font-semibold tw-leading-relaxed tw-text-[var(--text-secondary)]">
-          {t('keyboardShortcutsManualHint')}
-        </p>
-      ) : !loading && managerAccess === 'openable' ? (
-        <div className="tw-mt-3">
-          <button
-            type="button"
-            className={buttonClassName}
-            onClick={onOpenManager}
-            aria-label={t('keyboardShortcutsManage')}
-          >
-            {t('keyboardShortcutsManage')}
-          </button>
+                {loading ? (
+                  <span className="tw-shrink-0 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-70">
+                    {t('loadingDots')}
+                  </span>
+                ) : unsupported ? (
+                  <span
+                    className="tw-shrink-0 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]"
+                    aria-hidden="true"
+                  >
+                    —
+                  </span>
+                ) : shortcut ? (
+                  <kbd className="tw-max-w-[55%] tw-shrink-0 tw-overflow-hidden tw-text-ellipsis tw-whitespace-nowrap tw-font-mono tw-text-xs tw-font-medium tw-text-[var(--text-secondary)]">
+                    {shortcut}
+                  </kbd>
+                ) : (
+                  <span className="tw-shrink-0 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-80">
+                    {t('keyboardShortcutsUnassigned')}
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
-      ) : null}
-    </section>
+
+        {!loading && unsupported ? (
+          <p className="tw-mb-0 tw-mt-3 tw-text-xs tw-font-semibold tw-leading-relaxed tw-text-[var(--text-secondary)]">
+            {t('keyboardShortcutsUnsupported')}
+          </p>
+        ) : !loading && managerAccess === 'manual' ? (
+          <p className="tw-mb-0 tw-mt-3 tw-text-xs tw-font-semibold tw-leading-relaxed tw-text-[var(--text-secondary)]">
+            {t('keyboardShortcutsManualHint')}
+          </p>
+        ) : !loading && managerAccess === 'openable' ? (
+          <div className="tw-mt-3">
+            <button
+              type="button"
+              className={buttonClassName}
+              onClick={onOpenManager}
+              aria-label={t('keyboardShortcutsManage')}
+            >
+              {t('keyboardShortcutsManage')}
+            </button>
+          </div>
+        ) : null}
+      </section>
+      <InAppShortcutsPanel />
+    </div>
   );
 }
