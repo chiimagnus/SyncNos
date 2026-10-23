@@ -348,6 +348,12 @@ export default function AppShell() {
     ]);
 
     const triggerCommentsSidebar = () => {
+      if (showCommentsSidebar) {
+        if (isMedium) setMediumCommentsCollapsed(true);
+        else if (isWide) setWideCommentsCollapsed(true);
+        commentsSidebarSession.requestClose();
+        return;
+      }
       if (isMedium) {
         setMediumCommentsCollapsed(false);
       } else if (isWide) {

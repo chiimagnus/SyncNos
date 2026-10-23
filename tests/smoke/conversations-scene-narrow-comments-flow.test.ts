@@ -20,6 +20,12 @@ type PendingOpenConversationMockPayload = {
 } | null;
 const consumePendingOpenConversation = vi.fn<() => PendingOpenConversationMockPayload>(() => null);
 const sidebarOpen = vi.fn(async () => {});
+const sidebarRequestClose = vi.fn();
+
+vi.mock('../../src/services/shared/storage', () => ({
+  storageGet: vi.fn(async () => ({ in_app_shortcuts_v3: { 'detail-comments': 'Alt+Shift+C' } })),
+  storageOnChanged: () => () => {},
+}));
 const subscribeSidebarClose = vi.fn((listener: () => void) => {
   currentSidebarCloseListener = listener;
   return () => {
@@ -139,6 +145,7 @@ function setupDom() {
   Object.defineProperty(globalThis, 'document', { configurable: true, value: dom.window.document });
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: dom.window.navigator });
   Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: dom.window.HTMLElement });
+  Object.defineProperty(globalThis, 'Element', { configurable: true, value: dom.window.Element });
   Object.defineProperty(globalThis, 'Node', { configurable: true, value: dom.window.Node });
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: dom.window.localStorage });
   Object.defineProperty(globalThis, 'getComputedStyle', {
@@ -158,6 +165,7 @@ function cleanupDom() {
   delete (globalThis as any).document;
   delete (globalThis as any).navigator;
   delete (globalThis as any).HTMLElement;
+  delete (globalThis as any).Element;
   delete (globalThis as any).Node;
   delete (globalThis as any).localStorage;
   delete (globalThis as any).getComputedStyle;
@@ -180,6 +188,7 @@ describe('ConversationsScene narrow comments flow', () => {
     consumePendingOpenConversation.mockReset();
     consumePendingOpenConversation.mockReturnValue(null);
     sidebarOpen.mockReset();
+    sidebarRequestClose.mockReset();
     subscribeSidebarClose.mockClear();
     panelLeaseDispose.mockReset();
     attachPanel.mockReset();
@@ -219,6 +228,7 @@ describe('ConversationsScene narrow comments flow', () => {
         attachPanel,
         subscribe: sessionSubscribe,
         getSnapshot: getSessionSnapshot,
+        requestClose: sidebarRequestClose,
       } as any,
       sidebarController: {
         open: sidebarOpen,
@@ -272,6 +282,22 @@ describe('ConversationsScene narrow comments flow', () => {
     expect(commentsPanel?.getAttribute('data-surface')).toBe('app-narrow');
     expect(commentsPanel?.style.width).toBe('100%');
     expect(commentsPanel?.shadowRoot?.querySelector('.webclipper-inpage-comments-panel__resize-handle')).toBeFalsy();
+
+    const toggleComments = new window.KeyboardEvent('keydown', {
+      key: 'c',
+      code: 'KeyC',
+      altKey: true,
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    await act(async () => {
+      document.dispatchEvent(toggleComments);
+      await flushImmediate();
+    });
+    expect(toggleComments.defaultPrevented).toBe(true);
+    expect(sidebarRequestClose).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
 
     await act(async () => {
       currentSidebarCloseListener?.();
@@ -356,6 +382,7 @@ describe('ConversationsScene narrow comments flow', () => {
         attachPanel,
         subscribe: sessionSubscribe,
         getSnapshot: getSessionSnapshot,
+        requestClose: sidebarRequestClose,
       } as any,
       sidebarController: {
         open: sidebarOpen,

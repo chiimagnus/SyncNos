@@ -352,8 +352,24 @@ describe('AppShell comments sidebar', () => {
     expect(host).toBeTruthy();
     expect(host?.getAttribute('data-surface')).toBe('app-wide');
 
+    await actAndFlush(() => {
+      openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+    await waitForCommentsUi(() => {
+      expect(document.querySelector('webclipper-threaded-comments-panel')).toBeFalsy();
+    });
+    expect(window.localStorage.getItem(COMMENTS_SIDEBAR_COLLAPSED_KEY)).toBe('1');
+
+    await actAndFlush(() => {
+      openBtn!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    });
+    await waitForCommentsUi(() => {
+      expect(document.querySelector('webclipper-threaded-comments-panel')).toBeTruthy();
+    });
+
+    const reopenedHost = document.querySelector('webclipper-threaded-comments-panel') as HTMLElement | null;
     const closeBtn = (await waitForCommentsUi(() => {
-      const btn = (host?.shadowRoot?.querySelector('.webclipper-inpage-comments-panel__collapse') ||
+      const btn = (reopenedHost?.shadowRoot?.querySelector('.webclipper-inpage-comments-panel__collapse') ||
         null) as HTMLButtonElement | null;
       expect(btn).toBeTruthy();
       return btn;

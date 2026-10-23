@@ -10,6 +10,7 @@ import type { CommentLocatorSurfaceRoots } from '@ui/comments';
 import { ConversationListPane } from '@ui/conversations/ConversationListPane';
 import { LazyArticleCommentsSection, LazyConversationDetailPane } from '@ui/conversations/LazyConversationSurfaces';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
+import { useInAppShortcuts } from '@viewmodels/shortcuts/useInAppShortcuts';
 import { consumePendingOpenConversation } from '@ui/conversations/pending-open';
 import { CapturedListPaneShell } from '@ui/shared/CapturedListPaneShell';
 import { conversationKinds } from '@services/protocols/conversation-kinds';
@@ -83,6 +84,17 @@ export function ConversationsScene({
     commentsSidebarEnabled &&
     Boolean(selectedConversationCanonicalUrl);
   const detailSurfaceVisible = !isNarrow || narrowRoute === 'detail';
+  useInAppShortcuts(
+    {
+      'detail-comments': () => {
+        if (!commentsSidebarRuntime) return false;
+        commentsSidebarRuntime.sidebarSession.requestClose();
+        returnToDetail();
+        return true;
+      },
+    },
+    isNarrow && narrowRoute === 'comments',
+  );
 
   useLayoutEffect(() => {
     setDetailSurfaceActive(detailSurfaceVisible);

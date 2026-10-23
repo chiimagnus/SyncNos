@@ -8,6 +8,8 @@ import { useChatOutlineActiveIndex } from '@ui/conversations/chat-outline/useCha
 
 import { t, formatConversationTitle } from '@i18n';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
+import { useInAppShortcuts } from '@viewmodels/shortcuts/useInAppShortcuts';
+import { DETAIL_ACTION_SHORTCUTS, type InAppShortcutAction } from '@services/shortcuts/in-app-shortcuts';
 import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
 import {
   buttonFilledClassName,
@@ -16,7 +18,7 @@ import {
   headerButtonClassName,
 } from '@ui/shared/button-styles';
 import { MenuPopover } from '@ui/shared/MenuPopover';
-import { tooltipAttrs } from '@ui/shared/AppTooltip';
+import { tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { countConversationMessageImages } from '@services/conversations/domain/image-count';
 import { countConversationMessageTextUnits } from '@services/conversations/domain/text-count';
@@ -83,7 +85,7 @@ export function ConversationDetailPane({
   const canOpenCommentsSidebar = kindView.commentsSidebar && typeof onTriggerCommentsSidebar === 'function';
   const containerPaddingClassName = 'tw-px-3 md:tw-px-4';
   const expandSidebarLabel = t('expandSidebar');
-  const commentsSidebarLabel = t('openCommentsSidebar');
+  const commentsSidebarLabel = t(commentsSidebarOpen ? 'closeCommentsSidebar' : 'openCommentsSidebar');
   const messagesRootRef = useRef<HTMLDivElement | null>(null);
   const userMessageElByIdRef = useRef<Map<number, HTMLDivElement>>(new Map());
   const userMessageRefSetterByIdRef = useRef<Map<number, (node: HTMLDivElement | null) => void>>(new Map());
@@ -166,6 +168,12 @@ export function ConversationDetailPane({
   const [urlDraft, setUrlDraft] = useState('');
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const urlInputRef = useRef<HTMLInputElement | null>(null);
+  const detailShortcutBusyRef = useRef(false);
+  const currentConversationIdRef = useRef(Number(selected?.id) || 0);
+  currentConversationIdRef.current = Number(selected?.id) || 0;
+  const [shortcutFeedback, setShortcutFeedback] = useState('');
+  const [shortcutCopiedActionId, setShortcutCopiedActionId] = useState('');
+  const shortcutFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const displayedUrl = String((selected as any)?.url || '').trim();
   const isVideo = String((selected as any)?.sourceType || '') === 'video';
   const videoDescription = isVideo ? String((selected as any)?.videoDescription || '').trim() : '';
@@ -202,7 +210,7 @@ export function ConversationDetailPane({
   const hasReaderMoreMenuContent = readerFeatures.textLayout || readerFeatures.theme || readerFeatures.narration;
   const hasMoreMenuContent =
     Boolean(textCountText || imageCountText) || moreActions.length > 0 || hasReaderMoreMenuContent;
-  const moreMenuPanelClassName = 'tw-w-[214px] tw-max-w-[min(214px,calc(100vw-28px))] tw-text-[var(--text-primary)]';
+  const moreMenuPanelClassName = 'tw-w-[260px] tw-max-w-[min(260px,calc(100vw-28px))] tw-text-[var(--text-primary)]';
   const floatingIslandClassName = [
     'tw-pointer-events-auto tw-flex tw-w-fit tw-items-center tw-gap-1 tw-rounded-[var(--radius-inline)] tw-border tw-border-[var(--border)] tw-p-1',
     'tw-bg-[color-mix(in_srgb,var(--bg-card)_88%,transparent)] tw-backdrop-blur-[10px] tw-backdrop-saturate-150',
@@ -227,7 +235,17 @@ export function ConversationDetailPane({
     setUrlEditing(false);
     setUrlDraft('');
     closeMoreMenu();
+    setShortcutFeedback('');
+    setShortcutCopiedActionId('');
+    if (shortcutFeedbackTimerRef.current != null) clearTimeout(shortcutFeedbackTimerRef.current);
   }, [activeId, selected?.id, closeMoreMenu]);
+
+  useEffect(
+    () => () => {
+      if (shortcutFeedbackTimerRef.current != null) clearTimeout(shortcutFeedbackTimerRef.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     userMessageElByIdRef.current.clear();
@@ -293,6 +311,52 @@ export function ConversationDetailPane({
       else console.error(message);
     });
   };
+
+  const triggerDetailShortcut = (actionId: string) => {
+    const conversationId = Number(selected?.id);
+    if (!conversationId || conversationId !== Number(activeId) || detailShortcutBusyRef.current) return false;
+    const action = safeActions.find((item) => item.id === actionId && !item.disabled);
+    if (!action) return false;
+    detailShortcutBusyRef.current = true;
+    closeMoreMenu();
+    setShortcutFeedback('');
+    setShortcutCopiedActionId('');
+    void Promise.resolve()
+      .then(() => action.onTrigger())
+      .then(() => {
+        if (currentConversationIdRef.current !== conversationId) return;
+        setShortcutFeedback(action.kind === 'copy-text' ? t('copied') : action.label);
+        if (action.kind === 'copy-text') setShortcutCopiedActionId(action.id);
+        if (shortcutFeedbackTimerRef.current != null) clearTimeout(shortcutFeedbackTimerRef.current);
+        shortcutFeedbackTimerRef.current = setTimeout(() => {
+          setShortcutFeedback('');
+          setShortcutCopiedActionId('');
+          shortcutFeedbackTimerRef.current = null;
+        }, 1_500);
+      })
+      .catch((error: unknown) => {
+        if (currentConversationIdRef.current === conversationId) {
+          window.alert(error instanceof Error ? error.message : String(error));
+        }
+      })
+      .finally(() => {
+        detailShortcutBusyRef.current = false;
+      });
+    return true;
+  };
+  const shortcut = useInAppShortcuts({
+    ...(Object.fromEntries(
+      Object.entries(DETAIL_ACTION_SHORTCUTS).map(([actionId, shortcutId]) => [
+        shortcutId,
+        () => triggerDetailShortcut(actionId),
+      ]),
+    ) as Partial<Record<InAppShortcutAction, () => boolean>>),
+    'detail-comments': () => {
+      if (!canOpenCommentsSidebar || Number(selected?.id) !== Number(activeId)) return false;
+      onTriggerCommentsSidebar?.();
+      return true;
+    },
+  });
 
   const detailMetadata = (
     <div className="tw-mb-1 tw-min-w-0" data-detail-metadata="true">
@@ -418,6 +482,7 @@ export function ConversationDetailPane({
                   onClick={onExpandSidebar}
                   className={headerIconButtonClass}
                   aria-label={expandSidebarLabel}
+                  {...tooltipAttrsWithShortcut(expandSidebarLabel, shortcut('toggle-sidebar'))}
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                     <path
@@ -434,7 +499,13 @@ export function ConversationDetailPane({
               ) : null}
 
               {onBack ? (
-                <button type="button" onClick={onBack} className={headerIconButtonClass} aria-label={t('backButton')}>
+                <button
+                  type="button"
+                  onClick={onBack}
+                  className={headerIconButtonClass}
+                  aria-label={t('backButton')}
+                  {...tooltipAttrsWithShortcut(t('backButton'), '')}
+                >
                   <ChevronLeft size={14} strokeWidth={2} aria-hidden="true" />
                   <span className="tw-sr-only">{t('backButton')}</span>
                 </button>
@@ -457,6 +528,8 @@ export function ConversationDetailPane({
                 menuTriggerLabel={t('detailHeaderCopyLinkMenuLabel')}
                 menuTriggerAriaLabel={t('detailHeaderCopyLinkMenuAria')}
                 menuAriaLabel={t('detailHeaderCopyLinkMenuAria')}
+                getShortcut={shortcut}
+                shortcutCopiedActionId={shortcutCopiedActionId}
                 className="tw-order-1"
               />
 
@@ -468,7 +541,7 @@ export function ConversationDetailPane({
                   }}
                   className={[headerButtonClassName(), 'tw-order-2'].join(' ')}
                   aria-label={commentsSidebarLabel}
-                  {...tooltipAttrs(commentsSidebarLabel)}
+                  {...tooltipAttrsWithShortcut(commentsSidebarLabel, shortcut('detail-comments'))}
                   aria-pressed={commentsSidebarOpen ? 'true' : 'false'}
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -493,7 +566,7 @@ export function ConversationDetailPane({
                   ariaLabel={t('moreButton')}
                   side="bottom"
                   align="end"
-                  panelMinWidth={214}
+                  panelMinWidth={260}
                   panelClassName={moreMenuPanelClassName}
                   className="tw-order-3"
                   trigger={(triggerProps) => (
@@ -501,6 +574,7 @@ export function ConversationDetailPane({
                       {...triggerProps}
                       data-detail-header-more-trigger="true"
                       aria-label={t('moreButton')}
+                      {...tooltipAttrsWithShortcut(t('moreButton'), '')}
                       className={headerIconButtonClass}
                     >
                       <MoreHorizontal size={14} strokeWidth={2} aria-hidden="true" />
@@ -531,6 +605,7 @@ export function ConversationDetailPane({
                             actions={moreActions}
                             buttonClassName={buttonMenuItemClassName()}
                             inlineMenuItems
+                            getShortcut={shortcut}
                             closeMenuOnActionTrigger={closeMoreMenu}
                             className="tw-w-full"
                           />
@@ -556,6 +631,15 @@ export function ConversationDetailPane({
                     </div>
                   ) : null}
                 </MenuPopover>
+              ) : null}
+              {shortcutFeedback ? (
+                <span
+                  role="status"
+                  aria-live="polite"
+                  className="tw-absolute tw-right-0 tw-top-[calc(100%+6px)] tw-rounded-[var(--radius-inline)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)] tw-px-2 tw-py-1 tw-text-[11px] tw-font-semibold tw-text-[var(--text-primary)] tw-shadow-[0_8px_24px_rgba(0,0,0,0.14)]"
+                >
+                  {shortcutFeedback}
+                </span>
               ) : null}
             </div>
           ) : null}
