@@ -7,20 +7,10 @@ const INTERNAL_IMAGE_PLACEHOLDER_SRC = 'data:image/gif;base64,R0lGODlhAQABAIAAAA
 
 export type MarkdownRendererOptions = {
   /**
-   * If true, rendered links will open in a new tab.
-   * Defaults to true to keep popup/app behavior consistent.
-   */
-  openLinksInNewTab?: boolean;
-  /**
    * If false, image tokens degrade to readable text/links without creating `<img>`.
    * Defaults to true.
    */
   renderImages?: boolean;
-  /**
-   * KaTeX output mode when a math runtime is active.
-   * Defaults to KaTeX's normal HTML + MathML output.
-   */
-  mathOutput?: 'html' | 'mathml' | 'htmlAndMathml';
 };
 
 export type MarkdownMathRuntime = {
@@ -39,9 +29,7 @@ export function markdownLikelyContainsMath(markdown: string): boolean {
 }
 
 export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, mathRuntime?: MarkdownMathRuntime) {
-  const openLinksInNewTab = options.openLinksInNewTab ?? true;
   const renderImages = options.renderImages ?? true;
-  const mathOutput = options.mathOutput ?? 'htmlAndMathml';
   const inst = new MarkdownIt({
     html: false,
     breaks: true,
@@ -52,12 +40,6 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, ma
   function isHttpUrl(url: unknown): boolean {
     const text = String(url || '').trim();
     return /^https?:\/\//i.test(text);
-  }
-
-  function isDataImageUrl(url: unknown): boolean {
-    const text = String(url || '').trim();
-    if (!text) return false;
-    return /^data:image\/[a-z0-9.+-]+(?:;charset=[a-z0-9._-]+)?(?:;base64)?,/i.test(text);
   }
 
   function sanitizeUrlForDisplay(url: unknown): string {
@@ -82,7 +64,8 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, ma
       katexOptions: {
         throwOnError: false,
         strict: 'ignore',
-        output: mathOutput,
+        // HTML provides visual layout; hidden MathML remains for assistive technology.
+        output: 'htmlAndMathml',
       },
     });
   }
@@ -114,8 +97,7 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, ma
       const escapedLabel = inst.utils.escapeHtml(label);
       if (!isHttpUrl(safeSrc)) return `<span class="syncnos-md-image-text">${escapedLabel}</span>`;
       const escapedHref = inst.utils.escapeHtml(safeSrc);
-      const linkAttrs = openLinksInNewTab ? ' target="_blank" rel="noreferrer noopener"' : '';
-      return `<a class="syncnos-md-image-text" href="${escapedHref}"${linkAttrs}>${escapedLabel}</a>`;
+      return `<a class="syncnos-md-image-text" href="${escapedHref}" target="_blank" rel="noreferrer noopener">${escapedLabel}</a>`;
     }
     const titleRaw = token && typeof token.attrGet === 'function' ? String(token.attrGet('title') || '') : '';
     const titleAttr = titleRaw ? ` title="${inst.utils.escapeHtml(titleRaw)}"` : '';
@@ -153,7 +135,7 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, ma
     const escapedSrc = inst.utils.escapeHtml(safeSrc);
     const img = `<img src="${escapedSrc}" alt="${escapedAlt}"${titleAttr}>`;
 
-    if (!isHttpUrl(safeSrc) || isDataImageUrl(safeSrc)) return img;
+    if (!isHttpUrl(safeSrc)) return img;
 
     return renderExternalImageWithLink(img, safeSrc);
   };
@@ -177,14 +159,12 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, ma
     return false;
   });
 
-  if (openLinksInNewTab) {
-    inst.use(linkAttributes as any, {
-      attrs: {
-        target: '_blank',
-        rel: 'noreferrer noopener',
-      },
-    });
-  }
+  inst.use(linkAttributes as any, {
+    attrs: {
+      target: '_blank',
+      rel: 'noreferrer noopener',
+    },
+  });
 
   return inst;
 }

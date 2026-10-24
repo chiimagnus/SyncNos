@@ -322,7 +322,7 @@ SYNCNOS-ATTACHMENT-ACK
 
 ### UI-01：Markdown 展示压力测试
 
-此用例专门验证 Render 层。可复用 DOM-02 / DOM-03 的已保存记录，再补一条宽表和双位数列表。
+此用例专门验证 Render 层。可复用 DOM-02 / DOM-03 的已保存记录，再补一条宽表和双位数列表。共享正文、公式或字体变更还需按 [`Markdown 与公式渲染`](markdown-rendering.md#排障与验证) 覆盖文章及评论入口；不必为纯显示改动重新触发无关站点采集。
 
 ```text
 请先输出从 10 到 12 的三项有序列表，再输出一个 8 列 Markdown 表格。

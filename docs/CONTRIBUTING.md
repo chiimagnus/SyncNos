@@ -50,6 +50,10 @@ Safari/Xcode 集成使用 `npm run setup:safari:xcode`。排障见 [`troubleshoo
 
 `npm run gate` 比 `gate:ci` 多构建 Chromium production artifact 并执行 `check:dist`。Zen / Safari 有改动时再运行 `npm run check:zen` / `npm run check:safari`。模拟平台测试不能冒充真实平台 E2E。
 
+`check:dist` 约束解压后的完整目录体积、manifest 声明的 content script JS 总体积和 Popup 启动 JS/CSS，并拒绝冗余 KaTeX TTF/WOFF。具体预算以 [`check-dist.mjs`](../.github/scripts/webclipper/check-dist.mjs) 为准；超标时先查实际依赖和资源，不以放宽预算代替优化。
+
+修改 Markdown、公式或字体构建时，按 [`markdown-rendering.md`](markdown-rendering.md) 核对共享渲染与实际显示。尽可能覆盖受影响功能的适用环境、输入、失败/恢复、时序与极端组合；未执行项说明原因、影响及补验，不把组件预览或构建通过写成真实扩展 E2E。
+
 ## 数据、权限与隐私
 
 修改 IndexedDB、Backup、sync mapping、OAuth、图片缓存、权限、Native Messaging 或迁移时，必须说明失败后如何保持数据可恢复，以及是否新增本地到外部的数据流。

@@ -17,6 +17,20 @@ Select article text, then save the quote by itself or add a comment at the same 
 
 Later comments stay in the same group. Deleting the first item removes the group; deleting a later comment removes only that comment.
 
-`Ctrl/⌘ + Enter` submits. Comments support common Markdown and `$...$` / `$$...$$` math.
+`Ctrl/⌘ + Enter` submits.
 
-Markdown images are not loaded or synced as comment attachments, and raw HTML is not executed as HTML.
+## Markdown and math
+
+Comments and replies support common Markdown and use the same math layout as articles and chats. Use `$...$` for inline math and `$$...$$` for display math:
+
+```text
+Inline math: $E=mc^2$
+
+$$
+\frac{1}{1+x}
+$$
+```
+
+Image syntax appears as text or links; images are not loaded or synced as comment attachments. Raw HTML appears as text.
+
+Quote previews from article selections remain text; Markdown and math are not reinterpreted.

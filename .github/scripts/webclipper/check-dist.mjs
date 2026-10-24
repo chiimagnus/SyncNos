@@ -8,6 +8,9 @@ import { resolveRepoRoot } from './script-utils.mjs';
 const POPUP_BOOTSTRAP_JS_BUDGET_BYTES = 8 * 1024;
 const POPUP_IMMEDIATE_JS_BUDGET_BYTES = 480 * 1024;
 const POPUP_STARTUP_CSS_BUDGET_BYTES = 12 * 1024;
+// Leave headroom above the optimized ~4.76 MB artifact and ~1.56 MB combined content entries.
+const UNPACKED_EXTENSION_BUDGET_BYTES = 5 * 1024 * 1024;
+const CONTENT_SCRIPT_JS_BUDGET_BYTES = 1600 * 1024;
 
 function extractManifestMsgKey(value) {
   if (typeof value !== 'string') return null;
@@ -68,7 +71,7 @@ function readLocaleMessages(root, locale) {
   };
 }
 
-function listFilesRecursively(root, extension) {
+function listFilesRecursively(root, extension = '') {
   const files = [];
   const walk = (dir) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -167,6 +170,30 @@ for (const size of [16, 48, 128]) {
   if (!existsSync(p)) fail(`icon missing: ${manifest.icons[String(size)]}`);
 }
 
+const allFiles = listFilesRecursively(root);
+const unpackedBytes = allFiles.reduce((total, file) => total + statSync(file).size, 0);
+const legacyKatexFonts = allFiles.filter((file) => /[\\/]KaTeX_[^\\/]+\.(?:woff|ttf)$/i.test(file));
+if (legacyKatexFonts.length) {
+  fail(`Redundant KaTeX fallback fonts: ${formatDistPaths(root, legacyKatexFonts).join(', ')}; keep WOFF2 only`);
+}
+enforceBudget('Unpacked extension', unpackedBytes, UNPACKED_EXTENSION_BUDGET_BYTES, root, allFiles);
+
+const contentScriptFiles = [
+  ...new Set(manifest.content_scripts.flatMap((entry) => entry.js ?? []).map((file) => join(root, file))),
+];
+if (!contentScriptFiles.length) fail('content_scripts must declare JavaScript entries');
+for (const file of contentScriptFiles) {
+  if (!existsSync(file)) fail(`content script missing: ${formatDistPaths(root, [file])[0]}`);
+}
+const contentScriptBytes = contentScriptFiles.reduce((total, file) => total + statSync(file).size, 0);
+enforceBudget(
+  'Content script JS entries',
+  contentScriptBytes,
+  CONTENT_SCRIPT_JS_BUDGET_BYTES,
+  root,
+  contentScriptFiles,
+);
+
 let popupStartup;
 let backgroundRuntime;
 try {
@@ -198,6 +225,12 @@ enforceBudget(
   popupStartup.startupStylesheetFiles,
 );
 
+console.log(
+  `[check] unpacked extension: ${formatBytes(unpackedBytes)} / ${formatBytes(UNPACKED_EXTENSION_BUDGET_BYTES)}`,
+);
+console.log(
+  `[check] content scripts: ${formatBytes(contentScriptBytes)} / ${formatBytes(CONTENT_SCRIPT_JS_BUDGET_BYTES)}`,
+);
 console.log(
   `[check] popup bootstrap: ${formatBytes(popupStartup.bootstrapBytes)} / ${formatBytes(POPUP_BOOTSTRAP_JS_BUDGET_BYTES)}`,
 );

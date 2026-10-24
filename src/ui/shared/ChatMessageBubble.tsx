@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type { ReactNode } from 'react';
-import { createMarkdownRenderer, markdownLikelyContainsMath } from '@ui/shared/markdown-core';
+import { MarkdownContent } from '@ui/shared/MarkdownContent';
 import { getMarkdownReadingProfilePreset } from '@ui/shared/markdown-reading-profile-presets';
 
 type BubbleRole = 'user' | 'assistant';
@@ -28,23 +28,6 @@ export type ChatMessageBubbleProps = {
   className?: string;
 };
 
-// Shared singleton to avoid per-message renderer instantiation.
-const sharedMd = createMarkdownRenderer({ openLinksInNewTab: true });
-let sharedMathMd: ReturnType<typeof createMarkdownRenderer> | null = null;
-let sharedMathMdPromise: Promise<ReturnType<typeof createMarkdownRenderer>> | null = null;
-
-async function ensureSharedMathRenderer(): Promise<ReturnType<typeof createMarkdownRenderer>> {
-  if (sharedMathMd) return sharedMathMd;
-  if (!sharedMathMdPromise) {
-    sharedMathMdPromise = import('@ui/shared/markdown-math-styled').then((mod) => {
-      const renderer = mod.createKatexMarkdownRenderer({ openLinksInNewTab: true });
-      sharedMathMd = renderer;
-      return renderer;
-    });
-  }
-  return sharedMathMdPromise;
-}
-
 export function ChatMessageBubble({
   role,
   headerLeft,
@@ -57,43 +40,6 @@ export function ChatMessageBubble({
 }: ChatMessageBubbleProps) {
   const bubbleRole = normalizeRole(role);
   const readingProfilePreset = useMemo(() => getMarkdownReadingProfilePreset(readingProfile), [readingProfile]);
-  const [mathRenderer, setMathRenderer] = useState<ReturnType<typeof createMarkdownRenderer> | null>(
-    () => sharedMathMd,
-  );
-
-  const containsMath = useMemo(() => markdownLikelyContainsMath(markdown), [markdown]);
-
-  useEffect(() => {
-    if (!containsMath || sharedMathMd) return;
-    let disposed = false;
-    void ensureSharedMathRenderer()
-      .then(() => {
-        if (disposed) return;
-        setMathRenderer(sharedMathMd);
-      })
-      .catch((error) => {
-        console.warn('[Markdown] failed to load math renderer', {
-          error: error instanceof Error ? error.message : String(error || ''),
-        });
-      });
-    return () => {
-      disposed = true;
-    };
-  }, [containsMath]);
-
-  const html = useMemo(() => {
-    const activeMathRenderer = mathRenderer || sharedMathMd;
-    const renderer = containsMath && activeMathRenderer ? activeMathRenderer : sharedMd;
-    return renderer.render(String(markdown || ''), {
-      syncnosAssetSrcById,
-      chatgptFileSrcById,
-    } as any);
-  }, [markdown, syncnosAssetSrcById, chatgptFileSrcById, containsMath, mathRenderer]);
-  const innerHtml = useMemo(() => ({ __html: html }), [html]);
-
-  // NOTE: asset URLs are resolved before render via markdown-it env;
-  // no post-render DOM hydration is needed, which avoids re-render race conditions.
-
   const bubbleBase = 'tw-min-w-0 tw-border tw-rounded-[var(--radius-inline)] tw-p-3 tw-shadow-none';
 
   const bubbleRoleClass =
@@ -184,7 +130,12 @@ export function ChatMessageBubble({
           <div className={headerRightClass}>{headerRight}</div>
         </header>
       ) : null}
-      <div className={[mdClass, mdRoleOverrides].filter(Boolean).join(' ')} dangerouslySetInnerHTML={innerHtml} />
+      <MarkdownContent
+        markdown={markdown}
+        syncnosAssetSrcById={syncnosAssetSrcById}
+        chatgptFileSrcById={chatgptFileSrcById}
+        className={[mdClass, mdRoleOverrides].filter(Boolean).join(' ')}
+      />
     </section>
   );
 }

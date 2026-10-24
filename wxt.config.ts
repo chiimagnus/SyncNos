@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import postcss from 'postcss';
 import { defineConfig, type UserManifestFn } from 'wxt';
 
 import { KEYBOARD_SHORTCUT_COMMAND_IDS } from './src/services/shortcuts/keyboard-shortcut-contract';
@@ -13,6 +14,75 @@ const viteAlias = {
   '@entrypoints': path.resolve('src/entrypoints'),
   '@i18n': path.resolve('src/ui/i18n'),
 };
+
+function filterKatexWoff2(source: string, id: string): string {
+  const css = postcss.parse(source, { from: id });
+  css.walkAtRules('font-face', (rule) => {
+    rule.walkDecls('src', (decl) => {
+      const woff2 = decl.value.split(',').find((entry) => entry.includes('.woff2'));
+      if (!woff2) throw decl.error('KaTeX font face must provide a WOFF2 source');
+      decl.value = woff2.trim();
+    });
+  });
+  return css.toString();
+}
+
+// Vite library-mode content scripts inline every asset in CSS ?inline, regardless
+// of assetsInlineLimit. Emit shared font assets explicitly through Rollup instead.
+function katexShadowStyles() {
+  const publicId = 'virtual:syncnos-katex-shadow-css';
+  const virtualId = `\0${publicId}`;
+  const references = new Set<string>();
+  let isBuild = true;
+  return {
+    name: 'katex-shadow-styles',
+    configResolved(config: { command: string }) {
+      isBuild = config.command === 'build';
+    },
+    resolveId(id: string) {
+      if (id === publicId) return virtualId;
+    },
+    load(
+      this: { emitFile: (asset: { type: 'asset'; name: string; fileName: string; source: Buffer }) => string },
+      id: string,
+    ) {
+      if (id !== virtualId) return;
+      const sourcePath = path.resolve('node_modules/katex/dist/katex.min.css');
+      const css = postcss.parse(filterKatexWoff2(fs.readFileSync(sourcePath, 'utf8'), sourcePath));
+      const urls: string[] = [];
+      css.walkAtRules('font-face', (rule) => {
+        rule.walkDecls('src', (decl) => {
+          decl.value = decl.value.replace(/url\((['"]?)([^)'"\s]+)\1\)/, (_match, _quote, relativePath: string) => {
+            const fontPath = path.resolve(path.dirname(sourcePath), relativePath);
+            let expression: string;
+            if (isBuild) {
+              const ref = this.emitFile({
+                type: 'asset',
+                name: path.basename(fontPath),
+                fileName: `assets/${path.basename(fontPath)}`,
+                source: fs.readFileSync(fontPath),
+              });
+              references.add(ref);
+              expression = `import.meta.ROLLUP_FILE_URL_${ref}`;
+            } else {
+              expression = `new URL(${JSON.stringify(`/@fs/${fontPath.replaceAll('\\', '/')}`)}, import.meta.url).href`;
+            }
+            const index = urls.push(expression) - 1;
+            return `url(__SYNCNOS_KATEX_FONT_${index}__)`;
+          });
+        });
+      });
+      const code = JSON.stringify(css.toString()).replace(
+        /__SYNCNOS_KATEX_FONT_(\d+)__/g,
+        (_match, index: string) => `" + ${urls[Number(index)]} + "`,
+      );
+      return `export default ${code};`;
+    },
+    resolveFileUrl({ referenceId, fileName }: { referenceId: string; fileName: string }) {
+      if (references.has(referenceId)) return JSON.stringify(`/${fileName}`);
+    },
+  };
+}
 
 function firstExistingPath(candidates: string[]): string | undefined {
   for (const candidate of candidates) {
@@ -81,6 +151,10 @@ const resolveManifest: UserManifestFn = (env) => {
     host_permissions: ['http://*/*', 'https://*/*'],
     web_accessible_resources: [
       {
+        resources: ['assets/KaTeX_*.woff2'],
+        matches: ['http://*/*', 'https://*/*'],
+      },
+      {
         resources: ['icons/icon-128.png'],
         matches: [
           'https://chatgpt.com/*',
@@ -115,6 +189,7 @@ export default defineConfig({
   entrypointsDir: 'src/entrypoints',
   webExt: chromeBinary ? { binaries: { chrome: chromeBinary } } : undefined,
   vite: (env) => ({
+    plugins: [katexShadowStyles()],
     define: {
       __SYNCNOS_FEISHU_OAUTH_CLIENT_ID__: JSON.stringify(process.env.SYNCNOS_FEISHU_OAUTH_CLIENT_ID ?? ''),
       __SYNCNOS_FEISHU_OAUTH_TOKEN_EXCHANGE_PROXY_URL__: JSON.stringify(
@@ -122,7 +197,10 @@ export default defineConfig({
       ),
     },
     resolve: {
-      alias: viteAlias,
+      alias: [
+        { find: /^katex$/, replacement: path.resolve('node_modules/katex/dist/katex.mjs') },
+        ...Object.entries(viteAlias).map(([find, replacement]) => ({ find, replacement })),
+      ],
     },
     build: {
       // Some dependencies (notably `entities` via markdown-it) store compact lookup tables

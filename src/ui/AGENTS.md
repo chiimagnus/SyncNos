@@ -16,6 +16,7 @@
 - 可交互元素必须保留清晰的 `focus-visible` 状态，不以鼠标视觉效果换掉键盘可访问性。
 - 修改共享视觉规则时先改 canonical token/shared style，再让消费者继承，不在多个组件中同步手抄常量。
 - 需要融入宿主页视觉的 in-page Shadow DOM surface 统一通过 `inpage/inpage-surface-theme.ts` 读取宿主页颜色与未继承的颜色滤镜；不要在组件内各自猜 light/dark。
+- 文章、聊天与评论共用 `MarkdownContent`，不另建解析器或公式加载链；公式、字体和样式生命周期见 [`docs/markdown-rendering.md`](../../docs/markdown-rendering.md)。
 
 ## 验证
 
