@@ -197,12 +197,11 @@ describe('createMarkdownRenderer', () => {
     expect(html).not.toContain('href="javascript:');
   });
 
-  it('supports MathML-only output for Shadow DOM consumers', () => {
-    const md = createKatexMarkdownRenderer({ mathOutput: 'mathml' });
-    const html = md.render('$E=mc^2$');
+  it('uses HTML visual layout and a separate accessibility MathML tree for every consumer', () => {
+    const html = createKatexMarkdownRenderer().render('$E=mc^2$');
+    expect(html).toContain('class="katex-mathml"');
     expect(html).toContain('<math');
-    expect(html).toContain('class="katex"');
-    expect(html).not.toContain('katex-html');
+    expect(html).toContain('class="katex-html" aria-hidden="true"');
   });
 });
 

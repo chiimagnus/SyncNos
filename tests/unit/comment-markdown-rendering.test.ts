@@ -94,6 +94,7 @@ describe('comment markdown rendering', () => {
     ].join('\n');
 
     const host = await renderIntoHost(createElement(CommentMarkdown, { markdown }));
+    expect(document.querySelector('style[data-syncnos-katex]')).toBeNull();
     expect(host.querySelector('h1')?.textContent).toBe('Heading');
     expect(host.querySelector('strong')?.textContent).toBe('bold');
     expect(host.querySelector('em')?.textContent).toBe('italic');
@@ -140,15 +141,40 @@ describe('comment markdown rendering', () => {
     expect(renderSpy).toHaveBeenCalledTimes(2);
   });
 
-  it('renders inline and block math as MathML after the lazy runtime loads', async () => {
+  it('renders inline and block math with KaTeX HTML after the lazy runtime loads', async () => {
     const host = await renderIntoHost(createElement(CommentMarkdown, { markdown: '$E=mc^2$\n\n$$x^2$$' }));
     await act(async () => {
-      await import('@ui/shared/markdown-math');
+      await import('@ui/shared/markdown-math-styles');
       await Promise.resolve();
     });
-    expect(host.querySelectorAll('math').length).toBeGreaterThanOrEqual(2);
-    expect(host.querySelector('eqn math[display="block"]')).toBeTruthy();
-    expect(host.querySelector('.katex-html')).toBeNull();
+    expect(host.querySelectorAll('.katex-html')).toHaveLength(2);
+    expect(host.querySelector('.katex-display .katex-html')).toBeTruthy();
+    expect(host.querySelectorAll('.katex-mathml math')).toHaveLength(2);
+    expect(document.querySelector('style[data-syncnos-katex="fonts"]')).toBeTruthy();
+    expect(document.querySelector('style[data-syncnos-katex="layout"]')?.textContent).toContain('.katex .katex-mathml');
+  });
+
+  it('keeps advanced formulas in the HTML layout tree and removes styles when math is removed', async () => {
+    const host = await renderIntoHost(
+      createElement(CommentMarkdown, {
+        markdown: String.raw`$$\boxed{E=mc^2}+\cancel{x}+\mathcal{A}+\mathfrak{B}+\mathscr{C}+\underset{a}{\overset{b}{X}}$$`,
+      }),
+    );
+    await act(async () => {
+      await import('@ui/shared/markdown-math-styles');
+      await Promise.resolve();
+    });
+    const visual = host.querySelector('.katex-html')!;
+    expect(visual).toBeTruthy();
+    expect(visual.querySelector('.fbox')).toBeTruthy();
+    expect(visual.querySelector('svg line')).toBeTruthy();
+    expect(visual.querySelector('.mathcal')).toBeTruthy();
+    expect(visual.querySelector('.mathfrak')).toBeTruthy();
+    expect(visual.querySelector('.mathscr')).toBeTruthy();
+    expect(visual.querySelector('.vlist')).toBeTruthy();
+    await act(async () => root!.render(createElement(CommentMarkdown, { markdown: 'No formula' })));
+    expect(host.querySelector('.katex')).toBeNull();
+    expect(document.querySelector('style[data-syncnos-katex]')).toBeNull();
   });
 
   it('uses the same markdown renderer for imported roots and replies', async () => {
@@ -214,9 +240,8 @@ describe('comment markdown rendering', () => {
     expect(markdownRule).not.toMatch(/white-space\s*:\s*pre-wrap/);
     expect(css).toContain('.webclipper-inpage-comments-panel__markdown pre {');
     expect(css).toContain('.webclipper-inpage-comments-panel__markdown table {');
-    expect(css).toContain('.webclipper-inpage-comments-panel__markdown eq {');
-    expect(css).toContain('.webclipper-inpage-comments-panel__markdown eqn {');
-    expect(css).not.toContain('.webclipper-inpage-comments-panel__markdown .katex-display {');
+    expect(css).not.toMatch(/__markdown\s+eqn?\s*\{/);
+    expect(css).toContain('.webclipper-inpage-comments-panel__markdown .katex-display {');
     expect(css).toContain('.webclipper-inpage-comments-panel__markdown a:focus-visible {');
     expect(css).not.toContain(
       '.webclipper-inpage-comments-panel__comment-main > .webclipper-inpage-comments-panel__text',

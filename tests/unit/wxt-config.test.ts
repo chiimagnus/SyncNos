@@ -115,6 +115,61 @@ describe('WXT browser-scoped Vite config', () => {
     );
   });
 
+  it('emits all shadow fonts as shared assets instead of embedding font bytes in content-script JavaScript', async () => {
+    const config = await resolveViteConfig('chrome');
+    const plugin = config.plugins?.find((entry) => entry && (entry as Plugin).name === 'katex-shadow-styles') as Plugin;
+    if (
+      typeof plugin?.load !== 'function' ||
+      typeof plugin.resolveId !== 'function' ||
+      typeof plugin.resolveFileUrl !== 'function'
+    ) {
+      throw new Error('Missing KaTeX shadow asset hooks');
+    }
+    const virtualId = plugin.resolveId.call(null as never, 'virtual:syncnos-katex-shadow-css', undefined, {
+      isEntry: true,
+    }) as string;
+    const assets: { type: string; name: string; fileName: string; source: Buffer }[] = [];
+    const code = plugin.load.call(
+      {
+        emitFile: (asset: (typeof assets)[number]) => {
+          const ref = `font${assets.length}`;
+          assets.push(asset);
+          return ref;
+        },
+      } as never,
+      virtualId,
+    ) as string;
+    expect(assets).toHaveLength(20);
+    expect(code).not.toContain('data:font');
+    expect(code).not.toContain('.ttf');
+    expect(code).not.toMatch(/\.woff["')]/);
+    for (const asset of assets) {
+      expect(asset.name).toMatch(/^KaTeX_.*\.woff2$/);
+      expect(asset.fileName).toBe(`assets/${asset.name}`);
+      expect(asset.source.equals(fs.readFileSync(path.resolve('node_modules/katex/dist/fonts', asset.name)))).toBe(
+        true,
+      );
+    }
+    const output = code
+      .replace(/import\.meta\.ROLLUP_FILE_URL_font(\d+)/g, (_match, index) =>
+        JSON.stringify(`/assets/${assets[Number(index)].name}`),
+      )
+      .replace('export default ', 'return ');
+    const css = new Function(output)() as string;
+    const faces: string[] = [];
+    postcss.parse(css).walkAtRules('font-face', (rule) => {
+      faces.push(rule.toString());
+    });
+    expect(faces).toHaveLength(20);
+    expect(css).toContain('.katex .katex-mathml');
+    expect(
+      plugin.resolveFileUrl.call(null as never, { referenceId: 'font0', fileName: 'assets/font.woff2' } as never),
+    ).toBe('"/assets/font.woff2"');
+    expect(
+      plugin.resolveFileUrl.call(null as never, { referenceId: 'unrelated', fileName: 'other.bin' } as never),
+    ).toBeUndefined();
+  });
+
   it('keeps the shared chunk warning limit for every browser', async () => {
     for (const browser of ['chrome', 'firefox', 'safari'] as const) {
       const config = await resolveViteConfig(browser);
@@ -126,6 +181,16 @@ describe('WXT browser-scoped Vite config', () => {
     for (const browser of ['chrome', 'firefox', 'safari'] as const) {
       const manifest = await resolveManifest(browser);
       expect(manifest.incognito).not.toBe('split');
+    }
+  });
+
+  it('exposes only packaged KaTeX WOFF2 fonts for in-page comments on every supported browser', async () => {
+    for (const browser of ['chrome', 'firefox', 'safari'] as const) {
+      const manifest = await resolveManifest(browser);
+      const fonts = manifest.web_accessible_resources?.find((entry: any) =>
+        entry.resources.includes('assets/KaTeX_*.woff2'),
+      ) as { resources: string[]; matches: string[] } | undefined;
+      expect(fonts).toEqual({ resources: ['assets/KaTeX_*.woff2'], matches: ['http://*/*', 'https://*/*'] });
     }
   });
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { createMarkdownRenderer, markdownLikelyContainsMath } from '@ui/shared/markdown-core';
 
@@ -7,43 +7,50 @@ const plainRenderer = createMarkdownRenderer({
   renderImages: false,
 });
 
-let mathRenderer: ReturnType<typeof createMarkdownRenderer> | null = null;
-let mathRendererPromise: Promise<ReturnType<typeof createMarkdownRenderer>> | null = null;
+type MathRuntime = {
+  renderer: ReturnType<typeof createMarkdownRenderer>;
+  mountStyles: (element: HTMLElement) => () => void;
+};
+let mathRuntime: MathRuntime | null = null;
+let mathRuntimePromise: Promise<MathRuntime> | null = null;
 
-async function ensureMathRenderer(): Promise<ReturnType<typeof createMarkdownRenderer>> {
-  if (mathRenderer) return mathRenderer;
-  if (!mathRendererPromise) {
-    mathRendererPromise = import('@ui/shared/markdown-math')
+async function ensureMathRuntime(): Promise<MathRuntime> {
+  if (mathRuntime) return mathRuntime;
+  if (!mathRuntimePromise) {
+    mathRuntimePromise = import('@ui/shared/markdown-math-styles')
       .then((mod) => {
-        const renderer = mod.createKatexMarkdownRenderer({
-          openLinksInNewTab: true,
-          renderImages: false,
-          mathOutput: 'mathml',
-        });
-        mathRenderer = renderer;
-        return renderer;
+        const runtime = {
+          renderer: mod.createKatexMarkdownRenderer({ openLinksInNewTab: true, renderImages: false }),
+          mountStyles: mod.mountKatexStyles,
+        };
+        mathRuntime = runtime;
+        return runtime;
       })
       .catch((error) => {
-        mathRendererPromise = null;
+        mathRuntimePromise = null;
         throw error;
       });
   }
-  return mathRendererPromise;
+  return mathRuntimePromise;
 }
 
 export function CommentMarkdown({ markdown }: { markdown: string }) {
   const source = markdown;
   const containsMath = useMemo(() => markdownLikelyContainsMath(source), [source]);
-  const [loadedMathRenderer, setLoadedMathRenderer] = useState<ReturnType<typeof createMarkdownRenderer> | null>(
-    () => mathRenderer,
-  );
+  const elementRef = useRef<HTMLDivElement>(null);
+  const [loadedMathRuntime, setLoadedMathRuntime] = useState(() => mathRuntime);
+
+  useLayoutEffect(() => {
+    if (!containsMath || !loadedMathRuntime || !elementRef.current) return;
+    return loadedMathRuntime.mountStyles(elementRef.current);
+  }, [containsMath, loadedMathRuntime]);
 
   useEffect(() => {
-    if (!containsMath || loadedMathRenderer) return;
+    if (!containsMath || loadedMathRuntime) return;
     let disposed = false;
-    void ensureMathRenderer()
-      .then((renderer) => {
-        if (!disposed) setLoadedMathRenderer(renderer);
+    void ensureMathRuntime()
+      .then((runtime) => {
+        if (!disposed) setLoadedMathRuntime(runtime);
       })
       .catch((error) => {
         console.warn('[Comments] failed to load math renderer', {
@@ -53,11 +60,13 @@ export function CommentMarkdown({ markdown }: { markdown: string }) {
     return () => {
       disposed = true;
     };
-  }, [containsMath, loadedMathRenderer]);
+  }, [containsMath, loadedMathRuntime]);
 
-  const activeRenderer = containsMath && loadedMathRenderer ? loadedMathRenderer : plainRenderer;
+  const activeRenderer = containsMath && loadedMathRuntime ? loadedMathRuntime.renderer : plainRenderer;
   const html = useMemo(() => activeRenderer.render(source), [activeRenderer, source]);
   const innerHtml = useMemo(() => ({ __html: html }), [html]);
 
-  return <div className="webclipper-inpage-comments-panel__markdown" dangerouslySetInnerHTML={innerHtml} />;
+  return (
+    <div ref={elementRef} className="webclipper-inpage-comments-panel__markdown" dangerouslySetInnerHTML={innerHtml} />
+  );
 }

@@ -16,11 +16,6 @@ export type MarkdownRendererOptions = {
    * Defaults to true.
    */
   renderImages?: boolean;
-  /**
-   * KaTeX output mode when a math runtime is active.
-   * Defaults to KaTeX's normal HTML + MathML output.
-   */
-  mathOutput?: 'html' | 'mathml' | 'htmlAndMathml';
 };
 
 export type MarkdownMathRuntime = {
@@ -41,7 +36,6 @@ export function markdownLikelyContainsMath(markdown: string): boolean {
 export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, mathRuntime?: MarkdownMathRuntime) {
   const openLinksInNewTab = options.openLinksInNewTab ?? true;
   const renderImages = options.renderImages ?? true;
-  const mathOutput = options.mathOutput ?? 'htmlAndMathml';
   const inst = new MarkdownIt({
     html: false,
     breaks: true,
@@ -82,7 +76,8 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, ma
       katexOptions: {
         throwOnError: false,
         strict: 'ignore',
-        output: mathOutput,
+        // HTML provides visual layout; hidden MathML remains for assistive technology.
+        output: 'htmlAndMathml',
       },
     });
   }
