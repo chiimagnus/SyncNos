@@ -27,19 +27,6 @@ function filterKatexWoff2(source: string, id: string): string {
   return css.toString();
 }
 
-// All supported browsers decode WOFF2. Filter before Vite discovers fallback font assets.
-function katexWoff2Fonts() {
-  return {
-    name: 'katex-woff2-fonts',
-    enforce: 'pre' as const,
-    apply: 'build' as const,
-    transform(source: string, id: string) {
-      if (!id.replaceAll('\\', '/').split('?')[0].endsWith('/katex/dist/katex.min.css')) return;
-      return { code: filterKatexWoff2(source, id), map: null };
-    },
-  };
-}
-
 // Vite library-mode content scripts inline every asset in CSS ?inline, regardless
 // of assetsInlineLimit. Emit shared font assets explicitly through Rollup instead.
 function katexShadowStyles() {
@@ -202,7 +189,7 @@ export default defineConfig({
   entrypointsDir: 'src/entrypoints',
   webExt: chromeBinary ? { binaries: { chrome: chromeBinary } } : undefined,
   vite: (env) => ({
-    plugins: [katexWoff2Fonts(), katexShadowStyles()],
+    plugins: [katexShadowStyles()],
     define: {
       __SYNCNOS_FEISHU_OAUTH_CLIENT_ID__: JSON.stringify(process.env.SYNCNOS_FEISHU_OAUTH_CLIENT_ID ?? ''),
       __SYNCNOS_FEISHU_OAUTH_TOKEN_EXCHANGE_PROXY_URL__: JSON.stringify(

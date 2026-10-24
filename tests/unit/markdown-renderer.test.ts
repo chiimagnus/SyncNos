@@ -89,21 +89,15 @@ describe('createMarkdownRenderer', () => {
     expect(html).not.toContain('<script>');
   });
 
-  it('can render links with target blank when enabled', () => {
-    const md = createMarkdownRenderer({ openLinksInNewTab: true });
+  it('opens rendered links in a separate tab', () => {
+    const md = createMarkdownRenderer();
     const html = md.render('[x](https://example.com)');
     expect(html).toContain('target="_blank"');
     expect(html).toContain('rel="noreferrer noopener"');
   });
 
-  it('keeps links in the current tab when openLinksInNewTab is disabled', () => {
-    const md = createMarkdownRenderer({ openLinksInNewTab: false });
-    const html = md.render('[x](https://example.com)');
-    expect(html).not.toContain('target="_blank"');
-  });
-
   it('renders images with an explicit link below (http urls only)', () => {
-    const md = createMarkdownRenderer({ openLinksInNewTab: true });
+    const md = createMarkdownRenderer();
     const html = md.render('![](https://example.com/a.png?token=secret&x=1)');
     expect(html).toContain('<img');
     expect(html).toContain('class="syncnos-md-image"');
@@ -114,14 +108,14 @@ describe('createMarkdownRenderer', () => {
   });
 
   it('does not render a link line for data:image urls', () => {
-    const md = createMarkdownRenderer({ openLinksInNewTab: true });
+    const md = createMarkdownRenderer();
     const html = md.render('![](data:image/png;base64,AAAA)');
     expect(html).toContain('<img');
     expect(html).not.toContain('syncnos-md-image-link');
   });
 
   it('renders syncnos-asset images with local asset markers and placeholder src', () => {
-    const md = createMarkdownRenderer({ openLinksInNewTab: true });
+    const md = createMarkdownRenderer();
     const html = md.render('![](syncnos-asset://42)');
     expect(html).toContain('<img');
     expect(html).toContain('data-syncnos-asset-id="42"');
@@ -132,7 +126,7 @@ describe('createMarkdownRenderer', () => {
   });
 
   it('renders malformed internal image targets as safe placeholders without leaking internal urls', () => {
-    const md = createMarkdownRenderer({ openLinksInNewTab: true });
+    const md = createMarkdownRenderer();
     for (const target of [
       'syncnos-asset://nope',
       'syncnos-asset://0',
@@ -163,7 +157,7 @@ describe('createMarkdownRenderer', () => {
   });
 
   it('degrades image tokens without creating img elements when images are disabled', () => {
-    const md = createMarkdownRenderer({ openLinksInNewTab: true, renderImages: false });
+    const md = createMarkdownRenderer({ renderImages: false });
     const html = md.render(
       [
         '![Remote](https://example.com/a.png)',
@@ -192,7 +186,7 @@ describe('createMarkdownRenderer', () => {
   });
 
   it('does not emit dangerous href schemes', () => {
-    const md = createMarkdownRenderer({ openLinksInNewTab: true });
+    const md = createMarkdownRenderer();
     const html = md.render('[x](javascript:alert(1))');
     expect(html).not.toContain('href="javascript:');
   });

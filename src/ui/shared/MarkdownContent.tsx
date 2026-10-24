@@ -2,13 +2,13 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { createMarkdownRenderer, markdownLikelyContainsMath } from '@ui/shared/markdown-core';
 
-const plainRenderer = createMarkdownRenderer({
-  openLinksInNewTab: true,
-  renderImages: false,
-});
+const plainRenderers = {
+  content: createMarkdownRenderer(),
+  textOnly: createMarkdownRenderer({ renderImages: false }),
+};
 
 type MathRuntime = {
-  renderer: ReturnType<typeof createMarkdownRenderer>;
+  renderers: typeof plainRenderers;
   mountStyles: (element: HTMLElement) => () => void;
 };
 let mathRuntime: MathRuntime | null = null;
@@ -20,7 +20,10 @@ async function ensureMathRuntime(): Promise<MathRuntime> {
     mathRuntimePromise = import('@ui/shared/markdown-math-styles')
       .then((mod) => {
         const runtime = {
-          renderer: mod.createKatexMarkdownRenderer({ openLinksInNewTab: true, renderImages: false }),
+          renderers: {
+            content: mod.createKatexMarkdownRenderer(),
+            textOnly: mod.createKatexMarkdownRenderer({ renderImages: false }),
+          },
           mountStyles: mod.mountKatexStyles,
         };
         mathRuntime = runtime;
@@ -34,9 +37,22 @@ async function ensureMathRuntime(): Promise<MathRuntime> {
   return mathRuntimePromise;
 }
 
-export function CommentMarkdown({ markdown }: { markdown: string }) {
-  const source = markdown;
-  const containsMath = useMemo(() => markdownLikelyContainsMath(source), [source]);
+type MarkdownContentProps = {
+  markdown: string;
+  className?: string;
+  renderImages?: boolean;
+  syncnosAssetSrcById?: ReadonlyMap<number, string>;
+  chatgptFileSrcById?: ReadonlyMap<string, string>;
+};
+
+export function MarkdownContent({
+  markdown,
+  className,
+  renderImages = true,
+  syncnosAssetSrcById,
+  chatgptFileSrcById,
+}: MarkdownContentProps) {
+  const containsMath = useMemo(() => markdownLikelyContainsMath(markdown), [markdown]);
   const elementRef = useRef<HTMLDivElement>(null);
   const [loadedMathRuntime, setLoadedMathRuntime] = useState(() => mathRuntime);
 
@@ -53,20 +69,20 @@ export function CommentMarkdown({ markdown }: { markdown: string }) {
         if (!disposed) setLoadedMathRuntime(runtime);
       })
       .catch((error) => {
-        console.warn('[Comments] failed to load math renderer', {
-          error: error instanceof Error ? error.message : String(error || ''),
-        });
+        console.warn('[Markdown] failed to load math renderer', error);
       });
     return () => {
       disposed = true;
     };
   }, [containsMath, loadedMathRuntime]);
 
-  const activeRenderer = containsMath && loadedMathRuntime ? loadedMathRuntime.renderer : plainRenderer;
-  const html = useMemo(() => activeRenderer.render(source), [activeRenderer, source]);
+  const renderers = containsMath && loadedMathRuntime ? loadedMathRuntime.renderers : plainRenderers;
+  const renderer = renderImages ? renderers.content : renderers.textOnly;
+  const html = useMemo(
+    () => renderer.render(markdown, { syncnosAssetSrcById, chatgptFileSrcById }),
+    [renderer, markdown, syncnosAssetSrcById, chatgptFileSrcById],
+  );
   const innerHtml = useMemo(() => ({ __html: html }), [html]);
 
-  return (
-    <div ref={elementRef} className="webclipper-inpage-comments-panel__markdown" dangerouslySetInnerHTML={innerHtml} />
-  );
+  return <div ref={elementRef} className={className} dangerouslySetInnerHTML={innerHtml} />;
 }

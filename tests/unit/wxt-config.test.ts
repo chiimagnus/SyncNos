@@ -23,15 +23,6 @@ async function resolveViteConfig(browser: TargetBrowser) {
   return await wxtConfig.vite(buildEnv(browser));
 }
 
-async function transformKatexCss(source: string, id: string) {
-  const config = await resolveViteConfig('chrome');
-  const plugin = config.plugins?.find((entry) => entry && (entry as Plugin).name === 'katex-woff2-fonts') as Plugin;
-  if (typeof plugin?.transform !== 'function') throw new Error('Missing KaTeX CSS transform');
-  expect(plugin.enforce).toBe('pre');
-  expect(plugin.apply).toBe('build');
-  return plugin.transform.call(null as never, source, id);
-}
-
 async function resolveManifest(browser: TargetBrowser) {
   if (!wxtConfig.manifest) throw new Error('WXT manifest config is missing');
   return typeof wxtConfig.manifest === 'function' ? await wxtConfig.manifest(buildEnv(browser)) : wxtConfig.manifest;
@@ -64,55 +55,6 @@ describe('WXT browser-scoped Vite config', () => {
       expect(fs.existsSync(katexAlias!.replacement)).toBe(true);
       expect((katexAlias!.find as RegExp).test('katex/dist/katex.min.css')).toBe(false);
     }
-  });
-
-  it('retains every KaTeX font family, style, weight and glyph source using WOFF2 only', async () => {
-    const id = path.resolve('node_modules/katex/dist/katex.min.css');
-    const source = fs.readFileSync(id, 'utf8');
-    const transformed = await transformKatexCss(source, id);
-    if (!transformed || typeof transformed === 'string') throw new Error('Expected transformed KaTeX CSS');
-    const original = postcss.parse(source);
-    const actual = postcss.parse(transformed.code);
-    const families: string[] = [];
-    original.walkAtRules('font-face', (rule) => {
-      rule.walkDecls('src', (decl) => {
-        const woff2 = decl.value.split(',').find((entry) => entry.includes('.woff2'))!;
-        families.push(woff2.trim());
-        decl.remove();
-      });
-    });
-    const actualSources: string[] = [];
-    actual.walkAtRules('font-face', (rule) => {
-      rule.walkDecls('src', (decl) => {
-        actualSources.push(decl.value);
-        expect(decl.value).not.toMatch(/\.woff["')]|\.ttf/);
-        decl.remove();
-      });
-    });
-    expect(families).toHaveLength(20);
-    expect(actualSources).toEqual(families);
-    expect(actual.toString()).toBe(original.toString());
-  });
-
-  it.each(['/repo/node_modules/katex/dist/katex.min.css?direct', 'C:\\repo\\node_modules\\katex\\dist\\katex.min.css'])(
-    'filters KaTeX CSS on query-bearing and Windows paths: %s',
-    async (id) => {
-      const result = await transformKatexCss(
-        '@font-face{font-family:KaTeX_Main;src:url(main.woff2) format("woff2"),url(main.ttf) format("truetype")}',
-        id,
-      );
-      expect(result && typeof result !== 'string' && result.code).toBe(
-        '@font-face{font-family:KaTeX_Main;src:url(main.woff2) format("woff2")}',
-      );
-    },
-  );
-
-  it('does not change unrelated CSS and fails closed if a KaTeX font loses its WOFF2 source', async () => {
-    const source = '@font-face{src:url(main.ttf) format("truetype")}';
-    expect(await transformKatexCss(source, '/repo/src/ui/styles/fonts.css')).toBeUndefined();
-    await expect(transformKatexCss(source, '/repo/node_modules/katex/dist/katex.min.css')).rejects.toThrow(
-      'must provide a WOFF2 source',
-    );
   });
 
   it('emits all shadow fonts as shared assets instead of embedding font bytes in content-script JavaScript', async () => {
@@ -162,6 +104,26 @@ describe('WXT browser-scoped Vite config', () => {
     });
     expect(faces).toHaveLength(20);
     expect(css).toContain('.katex .katex-mathml');
+    // Compare the complete vendor stylesheet after removing only source URLs:
+    // every family, weight, style and layout rule must survive the real build path.
+    const original = postcss.parse(fs.readFileSync(path.resolve('node_modules/katex/dist/katex.min.css'), 'utf8'));
+    const actual = postcss.parse(css);
+    const originalSources: string[] = [];
+    const actualSources: string[] = [];
+    original.walkAtRules('font-face', (rule) => {
+      rule.walkDecls('src', (decl) => {
+        originalSources.push(path.basename(decl.value.match(/url\(([^)]+\.woff2)\)/)![1]));
+        decl.remove();
+      });
+    });
+    actual.walkAtRules('font-face', (rule) => {
+      rule.walkDecls('src', (decl) => {
+        actualSources.push(path.basename(decl.value.match(/url\(([^)]+\.woff2)\)/)![1]));
+        decl.remove();
+      });
+    });
+    expect(actualSources).toEqual(originalSources);
+    expect(actual.toString()).toBe(original.toString());
     expect(
       plugin.resolveFileUrl.call(null as never, { referenceId: 'font0', fileName: 'assets/font.woff2' } as never),
     ).toBe('"/assets/font.woff2"');

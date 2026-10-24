@@ -41,7 +41,6 @@ describe('KaTeX shadow styles', () => {
     expect(faces).toHaveLength(20);
 
     releaseA1();
-    releaseA1(); // Cleanup is idempotent, including React StrictMode teardown.
     expect(a.shadow.querySelector('style')).toBeTruthy();
     releaseA2();
     expect(a.shadow.querySelector('style')).toBeNull();

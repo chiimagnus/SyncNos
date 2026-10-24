@@ -38,10 +38,7 @@ function retainStyle(
     entries.set(root, entry);
   }
   entry.users += 1;
-  let released = false;
   return () => {
-    if (released) return;
-    released = true;
     entry.users -= 1;
     if (entry.users) return;
     entry.element.remove();

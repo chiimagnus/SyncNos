@@ -1,4 +1,4 @@
-import { act, createElement } from 'react';
+import { act, createElement, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -7,7 +7,13 @@ import { readFileSync } from 'node:fs';
 import MarkdownIt from 'markdown-it';
 
 import type { CommentSidebarItem } from '@services/comments/sidebar/comment-sidebar-contract';
-import { CommentMarkdown } from '@ui/comments/react/CommentMarkdown';
+import { MarkdownContent } from '@ui/shared/MarkdownContent';
+import { ChatMessageBubble } from '@ui/shared/ChatMessageBubble';
+
+const commentMarkdownProps = {
+  renderImages: false,
+  className: 'webclipper-inpage-comments-panel__markdown',
+};
 import { CommentQuotePreview } from '@ui/comments/react/CommentQuotePreview';
 import { CommentThread } from '@ui/comments/react/CommentThread';
 
@@ -93,7 +99,7 @@ describe('comment markdown rendering', () => {
       '<script>alert(1)</script>',
     ].join('\n');
 
-    const host = await renderIntoHost(createElement(CommentMarkdown, { markdown }));
+    const host = await renderIntoHost(createElement(MarkdownContent, { ...commentMarkdownProps, markdown }));
     expect(document.querySelector('style[data-syncnos-katex]')).toBeNull();
     expect(host.querySelector('h1')?.textContent).toBe('Heading');
     expect(host.querySelector('strong')?.textContent).toBe('bold');
@@ -116,7 +122,7 @@ describe('comment markdown rendering', () => {
 
   it('shares punctuation-adjacent emphasis rules with article and chat rendering', async () => {
     const host = await renderIntoHost(
-      createElement(CommentMarkdown, { markdown: '**采集完成。**继续阅读 *重点。*正文' }),
+      createElement(MarkdownContent, { ...commentMarkdownProps, markdown: '**采集完成。**继续阅读 *重点。*正文' }),
     );
     expect(host.querySelector('strong')?.textContent).toBe('采集完成。');
     expect(host.querySelector('em')?.textContent).toBe('重点。');
@@ -125,24 +131,91 @@ describe('comment markdown rendering', () => {
 
   it('does not reparse unchanged comment Markdown on unrelated rerenders', async () => {
     const renderSpy = vi.spyOn(MarkdownIt.prototype, 'render');
-    await renderIntoHost(createElement(CommentMarkdown, { markdown: '**same**' }));
+    await renderIntoHost(createElement(MarkdownContent, { ...commentMarkdownProps, markdown: '**same**' }));
     expect(renderSpy).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      root!.render(createElement(CommentMarkdown, { markdown: '**same**' }));
+      root!.render(createElement(MarkdownContent, { ...commentMarkdownProps, markdown: '**same**' }));
       await Promise.resolve();
     });
     expect(renderSpy).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      root!.render(createElement(CommentMarkdown, { markdown: '**changed**' }));
+      root!.render(createElement(MarkdownContent, { ...commentMarkdownProps, markdown: '**changed**' }));
       await Promise.resolve();
     });
     expect(renderSpy).toHaveBeenCalledTimes(2);
   });
 
+  it('uses identical Markdown and math HTML across article, chat and comments with one stylesheet lifetime', async () => {
+    const markdown =
+      '**共同规则。**正文\n\n|a|b|\n|-|-|\n|1|2|\n\n$E=mc^2$\n\n$$\\frac{1}{x}$$\n\n<script>alert(1)</script>\n\n[x](javascript:alert(1))';
+    const host = await renderIntoHost(
+      createElement(
+        StrictMode,
+        null,
+        createElement(
+          'div',
+          null,
+          createElement(ChatMessageBubble, { markdown, className: 'article-markdown' }),
+          createElement(ChatMessageBubble, { markdown, role: 'assistant', className: 'chat-markdown' }),
+          createElement(MarkdownContent, { ...commentMarkdownProps, markdown }),
+        ),
+      ),
+    );
+    await act(async () => {
+      await import('@ui/shared/markdown-math-styles');
+    });
+    const article = host.querySelector('.article-markdown')!;
+    const chat = host.querySelector('.chat-markdown')!;
+    const comment = host.querySelector('.webclipper-inpage-comments-panel__markdown')!;
+    expect(article.querySelectorAll('.katex-html')).toHaveLength(2);
+    expect(article.querySelector('.katex-error')).toBeNull();
+    expect(article.querySelector('script, a[href^="javascript:"]')).toBeNull();
+    expect(article.querySelector('.katex-display annotation')?.textContent).toBe(String.raw`\frac{1}{x}`);
+    expect(article.innerHTML).toBe(chat.innerHTML);
+    expect(article.innerHTML).toBe(comment.innerHTML);
+    expect(document.querySelectorAll('[data-syncnos-katex="fonts"]')).toHaveLength(1);
+    expect(document.querySelectorAll('[data-syncnos-katex="layout"]')).toHaveLength(1);
+
+    await act(async () => root!.render(createElement(MarkdownContent, { ...commentMarkdownProps, markdown })));
+    expect(host.querySelectorAll('.katex-html')).toHaveLength(2);
+    expect(document.querySelectorAll('[data-syncnos-katex="fonts"]')).toHaveLength(1);
+    await act(async () =>
+      root!.render(createElement(MarkdownContent, { ...commentMarkdownProps, markdown: 'No math' })),
+    );
+    expect(document.querySelector('[data-syncnos-katex]')).toBeNull();
+  });
+
+  it('preserves image policy and resolved sources when math and images share the common renderer', async () => {
+    const markdown = '$x$\n\n![cached](syncnos-asset://7)\n\n![remote](https://example.com/a.png)';
+    const host = await renderIntoHost(
+      createElement(
+        'div',
+        null,
+        createElement(ChatMessageBubble, {
+          markdown,
+          className: 'article-markdown',
+          syncnosAssetSrcById: new Map([[7, 'blob:cached-7']]),
+        }),
+        createElement(MarkdownContent, { ...commentMarkdownProps, markdown }),
+      ),
+    );
+    await act(async () => {
+      await import('@ui/shared/markdown-math-styles');
+    });
+    expect(host.querySelector('.article-markdown img')?.getAttribute('src')).toBe('blob:cached-7');
+    expect(host.querySelector('.webclipper-inpage-comments-panel__markdown img')).toBeNull();
+    expect(host.querySelector('.webclipper-inpage-comments-panel__markdown a')?.getAttribute('href')).toBe(
+      'https://example.com/a.png',
+    );
+    expect(host.querySelectorAll('.katex-html')).toHaveLength(2);
+  });
+
   it('renders inline and block math with KaTeX HTML after the lazy runtime loads', async () => {
-    const host = await renderIntoHost(createElement(CommentMarkdown, { markdown: '$E=mc^2$\n\n$$x^2$$' }));
+    const host = await renderIntoHost(
+      createElement(MarkdownContent, { ...commentMarkdownProps, markdown: '$E=mc^2$\n\n$$x^2$$' }),
+    );
     await act(async () => {
       await import('@ui/shared/markdown-math-styles');
       await Promise.resolve();
@@ -156,7 +229,8 @@ describe('comment markdown rendering', () => {
 
   it('keeps advanced formulas in the HTML layout tree and removes styles when math is removed', async () => {
     const host = await renderIntoHost(
-      createElement(CommentMarkdown, {
+      createElement(MarkdownContent, {
+        ...commentMarkdownProps,
         markdown: String.raw`$$\boxed{E=mc^2}+\cancel{x}+\mathcal{A}+\mathfrak{B}+\mathscr{C}+\underset{a}{\overset{b}{X}}$$`,
       }),
     );
@@ -172,7 +246,9 @@ describe('comment markdown rendering', () => {
     expect(visual.querySelector('.mathfrak')).toBeTruthy();
     expect(visual.querySelector('.mathscr')).toBeTruthy();
     expect(visual.querySelector('.vlist')).toBeTruthy();
-    await act(async () => root!.render(createElement(CommentMarkdown, { markdown: 'No formula' })));
+    await act(async () =>
+      root!.render(createElement(MarkdownContent, { ...commentMarkdownProps, markdown: 'No formula' })),
+    );
     expect(host.querySelector('.katex')).toBeNull();
     expect(document.querySelector('style[data-syncnos-katex]')).toBeNull();
   });
