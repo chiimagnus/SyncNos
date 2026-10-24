@@ -122,7 +122,10 @@ export default defineConfig({
       ),
     },
     resolve: {
-      alias: viteAlias,
+      alias: [
+        { find: /^katex$/, replacement: path.resolve('node_modules/katex/dist/katex.mjs') },
+        ...Object.entries(viteAlias).map(([find, replacement]) => ({ find, replacement })),
+      ],
     },
     build: {
       // Some dependencies (notably `entities` via markdown-it) store compact lookup tables

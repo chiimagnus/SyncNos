@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 import type { ConfigEnv, TargetBrowser } from 'wxt';
@@ -40,6 +41,18 @@ describe('WXT browser-scoped Vite config', () => {
     expect(chrome.build?.modulePreload).toBe(false);
     expect(firefox.build?.modulePreload).toBeUndefined();
     expect(safari.build?.modulePreload).toBeUndefined();
+  });
+
+  it('resolves ESM imports and CommonJS requires to one KaTeX engine without redirecting CSS', async () => {
+    for (const browser of ['chrome', 'firefox', 'safari'] as const) {
+      const config = await resolveViteConfig(browser);
+      const aliases = config.resolve?.alias;
+      if (!Array.isArray(aliases)) throw new Error('Expected ordered Vite aliases');
+      const katexAlias = aliases.find((alias) => alias.find instanceof RegExp && alias.find.test('katex'));
+      expect(katexAlias?.replacement).toBe(path.resolve('node_modules/katex/dist/katex.mjs'));
+      expect(fs.existsSync(katexAlias!.replacement)).toBe(true);
+      expect((katexAlias!.find as RegExp).test('katex/dist/katex.min.css')).toBe(false);
+    }
   });
 
   it('keeps the shared chunk warning limit for every browser', async () => {
