@@ -50,6 +50,8 @@ Safari/Xcode 集成使用 `npm run setup:safari:xcode`。排障见 [`troubleshoo
 
 `npm run gate` 比 `gate:ci` 多构建 Chromium production artifact 并执行 `check:dist`。Zen / Safari 有改动时再运行 `npm run check:zen` / `npm run check:safari`。模拟平台测试不能冒充真实平台 E2E。
 
+`check:dist` 同时约束解压后的完整目录体积、manifest 声明的 content script 总体积和启动闭包，具体预算以 [`check-dist.mjs`](../.github/scripts/webclipper/check-dist.mjs) 为准。公式引擎统一使用 KaTeX ESM 入口；字体在 Vite 收集资源前只保留 WOFF2，不靠构建后删文件。新增浏览器目标或升级 KaTeX 时，需复核字体支持及公式渲染，不能仅放宽预算或删除字体来让检查通过。
+
 ## 数据、权限与隐私
 
 修改 IndexedDB、Backup、sync mapping、OAuth、图片缓存、权限、Native Messaging 或迁移时，必须说明失败后如何保持数据可恢复，以及是否新增本地到外部的数据流。
