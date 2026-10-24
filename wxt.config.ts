@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import postcss from 'postcss';
 import { defineConfig, type UserManifestFn } from 'wxt';
 
 import { KEYBOARD_SHORTCUT_COMMAND_IDS } from './src/services/shortcuts/keyboard-shortcut-contract';
@@ -13,6 +14,27 @@ const viteAlias = {
   '@entrypoints': path.resolve('src/entrypoints'),
   '@i18n': path.resolve('src/ui/i18n'),
 };
+
+// All supported browsers decode WOFF2. Filter before Vite discovers fallback font assets.
+function katexWoff2Fonts() {
+  return {
+    name: 'katex-woff2-fonts',
+    enforce: 'pre' as const,
+    apply: 'build' as const,
+    transform(source: string, id: string) {
+      if (!id.replaceAll('\\', '/').split('?')[0].endsWith('/katex/dist/katex.min.css')) return;
+      const css = postcss.parse(source, { from: id });
+      css.walkAtRules('font-face', (rule) => {
+        rule.walkDecls('src', (decl) => {
+          const woff2 = decl.value.split(',').find((entry) => entry.includes('.woff2'));
+          if (!woff2) throw decl.error('KaTeX font face must provide a WOFF2 source');
+          decl.value = woff2.trim();
+        });
+      });
+      return { code: css.toString(), map: null };
+    },
+  };
+}
 
 function firstExistingPath(candidates: string[]): string | undefined {
   for (const candidate of candidates) {
@@ -115,6 +137,7 @@ export default defineConfig({
   entrypointsDir: 'src/entrypoints',
   webExt: chromeBinary ? { binaries: { chrome: chromeBinary } } : undefined,
   vite: (env) => ({
+    plugins: [katexWoff2Fonts()],
     define: {
       __SYNCNOS_FEISHU_OAUTH_CLIENT_ID__: JSON.stringify(process.env.SYNCNOS_FEISHU_OAUTH_CLIENT_ID ?? ''),
       __SYNCNOS_FEISHU_OAUTH_TOKEN_EXCHANGE_PROXY_URL__: JSON.stringify(
