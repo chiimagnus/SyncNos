@@ -50,7 +50,9 @@ Safari/Xcode 集成使用 `npm run setup:safari:xcode`。排障见 [`troubleshoo
 
 `npm run gate` 比 `gate:ci` 多构建 Chromium production artifact 并执行 `check:dist`。Zen / Safari 有改动时再运行 `npm run check:zen` / `npm run check:safari`。模拟平台测试不能冒充真实平台 E2E。
 
-`check:dist` 同时约束解压后的完整目录体积、manifest 声明的 content script 总体积和启动闭包，具体预算以 [`check-dist.mjs`](../.github/scripts/webclipper/check-dist.mjs) 为准。文章、聊天与评论共用 `MarkdownContent` 组件，统一 Markdown 规则、公式懒加载及样式生命周期；评论仅保留紧凑布局和不创建图片元素的显示策略。公式引擎统一使用 KaTeX ESM 入口和 HTML 视觉排版，隐藏的 MathML 仅用于无障碍。排版规则挂载到实际 document / shadow root，字体声明按 document 共享；最后一个使用者卸载后移除样式。字体在 Vite 收集资源前只保留 WOFF2，不靠构建后删文件；in-page 字体 URL 必须指向扩展自身，manifest 仅开放对应的静态 WOFF2 资源。新增浏览器目标或升级 KaTeX 时，需复核字体支持及公式渲染，不能仅放宽预算或删除字体来让检查通过。
+`check:dist` 约束解压后的完整目录体积、manifest 声明的 content script JS 总体积和 Popup 启动 JS/CSS，并拒绝冗余 KaTeX TTF/WOFF。具体预算以 [`check-dist.mjs`](../.github/scripts/webclipper/check-dist.mjs) 为准；超标时先查实际依赖和资源，不以放宽预算代替优化。
+
+修改 Markdown、公式或字体构建时，按 [`markdown-rendering.md`](markdown-rendering.md) 核对共享渲染与实际显示。尽可能覆盖受影响功能的适用环境、输入、失败/恢复、时序与极端组合；未执行项说明原因、影响及补验，不把组件预览或构建通过写成真实扩展 E2E。
 
 ## 数据、权限与隐私
 

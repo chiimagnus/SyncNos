@@ -21,6 +21,7 @@
 | Video 字幕未保存 | SyncNos 只保存播放器当前已开启的字幕：字幕关闭时只保存视频信息/章节；开启后只采集当前语言。若当前字幕已开启但正文获取失败，会单独提示“字幕暂时无法获取”。 |
 | `syncnos doctor` 报错 | 按 `error.code` 检查 installation health、浏览器在线状态、权限或版本；不要猜。 |
 | 评论无法定位 | 检查 `resolveCommentAnchor()` reason、候选 root 和 exact quote；不要增加模糊高亮。 |
+| 公式错位、重复或缺字 | 按 [`Markdown 与公式渲染`](markdown-rendering.md#排障与验证) 检查样式 root、隐藏 MathML 与扩展字体请求。 |
 | Zen 本地测试 | 用 `npm run dev:zen` / `npm run build:zen`；unsigned XPI 只用于测试 Profile。 |
 
 ## 消息生命周期
