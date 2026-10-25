@@ -32,7 +32,7 @@ collectors -> services/shared
 - UI 圆角只使用 `src/ui/styles/tokens.css` 中的 `--radius-*`；细则见 `src/ui/AGENTS.md`。
 - 浏览器级快捷键由原生 Commands 管理，不在 SyncNos 内保存或编辑，也不声明默认 `suggested_key`。SyncNos 内部快捷键独立配置，仅在插件 Popup／应用内触发，不抢占输入框、编辑器及模态弹窗；详情快捷键只作用于当前打开的会话。
 - 会话列表必须使用 `bootstrap + loadMore` 分页，禁止恢复全量读取。
-- ChatGPT 与 Google AI Studio 的虚拟列表会卸载离屏轮次，禁止加入 `AI_CHAT_AUTO_SAVE_COLLECTOR_IDS`。Google AI Studio 完整历史继续只走手动 `prepareManualCapture()`；ChatGPT 默认手动 DOM 只做 partial-safe 保存，不得以可见窗口覆盖历史。仅用户显式开启 Advanced API 后，ChatGPT 手动抓取才走分页 `conversations/{id}` + `messages?before=`，逐页校验并只追加落库；确认历史游标终止、会话未变化、无重复节点与分支冲突后才能最终 snapshot。分页响应中的 `parent_id` 缺失不等于历史缺页；失败时保留已写入页、调度启用状态下的图片补全，不得静默回退 DOM。
+- ChatGPT 与 Google AI Studio 禁止自动保存；其虚拟历史不能靠可见窗口证明完整。Google AI Studio 继续手动扫描；ChatGPT 默认 DOM 采集只能安全追加。ChatGPT Advanced 必须由用户显式开启、逐页保存；仅确认完整且当前会话未变化时才可覆盖旧历史，中途失败保留已存内容，不静默回退 DOM。具体边界见 [`docs/collectors.md`](docs/collectors.md)。
 - AI 对话正文持久化不得等待图片网络；ChatGPT 未缓存内容图片保留可恢复身份，禁止持久化临时 signed URL / session credential。用户上传和 AI 生成图片属于内容，普通 tool/MCP 截图与视觉执行产物不属于内容。完整图片缓存、导出和失败语义见 [`docs/storage.md`](docs/storage.md)。
 - 评论选区只附加到 thread 首条引用内容的 composer；reply 输入框和评论面板内选区不得覆盖已附加引用。
 - 评论 thread 首节点只承载引用或评论一种内容；引用与评论独立持久化。迁移不得丢内容或伪造 locator；删除首节点删除整个 thread，删除后续评论只删除自身。完整恢复边界见 [`docs/storage.md`](docs/storage.md)。

@@ -271,6 +271,14 @@ SYNCNOS-ATTACHMENT-ACK
 - 标题优先取当前会话对应的历史链接；ChatGPT 在已核验正式会话身份且链接未挂载时，可使用当前页面非通用 `<title>`，不能取浮动聊天或其它会话的标题。
 - 无可靠标题时，才允许从首条 user semantic text 生成短标题。
 
+### API-01：ChatGPT Advanced 分页与恢复
+
+复用 DOM-05 的 12 轮测试会话，分别用默认页面采集和 Advanced 采集；必须使用已登录的正式会话，不用分享页或临时会话。
+
+- **完整历史**：Advanced 能读取当前页面未渲染的旧轮次；到达历史末页且会话稳定时，保存结果才可标记 `complete`。默认页面采集即使滚到顶部也保持 `partial`，不能删除已有历史。
+- **消息一致性**：核对本地消息数量、角色、顺序、稳定身份和重复采集；切换分支、修改当前回复或生成中时不得把不确定历史当完整快照覆盖。
+- **失败与恢复**：在允许且可控的环境中模拟分页超时或 HTTP 错误，确认 CLI 保留错误码和状态、已保存页可读且没有静默切换采集方式；恢复后再次采集，同一会话不得出现重复或丢失内容。无法安全注入故障时，注明未测条件并以定向测试补证，不将其记为真实 E2E PASS。
+
 ### IMG-01：用户上传图片
 
 适用于原生支持图片上传的站点。准备一张**无敏感信息的 PNG**，包含独特的可见标记 `SYNCNOS-UPLOAD-IMAGE`，使用已知尺寸（建议大于 1000 px，便于识别缩略图）；记录原文件尺寸与 SHA-256。将图片与「这张图是什么？最后回复 `SYNCNOS-IMAGE-UPLOAD-ACK`」一起发到独立测试会话。
@@ -350,6 +358,7 @@ Capture / Persist 已 PASS 但上述视觉错误存在时，只记 Render FAIL�
 | Markdown / shared Markdown helper | DOM-02、DOM-03、UI-01；触发问题的 provider + 至少一个同 helper 的其它 provider |
 | streaming / auto-save | DOM-04 生成中 + 完成后、DOM-08 |
 | 虚拟列表 / 分批历史 / completeness | DOM-05 全 12 轮、后台 → 前台恢复、DOM-08 |
+| ChatGPT Advanced API / 分页持久化 | API-01、DOM-05、DOM-06、DOM-08；能安全执行时覆盖中途失败与恢复 |
 | branch / edit / retry | DOM-06、DOM-08 |
 | 普通文件 / 视频附件 | DOM-07、DOM-08（按站点支持情况） |
 | 用户上传图片、DOM Blob、图片缓存、导出 | IMG-01、DOM-08；核对 App / popup 及 ZIP 实际图片文件 |
@@ -387,6 +396,7 @@ Capture / Persist 已 PASS 但上述视觉错误存在时，只记 Render FAIL�
 | DOM-06 |  |  |  | N/A |  |  |
 | DOM-07 |  |  |  |  |  |  |
 | DOM-08 |  |  |  | N/A |  |  |
+| API-01 |  |  |  |  |  |  |
 | IMG-01 |  |  |  |  |  |  |
 | IMG-02 |  |  |  |  |  |  |
 | RICH-01 |  |  |  |  |  |  |

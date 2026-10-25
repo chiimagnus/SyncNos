@@ -16,7 +16,7 @@
 | Vitest 不退出 | 未释放的 timer、listener 或 React root；超时不是 PASS。 |
 | OAuth Connect 无响应 | client ID、redirect URI、授权状态和对应 Worker / endpoint。 |
 | Notion schema / managed section 异常 | 不要新增重复字段或把读取失败当作“未找到”；按真实不兼容或远端失败处理。 |
-| ChatGPT Advanced 失败 | 区分会话身份/树完整性失败与 schema drift；同一次保存不静默回退 DOM。 |
+| ChatGPT Advanced 失败 | 查看 `chatgpt_api_*` 错误码及 HTTP 状态：先确认登录、正式会话和连接；分页中断后旧页可能已保存。结构不确定时按 partial-safe 处理，不静默回退 DOM；采集规则见 [`collectors.md`](collectors.md#chatgpt-手动采集)。 |
 | 正文已保存但图片缺失 | 检查图片设置、resolver、anti-hotlink 与 warning；图片失败不改变正文成功状态。 |
 | Video 字幕未保存 | SyncNos 只保存播放器当前已开启的字幕：字幕关闭时只保存视频信息/章节；开启后只采集当前语言。若当前字幕已开启但正文获取失败，会单独提示“字幕暂时无法获取”。 |
 | `syncnos doctor` 报错 | 按 `error.code` 检查 installation health、浏览器在线状态、权限或版本；不要猜。 |
