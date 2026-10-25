@@ -1018,9 +1018,9 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       },
       messages,
       captureMeta: {
-        completeness: finalPrepared.completeness,
+        completeness: 'partial',
         identityVerified: true,
-        reasons: finalPrepared.reasons,
+        reasons: Array.from(new Set([...finalPrepared.reasons, 'chatgpt_dom_history_unverified'])),
         metrics: finalPrepared.metrics,
       },
     };

@@ -6,6 +6,7 @@ import { createBackgroundRouter } from '@platform/messaging/background-router';
 import { registerWebArticleHandlers } from '@collectors/web/article-fetch-background-handlers';
 import { registerChatgptDeepResearchHandlers } from '@collectors/chatgpt/chatgpt-deep-research-background-handlers';
 import { registerChatgptImageHandlers } from '@services/integrations/chatgpt/image-background-handlers';
+import { registerChatgptApiHandlers } from '@services/integrations/chatgpt/api-background-handlers';
 import { registerUiMessageHandlers } from '@platform/messaging/ui-background-handlers';
 import { refreshContentScriptsAfterExtensionUpdate } from '@platform/messaging/content-script-recovery';
 import { registerArticleCommentsHandlers } from '@services/comments/background/handlers';
@@ -80,6 +81,7 @@ export default defineBackground(() => {
   });
   registerChatgptDeepResearchHandlers(router);
   registerChatgptImageHandlers(router);
+  registerChatgptApiHandlers(router);
   registerNotionSettingsHandlers(router, {
     runExclusiveMaintenance: services.notionSyncOrchestrator.runExclusiveMaintenance,
   });

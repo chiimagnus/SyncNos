@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { buildChatgptGeneratedImageMessageKey } from '@services/shared/chatgpt-image-identity';
 import { markdownToSemanticText } from '@services/shared/markdown-semantic-text';
 import { hasCacheableChatImageReference } from '@services/conversations/data/image-inline';
+import { resolveCaptureIntegrity } from '@services/shared/capture-integrity';
 import { resolveScrollRoot } from '@collectors/virtualized-chat/virtualized-chat-sweep';
 import normalizeApi from '@services/shared/normalize.ts';
 import { createCollectorEnv } from '../../src/collectors/collector-env.ts';
@@ -209,7 +210,12 @@ describe('chatgpt current DOM', () => {
     const dom = articleTurnDom();
     const def = currentDef(dom);
     const snapshot = (await capturePrepared(def)) as any;
-    expect(snapshot.captureMeta.completeness).toBe('complete');
+    expect(snapshot.captureMeta.completeness).toBe('partial');
+    expect(snapshot.captureMeta.reasons).toContain('chatgpt_dom_history_unverified');
+    expect(resolveCaptureIntegrity('chatgpt', snapshot)).toMatchObject({
+      ok: true,
+      persistence: { mode: 'append', diff: { removed: [] } },
+    });
     expect(snapshot.messages.map((message: any) => [message.messageKey, message.role])).toEqual([
       ['modern-user-1', 'user'],
       ['modern-assistant-1', 'assistant'],
@@ -238,7 +244,7 @@ describe('chatgpt current DOM', () => {
       '<div hidden data-message-author-role="assistant" data-message-id="old-hidden-sibling">obsolete reply</div>',
     );
     const snapshot = (await capturePrepared(currentDef(dom))) as any;
-    expect(snapshot.captureMeta.completeness).toBe('complete');
+    expect(snapshot.captureMeta.completeness).toBe('partial');
     expect(snapshot.messages.map((message: any) => message.messageKey)).toEqual([
       'modern-user-1',
       'modern-assistant-1',
@@ -303,7 +309,7 @@ describe('chatgpt current DOM', () => {
     const dom = setupChatgptDom(html, 'https://chatgpt.com/c/modern-conversation');
     (dom.window as any).scrollTo = vi.fn();
     const snapshot = (await capturePrepared(currentDef(dom))) as any;
-    expect(snapshot.captureMeta.completeness).toBe('complete');
+    expect(snapshot.captureMeta.completeness).toBe('partial');
     expect(snapshot.messages).toHaveLength(24);
     expect(snapshot.messages.map((message: any) => message.messageKey)).toEqual(
       Array.from({ length: 12 }, (_, index) => [`user-${index}`, `assistant-${index}`]).flat(),
@@ -340,7 +346,7 @@ describe('chatgpt current DOM', () => {
     turn.setAttribute('data-turn-id', 'additional-id');
     turn.setAttribute('data-turn', 'user');
     const snapshot = (await capturePrepared(currentDef(dom))) as any;
-    expect(snapshot.captureMeta.completeness).toBe('complete');
+    expect(snapshot.captureMeta.completeness).toBe('partial');
     expect(snapshot.messages.map((message: any) => message.messageKey)).toEqual([
       'user-message-1',
       'assistant-message-1',

@@ -85,6 +85,7 @@ export const OPEN_TARGET_MESSAGE_TYPES = {
 } as const;
 
 export const CHATGPT_MESSAGE_TYPES = {
+  FETCH_API_PAGE: 'chatgptFetchApiPage',
   EXTRACT_DEEP_RESEARCH: 'chatgptExtractDeepResearch',
   RESOLVE_IMAGE_URLS: 'chatgptResolveImageUrls',
 } as const;

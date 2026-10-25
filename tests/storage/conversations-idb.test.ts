@@ -685,6 +685,53 @@ describe('conversations storage-idb', () => {
     expect((await getConversationById(currentId))?.feishuDocId).toBe('feishu-doc-kimi');
   });
 
+  it('persists paged ChatGPT snapshots newest-first without deleting legacy messages or reversing recovered history', async () => {
+    const conversation = await upsertConversation({
+      source: 'chatgpt',
+      sourceType: 'chat',
+      conversationKey: 'paged-capture-1',
+      url: 'https://chatgpt.com/c/paged-capture-1',
+    });
+    const conversationId = Number(conversation.id);
+    await syncConversationMessages(conversationId, [
+      { messageKey: 'legacy', role: 'user', contentMarkdown: 'keep existing history', sequence: 0 },
+    ]);
+    const writePage = async (ids: string[]) => {
+      const snapshot = {
+        conversation: { source: 'chatgpt', sourceType: 'chat', conversationKey: 'paged-capture-1' },
+        messages: ids.map((key, sequence) => ({ messageKey: key, role: 'assistant', contentMarkdown: key, sequence })),
+        captureMeta: { completeness: 'partial' as const, identityVerified: true },
+      };
+      const plan = resolveCaptureIntegrity('chatgpt', snapshot);
+      expect(plan.ok).toBe(true);
+      if (!plan.ok) return;
+      expect(plan.persistence.mode).toBe('append');
+      await syncConversationMessages(conversationId, plan.snapshot.messages, {
+        mode: plan.persistence.mode,
+        diff: plan.persistence.diff,
+      });
+    };
+
+    await writePage(['latest']);
+    expect((await getMessagesByConversationId(conversationId)).map((entry) => entry.messageKey)).toEqual([
+      'legacy',
+      'latest',
+    ]);
+    await writePage(['older', 'latest']);
+    expect((await getMessagesByConversationId(conversationId)).map((entry) => entry.messageKey)).toEqual([
+      'legacy',
+      'older',
+      'latest',
+    ]);
+    await writePage(['older', 'latest']);
+    expect((await getMessagesByConversationId(conversationId)).map((entry) => entry.messageKey)).toEqual([
+      'legacy',
+      'older',
+      'latest',
+    ]);
+    expect((await getMessagesByConversationId(conversationId))[0]?.contentMarkdown).toBe('keep existing history');
+  });
+
   it('preserves identical messages at different logical positions when a partial window starts at zero', async () => {
     const conversation = await upsertConversation({
       source: 'kimi',

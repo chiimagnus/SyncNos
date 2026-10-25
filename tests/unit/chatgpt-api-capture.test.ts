@@ -57,18 +57,12 @@ function message(input: MessageInput) {
   };
 }
 
-function mappingFrom(messages: Array<ReturnType<typeof message>>, currentIndex = messages.length - 1) {
-  const mapping: Record<string, any> = {};
-  messages.forEach((entry, index) => {
-    const nodeId = `n${index + 1}`;
-    mapping[nodeId] = { id: nodeId, parent: index ? `n${index}` : null, children: [], message: entry };
-    if (index) mapping[`n${index}`].children.push(nodeId);
-  });
+function pagedFrom(messages: Array<ReturnType<typeof message>>, currentIndex = messages.length - 1) {
   return {
     conversation_id: 'conversation-1',
     title: 'API Conversation',
-    mapping,
-    current_node: `n${currentIndex + 1}`,
+    messages: messages.slice(0, currentIndex + 1),
+    current_node: messages[currentIndex]?.id,
   };
 }
 
@@ -102,7 +96,7 @@ describe('ChatGPT API snapshot', () => {
     const chart =
       '<Chart content={{"chartType":"line","xKey":"x","series":[{"dataKey":"y"}],"data":[{"x":"2026","y":38}]}}/>';
     const snapshot = build(
-      mappingFrom([
+      pagedFrom([
         message({ id: 'user', role: 'user', parts: ['q'] }),
         message({
           id: 'assistant',
@@ -131,7 +125,7 @@ describe('ChatGPT API snapshot', () => {
     };
     const markup = '<Chart content={' + JSON.stringify(chart) + '}/>';
     const result = build(
-      mappingFrom([
+      pagedFrom([
         message({ id: 'user-1', role: 'user', parts: ['q'] }),
         message({
           id: 'assistant-1',
@@ -176,7 +170,7 @@ describe('ChatGPT API snapshot', () => {
       '}/>';
     const dynamic = '<Chart content={chartState.data}/>';
     const result = build(
-      mappingFrom([
+      pagedFrom([
         message({ id: 'user-1', role: 'user', parts: ['q'] }),
         message({
           id: 'assistant-1',
@@ -204,7 +198,7 @@ describe('ChatGPT API snapshot', () => {
       '<MapWidgetV2 points={' + JSON.stringify(mapPoints) + '}/>',
     ].join('\n');
     const result = build(
-      mappingFrom([
+      pagedFrom([
         message({ id: 'user-1', role: 'user', parts: ['q'] }),
         message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: [source] }),
       ]),
@@ -239,7 +233,7 @@ describe('ChatGPT API snapshot', () => {
       '```',
     ].join('\n');
     const result = build(
-      mappingFrom([
+      pagedFrom([
         message({ id: 'user-1', role: 'user', parts: ['q'] }),
         message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: [original] }),
       ]),
@@ -274,7 +268,7 @@ describe('ChatGPT API snapshot', () => {
       '<Link url="https://example.com/paper" title="论文"/>',
     ].join('\n');
     const result = build(
-      mappingFrom([
+      pagedFrom([
         message({ id: 'user-1', role: 'user', parts: ['q'] }),
         message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: [source] }),
       ]),
@@ -289,11 +283,11 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('downgrades malformed parts and attachment containers without aborting the conversation', () => {
-    const malformedParts = mappingFrom([
+    const malformedParts = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
       message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: ['a'] }),
     ]);
-    malformedParts.mapping.n1.message.content.parts = { text: 'not-an-array' };
+    malformedParts.messages[0]!.content.parts = { text: 'not-an-array' };
     const partsResult = build(malformedParts);
     expect(partsResult.snapshot.messages).toEqual([
       expect.objectContaining({ messageKey: 'assistant-1', contentMarkdown: 'a' }),
@@ -304,19 +298,19 @@ describe('ChatGPT API snapshot', () => {
       reasons: ['chatgpt_api_schema_drift_partial'],
     });
 
-    const malformedAttachments = mappingFrom([
+    const malformedAttachments = pagedFrom([
       message({ id: 'user-1', role: 'user', contentType: 'multimodal_text', parts: ['q'] }),
       message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: ['a'] }),
     ]);
-    malformedAttachments.mapping.n1.message.metadata.attachments = { id: 'file_image_1' };
+    malformedAttachments.messages[0]!.metadata.attachments = { id: 'file_image_1' };
     const attachmentsResult = build(malformedAttachments);
     expect(attachmentsResult.snapshot.messages.map((entry: any) => entry.contentMarkdown)).toEqual(['q', 'a']);
     expect(attachmentsResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
   });
 
   it('keeps top-level text as a partial schema-drift fallback when parts are absent', () => {
-    const data = mappingFrom([message({ id: 'user-1', role: 'user' })]);
-    data.mapping.n1.message.content.text = 'fallback text';
+    const data = pagedFrom([message({ id: 'user-1', role: 'user' })]);
+    data.messages[0]!.content.text = 'fallback text';
     const result = build(data);
     expect(result.snapshot.messages).toEqual([
       expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'fallback text' }),
@@ -329,7 +323,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('requires the current conversation_id response identity', () => {
-    const data = mappingFrom([message({ id: 'user-1', role: 'user', parts: ['question'] })]);
+    const data = pagedFrom([message({ id: 'user-1', role: 'user', parts: ['question'] })]);
     delete data.conversation_id;
     data.id = 'conversation-1';
     expect(errorCode(() => build(data))).toBe('conversation_identity_mismatch');
@@ -339,7 +333,7 @@ describe('ChatGPT API snapshot', () => {
     const cite = 'citeturn1search0turn1search1';
     const widget =
       'genui{"chart":{"meta":{"title":"Price history","description":"Standard price, not sale price"},"data":[{"x":1,"y":2}]}}';
-    const data = mappingFrom([
+    const data = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
       message({
         id: 'assistant-1',
@@ -376,7 +370,7 @@ describe('ChatGPT API snapshot', () => {
   it('omits hidden reference tokens and fails soft on unknown internal rich tokens', () => {
     const hidden = 'fileciteturn1file0L1-L2';
     const unknown = 'future-widgetopaque';
-    const data = mappingFrom([
+    const data = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
       message({
         id: 'assistant-1',
@@ -393,7 +387,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('classifies whether the backend current turn is finalized before live-tail reconciliation', () => {
-    const finalized = mappingFrom([
+    const finalized = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
       message({
         id: 'assistant-1',
@@ -406,7 +400,7 @@ describe('ChatGPT API snapshot', () => {
     ]);
     expect(build(finalized)).toMatchObject({ currentTurnState: 'finalized', currentTurnId: 'turn-a' });
 
-    const openReasoning = mappingFrom([
+    const openReasoning = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
       message({
         id: 'thought-1',
@@ -418,10 +412,10 @@ describe('ChatGPT API snapshot', () => {
     ]);
     expect(build(openReasoning)).toMatchObject({ currentTurnState: 'open', currentTurnId: 'turn-a' });
 
-    const userOnly = mappingFrom([message({ id: 'user-1', role: 'user', parts: ['q'] })]);
+    const userOnly = pagedFrom([message({ id: 'user-1', role: 'user', parts: ['q'] })]);
     expect(build(userOnly)).toMatchObject({ currentTurnState: 'open', currentTurnId: '' });
 
-    const statuslessFinal = mappingFrom([
+    const statuslessFinal = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
       message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: ['answer'], turnId: 'turn-a' }),
     ]);
@@ -429,7 +423,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('keeps an explicitly unfinished final under the turn key until the backend marks it finalized', () => {
-    const data = mappingFrom([
+    const data = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['question'], turnId: 'turn-a' }),
       message({
         id: 'assistant-streaming',
@@ -455,8 +449,8 @@ describe('ChatGPT API snapshot', () => {
     });
   });
 
-  it('keeps only the current branch and preserves stable DOM-compatible message ids', () => {
-    const data = mappingFrom([
+  it('preserves backend-selected message IDs without inventing a different branch', () => {
+    const data = pagedFrom([
       message({ id: 'system-1', role: 'system', parts: ['internal'] }),
       message({ id: 'user-1', role: 'user', parts: ['question'] }),
       message({
@@ -467,20 +461,6 @@ describe('ChatGPT API snapshot', () => {
         turnId: 'turn-a',
       }),
     ]);
-    data.mapping['sibling'] = {
-      id: 'sibling',
-      parent: 'n2',
-      children: [],
-      message: message({
-        id: 'assistant-regenerated-away',
-        role: 'assistant',
-        channel: 'final',
-        parts: ['old answer'],
-        turnId: 'turn-old',
-      }),
-    };
-    data.mapping.n2.children.push('sibling');
-
     const result = build(data);
     expect(result.snapshot.messages.map((entry: any) => entry.messageKey)).toEqual(['user-1', 'assistant-current']);
     expect(result.snapshot.messages.map((entry: any) => entry.contentMarkdown)).toEqual(['question', 'current answer']);
@@ -488,7 +468,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('attaches thoughts, recap and commentary to the following stable final owner in order', () => {
-    const data = mappingFrom([
+    const data = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['question'] }),
       message({
         id: 'thought-1',
@@ -528,7 +508,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('keeps stable visible output when reasoning schema drifts', () => {
-    const unsupportedThought = mappingFrom([
+    const unsupportedThought = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
       message({
         id: 'thought-1',
@@ -546,7 +526,7 @@ describe('ChatGPT API snapshot', () => {
     });
     expect(thoughtResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
 
-    const unsupportedChunk = mappingFrom([
+    const unsupportedChunk = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
       message({
         id: 'thought-1',
@@ -564,19 +544,19 @@ describe('ChatGPT API snapshot', () => {
     });
     expect(chunkResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
 
-    const unsupportedRecap = mappingFrom([
+    const unsupportedRecap = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
       message({ id: 'recap-1', role: 'assistant', contentType: 'reasoning_recap', turnId: 'turn-a' }),
       message({ id: 'assistant-final', role: 'assistant', channel: 'final', parts: ['answer'], turnId: 'turn-a' }),
     ]);
-    unsupportedRecap.mapping.n2.message.content.content = { opaque: true };
+    unsupportedRecap.messages[1]!.content.content = { opaque: true };
     const recapResult = build(unsupportedRecap);
     expect(recapResult.snapshot.messages.at(-1)).toMatchObject({ contentMarkdown: 'answer' });
     expect(recapResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
   });
 
   it('supports final image pointers and downgrades unfamiliar assistant image metadata', () => {
-    const finalImage = mappingFrom([
+    const finalImage = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
       message({
         id: 'assistant-1',
@@ -594,7 +574,7 @@ describe('ChatGPT API snapshot', () => {
     });
     expect(finalImageResult.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
 
-    const commentaryImage = mappingFrom([
+    const commentaryImage = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
       message({
         id: 'commentary-1',
@@ -612,7 +592,7 @@ describe('ChatGPT API snapshot', () => {
     });
     expect(commentaryResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
 
-    const finalAttachment = mappingFrom([
+    const finalAttachment = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
       message({
         id: 'assistant-1',
@@ -631,7 +611,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('ignores opaque tool execution nodes while preserving visible assistant output', () => {
-    const data = mappingFrom([
+    const data = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
       message({
         id: 'tool-call-1',
@@ -667,7 +647,7 @@ describe('ChatGPT API snapshot', () => {
       }),
       message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: ['answer'], turnId: 'turn-a' }),
     ]);
-    data.mapping.n3.message.content.parts = { opaque: true };
+    data.messages[2]!.content.parts = { opaque: true };
 
     const result = build(data);
     expect(result.snapshot.messages).toEqual([
@@ -677,7 +657,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('ignores tool-returned screenshots even when they use image_asset_pointer', () => {
-    const data = mappingFrom([
+    const data = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['inspect'] }),
       message({
         id: 'tool-call',
@@ -734,7 +714,7 @@ describe('ChatGPT API snapshot', () => {
       message({ id: 'assistant-long', role: 'assistant', channel: 'final', parts: ['answer'], turnId: 'turn-long' }),
     );
 
-    const result = build(mappingFrom(messages));
+    const result = build(pagedFrom(messages));
     expect(result.snapshot.messages).toEqual([
       expect.objectContaining({ messageKey: 'user-long', role: 'user', contentMarkdown: 'q' }),
       expect.objectContaining({ messageKey: 'assistant-long', role: 'assistant', contentMarkdown: 'answer' }),
@@ -743,7 +723,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('preserves an auxiliary-only assistant turn when the next user message closes it', () => {
-    const data = mappingFrom([
+    const data = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['first'] }),
       message({
         id: 'thoughts-only',
@@ -778,7 +758,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('still omits auxiliary text at a user boundary when no stable turn identity exists', () => {
-    const data = mappingFrom([
+    const data = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['first'] }),
       message({
         id: 'commentary-unowned',
@@ -800,7 +780,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('preserves a branch-end auxiliary-only turn under a stable provisional turn key', () => {
-    const data = mappingFrom([
+    const data = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
       message({
         id: 'thoughts-finished',
@@ -837,7 +817,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('preserves readable text from unknown final content types as partial', () => {
-    const data = mappingFrom([
+    const data = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
       message({
         id: 'assistant-future',
@@ -858,24 +838,19 @@ describe('ChatGPT API snapshot', () => {
     expect(result.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
   });
 
-  it('skips unknown roles and missing message ids without aborting safe history', () => {
-    const data = mappingFrom([
+  it('ignores unknown roles but rejects missing transport message identities', () => {
+    const data = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['first'] }),
       message({ id: 'future-role', role: 'future_role', parts: ['opaque'] }),
-      message({ id: '', role: 'user', parts: ['missing id'] }),
       message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: ['answer'], turnId: 'turn-a' }),
     ]);
-
-    const result = build(data);
-    expect(result.snapshot.messages).toEqual([
-      expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'first' }),
-      expect.objectContaining({ messageKey: 'assistant-1', role: 'assistant', contentMarkdown: 'answer' }),
-    ]);
-    expect(result.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
+    expect(build(data).snapshot.messages.map((entry: any) => entry.messageKey)).toEqual(['user-1', 'assistant-1']);
+    data.messages[1]!.id = '';
+    expect(errorCode(() => build(data))).toBe('chatgpt_api_message_id_invalid');
   });
 
   it('omits unknown assistant shapes and unfinished auxiliary tails without aborting prior safe messages', () => {
-    const unknownAssistant = mappingFrom([
+    const unknownAssistant = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
       message({ id: 'assistant-unknown', role: 'assistant', contentType: 'audio', parts: [] }),
     ]);
@@ -885,7 +860,7 @@ describe('ChatGPT API snapshot', () => {
     ]);
     expect(unknownResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
 
-    const unfinishedAuxiliary = mappingFrom([
+    const unfinishedAuxiliary = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
       message({
         id: 'commentary',
@@ -908,7 +883,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('does not attach pending auxiliary content when a later owner loses its turn id', () => {
-    const data = mappingFrom([
+    const data = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),
       message({
         id: 'commentary-1',
@@ -929,7 +904,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('materializes generated images independently of opaque tool-call nodes', () => {
-    const data = mappingFrom([
+    const data = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw'] }),
       message({
         id: 'image-call',
@@ -972,7 +947,7 @@ describe('ChatGPT API snapshot', () => {
       contentMarkdown: 'Generated the image.\n\nDone.\n\n![generated image](chatgpt-file://file_generated_1)',
     });
 
-    const missingImage = mappingFrom([
+    const missingImage = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw'] }),
       message({
         id: 'image-call',
@@ -999,7 +974,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('persists stable ChatGPT file references for user uploads and generated images without raw pointers', () => {
-    const data = mappingFrom([
+    const data = pagedFrom([
       message({
         id: 'user-upload',
         role: 'user',
@@ -1042,7 +1017,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('preserves the same stable file reference when one ChatGPT image appears in multiple messages', () => {
-    const data = mappingFrom([
+    const data = pagedFrom([
       message({
         id: 'user-1',
         role: 'user',
@@ -1064,7 +1039,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('keeps image-only turns and their stable auxiliary-only assistant output', () => {
-    const data = mappingFrom([
+    const data = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw it'] }),
       message({
         id: 'image-commentary',
@@ -1111,7 +1086,7 @@ describe('ChatGPT API snapshot', () => {
     ]);
     expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
 
-    const unfinishedAtBranchEnd = mappingFrom([
+    const unfinishedAtBranchEnd = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw it'] }),
       message({
         id: 'image-commentary',
@@ -1147,7 +1122,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('separates image and auxiliary state when their turn ids diverge', () => {
-    const data = mappingFrom([
+    const data = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw it'] }),
       message({
         id: 'image-call',
@@ -1193,7 +1168,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('dedupes repeated image-only keys as partial instead of throwing or duplicating content', () => {
-    const data = mappingFrom([
+    const data = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['first'] }),
       message({
         id: 'image-tool-1',
@@ -1225,7 +1200,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('uses the current DOM-compatible image-only key and records unsupported pointers for protective materialization', () => {
-    const data = mappingFrom([
+    const data = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw it'] }),
       message({
         id: 'image-call-only',
@@ -1290,7 +1265,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('ignores repeated opaque tool-call nodes before a visible generated-image result', () => {
-    const data = mappingFrom([
+    const data = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw'] }),
       message({
         id: 'image-call-1',
@@ -1324,7 +1299,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('accepts a visible generated-image tool result without requiring its opaque call node', () => {
-    const data = mappingFrom([
+    const data = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw'] }),
       message({
         id: 'image-tool',
@@ -1340,7 +1315,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('keeps recognized images when surrounding tool schema contains unfamiliar content', () => {
-    const data = mappingFrom([
+    const data = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw'] }),
       message({
         id: 'image-call',
@@ -1368,7 +1343,7 @@ describe('ChatGPT API snapshot', () => {
     expect(result.snapshot.messages.at(-1)).toMatchObject({ messageKey: imageKey, role: 'assistant' });
     expect(result.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
 
-    const attachmentData = mappingFrom([
+    const attachmentData = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw'] }),
       message({
         id: 'image-call',
@@ -1395,7 +1370,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('accepts image pointers even when ChatGPT changes the surrounding content type', () => {
-    const userTextImage = mappingFrom([
+    const userTextImage = pagedFrom([
       message({
         id: 'user-1',
         role: 'user',
@@ -1410,7 +1385,7 @@ describe('ChatGPT API snapshot', () => {
     });
     expect(userResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
 
-    const toolTextImage = mappingFrom([
+    const toolTextImage = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw'] }),
       message({
         id: 'image-call',
@@ -1439,7 +1414,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('does not reinterpret unknown image aliases but preserves the stable turn as partial', () => {
-    const typeAlias = mappingFrom([
+    const typeAlias = pagedFrom([
       message({
         id: 'user-1',
         role: 'user',
@@ -1453,7 +1428,7 @@ describe('ChatGPT API snapshot', () => {
     ]);
     expect(aliasResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
 
-    const suffixedPointer = mappingFrom([
+    const suffixedPointer = pagedFrom([
       message({
         id: 'user-1',
         role: 'user',
@@ -1469,7 +1444,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('does not misclassify unknown image-like objects while keeping the conversation capturable', () => {
-    const userData = mappingFrom([
+    const userData = pagedFrom([
       message({
         id: 'user-1',
         role: 'user',
@@ -1483,7 +1458,7 @@ describe('ChatGPT API snapshot', () => {
     ]);
     expect(userResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
 
-    const toolData = mappingFrom([
+    const toolData = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw'] }),
       message({
         id: 'image-call',
@@ -1510,7 +1485,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('drops an unkeyable generated image as partial instead of aborting the conversation', () => {
-    const data = mappingFrom([
+    const data = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['draw'] }),
       message({
         id: 'image-call',
@@ -1538,7 +1513,7 @@ describe('ChatGPT API snapshot', () => {
   });
 
   it('keeps text when non-image or unmatched attachment metadata is unsupported', () => {
-    const nonImage = mappingFrom([
+    const nonImage = pagedFrom([
       message({
         id: 'user-file',
         role: 'user',
@@ -1553,7 +1528,7 @@ describe('ChatGPT API snapshot', () => {
     ]);
     expect(nonImageResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
 
-    const unknownMime = mappingFrom([
+    const unknownMime = pagedFrom([
       message({
         id: 'user-file',
         role: 'user',
@@ -1569,7 +1544,7 @@ describe('ChatGPT API snapshot', () => {
     });
     expect(unknownMimeResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
 
-    const unmatchedImage = mappingFrom([
+    const unmatchedImage = pagedFrom([
       message({
         id: 'user-image',
         role: 'user',
@@ -1586,218 +1561,275 @@ describe('ChatGPT API snapshot', () => {
     expect(unmatchedImageResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
   });
 
-  it('still fails closed for conversation identity, mapping topology and duplicate stable message keys', () => {
+  it('fails closed for conversation identity, page shape and duplicate message identities', () => {
     expect(
       errorCode(() =>
         buildChatgptApiSnapshot({
-          data: mappingFrom([message({ id: 'user-1', role: 'user', parts: ['q'] })]),
+          data: pagedFrom([message({ id: 'user-1', role: 'user', parts: ['q'] })]),
           conversationId: '',
           conversationUrl: 'https://chatgpt.com/c/conversation-1',
         }),
       ),
     ).toBe('conversation_identity_invalid');
 
-    const invalidMapping = mappingFrom([message({ id: 'user-1', role: 'user', parts: ['q'] })]);
-    invalidMapping.mapping = null as any;
-    expect(errorCode(() => build(invalidMapping))).toBe('mapping_invalid');
+    const invalidMessages = pagedFrom([message({ id: 'user-1', role: 'user', parts: ['q'] })]);
+    invalidMessages.messages = null as any;
+    expect(errorCode(() => build(invalidMessages))).toBe('chatgpt_api_messages_invalid');
 
-    const invalidCurrent = mappingFrom([message({ id: 'user-1', role: 'user', parts: ['q'] })]);
+    const invalidCurrent = pagedFrom([message({ id: 'user-1', role: 'user', parts: ['q'] })]);
     invalidCurrent.current_node = 'missing';
-    expect(errorCode(() => build(invalidCurrent))).toBe('mapping_current_node_invalid');
+    expect(errorCode(() => build(invalidCurrent))).toBe('chatgpt_api_current_node_invalid');
 
-    const mismatch = mappingFrom([message({ id: 'user-1', role: 'user', parts: ['q'] })]);
+    const mismatch = pagedFrom([message({ id: 'user-1', role: 'user', parts: ['q'] })]);
     mismatch.conversation_id = 'other';
     expect(errorCode(() => build(mismatch))).toBe('conversation_identity_mismatch');
 
-    const missingParent = mappingFrom([message({ id: 'user-1', role: 'user', parts: ['q'] })]);
-    missingParent.mapping.n1.parent = 'missing';
-    expect(errorCode(() => build(missingParent))).toBe('mapping_parent_missing');
-
-    const cycle = mappingFrom([message({ id: 'user-1', role: 'user', parts: ['q'] })]);
-    cycle.mapping.n1.parent = 'n1';
-    expect(errorCode(() => build(cycle))).toBe('mapping_cycle');
-
-    const duplicate = mappingFrom([
+    const duplicate = pagedFrom([
       message({ id: 'same', role: 'user', parts: ['q'] }),
       message({ id: 'same', role: 'assistant', channel: 'final', parts: ['a'] }),
     ]);
-    expect(errorCode(() => build(duplicate))).toBe('duplicate_message_key');
+    expect(errorCode(() => build(duplicate))).toBe('chatgpt_api_message_id_invalid');
   });
 });
 
-describe('ChatGPT API transport', () => {
-  it('invokes native-style fetch without rebinding its receiver', async () => {
-    const mapping = mappingFrom([
-      message({ id: 'user-1', role: 'user', parts: ['question'] }),
-      message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: ['answer'], turnId: 'turn-a' }),
-    ]);
-    let callCount = 0;
-    const fetchFn = async function receiverSensitiveFetch(this: unknown, input: RequestInfo | URL) {
-      if (this !== undefined) throw new TypeError('Illegal invocation');
-      callCount += 1;
-      if (String(input).endsWith('/api/auth/session')) {
-        return new Response(JSON.stringify({ accessToken: 'token' }), { status: 200 });
-      }
-      return new Response(JSON.stringify(mapping), { status: 200 });
-    } as typeof fetch;
+describe('ChatGPT paged API transport', () => {
+  const base = 'https://chatgpt.com/c/conversation-1';
+  const newer = [
+    message({ id: 'user-2', role: 'user', parts: ['new question'] }),
+    message({
+      id: 'assistant-2',
+      role: 'assistant',
+      channel: 'final',
+      parts: ['new answer'],
+      status: 'finished_successfully',
+    }),
+  ];
+  const older = [
+    message({ id: 'user-1', role: 'user', parts: ['old question'] }),
+    message({
+      id: 'assistant-1',
+      role: 'assistant',
+      channel: 'final',
+      parts: ['old answer'],
+      status: 'finished_successfully',
+    }),
+  ];
 
+  function responsePage(items: any[], hasPrevious: boolean, initial = false) {
+    return {
+      ...(initial ? pagedFrom(items) : {}),
+      messages: items,
+      page_info: {
+        start_cursor: items[0]?.id,
+        end_cursor: items.at(-1)?.id,
+        has_previous_page: hasPrevious,
+        has_next_page: !initial,
+      },
+    };
+  }
+
+  function requestPages(pages: any[], options?: { latestNode?: string }) {
+    const first = pages.find((page) => page?.current_node);
+    const calls: Array<{ conversationId: string; before?: string; numTurns: number; timeoutMs: number }> = [];
+    const requestPage = vi.fn(
+      async (input: { conversationId: string; before?: string; numTurns: number; timeoutMs: number }) => {
+        calls.push(input);
+        if (input.numTurns === 1)
+          return {
+            conversation_id: 'conversation-1',
+            current_node: options?.latestNode || first?.current_node,
+          };
+        const page = pages.shift();
+        if (page === undefined) throw new Error('unexpected API page');
+        if (page instanceof Error) throw page;
+        return page;
+      },
+    );
+    return { requestPage, calls };
+  }
+
+  it('reads newest to oldest with one safe persistence callback per page', async () => {
+    const { requestPage, calls } = requestPages([responsePage(newer, true, true), responsePage(older, false)]);
+    const onPage = vi.fn(async () => {});
+    const result = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base + '?model=test#tail',
+      requestPage,
+      capturedAt: 10,
+      onPage,
+    });
+    expect(calls).toEqual([
+      { conversationId: 'conversation-1', numTurns: 10, timeoutMs: 30_000 },
+      { conversationId: 'conversation-1', before: 'user-2', numTurns: 10, timeoutMs: 30_000 },
+      { conversationId: 'conversation-1', numTurns: 1, timeoutMs: 30_000 },
+    ]);
+    expect(onPage).toHaveBeenCalledTimes(2);
+    expect(onPage.mock.calls[0][0].snapshot.captureMeta.completeness).toBe('partial');
+    expect(onPage.mock.calls[0][0].snapshot.messages.every((m: any) => !m.captureMergePolicy)).toBe(true);
+    expect(onPage.mock.calls[1][0].snapshot.messages.every((m: any) => !m.captureMergePolicy)).toBe(true);
+    expect(onPage.mock.calls[0][0].snapshot.messages.map((m: any) => m.messageKey)).toEqual(['user-2', 'assistant-2']);
+    expect(onPage.mock.calls[1][0].snapshot.messages.map((m: any) => m.messageKey)).toEqual([
+      'user-1',
+      'assistant-1',
+      'user-2',
+      'assistant-2',
+    ]);
+    expect(onPage.mock.calls[0][1]).toMatchObject({ page: 1, completed: false, messagesFetched: 2 });
+    expect(onPage.mock.calls[1][1]).toMatchObject({ page: 2, completed: true, messagesFetched: 4 });
+    expect(result.snapshot.captureMeta).toMatchObject({
+      completeness: 'partial',
+      reasons: ['chatgpt_api_branch_unverified'],
+    });
+    expect(result.snapshot.conversation.url).toBe(base);
+  });
+
+  it('confirms complete only for an intact single ancestor chain', async () => {
+    const messages = structuredClone([...older, ...newer]);
+    for (let i = 1; i < messages.length; i += 1) messages[i]!.metadata.parent_id = messages[i - 1]!.id;
+    const { requestPage } = requestPages([responsePage(messages, false, true)]);
+    const result = await captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage });
+    expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
+    expect(result.snapshot.messages.every((m: any) => !m.captureMergePolicy)).toBe(true);
+  });
+
+  it('keeps alternate branches partial even when all their parents are present', async () => {
+    const messages = structuredClone([...older, ...newer]);
+    messages[1]!.metadata.parent_id = 'user-1';
+    messages[2]!.metadata.parent_id = 'user-1';
+    messages[3]!.metadata.parent_id = 'user-2';
+    const { requestPage } = requestPages([responsePage(messages, false, true)]);
+    const result = await captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage });
+    expect(result.snapshot.captureMeta).toMatchObject({
+      completeness: 'partial',
+      reasons: ['chatgpt_api_branch_unverified'],
+    });
+  });
+
+  it('keeps an already saved page if later requests fail, retries transient failures only once', async () => {
+    const apiError = (status: number) =>
+      Object.assign(new Error('chatgpt_api_page_http'), {
+        code: 'chatgpt_api_page_http',
+        status,
+      });
+    const { requestPage, calls } = requestPages([responsePage(newer, true, true), apiError(503), apiError(503)]);
+    const saved: number[] = [];
     await expect(
       captureCurrentChatgptConversationViaApi({
-        readCurrentUrl: () => 'https://chatgpt.com/c/conversation-1',
-        fetchFn,
+        readCurrentUrl: () => base,
+        requestPage,
+        onPage: async (_snapshot, progress) => {
+          saved.push(progress.page);
+        },
       }),
-    ).resolves.toHaveProperty('snapshot');
-    expect(callCount).toBe(2);
+    ).rejects.toMatchObject({ code: 'chatgpt_api_page_http', status: 503 });
+    expect(saved).toEqual([1]);
+    expect(calls).toHaveLength(3);
   });
 
-  it('uses session cookies plus Bearer mapping only, never returns credentials, and never calls paged endpoints', async () => {
-    const calls: Array<{ url: string; init: RequestInit }> = [];
-    const token = 'ACCESS_TOKEN_SENTINEL';
-    const mapping = mappingFrom([
-      message({ id: 'user-1', role: 'user', parts: ['question'] }),
-      message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: ['answer'], turnId: 'turn-a' }),
-    ]);
-    const fetchFn = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
-      const url = String(input);
-      calls.push({ url, init });
-      if (url.endsWith('/api/auth/session')) {
-        return new Response(JSON.stringify({ accessToken: token }), { status: 200 });
-      }
-      return new Response(JSON.stringify(mapping), { status: 200 });
-    }) as typeof fetch;
+  it('does not retry forbidden or rate-limited response statuses', async () => {
+    for (const status of [403, 429]) {
+      const error = Object.assign(new Error('chatgpt_api_page_http'), { code: 'chatgpt_api_page_http', status });
+      const { requestPage, calls } = requestPages([error]);
+      await expect(
+        captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage }),
+      ).rejects.toMatchObject({ code: 'chatgpt_api_page_http', status });
+      expect(calls).toHaveLength(1);
+    }
+  });
 
-    const result = await captureCurrentChatgptConversationViaApi({
-      readCurrentUrl: () => 'https://chatgpt.com/c/conversation-1?model=test#tail',
-      fetchFn,
-      capturedAt: 10,
+  it('rejects duplicate IDs, cursor mismatches and invalid response shape before persistence', async () => {
+    for (const invalid of [
+      {
+        ...responsePage(newer, false, true),
+        page_info: { ...responsePage(newer, false, true).page_info, start_cursor: 'wrong' },
+      },
+      responsePage([newer[0], newer[0]], false, true),
+      { ...responsePage(newer, false, true), page_info: null },
+    ]) {
+      const { requestPage } = requestPages([invalid]);
+      const onPage = vi.fn();
+      await expect(
+        captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage, onPage }),
+      ).rejects.toMatchObject({ code: expect.stringMatching(/^chatgpt_api_page_/) });
+      expect(onPage).not.toHaveBeenCalled();
+    }
+  });
+
+  it('rejects a different server conversation ID and a changed browser route', async () => {
+    const wrong = { ...responsePage(newer, false, true), conversation_id: 'other' };
+    const { requestPage } = requestPages([wrong]);
+    await expect(
+      captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage }),
+    ).rejects.toMatchObject({ code: 'chatgpt_api_conversation_identity' });
+    let url = base;
+    const next = requestPages([responsePage(newer, false, true)]);
+    const request = async (input: Parameters<typeof next.requestPage>[0]) => {
+      const result = await next.requestPage(input);
+      url = 'https://chatgpt.com/c/other';
+      return result;
+    };
+    const onPage = vi.fn();
+    await expect(
+      captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => url, requestPage: request, onPage }),
+    ).rejects.toMatchObject({ code: 'chatgpt_api_navigation_changed' });
+    expect(onPage).not.toHaveBeenCalled();
+  });
+
+  it('marks the result partial if the current node changes during pagination', async () => {
+    const { requestPage } = requestPages([responsePage(newer, false, true)], { latestNode: 'new-tail' });
+    const result = await captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage });
+    expect(result.snapshot.captureMeta).toMatchObject({
+      completeness: 'partial',
+      reasons: expect.arrayContaining(['chatgpt_api_conversation_changed']),
     });
-
-    expect(calls.map((call) => call.url)).toEqual([
-      'https://chatgpt.com/api/auth/session',
-      'https://chatgpt.com/backend-api/conversation/conversation-1',
-    ]);
-    expect(calls[0].init).toMatchObject({ credentials: 'include' });
-    const headers = new Headers(calls[1].init.headers);
-    expect(headers.get('Authorization')).toBe(`Bearer ${token}`);
-    expect(headers.has('ChatGPT-Account-Id')).toBe(false);
-    expect(headers.has('oai-device-id')).toBe(false);
-    expect(JSON.stringify(result)).not.toContain(token);
-    expect(JSON.stringify(result)).not.toContain('/backend-api/conversations/');
-    expect(result.snapshot.conversation.url).toBe('https://chatgpt.com/c/conversation-1');
-    expect(result.snapshot.conversation.title).toBe('API Conversation');
   });
 
-  it('rejects non-durable routes before any API request', async () => {
-    const fetchFn = vi.fn() as unknown as typeof fetch;
+  it('classifies a trailing hidden tool node as an unfinished turn', async () => {
+    const tail = [
+      message({ id: 'user', role: 'user', parts: ['question'] }),
+      message({ id: 'assistant-work', role: 'assistant', channel: 'commentary', parts: ['Working'], turnId: 'turn-a' }),
+      message({ id: 'tool', role: 'tool', contentType: 'text', turnId: 'turn-a', hidden: true }),
+    ];
+    const { requestPage } = requestPages([responsePage(tail, false, true)]);
+    const result = await captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage });
+    expect(result.snapshot.messages[0]).toMatchObject({ messageKey: 'user' });
+    expect(result.currentTurnState).toBe('open');
+  });
+
+  it('defers persistence until any page actually yields a visible user or assistant', async () => {
+    const tool = message({ id: 'tool-only', role: 'tool', parts: ['internal'], hidden: true });
+    const { requestPage } = requestPages([responsePage([tool], true, true), responsePage(older, false)]);
+    const onPage = vi.fn(async () => {});
+    const result = await captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage, onPage });
+    expect(onPage).toHaveBeenCalledTimes(1);
+    expect(result.snapshot.messages.map((m: any) => m.messageKey)).toEqual(['user-1', 'assistant-1']);
+  });
+
+  it('does not retry a rejected persistence callback as though it were a network error', async () => {
+    const { requestPage, calls } = requestPages([responsePage(newer, false, true)]);
+    await expect(
+      captureCurrentChatgptConversationViaApi({
+        readCurrentUrl: () => base,
+        requestPage,
+        onPage: async () => {
+          throw new Error('database unavailable');
+        },
+      }),
+    ).rejects.toThrow('database unavailable');
+    expect(calls).toHaveLength(2);
+  });
+
+  it('rejects non-durable routes before querying the API', async () => {
+    const requestPage = vi.fn();
     for (const url of [
-      'https://chatgpt.com/?temporary-chat=true',
-      'https://chatgpt.com/share/share-id',
       'https://chatgpt.com/',
+      'https://chatgpt.com/share/a',
+      'https://chatgpt.com/?temporary-chat=true',
     ]) {
       await expect(
-        captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => url, fetchFn }),
-      ).rejects.toMatchObject({
-        code: 'chatgpt_api_navigation_changed',
-      });
+        captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => url, requestPage }),
+      ).rejects.toMatchObject({ code: 'chatgpt_api_navigation_changed' });
     }
-    expect(fetchFn).not.toHaveBeenCalled();
-  });
-
-  it('fails before returning a snapshot when SPA navigation changes the durable conversation id', async () => {
-    let currentUrl = 'https://chatgpt.com/c/conversation-1';
-    const mapping = mappingFrom([message({ id: 'user-1', role: 'user', parts: ['question'] })]);
-    const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.endsWith('/api/auth/session'))
-        return new Response(JSON.stringify({ accessToken: 'token' }), { status: 200 });
-      currentUrl = 'https://chatgpt.com/c/conversation-2';
-      return new Response(JSON.stringify(mapping), { status: 200 });
-    }) as typeof fetch;
-
-    await expect(
-      captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => currentUrl, fetchFn }),
-    ).rejects.toMatchObject({ code: 'chatgpt_api_navigation_changed' });
-  });
-
-  it('retries one transient mapping HTTP failure before succeeding', async () => {
-    const mapping = mappingFrom([
-      message({ id: 'user-1', role: 'user', parts: ['question'] }),
-      message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: ['answer'], turnId: 'turn-a' }),
-    ]);
-    let mappingAttempts = 0;
-    const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.endsWith('/api/auth/session')) {
-        return new Response(JSON.stringify({ accessToken: 'token' }), { status: 200 });
-      }
-      mappingAttempts += 1;
-      if (mappingAttempts === 1) return new Response('', { status: 503 });
-      return new Response(JSON.stringify(mapping), { status: 200 });
-    }) as typeof fetch;
-
-    await expect(
-      captureCurrentChatgptConversationViaApi({
-        readCurrentUrl: () => 'https://chatgpt.com/c/conversation-1',
-        fetchFn,
-      }),
-    ).resolves.toHaveProperty('snapshot');
-    expect(mappingAttempts).toBe(2);
-  });
-
-  it('does not retry a rate-limited mapping request', async () => {
-    let mappingAttempts = 0;
-    const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.endsWith('/api/auth/session')) {
-        return new Response(JSON.stringify({ accessToken: 'token' }), { status: 200 });
-      }
-      mappingAttempts += 1;
-      return new Response('', { status: 429 });
-    }) as typeof fetch;
-
-    await expect(
-      captureCurrentChatgptConversationViaApi({
-        readCurrentUrl: () => 'https://chatgpt.com/c/conversation-1',
-        fetchFn,
-      }),
-    ).rejects.toMatchObject({ code: 'chatgpt_api_mapping_http', status: 429 });
-    expect(mappingAttempts).toBe(1);
-  });
-
-  it('does not retry a non-transient mapping HTTP failure', async () => {
-    let mappingAttempts = 0;
-    const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.endsWith('/api/auth/session')) {
-        return new Response(JSON.stringify({ accessToken: 'token' }), { status: 200 });
-      }
-      mappingAttempts += 1;
-      return new Response('', { status: 403 });
-    }) as typeof fetch;
-
-    await expect(
-      captureCurrentChatgptConversationViaApi({
-        readCurrentUrl: () => 'https://chatgpt.com/c/conversation-1',
-        fetchFn,
-      }),
-    ).rejects.toMatchObject({ code: 'chatgpt_api_mapping_http', status: 403 });
-    expect(mappingAttempts).toBe(1);
-  });
-
-  it('uses safe error codes without embedding response bodies', async () => {
-    const fetchFn = vi.fn(async () => new Response('PRIVATE_RESPONSE_SENTINEL', { status: 401 })) as typeof fetch;
-    await expect(
-      captureCurrentChatgptConversationViaApi({
-        readCurrentUrl: () => 'https://chatgpt.com/c/conversation-1',
-        fetchFn,
-      }),
-    ).rejects.toMatchObject({ code: 'chatgpt_api_session_http', status: 401 });
-    await expect(
-      captureCurrentChatgptConversationViaApi({
-        readCurrentUrl: () => 'https://chatgpt.com/c/conversation-1',
-        fetchFn,
-      }),
-    ).rejects.not.toThrow('PRIVATE_RESPONSE_SENTINEL');
+    expect(requestPage).not.toHaveBeenCalled();
   });
 });
 

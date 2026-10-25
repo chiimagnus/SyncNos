@@ -419,9 +419,11 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
       ...(hasActivityAt ? { activityAt: Number(activityAt) } : null),
       ...(conversationContentChanged ? { conversationContentChanged: true } : null),
     });
-    fireAndForget(
-      deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages),
-    );
+    if (msg.deferRemoteSync !== true) {
+      fireAndForget(
+        deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages),
+      );
+    }
     if (shouldScheduleChatImageBackfill) {
       try {
         await deps.scheduleImageBackfill(conversationId);

@@ -74,7 +74,7 @@ function userFacingCaptureError(error: unknown): Error {
   const sessionUnavailable =
     code === 'chatgpt_api_session_schema' ||
     (code.startsWith('chatgpt_api_session_') && (status === 401 || status === 403)) ||
-    (code === 'chatgpt_api_mapping_http' && status === 401);
+    (code === 'chatgpt_api_page_http' && status === 401);
   const message =
     code === 'chatgpt_api_navigation_changed'
       ? t('chatgptApiCaptureNavigationChanged')
@@ -126,9 +126,6 @@ function markUnresolvedDeepResearch(snapshot: any): void {
     : [];
   if (!unresolved.length) return;
 
-  for (const message of unresolved) {
-    message.captureMergePolicy = 'preserve-existing-content';
-  }
   const existingMeta = snapshot?.captureMeta && typeof snapshot.captureMeta === 'object' ? snapshot.captureMeta : {};
   snapshot.captureMeta = {
     ...existingMeta,
@@ -251,9 +248,18 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
   async function saveSnapshot(
     snapshot: any,
     collectorId: string | null,
-    options?: { expectedChatgptConversationId?: string },
+    options?: { expectedChatgptConversationId?: string; deferRemoteSync?: boolean },
   ) {
     if (!snapshot || !snapshot.conversation) return null;
+    if (
+      collectorId === 'chatgpt' &&
+      snapshot.captureMeta?.completeness === 'partial' &&
+      Array.isArray(snapshot.messages)
+    ) {
+      for (const message of snapshot.messages || []) {
+        message.captureMergePolicy ??= 'preserve-existing-content';
+      }
+    }
 
     const integrity = resolveCaptureIntegrity(collectorId, snapshot);
     if (!integrity.ok) return null;
@@ -287,6 +293,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       conversationSourceType: normalizedSnapshot?.conversation?.sourceType || 'chat',
       conversationContentChanged: (conversation as any)?.__semanticContentChanged === true,
       activityAt,
+      ...(options?.deferRemoteSync ? { deferRemoteSync: true } : null),
     });
     if (!messagesRes?.ok) {
       throw new Error(messagesRes?.error?.message || 'syncConversationMessages failed');
@@ -354,8 +361,18 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
 
       let snapshot: any;
       let expectedChatgptConversationId = '';
+      let firstPageIsNew: boolean | null = null;
       if (target.kind === 'chat' && target.useChatgptApi) {
-        const apiCapture = await captureCurrentChatgptConversationViaApi();
+        const apiCapture = await captureCurrentChatgptConversationViaApi({
+          onPage: async (page) => {
+            const savedPage = await saveSnapshot(page.snapshot, 'chatgpt', {
+              expectedChatgptConversationId: String(page.snapshot?.conversation?.conversationKey || ''),
+              deferRemoteSync: true,
+            });
+            if (!savedPage) throw new Error('chatgpt_api_no_safe_messages');
+            firstPageIsNew ??= savedPage.isNew;
+          },
+        });
         snapshot = apiCapture.snapshot;
         expectedChatgptConversationId = String(snapshot?.conversation?.conversationKey || '').trim();
         if (apiCapture.currentTurnState === 'open') {
@@ -403,7 +420,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       }
 
       const title = String(snapshot?.conversation?.title || '');
-      const isNew = saved.isNew;
+      const isNew = firstPageIsNew ?? saved.isNew;
       const message = buildCaptureSuccessTipMessage({ isNew, title });
       setCaptureActivity('settled', 'success', message, pageUrl);
       return {

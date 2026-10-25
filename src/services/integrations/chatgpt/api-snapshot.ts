@@ -6,12 +6,6 @@ import {
   chatgptFileIdFromAssetPointer,
 } from '@services/shared/chatgpt-image-identity';
 
-type ChatgptMappingNode = {
-  id?: unknown;
-  parent?: unknown;
-  message?: any;
-};
-
 export type ChatgptApiCurrentTurnState = 'finalized' | 'open' | 'unknown';
 
 export type ChatgptApiSnapshotResult = {
@@ -400,36 +394,26 @@ function hasNonImagePartContent(message: any, onSchemaDrift: SchemaDriftReporter
   return parts.some((part: unknown) => !isImagePart(part));
 }
 
-function currentBranchNodes(mapping: unknown, currentNode: unknown): ChatgptMappingNode[] {
-  if (!mapping || typeof mapping !== 'object' || Array.isArray(mapping)) throw apiSnapshotError('mapping_invalid');
-  const nodes = mapping as Record<string, ChatgptMappingNode>;
-  let nodeId = stableString(currentNode);
-  if (!nodeId || !nodes[nodeId]) throw apiSnapshotError('mapping_current_node_invalid');
-
-  const branch: ChatgptMappingNode[] = [];
+function currentPageMessages(raw: unknown, currentNode: unknown): any[] {
+  if (!Array.isArray(raw) || !raw.length) throw apiSnapshotError('chatgpt_api_messages_invalid');
+  const lastId = stableString(raw.at(-1)?.id);
+  if (!lastId || lastId !== stableString(currentNode)) throw apiSnapshotError('chatgpt_api_current_node_invalid');
   const seen = new Set<string>();
-  while (nodeId) {
-    if (seen.has(nodeId)) throw apiSnapshotError('mapping_cycle');
-    seen.add(nodeId);
-    const node = nodes[nodeId];
-    if (!node) throw apiSnapshotError('mapping_parent_missing');
-    branch.push(node);
-    const parent = node.parent;
-    if (parent == null || parent === '') break;
-    nodeId = stableString(parent);
-    if (!nodeId) throw apiSnapshotError('mapping_parent_missing');
+  for (const message of raw) {
+    const id = stableString(message?.id);
+    if (!id || seen.has(id)) throw apiSnapshotError('chatgpt_api_message_id_invalid');
+    seen.add(id);
   }
-  branch.reverse();
-  return branch;
+  return raw;
 }
 
-function currentTurnInfo(branch: ChatgptMappingNode[]): {
+function currentTurnInfo(branch: any[]): {
   state: ChatgptApiCurrentTurnState;
   turnId: string;
 } {
   let executionTurnId = '';
   for (let index = branch.length - 1; index >= 0; index -= 1) {
-    const message = branch[index]?.message;
+    const message = branch[index];
     if (!message || isHidden(message) || INTERNAL_CONTENT_TYPES.has(contentType(message))) continue;
     const role = messageRole(message);
     if (role === 'system' || role === 'developer') continue;
@@ -498,7 +482,7 @@ export function buildChatgptApiSnapshot(input: {
   const responseId = responseConversationId(input.data);
   if (!responseId || responseId !== conversationId) throw apiSnapshotError('conversation_identity_mismatch');
 
-  const branch = currentBranchNodes(input.data?.mapping, input.data?.current_node);
+  const branch = currentPageMessages(input.data?.messages, input.data?.current_node);
   const backendCurrentTurn = currentTurnInfo(branch);
   const capturedAt = Number.isFinite(input.capturedAt) ? Number(input.capturedAt) : Date.now();
   const messages: any[] = [];
@@ -584,8 +568,7 @@ export function buildChatgptApiSnapshot(input: {
     if (!pendingMatchesTurn(turnId)) flushPendingWithoutOwner();
   };
 
-  for (const node of branch) {
-    const message = node?.message;
+  for (const message of branch) {
     if (!message || isHidden(message)) continue;
     const role = messageRole(message);
     const type = contentType(message);
