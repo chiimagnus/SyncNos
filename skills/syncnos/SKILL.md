@@ -1,6 +1,6 @@
 ---
 name: syncnos
-description: "Use the SyncNos Web Clipper and its `syncnos` CLI/browser extension to capture, query, and manage content; work with comments and settings; sync providers; open, export, and back up data."
+description: "Use the syncnos CLI to capture, find, manage, sync, export, or back up content saved by the SyncNos browser extension."
 ---
 
 # SyncNos
@@ -22,7 +22,7 @@ Use `syncnos` as the normal operational entry point. The Extension/IndexedDB rem
 
 ## Key operations
 
-- `capture` acts on the current active page. If another target page must be captured, use browser automation only to activate that tab; do not reimplement collector logic.
+- `capture` acts on the current active page. If another target page must be captured, use browser automation only to activate that tab; do not reimplement collector logic. A failed ChatGPT Advanced capture may have saved earlier pages: check the local item before retrying, and do not assume the operation rolled back.
 - Root/reply/delete comments use the CLI. Root/reply text may contain Markdown and `$...$` / `$$...$$` math source; Markdown image syntax is not a comment attachment mechanism. CLI-created root comments and replies are authored as `<About You name>' CLI`, or `CLI` when no name is configured; there is no caller-supplied author override. Selection-anchored comments follow the browser-required flow; never fabricate a locator.
 - Run `settings schema` before changing settings and only operate on public keys.
 - Provider auth/config must use CLI-exposed interfaces; do not read underlying credentials directly.
