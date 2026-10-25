@@ -424,7 +424,7 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
         deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages),
       );
     }
-    if (shouldScheduleChatImageBackfill) {
+    if (shouldScheduleChatImageBackfill && msg.deferRemoteSync !== true) {
       try {
         await deps.scheduleImageBackfill(conversationId);
       } catch (error) {

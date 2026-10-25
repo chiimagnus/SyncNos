@@ -284,6 +284,36 @@ describe('background-router conversations', () => {
     });
   });
 
+  it('defers image backfill and remote sync until the final page of a paged chat capture', async () => {
+    storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
+    const scheduleImageBackfill = vi.fn(async () => {});
+    const onConversationChanged = vi.fn(async () => {});
+    const router = createRouter({ scheduleImageBackfill, onConversationChanged });
+    const payload = {
+      type: 'syncConversationMessages',
+      conversationId: 2002,
+      conversationSourceType: 'chat',
+      mode: 'append',
+      messages: [{ messageKey: 'm1', role: 'assistant', contentMarkdown: '![](chatgpt-file://file_image_1)' }],
+      diff: { added: ['m1'], updated: [], removed: [] },
+    };
+
+    for (let page = 0; page < 2; page += 1) {
+      const result = await router.dispatch({ ...payload, deferRemoteSync: true });
+      expect(result.ok).toBe(true);
+      expect(onConversationChanged).not.toHaveBeenCalled();
+      expect(scheduleImageBackfill).not.toHaveBeenCalled();
+    }
+
+    const final = await router.dispatch(payload);
+    expect(final.ok).toBe(true);
+    expect(storageMocks.syncConversationMessages).toHaveBeenCalledTimes(3);
+    expect(onConversationChanged).toHaveBeenCalledTimes(1);
+    expect(onConversationChanged).toHaveBeenCalledWith(2002, 'syncConversationMessages');
+    expect(scheduleImageBackfill).toHaveBeenCalledOnce();
+    expect(scheduleImageBackfill).toHaveBeenCalledWith(2002);
+  });
+
   it('persists AI chat messages before durably enqueueing image backfill and never downloads in the save request', async () => {
     storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
     let releaseSchedule: (() => void) | null = null;
