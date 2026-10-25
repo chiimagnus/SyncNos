@@ -78,6 +78,19 @@ describe('inpage-button click combos', () => {
     expect(calls).toEqual(['double']);
   });
 
+  it('double-click saves exactly once when there is no double-click action', () => {
+    const api = loadInpageButton();
+    const calls: string[] = [];
+    api.ensureInpageButton({ collectorId: 'chatgpt', onClick: () => calls.push('save') });
+
+    const btn = document.getElementById('webclipper-inpage-btn');
+    btn?.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    btn?.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    vi.advanceTimersByTime(401);
+
+    expect(calls).toEqual(['save']);
+  });
+
   it('resets combo window after double-click so subsequent single click can still save', () => {
     const api = loadInpageButton();
     const calls: string[] = [];

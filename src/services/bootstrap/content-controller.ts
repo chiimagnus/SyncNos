@@ -1,7 +1,6 @@
 import type { CurrentPageCaptureService } from '@services/bootstrap/current-page-capture';
 import { AI_CHAT_AUTO_SAVE_COLLECTOR_IDS } from '@collectors/ai-chat-sites';
 import { resolveActiveCollector, type CollectorRegistryLike } from '@collectors/registry';
-import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
 import { resolveCaptureIntegrity } from '@services/shared/capture-integrity';
 import { storageGet, storageOnChanged } from '@services/shared/storage';
 import { CORE_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
@@ -36,7 +35,7 @@ type InpageButtonApi = {
 };
 
 type InpageTipApi = {
-  showSaveTip: (text: unknown, options?: { kind?: 'default' | 'error' }) => void;
+  showSaveTip: (text: string) => void;
 };
 
 type RuntimeObserverFactory = (input: {
@@ -82,20 +81,6 @@ export function createContentController(deps: Deps) {
   const createRuntimeObserver = deps.createRuntimeObserver;
   const incrementalEngine = deps.incrementalEngine;
   const itemMention = deps.itemMention;
-
-  function toTipKind(kind?: unknown): 'default' | 'error' | undefined {
-    const value = String(kind || '')
-      .trim()
-      .toLowerCase();
-    if (!value) return undefined;
-    if (value === 'ok') return 'default';
-    if (value === 'default' || value === 'error') return value;
-    return undefined;
-  }
-
-  function showInpageTip(text: string, kind?: string) {
-    inpageTip.showSaveTip(text, { kind: toTipKind(kind) });
-  }
 
   function send(type: string, payload?: Record<string, unknown>) {
     return runtime.send(type, payload);
@@ -492,18 +477,12 @@ export function createContentController(deps: Deps) {
         if (!manualSlot) return;
         setResidentSaving(true);
         try {
-          await currentPageCapture.captureCurrentPage({
-            onProgress: (progress) => {
-              if (!stopped && isCurrentResidentOwner(ownerToken)) {
-                showInpageTip(progress.message, progress.kind === 'default' ? 'ok' : progress.kind);
-              }
-            },
-          });
+          await currentPageCapture.captureCurrentPage();
         } finally {
           setResidentSaving(false);
         }
       } catch (_error) {
-        // tip already shown in progress callback
+        // Capture errors are reported by the shared activity state.
       } finally {
         if (manualSlot) exitManualPersistence(manualSlot);
       }
@@ -513,7 +492,7 @@ export function createContentController(deps: Deps) {
       const level = Number(payload?.level);
       if (!Number.isFinite(level)) return;
       const line = pickLineByLevel(level);
-      if (line) showInpageTip(line);
+      if (line) inpageTip.showSaveTip(line);
     };
 
     const openInpageCommentsSidebar = async () => {
@@ -642,6 +621,7 @@ export function createContentController(deps: Deps) {
 
     async function runAutoSaveTick() {
       if (stopped) return;
+      const pageUrl = String(globalThis.location?.href || '');
       const generation = liveGeneration;
       let backfill: Awaited<ReturnType<typeof maybeRunBackfill>> | null = null;
 
@@ -708,9 +688,9 @@ export function createContentController(deps: Deps) {
           }
 
           if (saved && isCurrentResidentOwner(ownerToken) && !stopped && (incrementalChanged || backfill.changed)) {
-            showInpageTip(
-              buildCaptureSuccessTipMessage({ isNew: saved.isNew, title: merged.snapshot?.conversation?.title }),
-              'ok',
+            currentPageCapture.reportAutoSave(
+              { isNew: saved.isNew, title: merged.snapshot?.conversation?.title },
+              pageUrl,
             );
           }
         } finally {
@@ -757,14 +737,12 @@ export function createContentController(deps: Deps) {
   }
 
   return {
-    async captureCurrentPage(
-      input?: Parameters<CurrentPageCaptureService['captureCurrentPage']>[0],
-    ): ReturnType<CurrentPageCaptureService['captureCurrentPage']> {
+    async captureCurrentPage(): ReturnType<CurrentPageCaptureService['captureCurrentPage']> {
       const manualSlot = await enterManualPersistence(null, () => true);
       if (!manualSlot) throw new Error('manual_capture_in_progress');
       inpageButton.setSaving(true);
       try {
-        return await currentPageCapture.captureCurrentPage(input);
+        return await currentPageCapture.captureCurrentPage();
       } finally {
         inpageButton.setSaving(false);
         exitManualPersistence(manualSlot);

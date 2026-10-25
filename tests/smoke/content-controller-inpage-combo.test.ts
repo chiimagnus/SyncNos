@@ -70,6 +70,13 @@ function createHarness(options?: {
         subtitleStatus: 'ok' as const,
       })),
     },
+    onActivity: (activity) => {
+      if (activity.phase !== 'settled') return;
+      tipCalls.push({
+        text: activity.message,
+        opts: { kind: activity.kind === 'error' ? 'error' : 'default', expiresAt: activity.expiresAt },
+      });
+    },
   });
 
   const controller = createContentController({
@@ -115,6 +122,7 @@ function createHarness(options?: {
   return {
     tipCalls,
     sendCalls,
+    getCaptureState: currentPageCapture.getCurrentPageCaptureState,
     runTick: async () => {
       if (tickRef) await tickRef();
       for (let i = 0; i < 16; i += 1) await Promise.resolve();
@@ -299,6 +307,7 @@ describe('content-controller inpage combo', () => {
     expect(harness.sendCalls.some((c) => c.type === 'upsertConversation')).toBe(true);
     expect(harness.sendCalls.some((c) => c.type === 'syncConversationMessages')).toBe(true);
     expect(harness.tipCalls.some((c) => String(c.text) === 'Saved')).toBe(true);
+    expect((await harness.getCaptureState()).activity).toMatchObject({ phase: 'settled', kind: 'success' });
   });
 
   it('skips auto-save when chatgpt deep research message is still a placeholder', async () => {
@@ -480,6 +489,8 @@ describe('content-controller inpage combo', () => {
     for (let i = 0; i < 8; i += 1) await Promise.resolve();
 
     expect(harness.sendCalls.filter((c) => c.type === 'upsertConversation')).toHaveLength(1);
+    expect((await harness.getCaptureState()).activity).toMatchObject({ phase: 'capturing' });
+    expect(harness.tipCalls).toHaveLength(0);
 
     resolveUpsert(undefined);
     await firstClick;

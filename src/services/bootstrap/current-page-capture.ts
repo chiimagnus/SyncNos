@@ -3,7 +3,7 @@ import { hydrateChatgptDeepResearchSnapshot } from '@collectors/chatgpt/chatgpt-
 import { resolveActiveOrInpageCollector, type CollectorRegistryLike } from '@collectors/registry';
 import { DISCOURSE_OP_NOT_FOUND_ERROR, isDiscourseOpNotFoundErrorMessage } from '@collectors/web/article-fetch-errors';
 import { ARTICLE_MESSAGE_TYPES, CORE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
-import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
+import { buildCaptureSuccessTipMessage, CAPTURE_ACTIVITY_VISIBLE_MS } from '@services/shared/capture-tip';
 import { resolveCaptureIntegrity } from '@services/shared/capture-integrity';
 import { detectSupportedVideoPagePlatform } from '@services/url-cleaning/video-url';
 import type { VideoTranscriptCaptureService } from '@services/bootstrap/video-transcript-capture';
@@ -21,14 +21,10 @@ type CurrentPageCaptureDeps = {
   runtime: RuntimeClient | null;
   collectorsRegistry: CollectorRegistryLike | null;
   videoCapture: Pick<VideoTranscriptCaptureService, 'captureVideoTranscript'>;
+  onActivity?: (activity: CurrentPageCaptureActivity) => void;
 };
 
-type CurrentPageCaptureProgress = {
-  kind?: 'default' | 'error';
-  message: string;
-};
-
-type CurrentPageCaptureActivity = {
+export type CurrentPageCaptureActivity = {
   phase: 'capturing' | 'settled';
   kind: 'info' | 'success' | 'error';
   message: string;
@@ -59,8 +55,6 @@ type CurrentPageCaptureResult =
     })
   | (CurrentPageSavedResult & { kind: 'article' })
   | (CurrentPageSavedResult & { kind: 'video'; subtitleStatus: VideoSubtitleStatus });
-
-const CAPTURE_ACTIVITY_VISIBLE_MS = 5_000;
 
 function errorMessage(error: unknown, fallback: string): string {
   const maybeError = error as { message?: unknown };
@@ -158,21 +152,35 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
   const collectorsRegistry = deps.collectorsRegistry;
   const videoCapture = deps.videoCapture;
   let captureActivity: CurrentPageCaptureActivity | null = null;
+  let captureActivityUrl = '';
+  const currentUrl = () => String(globalThis.location?.href || '');
 
   function setCaptureActivity(
     phase: CurrentPageCaptureActivity['phase'],
     kind: CurrentPageCaptureActivity['kind'],
     message: string,
+    pageUrl = currentUrl(),
   ) {
+    if (pageUrl !== currentUrl()) {
+      if (captureActivityUrl === pageUrl) captureActivity = null;
+      return;
+    }
+    captureActivityUrl = pageUrl;
     captureActivity = {
       phase,
       kind,
       message,
       expiresAt: phase === 'capturing' ? null : Date.now() + CAPTURE_ACTIVITY_VISIBLE_MS,
     };
+    try {
+      deps.onActivity?.(captureActivity);
+    } catch (_error) {
+      // UI feedback must not interrupt persistence or change capture results.
+    }
   }
 
   function readCaptureActivity(): CurrentPageCaptureActivity | null {
+    if (captureActivityUrl !== currentUrl()) captureActivity = null;
     if (!captureActivity) return null;
     if (captureActivity.expiresAt != null && captureActivity.expiresAt <= Date.now()) {
       captureActivity = null;
@@ -293,15 +301,9 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     };
   }
 
-  async function captureCurrentPage(input?: {
-    onProgress?: (progress: CurrentPageCaptureProgress) => void;
-  }): Promise<CurrentPageCaptureResult> {
-    const onProgress = input?.onProgress;
-    const report = (message: string, kind?: 'default' | 'error') => {
-      onProgress?.({ message, kind });
-    };
-
-    setCaptureActivity('capturing', 'info', t('fetchingDots'));
+  async function captureCurrentPage(): Promise<CurrentPageCaptureResult> {
+    const pageUrl = currentUrl();
+    setCaptureActivity('capturing', 'info', t('fetchingDots'), pageUrl);
 
     try {
       const target = await resolveCaptureTarget();
@@ -317,8 +319,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
               : result.subtitleStatus === 'unavailable'
                 ? t('videoTranscriptTipSubtitlesUnavailable')
                 : buildCaptureSuccessTipMessage({ isNew: result.isNew, title: result.title || '' });
-        setCaptureActivity('settled', 'success', message);
-        report(message, 'default');
+        setCaptureActivity('settled', 'success', message, pageUrl);
         return {
           kind: 'video',
           label: target.label,
@@ -340,8 +341,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         const isNew = response?.data?.isNew;
         if (typeof isNew !== 'boolean') throw new Error('invalid article capture response');
         const message = buildCaptureSuccessTipMessage({ isNew, title });
-        setCaptureActivity('settled', 'success', message);
-        report(message, 'default');
+        setCaptureActivity('settled', 'success', message, pageUrl);
         return {
           kind: 'article',
           label: target.label,
@@ -405,8 +405,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       const title = String(snapshot?.conversation?.title || '');
       const isNew = saved.isNew;
       const message = buildCaptureSuccessTipMessage({ isNew, title });
-      setCaptureActivity('settled', 'success', message);
-      report(message, 'default');
+      setCaptureActivity('settled', 'success', message, pageUrl);
       return {
         kind: 'chat',
         label: target.label,
@@ -420,10 +419,13 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     } catch (error) {
       const outwardError = userFacingCaptureError(error);
       const message = errorMessage(outwardError, t('captureFailedFallback'));
-      setCaptureActivity('settled', 'error', message);
-      report(message, 'error');
+      setCaptureActivity('settled', 'error', message, pageUrl);
       throw outwardError;
     }
+  }
+
+  function reportAutoSave(result: { isNew: boolean; title?: unknown }, pageUrl: string) {
+    setCaptureActivity('settled', 'success', buildCaptureSuccessTipMessage(result), pageUrl);
   }
 
   async function getCurrentPageCaptureState(): Promise<CurrentPageCaptureState> {
@@ -441,6 +443,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
   return {
     captureCurrentPage,
     getCurrentPageCaptureState,
+    reportAutoSave,
   };
 }
 

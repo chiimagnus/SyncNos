@@ -4,7 +4,6 @@ import { KEYBOARD_SHORTCUT_COMMAND_IDS } from '@services/shortcuts/keyboard-shor
 
 type ShortcutCaptureMessage = {
   type: typeof UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE;
-  source: 'shortcut';
 };
 
 type BackgroundKeyboardShortcutDeps = {
@@ -31,7 +30,6 @@ export function registerBackgroundKeyboardShortcuts({
       runShortcutAction(() =>
         dispatchMessage({
           type: UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE,
-          source: 'shortcut',
         }),
       );
       return;

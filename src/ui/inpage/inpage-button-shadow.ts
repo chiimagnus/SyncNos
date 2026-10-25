@@ -36,12 +36,7 @@ function toButtonHostCss(css: string) {
     .replace(/\.webclipper-inpage-btn(?!_)/g, ':host');
 }
 
-const BUTTON_SHADOW_CSS = [
-  toHostTokensCss(String(tokensCssRaw || '')),
-  toButtonHostCss(String(inpageButtonCssRaw || '')),
-]
-  .filter(Boolean)
-  .join('\n');
+const BUTTON_SHADOW_CSS = `${toHostTokensCss(tokensCssRaw)}\n${toButtonHostCss(inpageButtonCssRaw)}`;
 
 let runtime: InpageRuntime = null;
 
@@ -438,7 +433,9 @@ function ensureButtonInteractions(btn: HTMLElement) {
     }
 
     if (finalCount === 2) {
-      readOnDoubleClick(btn)?.();
+      const onDoubleClick = readOnDoubleClick(btn);
+      if (onDoubleClick) onDoubleClick();
+      else readOnClick(btn)?.();
       return;
     }
 
@@ -666,6 +663,7 @@ function cleanupButtons(activeCollectorId: string) {
 function setSaving(saving: boolean) {
   const el = document.getElementById(INPAGE_BTN_ID) as HTMLElement | null;
   if (!el) return;
+  el.setAttribute('aria-busy', String(saving));
   if (saving) el.classList.add('is-saving');
   else el.classList.remove('is-saving');
 }

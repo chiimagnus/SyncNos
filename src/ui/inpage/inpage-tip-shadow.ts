@@ -1,8 +1,8 @@
 import inpageTipCssRaw from '@ui/styles/inpage-tip.css?raw';
 import tokensCssRaw from '@ui/styles/tokens.css?raw';
+import { CAPTURE_ACTIVITY_VISIBLE_MS } from '@services/shared/capture-tip';
 const BUBBLE_ID = 'webclipper-inpage-bubble';
 const INPAGE_BTN_ID = 'webclipper-inpage-btn';
-const VISIBLE_MS = 1800;
 const ANIM_CLASS = 'is-enter';
 const VIEWPORT_PAD = 10;
 const ANCHOR_GAP = 10;
@@ -11,25 +11,18 @@ function toHostTokensCss(css: string) {
   return css.replaceAll(':root', ':host');
 }
 
-const BUBBLE_SHADOW_CSS = [toHostTokensCss(String(tokensCssRaw || '')), String(inpageTipCssRaw || '')]
-  .filter(Boolean)
-  .join('\n');
+const BUBBLE_SHADOW_CSS = `${toHostTokensCss(tokensCssRaw)}\n${inpageTipCssRaw}`;
 
 type TipKind = 'default' | 'error';
 
 const state = {
-  hideTimer: null as any,
-  animTimer: null as any,
-  rafId: null as any,
-  visibleUntil: 0,
+  hideTimer: null as ReturnType<typeof setTimeout> | null,
+  animTimer: null as ReturnType<typeof setTimeout> | null,
+  followTimer: null as ReturnType<typeof setTimeout> | null,
 };
 
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
-}
-
-function getDoc() {
-  return document;
 }
 
 function setImportantStyle(el: HTMLElement, name: string, value: string) {
@@ -55,14 +48,7 @@ function getViewport() {
 }
 
 function getAnchorRect() {
-  const doc = getDoc();
-  const btn = doc.getElementById(INPAGE_BTN_ID);
-  if (!btn) return null;
-  try {
-    return btn.getBoundingClientRect();
-  } catch (_e) {
-    return null;
-  }
+  return document.getElementById(INPAGE_BTN_ID)?.getBoundingClientRect() ?? null;
 }
 
 function inferPlacement(anchor: any, viewport: { width: number; height: number }) {
@@ -118,8 +104,8 @@ function computeBubblePosition(
 }
 
 function ensureBubble() {
-  const doc = getDoc();
-  if (!doc || !doc.documentElement) return null;
+  const doc = document;
+  if (!doc.documentElement) return null;
 
   const existing = doc.getElementById(BUBBLE_ID) as HTMLElement | null;
   if (existing) return existing;
@@ -155,15 +141,13 @@ function ensureBubble() {
 }
 
 function setTextAndKind(el: HTMLElement, text: unknown, kind?: TipKind) {
-  const shadow = (el as any).shadowRoot as ShadowRoot | null;
-  const textEl = shadow?.querySelector?.('.webclipper-inpage-bubble__text') as HTMLElement | null;
+  const textEl = el.shadowRoot?.querySelector<HTMLElement>('.webclipper-inpage-bubble__text');
   if (textEl) textEl.textContent = String(text || '');
-  const normalizedKind: TipKind = kind === 'error' ? 'error' : 'default';
-  (el as any).dataset.kind = normalizedKind;
+  el.dataset.kind = kind === 'error' ? 'error' : 'default';
 }
 
 function positionBubble(el: HTMLElement) {
-  if (!el || !(el as any).isConnected) return;
+  if (!el.isConnected) return;
   const viewport = getViewport();
   const bubbleRect = el.getBoundingClientRect();
   const anchorRect = getAnchorRect();
@@ -194,86 +178,56 @@ function positionBubble(el: HTMLElement) {
   setImportantStyle(el, 'top', `${Math.round(pos.top)}px`);
 }
 
-function stopFollowLoop() {
-  const caf =
-    typeof (globalThis as any).cancelAnimationFrame === 'function'
-      ? (globalThis as any).cancelAnimationFrame.bind(globalThis)
-      : clearTimeout;
-  if (state.rafId != null) {
-    caf(state.rafId);
-    state.rafId = null;
-  }
-}
-
 function startFollowLoop(el: HTMLElement) {
-  stopFollowLoop();
-  const raf =
-    typeof (globalThis as any).requestAnimationFrame === 'function'
-      ? (globalThis as any).requestAnimationFrame.bind(globalThis)
-      : (cb: any) => setTimeout(cb, 16);
+  const pageUrl = String(globalThis.location?.href || '');
   const tick = () => {
-    if (!el || !(el as any).isConnected) {
-      state.rafId = null;
+    state.followTimer = null;
+    if (!el.isConnected) return;
+    if (pageUrl !== String(globalThis.location?.href || '')) {
+      removeBubble();
       return;
     }
     positionBubble(el);
-    if (Date.now() < state.visibleUntil) {
-      state.rafId = raf(tick);
-      return;
-    }
-    state.rafId = null;
+    state.followTimer = setTimeout(tick, 100);
   };
-  state.rafId = raf(tick);
+  state.followTimer = setTimeout(tick, 100);
 }
 
 function resetTimers() {
-  if (state.hideTimer) {
-    clearTimeout(state.hideTimer);
-    state.hideTimer = null;
-  }
-  if (state.animTimer) {
-    clearTimeout(state.animTimer);
-    state.animTimer = null;
-  }
+  if (state.hideTimer !== null) clearTimeout(state.hideTimer);
+  if (state.animTimer !== null) clearTimeout(state.animTimer);
+  if (state.followTimer !== null) clearTimeout(state.followTimer);
+  state.hideTimer = state.animTimer = state.followTimer = null;
 }
 
 function removeBubble() {
   resetTimers();
-  stopFollowLoop();
-  const doc = getDoc();
-  if (!doc) return;
-  const el = doc.getElementById(BUBBLE_ID);
+  const el = document.getElementById(BUBBLE_ID);
   if (el && el.parentNode) el.parentNode.removeChild(el);
 }
 
 function replayEnterAnimation(el: HTMLElement) {
-  if (!el) return;
   el.classList.remove(ANIM_CLASS);
   // Force reflow so class re-add reliably replays animation for rapid replacements.
   void (el as any).offsetWidth;
   el.classList.add(ANIM_CLASS);
-  if (state.animTimer) clearTimeout(state.animTimer);
   state.animTimer = setTimeout(() => {
-    if (!el || !(el as any).isConnected) return;
-    el.classList.remove(ANIM_CLASS);
     state.animTimer = null;
+    if (el.isConnected) el.classList.remove(ANIM_CLASS);
   }, 340);
 }
 
-function showSaveTip(text: unknown, options?: { kind?: TipKind }) {
-  const opts = options && typeof options === 'object' ? options : {};
+function showSaveTip(text: unknown, options?: { kind?: TipKind; expiresAt?: number }) {
   const el = ensureBubble();
   if (!el) return;
   resetTimers();
-  setTextAndKind(el, text, (opts as any).kind);
+  setTextAndKind(el, text, options?.kind);
   positionBubble(el);
   replayEnterAnimation(el);
 
-  state.visibleUntil = Date.now() + VISIBLE_MS;
+  const expiresAt = options?.expiresAt ?? Date.now() + CAPTURE_ACTIVITY_VISIBLE_MS;
   startFollowLoop(el);
-  state.hideTimer = setTimeout(() => {
-    removeBubble();
-  }, VISIBLE_MS);
+  state.hideTimer = setTimeout(removeBubble, Math.max(0, expiresAt - Date.now()));
 }
 
 export const inpageTipApi = { showSaveTip, cleanup: removeBubble };

@@ -13,7 +13,10 @@ vi.mock('@services/integrations/chatgpt/api-capture', () => ({
 }));
 
 import { t } from '@i18n';
-import { createCurrentPageCaptureService } from '@services/bootstrap/current-page-capture';
+import {
+  createCurrentPageCaptureService,
+  type CurrentPageCaptureActivity,
+} from '@services/bootstrap/current-page-capture';
 import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
 
 function deferred<T>() {
@@ -60,6 +63,7 @@ function createHarness(input: {
   availabilityError?: string;
 }) {
   const calls: Array<{ type: string; payload?: any }> = [];
+  const activities: CurrentPageCaptureActivity[] = [];
   const capture = vi.fn((_options?: any) => input.snapshot);
   const runtime = {
     send: vi.fn(async (type: string, payload?: any) => {
@@ -103,8 +107,9 @@ function createHarness(input: {
       list: () => [],
     },
     videoCapture,
+    onActivity: (activity) => activities.push(activity),
   });
-  return { service, calls, capture, runtime, videoCapture };
+  return { service, activities, calls, capture, runtime, videoCapture };
 }
 
 beforeEach(() => {
@@ -145,15 +150,14 @@ describe('current page capture integrity routing', () => {
       url,
       video: { conversationId: 77, title: 'Video', url, isNew: true, subtitleStatus: 'empty' },
     });
-    const progress: any[] = [];
-    const result = await harness.service.captureCurrentPage({ onProgress: (item) => progress.push(item) });
+    const result = await harness.service.captureCurrentPage();
     expect(result).toMatchObject({
       kind: 'video',
       subtitleStatus: 'empty',
       conversationId: 77,
       isNew: true,
     });
-    expect(progress.at(-1)?.message).toBe(t('videoTranscriptTipNoSubtitles'));
+    expect(harness.activities.at(-1)?.message).toBe(t('videoTranscriptTipNoSubtitles'));
     expect(harness.calls.some((call) => call.type === 'fetchActiveTabArticle')).toBe(false);
   });
 
@@ -164,12 +168,11 @@ describe('current page capture integrity routing', () => {
       url,
       video: { conversationId: 77, title: 'Video', url, isNew: false, subtitleStatus: 'off' },
     });
-    const progress: any[] = [];
 
-    const result = await harness.service.captureCurrentPage({ onProgress: (item) => progress.push(item) });
+    const result = await harness.service.captureCurrentPage();
 
     expect(result).toMatchObject({ kind: 'video', subtitleStatus: 'off', conversationId: 77, isNew: false });
-    expect(progress.at(-1)?.message).toBe(t('videoTranscriptTipSubtitlesOff'));
+    expect(harness.activities.at(-1)?.message).toBe(t('videoTranscriptTipSubtitlesOff'));
   });
 
   it('reports subtitle fetch failure separately from a confirmed no-subtitle video', async () => {
@@ -179,12 +182,11 @@ describe('current page capture integrity routing', () => {
       url,
       video: { conversationId: 77, title: 'Video', url, isNew: false, subtitleStatus: 'unavailable' },
     });
-    const progress: any[] = [];
 
-    const result = await harness.service.captureCurrentPage({ onProgress: (item) => progress.push(item) });
+    const result = await harness.service.captureCurrentPage();
 
     expect(result).toMatchObject({ kind: 'video', subtitleStatus: 'unavailable', conversationId: 77, isNew: false });
-    expect(progress.at(-1)?.message).toBe(t('videoTranscriptTipSubtitlesUnavailable'));
+    expect(harness.activities.at(-1)?.message).toBe(t('videoTranscriptTipSubtitlesUnavailable'));
   });
 
   it('exposes one transient capture activity across UI surfaces', async () => {
@@ -203,6 +205,9 @@ describe('current page capture integrity routing', () => {
       message: t('fetchingDots'),
       expiresAt: null,
     });
+    expect(harness.activities).toEqual([
+      { phase: 'capturing', kind: 'info', message: t('fetchingDots'), expiresAt: null },
+    ]);
 
     pending.resolve({
       conversationId: 77,
@@ -217,8 +222,61 @@ describe('current page capture integrity routing', () => {
       phase: 'settled',
       kind: 'success',
     });
+    expect(harness.activities.at(-1)).toEqual((await harness.service.getCurrentPageCaptureState()).activity);
 
     vi.advanceTimersByTime(5_001);
+    expect((await harness.service.getCurrentPageCaptureState()).activity).toBeUndefined();
+  });
+
+  it('reports durable automatic saves through the same activity without starting a manual capture', async () => {
+    const harness = createHarness({ collectorId: 'gemini', snapshot: chatSnapshot({ source: 'gemini' }) });
+    harness.service.reportAutoSave({ isNew: false, title: 'Auto saved' }, String(globalThis.location?.href || ''));
+
+    const state = await harness.service.getCurrentPageCaptureState();
+    expect(state.activity).toMatchObject({ phase: 'settled', kind: 'success' });
+    expect(harness.activities).toEqual([state.activity]);
+    expect(harness.capture).not.toHaveBeenCalled();
+  });
+
+  it('does not let a failing feedback surface turn a persisted capture into an error', async () => {
+    const service = createCurrentPageCaptureService({
+      runtime: null,
+      collectorsRegistry: null,
+      videoCapture: {
+        captureVideoTranscript: vi.fn(async () => ({
+          conversationId: 77,
+          title: 'Video',
+          isNew: true,
+          subtitleStatus: 'ok' as const,
+        })),
+      },
+      onActivity: () => {
+        throw new Error('UI unavailable');
+      },
+    });
+    vi.stubGlobal('location', { href: 'https://www.youtube.com/watch?v=video' });
+    await expect(service.captureCurrentPage()).resolves.toMatchObject({ kind: 'video', conversationId: 77 });
+    expect((await service.getCurrentPageCaptureState()).activity).toMatchObject({ kind: 'success' });
+  });
+
+  it('does not present a previous page capture after navigation', async () => {
+    const pending = deferred<any>();
+    const harness = createHarness({
+      collectorId: 'web',
+      url: 'https://www.youtube.com/watch?v=previous',
+      video: pending.promise,
+    });
+    const run = harness.service.captureCurrentPage();
+    await Promise.resolve();
+    expect(harness.activities).toHaveLength(1);
+    expect(harness.activities[0].phase).toBe('capturing');
+
+    vi.stubGlobal('location', { href: 'https://www.youtube.com/watch?v=current' });
+    expect((await harness.service.getCurrentPageCaptureState()).activity).toBeUndefined();
+    pending.resolve({ conversationId: 77, title: 'Old video', isNew: true, subtitleStatus: 'ok' });
+    await expect(run).resolves.toMatchObject({ conversationId: 77 });
+
+    expect(harness.activities).toHaveLength(1);
     expect((await harness.service.getCurrentPageCaptureState()).activity).toBeUndefined();
   });
 
@@ -247,11 +305,8 @@ describe('current page capture integrity routing', () => {
       collectorId: 'chatgpt',
     });
 
-    const progress: any[] = [];
-    await expect(harness.service.captureCurrentPage({ onProgress: (item) => progress.push(item) })).rejects.toThrow(
-      t('noVisibleConversationFound'),
-    );
-    expect(progress.at(-1)).toEqual({ message: t('noVisibleConversationFound'), kind: 'error' });
+    await expect(harness.service.captureCurrentPage()).rejects.toThrow(t('noVisibleConversationFound'));
+    expect(harness.activities.at(-1)).toMatchObject({ message: t('noVisibleConversationFound'), kind: 'error' });
     expect(harness.capture).toHaveBeenCalledTimes(1);
     expect(harness.calls).toEqual([]);
   });
@@ -277,11 +332,8 @@ describe('current page capture integrity routing', () => {
     });
 
     await expect(harness.service.getCurrentPageCaptureState()).rejects.toThrow('availability failed');
-    const progress: any[] = [];
-    await expect(harness.service.captureCurrentPage({ onProgress: (item) => progress.push(item) })).rejects.toThrow(
-      'availability failed',
-    );
-    expect(progress.at(-1)).toEqual({ message: 'availability failed', kind: 'error' });
+    await expect(harness.service.captureCurrentPage()).rejects.toThrow('availability failed');
+    expect(harness.activities.at(-1)).toMatchObject({ message: 'availability failed', kind: 'error' });
   });
 
   it('consumes the web collector availability contract before routing to article capture', async () => {
@@ -659,11 +711,12 @@ describe('current page capture integrity routing', () => {
       snapshot: chatSnapshot({ completeness: 'partial' }),
     });
 
-    const progress: any[] = [];
-    const result = await harness.service.captureCurrentPage({ onProgress: (item) => progress.push(item) });
+    const result = await harness.service.captureCurrentPage();
 
     expect(result).toMatchObject({ captureCompleteness: 'partial' });
-    expect(progress.at(-1)?.message).toBe(buildCaptureSuccessTipMessage({ isNew: true, title: 'Conversation' }));
+    expect(harness.activities.at(-1)?.message).toBe(
+      buildCaptureSuccessTipMessage({ isNew: true, title: 'Conversation' }),
+    );
     expect(harness.calls.map((call) => call.type)).toEqual(['upsertConversation', 'syncConversationMessages']);
     expect(harness.calls[1].payload).toMatchObject({
       mode: 'append',
@@ -847,18 +900,17 @@ describe('current page capture integrity routing', () => {
   });
 
   it('reports unsupported-page errors through the same progress channel before rejecting', async () => {
+    const activities: CurrentPageCaptureActivity[] = [];
     const service = createCurrentPageCaptureService({
       runtime: null,
       collectorsRegistry: null,
       videoCapture: { captureVideoTranscript: vi.fn() } as any,
+      onActivity: (activity) => activities.push(activity),
     });
-    const progress: any[] = [];
 
-    await expect(service.captureCurrentPage({ onProgress: (item) => progress.push(item) })).rejects.toThrow(
-      t('currentPageCannotBeCaptured'),
-    );
+    await expect(service.captureCurrentPage()).rejects.toThrow(t('currentPageCannotBeCaptured'));
 
-    expect(progress.at(-1)).toEqual({
+    expect(activities.at(-1)).toMatchObject({
       message: t('currentPageCannotBeCaptured'),
       kind: 'error',
     });

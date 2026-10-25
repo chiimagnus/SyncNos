@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   cleanupInpageCommentsPanel: vi.fn(),
   isInpageCommentsPanelOpen: vi.fn(() => false),
   cleanupInpageTip: vi.fn(),
+  showInpageTip: vi.fn(),
 }));
 
 vi.mock('@i18n', () => ({ initializeLocale: mocks.initializeLocale }));
@@ -65,7 +66,7 @@ vi.mock('@ui/inpage/inpage-comments-panel-shadow.ts', () => ({
 vi.mock('@ui/inpage/inpage-button-shadow.ts', () => ({ inpageButtonApi: {} }));
 vi.mock('@ui/inpage/inpage-item-mention-shadow.ts', () => ({ inpageItemMentionApi: {} }));
 vi.mock('@ui/inpage/inpage-tip-shadow.ts', () => ({
-  inpageTipApi: { cleanup: mocks.cleanupInpageTip },
+  inpageTipApi: { cleanup: mocks.cleanupInpageTip, showSaveTip: mocks.showInpageTip },
 }));
 vi.mock('@collectors/runtime-observer.ts', () => ({ createObserver: vi.fn() }));
 vi.mock('@services/conversations/content/autosave-incremental-engine.ts', () => ({
@@ -101,6 +102,7 @@ async function loadContentMain() {
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
+  mocks.lifecycleIsDisposed.mockReturnValue(false);
   mocks.createContentController.mockReturnValue({});
   mocks.createItemMentionController.mockReturnValue({});
   mocks.createRuntimeClient.mockReturnValue({ onInvalidated: mocks.runtimeOnInvalidated });
@@ -145,7 +147,7 @@ describe('content entrypoint listener readiness', () => {
 
     let response: any = null;
     expect(
-      listeners[0]?.({ type: 'captureCurrentPage', payload: { source: 'popup' } }, {}, (value: any) => {
+      listeners[0]?.({ type: 'captureCurrentPage' }, {}, (value: any) => {
         response = value;
       }),
     ).toBe(true);
@@ -161,6 +163,37 @@ describe('content entrypoint listener readiness', () => {
     expect(rawCapture).not.toHaveBeenCalled();
     expect(response?.ok).toBe(true);
     expect(response?.data).toEqual({ title: 'gated' });
+  });
+
+  it('leaves capturing feedback to the animated icon and shows settled results in the bubble', async () => {
+    mocks.initializeLocale.mockResolvedValue(undefined);
+    const main = await loadContentMain();
+    await main();
+
+    const callback = mocks.createCurrentPageCaptureService.mock.calls[0]?.[0]?.onActivity;
+    expect(callback).toBeTypeOf('function');
+
+    callback({ phase: 'capturing', kind: 'info', message: 'Fetching...', expiresAt: null });
+    expect(mocks.cleanupInpageTip).toHaveBeenCalledTimes(1);
+    expect(mocks.showInpageTip).not.toHaveBeenCalled();
+
+    const expiresAt = Date.now() + 5_000;
+    callback({ phase: 'settled', kind: 'error', message: 'Capture failed', expiresAt });
+    expect(mocks.showInpageTip).toHaveBeenLastCalledWith('Capture failed', {
+      kind: 'error',
+      expiresAt,
+    });
+
+    callback({ phase: 'settled', kind: 'success', message: 'Saved', expiresAt });
+    expect(mocks.showInpageTip).toHaveBeenLastCalledWith('Saved', {
+      kind: 'default',
+      expiresAt,
+    });
+
+    mocks.lifecycleIsDisposed.mockReturnValue(true);
+    callback({ phase: 'capturing', kind: 'info', message: 'Fetching again...', expiresAt: null });
+    expect(mocks.cleanupInpageTip).toHaveBeenCalledTimes(1);
+    expect(mocks.showInpageTip).toHaveBeenCalledTimes(2);
   });
 
   it('registers content message listeners before locale readiness settles', async () => {

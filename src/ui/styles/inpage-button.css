@@ -170,4 +170,9 @@
     animation: none;
     filter: none;
   }
+
+  .webclipper-inpage-btn.is-saving {
+    outline: 2px solid var(--focus-ring, rgb(91 141 239));
+    outline-offset: -2px;
+  }
 }

@@ -70,7 +70,7 @@ function createHarness(options?: {
   const tipCalls: string[] = [];
   const capture = vi.fn(() => makeSnapshot());
   let manualIndex = 0;
-  const progressCallbacks: Array<(progress: any) => void> = [];
+  const captureCalls: number[] = [];
 
   const controller = createContentController({
     runtime: {
@@ -88,8 +88,8 @@ function createHarness(options?: {
       list: () => [],
     },
     currentPageCapture: {
-      captureCurrentPage: vi.fn(async (input: any) => {
-        progressCallbacks.push(input?.onProgress);
+      captureCurrentPage: vi.fn(async () => {
+        captureCalls.push(manualIndex);
         const pending = options?.manualCaptures?.[manualIndex++];
         if (pending) await pending.promise;
       }),
@@ -132,7 +132,7 @@ function createHarness(options?: {
     buttonConfigs,
     savingCalls,
     tipCalls,
-    progressCallbacks,
+    captureCalls,
   };
 }
 
@@ -222,7 +222,7 @@ describe('content-controller resident lifecycle', () => {
     resident?.stop?.();
   });
 
-  it('old manual progress/finally cannot overwrite a new resident saving state', async () => {
+  it('an old manual capture cannot overwrite a new resident saving state', async () => {
     installStorage({ ai_chat_auto_save_enabled: false, ai_chat_dollar_mention_enabled: false });
     const oldManual = deferred<void>();
     const newManual = deferred<void>();
@@ -246,17 +246,15 @@ describe('content-controller resident lifecycle', () => {
     const newClick = h.buttonConfigs.at(-1)?.onClick as (() => Promise<void>) | undefined;
     await newClick?.();
     await flush();
-    expect(h.progressCallbacks).toHaveLength(1);
+    expect(h.captureCalls).toHaveLength(1);
     expect(h.savingCalls.at(-1)).toBe(false);
 
-    h.progressCallbacks[0]?.({ message: 'stale progress', kind: 'default' });
     oldManual.resolve();
     await oldRun;
-    expect(h.tipCalls).not.toContain('stale progress');
 
     const newRun = newClick?.();
     await flush();
-    expect(h.progressCallbacks).toHaveLength(2);
+    expect(h.captureCalls).toHaveLength(2);
     expect(h.savingCalls.at(-1)).toBe(true);
     newManual.resolve();
     await newRun;
