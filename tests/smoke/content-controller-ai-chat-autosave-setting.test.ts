@@ -93,6 +93,7 @@ function createHarness(options: {
   const observerStart = vi.fn();
   const observerStop = vi.fn();
   const ensureButton = vi.fn();
+  const reportAutoSave = vi.fn();
   const sendCalls: Array<{ type: string; payload?: any }> = [];
   const capture = vi.fn(options.capture || (() => makeSnapshot()));
   const incremental = vi.fn(
@@ -126,6 +127,7 @@ function createHarness(options: {
     },
     currentPageCapture: {
       captureCurrentPage: vi.fn(),
+      reportAutoSave,
       getCurrentPageCaptureState: vi.fn(() => ({
         kind: 'chat',
         label: 'Fetch AI Chat',
@@ -163,6 +165,7 @@ function createHarness(options: {
     observerStart,
     observerStop,
     ensureButton,
+    reportAutoSave,
     sendCalls,
     runTick: async () => {
       if (tick) await tick();
@@ -202,6 +205,7 @@ describe('content-controller auto-save live setting', () => {
     await h.runTick();
     expect(h.capture).toHaveBeenCalledTimes(1);
     expect(h.sendCalls.some((entry) => entry.type === 'syncConversationMessages')).toBe(true);
+    expect(h.reportAutoSave).toHaveBeenCalledWith({ isNew: false, title: 'Chat' }, expect.any(String));
     h.resident?.stop?.();
   });
 
@@ -253,6 +257,7 @@ describe('content-controller auto-save live setting', () => {
     await h.runTick();
     expect(tailCalls).toBe(2);
     expect(h.sendCalls.filter((entry) => entry.type === 'syncConversationMessages')).toHaveLength(1);
+    expect(h.reportAutoSave).toHaveBeenCalledTimes(1);
     h.resident?.stop?.();
   });
 
@@ -289,6 +294,7 @@ describe('content-controller auto-save live setting', () => {
     expect(mentionStart).not.toHaveBeenCalled();
     await h.runTick();
     expect(h.capture).toHaveBeenCalledTimes(1);
+    expect(h.reportAutoSave).toHaveBeenCalledTimes(1);
     h.resident?.stop?.();
   });
 
@@ -364,6 +370,7 @@ describe('content-controller auto-save live setting', () => {
     expect(h.capture).toHaveBeenCalledTimes(1);
     expect(h.sendCalls.some((entry) => entry.type === 'upsertConversation')).toBe(true);
     expect(h.sendCalls.some((entry) => entry.type === 'syncConversationMessages')).toBe(true);
+    expect(h.reportAutoSave).toHaveBeenCalledTimes(1);
 
     storage.emit('ai_chat_auto_save_enabled', false);
     h.resident?.stop?.();
