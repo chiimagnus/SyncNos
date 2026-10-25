@@ -92,6 +92,20 @@ beforeEach(() => {
 });
 
 describe('ChatGPT API snapshot', () => {
+  it('preserves leading indentation and trailing whitespace from user and assistant text', () => {
+    const question = '    indented code\n\n      more code\n';
+    const answer = '    assistant code\n  last line  ';
+    const result = build(
+      pagedFrom([
+        message({ id: 'user-leading', role: 'user', parts: [question] }),
+        message({ id: 'assistant-leading', role: 'assistant', channel: 'final', parts: [answer] }),
+      ]),
+    );
+    expect(result.snapshot.messages[0].contentMarkdown).toBe(question);
+    expect(result.snapshot.messages[1].contentMarkdown).toBe(answer);
+    expect(result.snapshot.captureMeta.completeness).toBe('complete');
+  });
+
   it('ignores widget reference metadata when its marker does not occur in rendered text', () => {
     const widget = 'genui' + JSON.stringify({ charts_widget_v2: { content: { data: [1, 2] } } }) + '';
     const chart =

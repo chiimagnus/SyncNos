@@ -547,10 +547,7 @@ function responseConversationId(data: any): string {
 }
 
 function appendBlocks(parts: string[]): string {
-  return parts
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .join('\n\n');
+  return parts.filter((part) => part.trim().length > 0).join('\n\n');
 }
 
 function safeImageAlt(value: unknown): string {
