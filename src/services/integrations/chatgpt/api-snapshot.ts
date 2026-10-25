@@ -189,22 +189,39 @@ function transformOutsideInlineCode(text: string, transform: (text: string) => s
   return output + transform(text.slice(last));
 }
 
-function transformOutsideCodeFences(markdown: string, transform: (text: string) => string): string {
+function transformOutsideCodeFences(
+  markdown: string,
+  transform: (text: string) => string,
+  preserveStructuredLayout = false,
+): string {
   const result: string[] = [];
   let outside: string[] = [];
   let fenceChar = '';
   let fenceLength = 0;
+  let layoutDepth = 0;
   let indentedCode = false;
   let previousBlank = true;
   const flush = () => {
     if (!outside.length) return;
-    result.push(transformOutsideInlineCode(outside.join('\n'), transform));
+    const content = outside.join('\n');
+    const hasLayoutRoot = /(?:^|\n) {0,3}<(?:row|box|col|grid|flow|card|carousel)\b[^>]*>\s*(?:\n|$)/.test(content);
+    result.push(
+      preserveStructuredLayout && hasLayoutRoot ? transform(content) : transformOutsideInlineCode(content, transform),
+    );
     outside = [];
   };
   for (const line of markdown.split('\n')) {
     const marker = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
     const blank = !line.trim();
     const indented = /^( {4}|\t)/.test(line);
+    const layoutOpen =
+      /^\s*<(?:row|box|col|grid|grid-item|flow|flow-item|card|carousel|carousel-item|text|title|caption|badge)\b[^>]*>\s*$/.test(
+        line,
+      );
+    const layoutClose =
+      /^\s*<\/(?:row|box|col|grid|grid-item|flow|flow-item|card|carousel|carousel-item|text|title|caption|badge)>\s*$/.test(
+        line,
+      );
     if (!fenceLength) {
       if (indentedCode) {
         if (blank || indented) {
@@ -214,7 +231,7 @@ function transformOutsideCodeFences(markdown: string, transform: (text: string) 
         }
         indentedCode = false;
       }
-      if (indented && previousBlank) {
+      if (indented && previousBlank && !layoutDepth) {
         flush();
         result.push(line);
         indentedCode = true;
@@ -223,6 +240,8 @@ function transformOutsideCodeFences(markdown: string, transform: (text: string) 
       }
       if (!marker) {
         outside.push(line);
+        if (layoutOpen && (layoutDepth > 0 || !indented)) layoutDepth += 1;
+        if (layoutClose && layoutDepth > 0) layoutDepth -= 1;
         previousBlank = blank;
         continue;
       }
@@ -291,10 +310,16 @@ function normalizeRichUiMarkup(markdown: string): string {
   ) {
     return markdown;
   }
-  return transformOutsideCodeFences(markdown, (outside) => normalizeDilMarkdown(structuredRichUiMarkdown(outside)));
+  return transformOutsideCodeFences(
+    markdown,
+    (outside) => transformOutsideCodeFences(normalizeDilMarkdown(outside), structuredRichUiMarkdown),
+    true,
+  );
 }
 
-function renderTextParts(message: any, onSchemaDrift: SchemaDriftReporter): string {
+function renderTextParts(message: any, onSchemaDrift: SchemaDriftReporter, normalizeLayout = false): string {
+  const format = (source: string) =>
+    renderContentReferences(message, normalizeLayout ? normalizeRichUiMarkup(source) : source, onSchemaDrift);
   const parts = currentParts(message, onSchemaDrift);
   const output: string[] = [];
   for (const part of parts) {
@@ -315,7 +340,7 @@ function renderTextParts(message: any, onSchemaDrift: SchemaDriftReporter): stri
     }
     if (part != null && typeof part === 'object') onSchemaDrift();
   }
-  if (output.length) return renderContentReferences(message, output.join('\n'), onSchemaDrift);
+  if (output.length) return format(output.join('\n'));
 
   const content = message?.content;
   if (content && typeof content === 'object' && !Array.isArray(content)) {
@@ -323,7 +348,7 @@ function renderTextParts(message: any, onSchemaDrift: SchemaDriftReporter): stri
       const fallback = stableString(content[key]);
       if (!fallback) continue;
       onSchemaDrift();
-      return renderContentReferences(message, fallback, onSchemaDrift);
+      return format(fallback);
     }
     if (Object.keys(content).some((key) => key !== 'content_type' && key !== 'parts')) onSchemaDrift();
   }
@@ -747,7 +772,7 @@ export function buildChatgptApiSnapshot(input: {
 
         const markdown = appendBlocks([
           ...pendingAuxiliary.map((item) => item.markdown),
-          normalizeRichUiMarkup(renderTextParts(message, markSchemaDrift)),
+          renderTextParts(message, markSchemaDrift, true),
           renderImageBlocks(pendingImages),
           renderNonImageAttachments(message, markSchemaDrift),
         ]);

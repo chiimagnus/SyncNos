@@ -438,6 +438,92 @@ describe('ChatGPT API snapshot', () => {
     expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
   });
 
+  it('converts DIL text nested inside an indented layout without misclassifying it as code', () => {
+    const content = [
+      '## Abaqus flow',
+      '<row align="start">',
+      '  <box flex="1">',
+      '      **Step 1: Geometry**',
+      '',
+      '      | Parameter | Value |',
+      '      | --- | --- |',
+      '      | Diameter | 25 mm |',
+      '',
+      '      Model geometry agrees with the specimen.',
+      '  </box>',
+      '  <box flex="1">',
+      '      **Step 2: Material**',
+      '      Use elastic parameters.',
+      '',
+      '      <text size="sm" color="secondary">Material direction matters.</text>',
+      '      See <Cite refs={["turn9search1","turn9search2"]}/>',
+      '  </box>',
+      '</row>',
+      '<divider color="subtle"/>',
+      'Done.',
+    ].join('\n');
+    const result = build(
+      pagedFrom([
+        message({ id: 'user', role: 'user', parts: ['q'] }),
+        message({ id: 'assistant', role: 'assistant', channel: 'final', parts: [content] }),
+      ]),
+    );
+    const text = result.snapshot.messages[1].contentMarkdown;
+    expect(text).toContain('**Step 1: Geometry**');
+    expect(text).toContain('| Diameter | 25 mm |');
+    expect(text).toContain('**Step 2: Material**');
+    expect(text).toContain('Material direction matters.');
+    expect(text).toContain('（引用见原对话）');
+    expect(text).not.toMatch(/<\/?(?:row|box|text|Cite|divider)\b/);
+    expect(text).not.toMatch(/^ {4,}(?:\*\*Step|\| Parameter)/m);
+  });
+
+  it('preserves citation markers inside a nested DIL code fence but resolves prose citations', () => {
+    const cite = 'citeturn9search0';
+    const chart =
+      '<Chart content={{"chartType":"line","xKey":"x","series":[{"dataKey":"y"}],"data":[{"x":1,"y":2}]}}/>';
+    const content = [
+      '<row>',
+      '  <box>',
+      '      ```text',
+      `      literal ${cite}`,
+      `      ${chart}`,
+      '      ```',
+      `      Outside ${cite}`,
+      '      `This <box> is literal inline code`',
+      `      ${chart}`,
+      '  </box>',
+      '</row>',
+    ].join('\n');
+    const result = build(
+      pagedFrom([
+        message({ id: 'user', role: 'user', parts: ['q'] }),
+        message({
+          id: 'assistant',
+          role: 'assistant',
+          channel: 'final',
+          parts: [content],
+          contentReferences: [
+            {
+              type: 'grouped_webpages',
+              matched_text: cite,
+              items: [{ attribution: 'Paper', url: 'https://example.com/paper' }],
+            },
+          ],
+        }),
+      ]),
+    );
+    const text = result.snapshot.messages[1].contentMarkdown;
+    expect(text).toContain(`literal ${cite}`);
+    expect(text).toContain(chart);
+    expect(text).toContain('`This <box> is literal inline code`');
+    expect(text).toContain('Outside [Paper](https://example.com/paper)');
+    expect(text).toContain('| 1 | 2 |');
+    expect(text).toContain('```text');
+    expect(text).not.toMatch(/^\s*<\/?(?:row|box)\b/m);
+    expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
+  });
+
   it('leaves indented Markdown code intact while converting Rich UI outside it', () => {
     const literal = '    <box><text>Literal code</text></box>';
     const cite = 'citeturn1search0';
