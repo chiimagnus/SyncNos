@@ -147,7 +147,7 @@ describe('content entrypoint listener readiness', () => {
 
     let response: any = null;
     expect(
-      listeners[0]?.({ type: 'captureCurrentPage', payload: { source: 'popup' } }, {}, (value: any) => {
+      listeners[0]?.({ type: 'captureCurrentPage' }, {}, (value: any) => {
         response = value;
       }),
     ).toBe(true);

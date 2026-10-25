@@ -59,21 +59,14 @@ afterEach(() => {
 });
 
 describe('current-page-capture content handlers', () => {
-  it.each([
-    ['popup', undefined],
-    ['context menu', { source: 'contextmenu' }],
-    ['shortcut', { source: 'shortcut' }],
-  ])('routes %s capture through the same service state', async (_name, payload) => {
+  it('routes the canonical capture command through the shared service', async () => {
     const runtime = setupListener();
     const captureCurrentPage = vi.fn(async () => ({ kind: 'chat', title: 'Saved' }));
     registerCurrentPageCaptureContentHandlers({ getCurrentPageCaptureState: vi.fn(), captureCurrentPage } as any, {
       localeReady: Promise.resolve(),
     });
 
-    const result = await dispatch(runtime.getListener(), {
-      type: 'captureCurrentPage',
-      ...(payload ? { payload } : null),
-    });
+    const result = await dispatch(runtime.getListener(), { type: 'captureCurrentPage' });
 
     expect(result).toEqual({ ok: true, data: { kind: 'chat', title: 'Saved' }, error: null });
     expect(captureCurrentPage).toHaveBeenCalledOnce();
@@ -121,21 +114,28 @@ describe('current-page-capture content handlers', () => {
     expect(getCurrentPageCaptureState).toHaveBeenCalledOnce();
   });
 
-  it('keeps capture available when locale initialization fails', async () => {
+  it('keeps capture and state requests available when locale initialization fails', async () => {
     const locale = deferred<void>();
     const runtime = setupListener();
     const captureCurrentPage = vi.fn(async () => ({ title: 'Fallback' }));
-    registerCurrentPageCaptureContentHandlers({ getCurrentPageCaptureState: vi.fn(), captureCurrentPage } as any, {
+    const getCurrentPageCaptureState = vi.fn(async () => ({ kind: 'chat' }));
+    registerCurrentPageCaptureContentHandlers({ getCurrentPageCaptureState, captureCurrentPage } as any, {
       localeReady: locale.promise,
     });
-    let response: any = null;
+    let captureResponse: any = null;
+    let stateResponse: any = null;
     runtime.getListener()({ type: 'captureCurrentPage' }, {}, (next: any) => {
-      response = next;
+      captureResponse = next;
+    });
+    runtime.getListener()({ type: 'getCurrentPageCaptureState' }, {}, (next: any) => {
+      stateResponse = next;
     });
     locale.reject(new Error('locale failed'));
-    await waitFor(() => response?.ok === true);
+    await waitFor(() => captureResponse?.ok === true && stateResponse?.ok === true);
     expect(captureCurrentPage).toHaveBeenCalledOnce();
-    expect(response.data).toEqual({ title: 'Fallback' });
+    expect(getCurrentPageCaptureState).toHaveBeenCalledOnce();
+    expect(captureResponse.data).toEqual({ title: 'Fallback' });
+    expect(stateResponse.data).toEqual({ kind: 'chat' });
   });
 
   it('returns the same error envelope on failed captures', async () => {

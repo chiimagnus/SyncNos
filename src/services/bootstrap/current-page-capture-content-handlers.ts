@@ -14,31 +14,17 @@ export function registerCurrentPageCaptureContentHandlers(
   const onMessage = runtime?.onMessage;
   if (!onMessage?.addListener) return () => {};
 
-  const localeReady = options.localeReady;
   const listener = (msg: any, _sender: any, sendResponse: (value: ApiResponse<any>) => void) => {
-    if (!msg || typeof msg.type !== 'string') return undefined;
+    const isStateQuery = msg?.type === CURRENT_PAGE_MESSAGE_TYPES.GET_CAPTURE_STATE;
+    if (!isStateQuery && msg?.type !== CURRENT_PAGE_MESSAGE_TYPES.CAPTURE) return undefined;
+    const run: () => Promise<unknown> = isStateQuery ? service.getCurrentPageCaptureState : service.captureCurrentPage;
 
-    if (msg.type === CURRENT_PAGE_MESSAGE_TYPES.GET_CAPTURE_STATE) {
-      localeReady
-        .catch(() => undefined)
-        .then(() => service.getCurrentPageCaptureState())
-        .then((data) => sendResponse(ok(data)))
-        .catch((error) => sendResponse(err((error as any)?.message ?? error)));
-      return true;
-    }
-
-    if (msg.type === CURRENT_PAGE_MESSAGE_TYPES.CAPTURE) {
-      localeReady
-        .catch(() => undefined)
-        .then(() => service.captureCurrentPage())
-        .then((data) => sendResponse(ok(data)))
-        .catch((error) => {
-          sendResponse(err((error as any)?.message ?? error));
-        });
-      return true;
-    }
-
-    return undefined;
+    options.localeReady
+      .catch(() => undefined)
+      .then(() => run())
+      .then((data) => sendResponse(ok(data)))
+      .catch((error) => sendResponse(err((error as any)?.message ?? error)));
+    return true;
   };
 
   onMessage.addListener(listener);
