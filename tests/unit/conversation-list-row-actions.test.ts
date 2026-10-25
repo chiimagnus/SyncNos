@@ -478,6 +478,9 @@ describe('ConversationListPane row actions', () => {
     const jsonItem = document.getElementById('menuExportJson') as HTMLButtonElement | null;
     expect(markdownItem?.textContent).toBe('markdownExport');
     expect(jsonItem?.textContent).toBe('jsonExport');
+    const footer = exportButton?.closest('.tw-border-t') as HTMLElement | null;
+    expect(footer?.classList.contains('tw-relative')).toBe(true);
+    expect(footer?.classList.contains('tw-z-20')).toBe(true);
 
     await act(async () => {
       markdownItem!.click();

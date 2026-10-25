@@ -820,7 +820,7 @@ export function ConversationListPane({
         </div>
       </div>
 
-      <div className="tw-border-t tw-border-[var(--border)] tw-bg-[var(--bg-primary)]">
+      <div className="tw-relative tw-z-20 tw-border-t tw-border-[var(--border)] tw-bg-[var(--bg-primary)]">
         <div className="tw-px-3 tw-py-2">
           <div
             className={[
