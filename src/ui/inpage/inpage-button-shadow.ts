@@ -36,12 +36,7 @@ function toButtonHostCss(css: string) {
     .replace(/\.webclipper-inpage-btn(?!_)/g, ':host');
 }
 
-const BUTTON_SHADOW_CSS = [
-  toHostTokensCss(String(tokensCssRaw || '')),
-  toButtonHostCss(String(inpageButtonCssRaw || '')),
-]
-  .filter(Boolean)
-  .join('\n');
+const BUTTON_SHADOW_CSS = `${toHostTokensCss(tokensCssRaw)}\n${toButtonHostCss(inpageButtonCssRaw)}`;
 
 let runtime: InpageRuntime = null;
 

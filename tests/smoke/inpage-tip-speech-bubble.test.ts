@@ -129,7 +129,7 @@ describe('inpage-tip speech bubble', () => {
     appendIconRect(rect);
     const api = loadInpageTip();
 
-    api.showSaveTip('tip', { kind: 'loading' });
+    api.showSaveTip('tip');
     expect(document.getElementById('webclipper-inpage-bubble')?.dataset.placement).toBe(expected);
   });
 
@@ -137,7 +137,7 @@ describe('inpage-tip speech bubble', () => {
     appendIconRect({ left: 20, right: 60, top: 400, bottom: 440, width: 40, height: 40 });
     const api = loadInpageTip();
 
-    api.showSaveTip('Loading full history...', { kind: 'loading' });
+    api.showSaveTip('Previous result');
     api.showSaveTip('Save failed', { kind: 'error' });
 
     const nodes = document.querySelectorAll('#webclipper-inpage-bubble');
@@ -158,12 +158,26 @@ describe('inpage-tip speech bubble', () => {
     expect(bubble?.style.top).toMatch(/px$/);
   });
 
+  it('releases all bubble timers on cleanup after rapid replacement', () => {
+    vi.useFakeTimers();
+    appendIconRect({ left: 20, right: 60, top: 400, bottom: 440, width: 40, height: 40 });
+    const api = loadInpageTip();
+
+    api.showSaveTip('Updated');
+    api.showSaveTip('Saved');
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+    api.cleanup();
+
+    expect(document.getElementById('webclipper-inpage-bubble')).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('removes settled bubbles after 5000ms', () => {
     vi.useFakeTimers();
     appendIconRect({ left: 20, right: 60, top: 400, bottom: 440, width: 40, height: 40 });
     const api = loadInpageTip();
 
-    api.showSaveTip('Loading full history...', { kind: 'loading' });
+    api.showSaveTip('Previous result');
     expect(document.getElementById('webclipper-inpage-bubble')).toBeTruthy();
 
     vi.advanceTimersByTime(5001);
@@ -203,7 +217,7 @@ describe('inpage-tip speech bubble', () => {
     appendIconRect({ left: 20, right: 60, top: 400, bottom: 440, width: 40, height: 40 });
     const api = loadInpageTip();
 
-    api.showSaveTip('Loading full history...', { kind: 'loading' });
+    api.showSaveTip('Previous result');
     const bubble = document.getElementById('webclipper-inpage-bubble');
     expect(bubble?.classList.contains('is-enter')).toBe(true);
 

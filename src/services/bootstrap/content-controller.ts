@@ -35,7 +35,7 @@ type InpageButtonApi = {
 };
 
 type InpageTipApi = {
-  showSaveTip: (text: unknown, options?: { kind?: 'default' | 'error' }) => void;
+  showSaveTip: (text: string) => void;
 };
 
 type RuntimeObserverFactory = (input: {
@@ -81,10 +81,6 @@ export function createContentController(deps: Deps) {
   const createRuntimeObserver = deps.createRuntimeObserver;
   const incrementalEngine = deps.incrementalEngine;
   const itemMention = deps.itemMention;
-
-  function showInpageTip(text: string) {
-    inpageTip.showSaveTip(text);
-  }
 
   function send(type: string, payload?: Record<string, unknown>) {
     return runtime.send(type, payload);
@@ -496,7 +492,7 @@ export function createContentController(deps: Deps) {
       const level = Number(payload?.level);
       if (!Number.isFinite(level)) return;
       const line = pickLineByLevel(level);
-      if (line) showInpageTip(line);
+      if (line) inpageTip.showSaveTip(line);
     };
 
     const openInpageCommentsSidebar = async () => {
