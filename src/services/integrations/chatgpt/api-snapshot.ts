@@ -153,46 +153,113 @@ function clientWidgetReference(reference: any, onSchemaDrift: SchemaDriftReporte
   return '';
 }
 
+function transformOutsideInlineCode(text: string, transform: (text: string) => string): string {
+  let output = '';
+  let last = 0;
+  let index = 0;
+  while (index < text.length) {
+    if (text[index] !== '`') {
+      index += 1;
+      continue;
+    }
+    let openerEnd = index;
+    while (text[openerEnd] === '`') openerEnd += 1;
+    const delimiterLength = openerEnd - index;
+    let cursor = openerEnd;
+    let closerEnd = -1;
+    while (cursor < text.length) {
+      const start = text.indexOf('`', cursor);
+      if (start < 0) break;
+      let end = start;
+      while (text[end] === '`') end += 1;
+      if (end - start === delimiterLength) {
+        closerEnd = end;
+        break;
+      }
+      cursor = end;
+    }
+    if (closerEnd < 0) {
+      index = openerEnd;
+      continue;
+    }
+    output += transform(text.slice(last, index)) + text.slice(index, closerEnd);
+    last = closerEnd;
+    index = closerEnd;
+  }
+  return output + transform(text.slice(last));
+}
+
+function transformOutsideCodeFences(markdown: string, transform: (text: string) => string): string {
+  const result: string[] = [];
+  let outside: string[] = [];
+  let fenceChar = '';
+  let fenceLength = 0;
+  const flush = () => {
+    if (!outside.length) return;
+    result.push(transformOutsideInlineCode(outside.join('\n'), transform));
+    outside = [];
+  };
+  for (const line of markdown.split('\n')) {
+    const marker = line.match(/^\s*(`{3,}|~{3,})(.*)$/);
+    if (!fenceLength) {
+      if (!marker) {
+        outside.push(line);
+        continue;
+      }
+      flush();
+      fenceChar = marker[1]![0]!;
+      fenceLength = marker[1]!.length;
+    } else if (marker && marker[1]![0] === fenceChar && marker[1]!.length >= fenceLength && !marker[2]!.trim()) {
+      fenceLength = 0;
+    }
+    result.push(line);
+  }
+  flush();
+  return result.join('\n');
+}
+
 function renderContentReferences(message: any, text: string, onSchemaDrift: SchemaDriftReporter): string {
-  let output = text;
   const rawReferences = message?.metadata?.content_references;
   if (rawReferences != null && !Array.isArray(rawReferences)) {
     onSchemaDrift();
   }
   const references = Array.isArray(rawReferences) ? rawReferences : [];
-  const replaced = new Set<string>();
+  return transformOutsideCodeFences(text, (outside) => {
+    let output = outside;
+    const replaced = new Set<string>();
 
-  for (const reference of references) {
-    if (!reference || typeof reference !== 'object' || Array.isArray(reference)) {
+    for (const reference of references) {
+      if (!reference || typeof reference !== 'object' || Array.isArray(reference)) {
+        onSchemaDrift();
+        continue;
+      }
+      const type = stableString(reference.type).toLowerCase();
+      const matched = stableString(reference.matched_text);
+      if (type === 'sources_footnote' || !matched || replaced.has(matched) || !matched.includes('')) continue;
+      if (!output.includes(matched)) continue;
+
+      let replacement = '';
+      if (type === 'grouped_webpages') {
+        replacement = groupedWebpageReference(reference, onSchemaDrift);
+      } else if (type === 'client_defined_widget') {
+        replacement = clientWidgetReference(reference, onSchemaDrift);
+      } else if (type === 'hidden') {
+        replacement = '';
+      } else {
+        replacement = markdownReferenceAlt(reference.alt);
+        if (!replacement) onSchemaDrift();
+      }
+      output = output.split(matched).join(replacement);
+      replaced.add(matched);
+    }
+
+    const internalTokens = /[^]*/g;
+    if (internalTokens.test(output)) {
       onSchemaDrift();
-      continue;
+      output = output.replace(internalTokens, '');
     }
-    const type = stableString(reference.type).toLowerCase();
-    const matched = stableString(reference.matched_text);
-    if (type === 'sources_footnote' || !matched || replaced.has(matched) || !matched.includes('')) continue;
-    if (!output.includes(matched)) continue;
-
-    let replacement = '';
-    if (type === 'grouped_webpages') {
-      replacement = groupedWebpageReference(reference, onSchemaDrift);
-    } else if (type === 'client_defined_widget') {
-      replacement = clientWidgetReference(reference, onSchemaDrift);
-    } else if (type === 'hidden') {
-      replacement = '';
-    } else {
-      replacement = markdownReferenceAlt(reference.alt);
-      if (!replacement) onSchemaDrift();
-    }
-    output = output.split(matched).join(replacement);
-    replaced.add(matched);
-  }
-
-  const internalTokens = /[^]*/g;
-  if (internalTokens.test(output)) {
-    onSchemaDrift();
-    output = output.replace(internalTokens, '');
-  }
-  return output;
+    return output;
+  });
 }
 
 function normalizeRichUiMarkup(markdown: string): string {
@@ -203,30 +270,7 @@ function normalizeRichUiMarkup(markdown: string): string {
   ) {
     return markdown;
   }
-  const result: string[] = [];
-  let outside: string[] = [];
-  let fence = '';
-  const flush = () => {
-    if (!outside.length) return;
-    result.push(normalizeDilMarkdown(structuredRichUiMarkdown(outside.join('\n'))));
-    outside = [];
-  };
-  for (const line of markdown.split('\n')) {
-    const marker = line.match(/^\s*(`{3,}|~{3,})/);
-    if (marker) {
-      flush();
-      const kind = marker[1]![0]!;
-      if (!fence) fence = kind;
-      else if (fence === kind) fence = '';
-      result.push(line);
-    } else if (fence) {
-      result.push(line);
-    } else {
-      outside.push(line);
-    }
-  }
-  flush();
-  return result.join('\n');
+  return transformOutsideCodeFences(markdown, (outside) => normalizeDilMarkdown(structuredRichUiMarkdown(outside)));
 }
 
 function renderTextParts(message: any, onSchemaDrift: SchemaDriftReporter): string {

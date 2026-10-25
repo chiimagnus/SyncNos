@@ -368,6 +368,82 @@ describe('ChatGPT API snapshot', () => {
     expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
   });
 
+  it('resolves references in prose but preserves literal markers inside fenced code', () => {
+    const cite = 'citeturn1search0';
+    const unknown = 'future-widgetopaque';
+    const source = [`Source ${cite}`, '', '```md', `literal ${cite}`, `literal ${unknown}`, '```'].join('\n');
+    const result = build(
+      pagedFrom([
+        message({ id: 'user', role: 'user', parts: ['question'] }),
+        message({
+          id: 'assistant',
+          role: 'assistant',
+          channel: 'final',
+          parts: [source],
+          contentReferences: [
+            {
+              type: 'grouped_webpages',
+              matched_text: cite,
+              items: [{ attribution: 'Paper', url: 'https://example.com/paper' }],
+            },
+          ],
+        }),
+      ]),
+    );
+    const saved = result.snapshot.messages[1].contentMarkdown;
+    expect(saved).toContain('Source [Paper](https://example.com/paper)');
+    expect(saved).toContain(`\`\`\`md\nliteral ${cite}\nliteral ${unknown}\n\`\`\``);
+    expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
+  });
+
+  it('keeps literal citation markers and Rich UI tags inside inline code spans', () => {
+    const cite = 'citeturn1search0';
+    const source = `Outside ${cite}; inline \`${cite}\` and \`<box><text>literal</text></box>\`.`;
+    const result = build(
+      pagedFrom([
+        message({ id: 'user', role: 'user', parts: ['question'] }),
+        message({
+          id: 'assistant',
+          role: 'assistant',
+          channel: 'final',
+          parts: [source],
+          contentReferences: [
+            {
+              type: 'grouped_webpages',
+              matched_text: cite,
+              items: [{ attribution: 'Paper', url: 'https://example.com/paper' }],
+            },
+          ],
+        }),
+      ]),
+    );
+    const saved = result.snapshot.messages[1].contentMarkdown;
+    expect(saved).toContain('Outside [Paper](https://example.com/paper)');
+    expect(saved).toContain(`\`${cite}\``);
+    expect(saved).toContain('`<box><text>literal</text></box>`');
+    expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
+  });
+
+  it('keeps four-backtick fences intact when the code contains shorter backtick lines and Rich UI tags', () => {
+    const source = [
+      'before',
+      '````md',
+      '```',
+      '<box><text>Literal code</text></box>',
+      '````',
+      'after <box><text>Rendered prose</text></box>',
+    ].join('\n');
+    const result = build(
+      pagedFrom([
+        message({ id: 'user', role: 'user', parts: ['question'] }),
+        message({ id: 'assistant', role: 'assistant', channel: 'final', parts: [source] }),
+      ]),
+    );
+    const saved = result.snapshot.messages[1].contentMarkdown;
+    expect(saved).toContain('````md\n```\n<box><text>Literal code</text></box>\n````');
+    expect(saved).not.toContain('<box><text>Rendered prose');
+  });
+
   it('omits hidden reference tokens and fails soft on unknown internal rich tokens', () => {
     const hidden = 'fileciteturn1file0L1-L2';
     const unknown = 'future-widgetopaque';
