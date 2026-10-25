@@ -5,6 +5,7 @@ import { normalizeConversationListRecord } from '@platform/idb/conversation-list
 import { closeDbForTests, openDb } from '../../src/platform/idb/schema';
 import { readDataRevision } from '@services/data-revisions/storage-idb';
 import { resolveCaptureIntegrity } from '@services/shared/capture-integrity';
+import { captureCurrentChatgptConversationViaApi } from '@services/integrations/chatgpt/api-capture';
 import { JSDOM } from 'jsdom';
 import { createCollectorEnv } from '@collectors/collector-env';
 import { createClaudeCollectorDef } from '@collectors/claude/claude-collector';
@@ -4383,5 +4384,86 @@ describe('canonical video storage', () => {
     expect(ordinary.messageKey).toBe('ordinary');
     expect(ordinary).not.toHaveProperty('transcriptCues');
     expect(ordinary).not.toHaveProperty('videoChapters');
+  });
+});
+
+describe('ChatGPT paged saves through real IndexedDB message ordering', () => {
+  it.each([false, true])('keeps stable chronological order if pagination %s', async (interrupted) => {
+    const conversationId = 'paging-idb-integration';
+    const original = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: conversationId,
+      url: `https://chatgpt.com/c/${conversationId}`,
+      title: 'Paged History',
+    });
+    const id = Number(original.id);
+    const node = (key: string, role: 'user' | 'assistant') => ({
+      id: key,
+      author: { role },
+      recipient: 'all',
+      channel: role === 'assistant' ? 'final' : undefined,
+      status: 'finished_successfully',
+      content: { content_type: 'text', parts: [key] },
+      metadata: {},
+    });
+    const pages = [3, 2, 1].map((number, index) => {
+      const messages = [node(`user-${number}`, 'user'), node(`assistant-${number}`, 'assistant')];
+      return {
+        ...(index === 0
+          ? { conversation_id: conversationId, current_node: 'assistant-3', title: 'Paged History' }
+          : {}),
+        messages,
+        page_info: { start_cursor: messages[0]!.id, end_cursor: messages[1]!.id, has_previous_page: number > 1 },
+      };
+    });
+    const latestMessage = pages[0]!.messages[1]!;
+    if (interrupted) pages.pop();
+    const staged: string[][] = [];
+    const requestPage = async (request: { numTurns: number }) => {
+      if (request.numTurns === 1)
+        return {
+          conversation_id: conversationId,
+          current_node: 'assistant-3',
+          messages: [latestMessage],
+        };
+      const page = pages.shift();
+      if (!page) throw new Error('simulated older-page transport failure');
+      return page;
+    };
+    const run = captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => `https://chatgpt.com/c/${conversationId}`,
+      requestPage,
+      onPage: async ({ snapshot }, progress) => {
+        const integrity = resolveCaptureIntegrity('chatgpt', {
+          ...snapshot,
+          captureMeta: { ...snapshot.captureMeta, completeness: 'partial' },
+        });
+        if (!integrity.ok) throw new Error(integrity.code);
+        expect(integrity.persistence.mode).toBe('append');
+        staged.push(integrity.snapshot.messages.map((item: any) => item.messageKey));
+        await syncConversationMessages(id, integrity.snapshot.messages, integrity.persistence);
+        const current = (await getMessagesByConversationId(id)).map((item) => item.messageKey);
+        const expectedCurrent = Array.from({ length: progress.page }, (_, index) => 4 - progress.page + index).flatMap(
+          (number) => [`user-${number}`, `assistant-${number}`],
+        );
+        expect(current).toEqual(expectedCurrent);
+        expect(new Set(current).size).toBe(current.length);
+      },
+    });
+    if (interrupted) {
+      // Trigger a recoverable transport error before fetching the last historical page.
+      const outcome = await run.catch((error) => error);
+      expect(outcome).toBeInstanceOf(Error);
+    } else {
+      const result = await run;
+      expect(result.snapshot.captureMeta.completeness).toBe('complete');
+      await syncConversationMessages(id, result.snapshot.messages, { mode: 'snapshot' });
+    }
+    const expectedIds = interrupted
+      ? ['user-2', 'assistant-2', 'user-3', 'assistant-3']
+      : ['user-1', 'assistant-1', 'user-2', 'assistant-2', 'user-3', 'assistant-3'];
+    expect((await getMessagesByConversationId(id)).map((item) => item.messageKey)).toEqual(expectedIds);
+    expect(staged.every((batch) => batch.length <= 3)).toBe(true);
   });
 });

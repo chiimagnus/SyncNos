@@ -1861,7 +1861,6 @@ describe('ChatGPT paged API transport', () => {
       'user-1',
       'assistant-1',
       'user-2',
-      'assistant-2',
     ]);
     expect(onPage.mock.calls[0][1]).toMatchObject({ page: 1, completed: false, messagesFetched: 2 });
     expect(onPage.mock.calls[1][1]).toMatchObject({ page: 2, completed: true, messagesFetched: 4 });
@@ -1943,6 +1942,34 @@ describe('ChatGPT paged API transport', () => {
       completeness: 'partial',
       reasons: ['chatgpt_api_branch_ambiguous'],
     });
+  });
+
+  it('stages bounded message batches instead of retransmitting the full history on every page', async () => {
+    const pageCount = 130;
+    const itemsPerPage = 10;
+    const pages = Array.from({ length: pageCount }, (_, page) => {
+      const start = (pageCount - page - 1) * itemsPerPage;
+      const items = Array.from({ length: itemsPerPage }, (_, index) => {
+        const id = `user-${start + index}`;
+        return message({ id, role: 'user', parts: [id] });
+      });
+      return responsePage(items, page < pageCount - 1, page === 0);
+    });
+    const { requestPage } = requestPages(pages);
+    let stagedMessages = 0;
+    let stagedPages = 0;
+    const result = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage,
+      onPage: async ({ snapshot }) => {
+        stagedPages += 1;
+        stagedMessages += snapshot.messages.length;
+      },
+    });
+    expect(stagedPages).toBe(pageCount);
+    expect(result.snapshot.messages).toHaveLength(pageCount * itemsPerPage);
+    expect(result.snapshot.captureMeta.completeness).toBe('complete');
+    expect(stagedMessages).toBeLessThanOrEqual(pageCount * itemsPerPage * 2);
   });
 
   it('reads more than 100 pages when cursors progress and the history ends normally', async () => {

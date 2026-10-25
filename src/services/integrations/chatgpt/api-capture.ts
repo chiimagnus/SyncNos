@@ -96,6 +96,7 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
 
   const retained: any[] = [];
   const seenIds = new Set<string>();
+  const stagedContent = new Map<string, string>();
   const childByParent = new Map<string, string>();
   let hasAlternateBranches = false;
   let cursor = '';
@@ -223,7 +224,30 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
         ),
       };
     }
-    await input?.onPage?.(result, { page: page + 1, completed, messagesFetched: seenIds.size });
+    if (input?.onPage) {
+      const messages = result.snapshot.messages as Array<{ messageKey: string; contentMarkdown: string }>;
+      const toStage = new Set<string>();
+      for (const message of messages) {
+        if (stagedContent.get(message.messageKey) !== message.contentMarkdown) toStage.add(message.messageKey);
+      }
+      // Keep adjacent stored keys as order anchors when newly discovered older messages are prepended.
+      for (let index = 0; index < messages.length; index += 1) {
+        const key = messages[index]!.messageKey;
+        if (stagedContent.has(key)) continue;
+        if (index > 0 && stagedContent.has(messages[index - 1]!.messageKey))
+          toStage.add(messages[index - 1]!.messageKey);
+        if (index + 1 < messages.length && stagedContent.has(messages[index + 1]!.messageKey))
+          toStage.add(messages[index + 1]!.messageKey);
+      }
+      if (toStage.size) {
+        const batch = messages.filter((message) => toStage.has(message.messageKey));
+        await input.onPage(
+          { snapshot: { ...result.snapshot, messages: batch } },
+          { page: page + 1, completed, messagesFetched: seenIds.size },
+        );
+        for (const message of batch) stagedContent.set(message.messageKey, message.contentMarkdown);
+      }
+    }
     lastResult = result;
     if (completed) break;
     if (cursor === firstId) throw apiCaptureError('chatgpt_api_page_cursor_invalid');
