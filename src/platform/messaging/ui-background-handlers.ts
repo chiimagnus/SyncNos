@@ -158,7 +158,6 @@ async function relayToActiveTab(tabId: number, type: string, payload?: Record<st
         ok: false as const,
         code: 'CAPTURE_UNAVAILABLE',
         message: '',
-        status: undefined,
       };
     }
 

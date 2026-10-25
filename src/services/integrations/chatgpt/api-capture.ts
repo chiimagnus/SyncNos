@@ -43,14 +43,12 @@ async function requestPageWithRetry(
   request: PageRequest,
   fetchPage: (request: PageRequest) => Promise<any>,
 ): Promise<any> {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      return await fetchPage(request);
-    } catch (error) {
-      if (attempt || !isRetryableFetchError(error)) throw error;
-    }
+  try {
+    return await fetchPage(request);
+  } catch (error) {
+    if (!isRetryableFetchError(error)) throw error;
+    return fetchPage(request);
   }
-  throw apiCaptureError('chatgpt_api_page_network');
 }
 
 function currentNodeSignature(message: any): string {
@@ -190,7 +188,6 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
       cursor = firstId;
       continue;
     }
-    const changedWhileFetching = completed && !(await latestMatches());
     let result: ChatgptApiSnapshotResult;
     try {
       result = buildChatgptApiSnapshot({
@@ -212,6 +209,13 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
       }
       throw error;
     }
+    // Partial snapshots can only append; a head fetch is needed only before a possible complete replacement.
+    const changedWhileFetching =
+      completed &&
+      !currentNodeInProgress &&
+      !hasAlternateBranches &&
+      result.snapshot.captureMeta.completeness === 'complete' &&
+      !(await latestMatches());
     if (!completed || currentNodeInProgress || hasAlternateBranches || changedWhileFetching) {
       const meta = result.snapshot.captureMeta;
       result.snapshot.captureMeta = {

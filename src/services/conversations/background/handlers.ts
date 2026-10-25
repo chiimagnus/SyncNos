@@ -413,9 +413,9 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
           // Keep the original image data in the message if local caching fails.
         }
       }
-      shouldScheduleChatImageBackfill = messages.some((message: any) =>
-        hasCacheableChatImageReference(message?.contentMarkdown),
-      );
+      shouldScheduleChatImageBackfill =
+        msg.deferRemoteSync !== true &&
+        messages.some((message: any) => hasCacheableChatImageReference(message?.contentMarkdown));
     }
 
     const res = await syncConversationMessages(conversationId, messages, {
@@ -429,7 +429,7 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
         deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages),
       );
     }
-    if (shouldScheduleChatImageBackfill && msg.deferRemoteSync !== true) {
+    if (shouldScheduleChatImageBackfill) {
       try {
         await deps.scheduleImageBackfill(conversationId);
       } catch (error) {

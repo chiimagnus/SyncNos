@@ -2108,6 +2108,23 @@ describe('ChatGPT paged API transport', () => {
     }
   });
 
+  it('does not refetch the head when the saved history is already partial', async () => {
+    const branching = structuredClone([...older, ...newer]);
+    branching[1]!.metadata.parent_id = 'user-1';
+    branching[2]!.metadata.parent_id = 'user-1';
+    const streaming = [
+      message({ id: 'user-streaming', role: 'user', parts: ['question'] }),
+      message({ id: 'tool-running', role: 'tool', contentType: 'code', status: 'in_progress', hidden: true }),
+    ];
+    const schemaDrift = [message({ id: 'user-drift', role: 'user', contentType: 'unexpected', parts: ['question'] })];
+    for (const items of [branching, streaming, schemaDrift]) {
+      const { requestPage } = requestPages([responsePage(items, false, true)]);
+      const result = await captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage });
+      expect(result.snapshot.captureMeta.completeness).toBe('partial');
+      expect(requestPage).toHaveBeenCalledTimes(1);
+    }
+  });
+
   it('keeps an already saved page if later requests fail, retries transient failures only once', async () => {
     const apiError = (status: number) =>
       Object.assign(new Error('chatgpt_api_page_http'), {
