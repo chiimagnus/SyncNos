@@ -1,7 +1,6 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it, vi } from 'vitest';
 import { buildChatgptGeneratedImageMessageKey } from '@services/shared/chatgpt-image-identity';
-import { markdownToSemanticText } from '@services/shared/markdown-semantic-text';
 import { hasCacheableChatImageReference } from '@services/conversations/data/image-inline';
 import { resolveCaptureIntegrity } from '@services/shared/capture-integrity';
 import { resolveScrollRoot } from '@collectors/virtualized-chat/virtualized-chat-sweep';
@@ -12,10 +11,6 @@ import chatgptMarkdown from '../../src/collectors/chatgpt/chatgpt-markdown.ts';
 
 function setupChatgptDom(html: string, url: string) {
   return new JSDOM(`<body><main>${html}</main></body>`, { url });
-}
-
-function semanticText(message: any): string {
-  return markdownToSemanticText(message?.contentMarkdown, { includeImageAlt: true }).trim();
 }
 
 function currentDom(
@@ -223,11 +218,6 @@ describe('chatgpt current DOM', () => {
     expect(snapshot.messages[0].contentMarkdown).toBe('Modern question');
     expect(snapshot.messages[1].contentMarkdown).toBe('Modern **answer**.');
     expect(snapshot.messages[1].contentMarkdown).not.toContain('Copy');
-    expect(def.collector.captureApiLiveTurn({ expectedConversationId: 'modern-conversation' })).toMatchObject({
-      kind: 'candidate',
-      userMessage: { messageKey: 'modern-user-1' },
-      assistantMessage: { messageKey: 'modern-assistant-1' },
-    });
     dom.window.document.querySelector('[data-turn="user"]')?.setAttribute('data-turn-id', 'rerendered-user');
     dom.window.document.querySelector('[data-turn="assistant"]')?.setAttribute('data-turn-id', 'rerendered-assistant');
     expect(def.collector.__test.manualAdapter.readDescriptors().map((descriptor: any) => descriptor.key)).toEqual([
@@ -403,13 +393,6 @@ describe('chatgpt current DOM', () => {
     expect(def.collector.__test.manualAdapter.readUnresolvedKeys()).toContain(
       'chatgpt_turn_current-turn-2026_assistant',
     );
-  });
-
-  it('keeps Advanced API live-tail fail-closed when the current DOM has no assistant message id', () => {
-    const def = currentDef(current2026Dom());
-    expect(def.collector.captureApiLiveTurn({ expectedConversationId: 'current-conversation-2026' })).toEqual({
-      kind: 'unsafe',
-    });
   });
 
   it('captures current user/assistant units, expanded reasoning, and current code blocks', async () => {
@@ -937,26 +920,6 @@ A --> B</code></pre>
       }),
     );
     expect(await second.collector.capture({ manual: true, preparedCapture })).toBeNull();
-  });
-
-  it('provides only stable current DOM ids to Advanced API live-tail and fails closed otherwise', () => {
-    const def = currentDef(currentDom());
-    const live = def.collector.captureApiLiveTurn({ expectedConversationId: 'conversation-1' });
-    expect(live).toMatchObject({
-      kind: 'candidate',
-      conversationId: 'conversation-1',
-      userMessage: { messageKey: 'user-message-1', role: 'user', contentMarkdown: 'Current question' },
-      assistantMessage: { messageKey: 'assistant-message-1', role: 'assistant' },
-    });
-    expect(semanticText(live.assistantMessage)).toContain('Final answer.');
-
-    const missingAssistantId = currentDef(currentDom({ assistantIds: '' }));
-    expect(missingAssistantId.collector.captureApiLiveTurn({ expectedConversationId: 'conversation-1' })).toEqual({
-      kind: 'unsafe',
-    });
-    expect(def.collector.captureApiLiveTurn({ expectedConversationId: 'other-conversation' })).toEqual({
-      kind: 'identity_changed',
-    });
   });
 
   it('uses current fallback-turn ordinals and the dedicated history-loading sentinel for top completeness', () => {

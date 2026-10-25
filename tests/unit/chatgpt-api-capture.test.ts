@@ -386,42 +386,6 @@ describe('ChatGPT API snapshot', () => {
     expect(result.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
   });
 
-  it('classifies whether the backend current turn is finalized before live-tail reconciliation', () => {
-    const finalized = pagedFrom([
-      message({ id: 'user-1', role: 'user', parts: ['q'] }),
-      message({
-        id: 'assistant-1',
-        role: 'assistant',
-        channel: 'final',
-        parts: ['answer'],
-        turnId: 'turn-a',
-        status: 'finished_successfully',
-      }),
-    ]);
-    expect(build(finalized)).toMatchObject({ currentTurnState: 'finalized', currentTurnId: 'turn-a' });
-
-    const openReasoning = pagedFrom([
-      message({ id: 'user-1', role: 'user', parts: ['q'] }),
-      message({
-        id: 'thought-1',
-        role: 'assistant',
-        contentType: 'thoughts',
-        thoughts: [{ summary: 'Working', content: 'Still reasoning.' }],
-        turnId: 'turn-a',
-      }),
-    ]);
-    expect(build(openReasoning)).toMatchObject({ currentTurnState: 'open', currentTurnId: 'turn-a' });
-
-    const userOnly = pagedFrom([message({ id: 'user-1', role: 'user', parts: ['q'] })]);
-    expect(build(userOnly)).toMatchObject({ currentTurnState: 'open', currentTurnId: '' });
-
-    const statuslessFinal = pagedFrom([
-      message({ id: 'user-1', role: 'user', parts: ['q'] }),
-      message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: ['answer'], turnId: 'turn-a' }),
-    ]);
-    expect(build(statuslessFinal)).toMatchObject({ currentTurnState: 'unknown', currentTurnId: 'turn-a' });
-  });
-
   it('keeps an explicitly unfinished final under the turn key until the backend marks it finalized', () => {
     const data = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['question'], turnId: 'turn-a' }),
@@ -436,7 +400,6 @@ describe('ChatGPT API snapshot', () => {
     ]);
 
     const result = build(data);
-    expect(result.currentTurnState).toBe('open');
     expect(result.snapshot.messages.at(-1)).toMatchObject({
       messageKey: 'chatgpt-turn:turn-a',
       role: 'assistant',
@@ -757,25 +720,80 @@ describe('ChatGPT API snapshot', () => {
     expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
   });
 
-  it('still omits auxiliary text at a user boundary when no stable turn identity exists', () => {
+  it('preserves visible auxiliary text under the preceding user identity when turn_id is absent', () => {
     const data = pagedFrom([
       message({ id: 'user-1', role: 'user', parts: ['first'] }),
       message({
         id: 'commentary-unowned',
         role: 'assistant',
         channel: 'commentary',
-        parts: ['cannot be safely owned'],
+        parts: ['visible progress without a turn id'],
       }),
       message({ id: 'user-2', role: 'user', parts: ['second'] }),
       message({ id: 'assistant-2', role: 'assistant', channel: 'final', parts: ['answer'], turnId: 'turn-2' }),
     ]);
 
     const result = build(data);
-    expect(result.snapshot.messages.map((entry: any) => entry.messageKey)).toEqual(['user-1', 'user-2', 'assistant-2']);
-    expect(result.snapshot.captureMeta).toEqual({
+    expect(result.snapshot.messages.map((entry: any) => entry.messageKey)).toEqual([
+      'user-1',
+      'chatgpt-turn:user-1',
+      'user-2',
+      'assistant-2',
+    ]);
+    expect(result.snapshot.messages[1].contentMarkdown).toBe('visible progress without a turn id');
+    expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
+  });
+
+  it('preserves a terminal auxiliary-only turn without an explicit turn_id as complete history', () => {
+    const data = pagedFrom([
+      message({ id: 'user-1', role: 'user', parts: ['question'] }),
+      message({
+        id: 'thoughts-tail',
+        role: 'assistant',
+        contentType: 'thoughts',
+        thoughts: [{ summary: 'Plan', content: 'still-working history from backend' }],
+        status: 'finished_successfully',
+      }),
+      message({
+        id: 'progress-tail',
+        role: 'assistant',
+        channel: 'commentary',
+        parts: ['completed progress'],
+        status: 'finished_successfully',
+      }),
+      message({ id: 'hidden-tool-tail', role: 'tool', hidden: true, parts: [], status: 'finished_successfully' }),
+    ]);
+    const result = build(data);
+    expect(result.snapshot.messages).toEqual([
+      expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'question' }),
+      expect.objectContaining({
+        messageKey: 'chatgpt-turn:user-1',
+        role: 'assistant',
+        contentMarkdown: '**Plan**\n\nstill-working history from backend\n\ncompleted progress',
+      }),
+    ]);
+    expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
+  });
+
+  it('keeps explicitly streaming backend content partial even when turn_id is missing', () => {
+    const data = pagedFrom([
+      message({ id: 'user-1', role: 'user', parts: ['question'] }),
+      message({
+        id: 'assistant-live',
+        role: 'assistant',
+        channel: 'commentary',
+        parts: ['still generating'],
+        status: 'in_progress',
+      }),
+    ]);
+    const result = build(data);
+    expect(result.snapshot.messages.at(-1)).toMatchObject({
+      messageKey: 'chatgpt-turn:user-1',
+      contentMarkdown: 'still generating',
+    });
+    expect(result.snapshot.captureMeta).toMatchObject({
       completeness: 'partial',
-      identityVerified: true,
-      reasons: ['chatgpt_api_unowned_auxiliary_omitted'],
+      reasons: ['chatgpt_api_unfinished_turn_partial'],
     });
   });
 
@@ -809,11 +827,7 @@ describe('ChatGPT API snapshot', () => {
         contentMarkdown: '**done**\n\ncompleted execution-only turn\n\ncompleted progress',
       }),
     ]);
-    expect(result.snapshot.captureMeta).toEqual({
-      completeness: 'partial',
-      identityVerified: true,
-      reasons: ['chatgpt_api_unfinished_turn_partial'],
-    });
+    expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
   });
 
   it('preserves readable text from unknown final content types as partial', () => {
@@ -879,7 +893,7 @@ describe('ChatGPT API snapshot', () => {
         contentMarkdown: 'unfinished',
       }),
     ]);
-    expect(auxiliaryResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_unfinished_turn_partial']);
+    expect(auxiliaryResult.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
   });
 
   it('does not attach pending auxiliary content when a later owner loses its turn id', () => {
@@ -1118,7 +1132,7 @@ describe('ChatGPT API snapshot', () => {
         contentMarkdown: 'working',
       }),
     ]);
-    expect(unfinishedResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_unfinished_turn_partial']);
+    expect(unfinishedResult.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
   });
 
   it('separates image and auxiliary state when their turn ids diverge', () => {
@@ -1164,7 +1178,7 @@ describe('ChatGPT API snapshot', () => {
         contentMarkdown: 'belongs elsewhere',
       }),
     ]);
-    expect(result.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_unfinished_turn_partial']);
+    expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
   });
 
   it('dedupes repeated image-only keys as partial instead of throwing or duplicating content', () => {
@@ -1512,7 +1526,7 @@ describe('ChatGPT API snapshot', () => {
     expect(result.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
   });
 
-  it('keeps text when non-image or unmatched attachment metadata is unsupported', () => {
+  it('keeps non-image attachments as readable filename and type without treating a complete history as partial', () => {
     const nonImage = pagedFrom([
       message({
         id: 'user-file',
@@ -1524,9 +1538,29 @@ describe('ChatGPT API snapshot', () => {
     ]);
     const nonImageResult = build(nonImage);
     expect(nonImageResult.snapshot.messages).toEqual([
-      expect.objectContaining({ messageKey: 'user-file', role: 'user', contentMarkdown: 'see file' }),
+      expect.objectContaining({
+        messageKey: 'user-file',
+        role: 'user',
+        contentMarkdown: 'see file\n\n附件：document.pdf（application/pdf）',
+      }),
     ]);
-    expect(nonImageResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
+    expect(nonImageResult.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
+
+    const jsonData = pagedFrom([
+      message({
+        id: 'user-json',
+        role: 'user',
+        contentType: 'text',
+        parts: ['attached dataset'],
+        attachments: [{ id: 'file_json_1', name: 'data.json', mime_type: 'application/json' }],
+      }),
+    ]);
+    expect(build(jsonData).snapshot).toMatchObject({
+      messages: [
+        expect.objectContaining({ contentMarkdown: 'attached dataset\n\n附件：data.json（application/json）' }),
+      ],
+      captureMeta: { completeness: 'complete', identityVerified: true },
+    });
 
     const unknownMime = pagedFrom([
       message({
@@ -1675,14 +1709,26 @@ describe('ChatGPT paged API transport', () => {
     ]);
     expect(onPage.mock.calls[0][1]).toMatchObject({ page: 1, completed: false, messagesFetched: 2 });
     expect(onPage.mock.calls[1][1]).toMatchObject({ page: 2, completed: true, messagesFetched: 4 });
-    expect(result.snapshot.captureMeta).toMatchObject({
-      completeness: 'partial',
-      reasons: ['chatgpt_api_branch_unverified'],
-    });
+    expect(result.snapshot.captureMeta).toMatchObject({ completeness: 'complete', identityVerified: true });
     expect(result.snapshot.conversation.url).toBe(base);
   });
 
-  it('confirms complete only for an intact single ancestor chain', async () => {
+  it('completes when pagination reaches history end even if parent links are missing', async () => {
+    const history = structuredClone([...older, ...newer]);
+    history[1]!.metadata.parent_id = 'node-not-returned';
+    history[2]!.metadata.parent_id = 'another-missing-parent';
+    const { requestPage } = requestPages([responsePage(history, false, true)]);
+    const result = await captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage });
+    expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
+    expect(result.snapshot.messages.map((m: any) => m.messageKey)).toEqual([
+      'user-1',
+      'assistant-1',
+      'user-2',
+      'assistant-2',
+    ]);
+  });
+
+  it('confirms complete for an intact single ancestor chain', async () => {
     const messages = structuredClone([...older, ...newer]);
     for (let i = 1; i < messages.length; i += 1) messages[i]!.metadata.parent_id = messages[i - 1]!.id;
     const { requestPage } = requestPages([responsePage(messages, false, true)]);
@@ -1691,7 +1737,7 @@ describe('ChatGPT paged API transport', () => {
     expect(result.snapshot.messages.every((m: any) => !m.captureMergePolicy)).toBe(true);
   });
 
-  it('keeps alternate branches partial even when all their parents are present', async () => {
+  it('keeps ambiguous sibling branches partial even when all parents are present', async () => {
     const messages = structuredClone([...older, ...newer]);
     messages[1]!.metadata.parent_id = 'user-1';
     messages[2]!.metadata.parent_id = 'user-1';
@@ -1700,8 +1746,20 @@ describe('ChatGPT paged API transport', () => {
     const result = await captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage });
     expect(result.snapshot.captureMeta).toMatchObject({
       completeness: 'partial',
-      reasons: ['chatgpt_api_branch_unverified'],
+      reasons: ['chatgpt_api_branch_ambiguous'],
     });
+  });
+
+  it('reads more than 100 pages when cursors progress and the history ends normally', async () => {
+    const pages = Array.from({ length: 101 }, (_, index) => {
+      const messageId = `user-${101 - index}`;
+      return responsePage([message({ id: messageId, role: 'user', parts: [messageId] })], index < 100, index === 0);
+    });
+    const { requestPage } = requestPages(pages);
+    const result = await captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage });
+    expect(requestPage).toHaveBeenCalledTimes(102);
+    expect(result.snapshot.messages).toHaveLength(101);
+    expect(result.snapshot.captureMeta.completeness).toBe('complete');
   });
 
   it('keeps an already saved page if later requests fail, retries transient failures only once', async () => {
@@ -1783,7 +1841,7 @@ describe('ChatGPT paged API transport', () => {
     });
   });
 
-  it('classifies a trailing hidden tool node as an unfinished turn', async () => {
+  it('preserves visible terminal progress when a hidden tool node follows it', async () => {
     const tail = [
       message({ id: 'user', role: 'user', parts: ['question'] }),
       message({ id: 'assistant-work', role: 'assistant', channel: 'commentary', parts: ['Working'], turnId: 'turn-a' }),
@@ -1792,7 +1850,11 @@ describe('ChatGPT paged API transport', () => {
     const { requestPage } = requestPages([responsePage(tail, false, true)]);
     const result = await captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage });
     expect(result.snapshot.messages[0]).toMatchObject({ messageKey: 'user' });
-    expect(result.currentTurnState).toBe('open');
+    expect(result.snapshot.messages[1]).toMatchObject({
+      messageKey: 'chatgpt-turn:turn-a',
+      role: 'assistant',
+      contentMarkdown: 'Working',
+    });
   });
 
   it('defers persistence until any page actually yields a visible user or assistant', async () => {

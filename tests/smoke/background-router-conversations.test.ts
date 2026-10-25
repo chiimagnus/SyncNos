@@ -314,6 +314,37 @@ describe('background-router conversations', () => {
     expect(scheduleImageBackfill).toHaveBeenCalledWith(2002);
   });
 
+  it('reuses cached ChatGPT images during the final snapshot without downloading or changing cache settings', async () => {
+    storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
+    const original = [{ messageKey: 'm1', role: 'user', contentMarkdown: '![](chatgpt-file://file_1)' }];
+    imageInlineMocks.inlineChatImagesInMessages.mockImplementation(async (input: any) => {
+      expect(input.enableChatgptImages).toBe(true);
+      expect(input.downloadChatgptImages).toBeUndefined();
+      return {
+        messages: [{ ...input.messages[0], contentMarkdown: '![](syncnos-asset://7)' }],
+        inlinedCount: 1,
+        fromCacheCount: 1,
+        downloadedCount: 0,
+        inlinedBytes: 12,
+        warningFlags: [],
+      };
+    });
+    const router = createRouter();
+    const response = await router.dispatch({
+      type: 'syncConversationMessages',
+      conversationId: 123,
+      conversationSourceType: 'chat',
+      mode: 'snapshot',
+      messages: original,
+    });
+    expect(response.ok).toBe(true);
+    expect(storageMocks.syncConversationMessages).toHaveBeenCalledWith(
+      123,
+      [expect.objectContaining({ contentMarkdown: '![](syncnos-asset://7)' })],
+      { mode: 'snapshot', diff: null },
+    );
+  });
+
   it('persists AI chat messages before durably enqueueing image backfill and never downloads in the save request', async () => {
     storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
     let releaseSchedule: (() => void) | null = null;
@@ -343,7 +374,13 @@ describe('background-router conversations', () => {
     expect(storageMocks.syncConversationMessages.mock.invocationCallOrder[0]).toBeLessThan(
       scheduleImageBackfill.mock.invocationCallOrder[0]!,
     );
-    expect(imageInlineMocks.inlineChatImagesInMessages).not.toHaveBeenCalled();
+    expect(imageInlineMocks.inlineChatImagesInMessages).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationId: 2002,
+        enableChatgptImages: true,
+      }),
+    );
+    expect(imageInlineMocks.inlineChatImagesInMessages.mock.calls[0]?.[0]).not.toHaveProperty('downloadChatgptImages');
     expect(backfillJobMocks.backfillConversationImages).not.toHaveBeenCalled();
 
     releaseSchedule?.();
@@ -441,7 +478,7 @@ describe('background-router conversations', () => {
         conversationId: 2003,
         onlyMessageKeys: new Set(['m1']),
         enableHttpImages: false,
-        enableChatgptImages: false,
+        enableChatgptImages: true,
       }),
     );
   });

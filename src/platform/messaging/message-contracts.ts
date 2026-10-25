@@ -4,6 +4,7 @@ export const CORE_MESSAGE_TYPES = {
   UPDATE_CONVERSATION_URL: 'updateConversationUrl',
   SYNC_CONVERSATION_MESSAGES: 'syncConversationMessages',
   BACKFILL_CONVERSATION_IMAGES: 'backfillConversationImages',
+  ENQUEUE_CONVERSATION_IMAGE_BACKFILL: 'enqueueConversationImageBackfill',
   GET_CONVERSATION_LIST_BOOTSTRAP: 'getConversationListBootstrap',
   GET_CONVERSATION_LIST_PAGE: 'getConversationListPage',
   FIND_CONVERSATION_BY_SOURCE_AND_KEY: 'findConversationBySourceAndKey',

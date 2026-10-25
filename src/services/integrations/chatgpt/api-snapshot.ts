@@ -6,13 +6,9 @@ import {
   chatgptFileIdFromAssetPointer,
 } from '@services/shared/chatgpt-image-identity';
 
-export type ChatgptApiCurrentTurnState = 'finalized' | 'open' | 'unknown';
+type ChatgptApiCurrentTurnState = 'finalized' | 'open' | 'unknown';
 
-export type ChatgptApiSnapshotResult = {
-  snapshot: any;
-  currentTurnState: ChatgptApiCurrentTurnState;
-  currentTurnId: string;
-};
+export type ChatgptApiSnapshotResult = { snapshot: any };
 
 type PendingImage = {
   fileId: string;
@@ -63,6 +59,15 @@ function primitivePartText(part: unknown): string {
   if (typeof record.text === 'string') return record.text;
   if (typeof record.content === 'string') return record.content;
   return '';
+}
+
+function isFilePart(part: unknown): part is Record<string, unknown> {
+  return (
+    !!part &&
+    typeof part === 'object' &&
+    !Array.isArray(part) &&
+    stableString((part as Record<string, unknown>).content_type) === 'file_asset_pointer'
+  );
 }
 
 function isImagePart(part: unknown): part is Record<string, unknown> {
@@ -229,6 +234,15 @@ function renderTextParts(message: any, onSchemaDrift: SchemaDriftReporter): stri
   const output: string[] = [];
   for (const part of parts) {
     if (isImagePart(part)) continue;
+    if (isFilePart(part)) {
+      if (
+        !currentAttachments(message, onSchemaDrift).some(
+          (attachment) => stableString(attachment?.id) === chatgptFileIdFromAssetPointer(part.asset_pointer),
+        )
+      )
+        onSchemaDrift();
+      continue;
+    }
     const text = primitivePartText(part);
     if (text) {
       output.push(text);
@@ -351,6 +365,24 @@ function imageAlt(message: any, attachment: any): string {
   return stableString(attachment?.name) || stableString(message?.metadata?.image_gen_title);
 }
 
+function renderNonImageAttachments(message: any, onSchemaDrift: SchemaDriftReporter): string {
+  const attachments = currentAttachments(message, onSchemaDrift);
+  const text: string[] = [];
+  for (const attachment of attachments) {
+    const mimeType = stableString(attachment?.mime_type).toLowerCase();
+    if (mimeType.startsWith('image/')) continue;
+    const name = stableString(attachment?.name)
+      .replace(/[\r\n`<>]/g, '')
+      .slice(0, 200);
+    if (!stableString(attachment?.id) || !mimeType || !name) {
+      onSchemaDrift();
+      continue;
+    }
+    text.push(`附件：${name}（${mimeType}）`);
+  }
+  return Array.from(new Set(text)).join('\n');
+}
+
 function hasUnsupportedAttachmentMetadata(
   message: any,
   images: PendingImage[],
@@ -363,7 +395,8 @@ function hasUnsupportedAttachmentMetadata(
     if (!attachment || typeof attachment !== 'object' || Array.isArray(attachment)) return true;
     const id = stableString(attachment.id);
     const mimeType = stableString(attachment.mime_type).toLowerCase();
-    if (!id || !mimeType.startsWith('image/')) return true;
+    if (!id || !mimeType) return true;
+    if (!mimeType.startsWith('image/')) return !stableString(attachment.name);
     return !imageFileIds.has(id);
   });
 }
@@ -490,10 +523,29 @@ export function buildChatgptApiSnapshot(input: {
   const partialReasons = new Set<string>();
   let pendingAuxiliary: PendingAuxiliary[] = [];
   let pendingImages: PendingImage[] = [];
+  let precedingUserId = '';
 
   const markSchemaDrift = () => partialReasons.add(SCHEMA_DRIFT_REASON);
   const markUnownedAuxiliary = () => partialReasons.add(UNOWNED_AUXILIARY_REASON);
-  if (backendCurrentTurn.state === 'open' && backendCurrentTurn.turnId) partialReasons.add(UNFINISHED_TURN_REASON);
+  const latestUserIndex = branch.findLastIndex((message) => messageRole(message) === 'user' && !isHidden(message));
+  const latestTurn = branch.slice(latestUserIndex + 1);
+  const hasFinal = latestTurn.some(
+    (message) =>
+      messageRole(message) === 'assistant' &&
+      message.recipient === 'all' &&
+      message.channel === 'final' &&
+      (message.status === 'finished_successfully' || message.metadata?.is_complete === true),
+  );
+  const isStreaming =
+    !hasFinal &&
+    latestTurn.some(
+      (message) =>
+        !isHidden(message) &&
+        messageRole(message) === 'assistant' &&
+        message.recipient === 'all' &&
+        (message.status === 'in_progress' || message.status === 'streaming' || message.metadata?.is_complete === false),
+    );
+  if (isStreaming) partialReasons.add(UNFINISHED_TURN_REASON);
 
   const flushPendingImages = () => {
     if (!pendingImages.length) return;
@@ -527,19 +579,21 @@ export function buildChatgptApiSnapshot(input: {
     }
   };
 
-  const flushPendingStableTurn = (unfinished: boolean) => {
+  const flushPendingStableTurn = () => {
     flushPendingImages();
     if (!pendingAuxiliary.length) return;
     const turnId = pendingAuxiliary[0]?.turnId || '';
     const ownsOneStableTurn = !!turnId && pendingAuxiliary.every((item) => item.turnId === turnId);
+    const ownsPrecedingUser = !!precedingUserId && pendingAuxiliary.every((item) => !item.turnId);
+    const ownerId = ownsOneStableTurn ? turnId : ownsPrecedingUser ? precedingUserId : '';
     const markdown = appendBlocks(pendingAuxiliary.map((item) => item.markdown));
     pendingAuxiliary = [];
-    if (!ownsOneStableTurn || !markdown) {
+    if (!ownerId || !markdown) {
       markUnownedAuxiliary();
       return;
     }
 
-    const key = `${CHATGPT_API_PROVISIONAL_TURN_KEY_PREFIX}${turnId}`;
+    const key = `${CHATGPT_API_PROVISIONAL_TURN_KEY_PREFIX}${ownerId}`;
     if (seenMessageKeys.has(key)) {
       markSchemaDrift();
       return;
@@ -552,7 +606,6 @@ export function buildChatgptApiSnapshot(input: {
       sequence: messages.length,
       updatedAt: capturedAt,
     });
-    if (unfinished) partialReasons.add(UNFINISHED_TURN_REASON);
   };
 
   const pendingMatchesTurn = (turnId: string): boolean => {
@@ -581,7 +634,7 @@ export function buildChatgptApiSnapshot(input: {
     if (role === 'user') {
       // A later user message proves the preceding assistant turn is closed even when ChatGPT never emitted a final node.
       // Keep its visible reasoning/progress under the stable turn id instead of discarding it.
-      flushPendingStableTurn(false);
+      flushPendingStableTurn();
       if (!id) {
         markSchemaDrift();
         continue;
@@ -590,12 +643,17 @@ export function buildChatgptApiSnapshot(input: {
       const parts = currentParts(message, markSchemaDrift);
       const images = collectMessageImages(message, markSchemaDrift);
       const attachments = currentAttachments(message, markSchemaDrift);
-      if ((images.length || attachments.length) && type !== 'multimodal_text') markSchemaDrift();
+      if (images.length && type !== 'multimodal_text') markSchemaDrift();
       if (hasUnsupportedAttachmentMetadata(message, images, markSchemaDrift)) markSchemaDrift();
-      const markdown = appendBlocks([renderTextParts(message, markSchemaDrift), renderImageBlocks(images)]);
+      const markdown = appendBlocks([
+        renderTextParts(message, markSchemaDrift),
+        renderImageBlocks(images),
+        renderNonImageAttachments(message, markSchemaDrift),
+      ]);
       const hasOpaquePayload = parts.length > 0 || attachments.length > 0;
       if (!markdown && !hasOpaquePayload) continue;
       if (seenMessageKeys.has(id)) throw apiSnapshotError('duplicate_message_key');
+      precedingUserId = id;
       seenMessageKeys.add(id);
       messages.push({
         messageKey: id,
@@ -624,6 +682,7 @@ export function buildChatgptApiSnapshot(input: {
           ...pendingAuxiliary.map((item) => item.markdown),
           normalizeRichUiMarkup(renderTextParts(message, markSchemaDrift)),
           renderImageBlocks(pendingImages),
+          renderNonImageAttachments(message, markSchemaDrift),
         ]);
         let imageOwnerKey = buildChatgptGeneratedImageMessageKey(pendingImages.map((image) => image.fileId));
         if (pendingImages.length && !imageOwnerKey) {
@@ -697,7 +756,13 @@ export function buildChatgptApiSnapshot(input: {
       const images = collectMessageImages(message, markSchemaDrift);
       if (message.recipient !== 'all' || type !== 'multimodal_text') markSchemaDrift();
       if (hasNonImagePartContent(message, markSchemaDrift)) markSchemaDrift();
-      if (hasUnsupportedAttachmentMetadata(message, images, markSchemaDrift)) markSchemaDrift();
+      if (
+        hasUnsupportedAttachmentMetadata(message, images, markSchemaDrift) ||
+        currentAttachments(message, markSchemaDrift).some(
+          (attachment) => !stableString(attachment?.mime_type).startsWith('image/'),
+        )
+      )
+        markSchemaDrift();
       pendingImages.push(...images);
       continue;
     }
@@ -705,7 +770,7 @@ export function buildChatgptApiSnapshot(input: {
     markSchemaDrift();
   }
 
-  flushPendingStableTurn(true);
+  flushPendingStableTurn();
   if (!messages.length) throw apiSnapshotError('no_visible_messages');
 
   const title = stableString(input.data?.title) || 'ChatGPT';
@@ -726,9 +791,5 @@ export function buildChatgptApiSnapshot(input: {
     },
   };
 
-  return {
-    snapshot,
-    currentTurnState: backendCurrentTurn.state,
-    currentTurnId: backendCurrentTurn.turnId,
-  };
+  return { snapshot };
 }

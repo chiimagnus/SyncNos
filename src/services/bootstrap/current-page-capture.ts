@@ -10,7 +10,6 @@ import type { VideoTranscriptCaptureService } from '@services/bootstrap/video-tr
 import type { VideoSubtitleStatus } from '@services/shared/video-capture';
 import { readChatgptApiCaptureEnabled } from '@services/integrations/chatgpt/api-capture-settings';
 import { captureCurrentChatgptConversationViaApi } from '@services/integrations/chatgpt/api-capture';
-import { augmentChatgptApiSnapshotWithLiveTurn } from '@services/integrations/chatgpt/api-live-tail';
 import { parseChatgptDurableConversationRoute } from '@services/shared/chatgpt-route';
 
 type RuntimeClient = {
@@ -251,17 +250,18 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     options?: { expectedChatgptConversationId?: string; deferRemoteSync?: boolean },
   ) {
     if (!snapshot || !snapshot.conversation) return null;
-    if (
-      collectorId === 'chatgpt' &&
-      snapshot.captureMeta?.completeness === 'partial' &&
-      Array.isArray(snapshot.messages)
-    ) {
-      for (const message of snapshot.messages || []) {
-        message.captureMergePolicy ??= 'preserve-existing-content';
-      }
-    }
+    const safeSnapshot =
+      collectorId === 'chatgpt' && snapshot.captureMeta?.completeness === 'partial' && Array.isArray(snapshot.messages)
+        ? {
+            ...snapshot,
+            messages: snapshot.messages.map((message: any) => ({
+              ...message,
+              captureMergePolicy: message.captureMergePolicy ?? 'preserve-existing-content',
+            })),
+          }
+        : snapshot;
 
-    const integrity = resolveCaptureIntegrity(collectorId, snapshot);
+    const integrity = resolveCaptureIntegrity(collectorId, safeSnapshot);
     if (!integrity.ok) return null;
     const normalizedSnapshot = integrity.snapshot;
     const activityAt = Date.now();
@@ -310,6 +310,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
 
   async function captureCurrentPage(): Promise<CurrentPageCaptureResult> {
     const pageUrl = currentUrl();
+    const savedPagedConversationIds = new Set<number>();
     setCaptureActivity('capturing', 'info', t('fetchingDots'), pageUrl);
 
     try {
@@ -365,24 +366,21 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       if (target.kind === 'chat' && target.useChatgptApi) {
         const apiCapture = await captureCurrentChatgptConversationViaApi({
           onPage: async (page) => {
-            const savedPage = await saveSnapshot(page.snapshot, 'chatgpt', {
+            const staged = {
+              ...page.snapshot,
+              captureMeta: { ...page.snapshot.captureMeta, completeness: 'partial' },
+            };
+            const savedPage = await saveSnapshot(staged, 'chatgpt', {
               expectedChatgptConversationId: String(page.snapshot?.conversation?.conversationKey || ''),
               deferRemoteSync: true,
             });
             if (!savedPage) throw new Error('chatgpt_api_no_safe_messages');
+            savedPagedConversationIds.add(savedPage.conversationId);
             firstPageIsNew ??= savedPage.isNew;
           },
         });
         snapshot = apiCapture.snapshot;
         expectedChatgptConversationId = String(snapshot?.conversation?.conversationKey || '').trim();
-        if (apiCapture.currentTurnState === 'open') {
-          const liveTurn = target.collector.captureApiLiveTurn({
-            expectedConversationId: expectedChatgptConversationId,
-          });
-          snapshot = augmentChatgptApiSnapshotWithLiveTurn(snapshot, liveTurn, {
-            currentTurnId: apiCapture.currentTurnId,
-          });
-        }
         if (typeof target.collector.enrichApiSnapshotWithRenderedGraphics === 'function') {
           snapshot = await target.collector.enrichApiSnapshotWithRenderedGraphics(snapshot);
         }
@@ -434,6 +432,13 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         captureReasons: saved.captureReasons,
       };
     } catch (error) {
+      for (const conversationId of savedPagedConversationIds) {
+        try {
+          await send(CORE_MESSAGE_TYPES.ENQUEUE_CONVERSATION_IMAGE_BACKFILL, { conversationId });
+        } catch (_error) {
+          // Image recovery must not hide the original capture failure.
+        }
+      }
       const outwardError = userFacingCaptureError(error);
       const message = errorMessage(outwardError, t('captureFailedFallback'));
       setCaptureActivity('settled', 'error', message, pageUrl);

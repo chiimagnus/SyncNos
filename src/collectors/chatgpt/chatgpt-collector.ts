@@ -724,97 +724,6 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     getExtractionCount: () => manualExtractionCount,
   };
 
-  function captureApiLiveTurn(input: { expectedConversationId: string }) {
-    const expectedConversationId = String(input.expectedConversationId || '').trim();
-    const currentConversationId = String(findConversationIdFromUrl() || '').trim();
-    if (!expectedConversationId || !currentConversationId || currentConversationId !== expectedConversationId) {
-      return { kind: 'identity_changed' };
-    }
-
-    try {
-      const root = getConversationRoot();
-      if (!root) return { kind: 'none' };
-      const wrappers = getTurnWrappers(root);
-      let lastUserIndex = -1;
-      for (let index = wrappers.length - 1; index >= 0; index -= 1) {
-        if (roleFromWrapper(wrappers[index]) === 'user' && !isExplicitlyHiddenWithin(wrappers[index], root)) {
-          lastUserIndex = index;
-          break;
-        }
-      }
-      if (lastUserIndex < 0) return { kind: 'none' };
-
-      const cotByOwner = buildCotAssociations(wrappers, true);
-      let assistantWrapper: any = null;
-      for (let index = wrappers.length - 1; index > lastUserIndex; index -= 1) {
-        const wrapper = wrappers[index];
-        if (
-          roleFromWrapper(wrapper) !== 'assistant' ||
-          isExplicitlyHiddenWithin(wrapper, root) ||
-          !isVisibleWindow(wrapper)
-        )
-          continue;
-        const node = assistantContentNode(wrapper);
-        const text = env.normalize.normalizeText(node?.innerText || node?.textContent || '');
-        const cot = cotByOwner.get(wrapper);
-        const hasCot = !!String(cot?.semanticText || cot?.semanticMarkdown || '').trim();
-        if (!text && !hasCot && !extractChatgptImageUrls(wrapper).length && !findDeepResearchIframe(wrapper)) continue;
-        assistantWrapper = wrapper;
-        break;
-      }
-      if (!assistantWrapper) return { kind: 'none' };
-
-      const userWrapper = wrappers[lastUserIndex];
-      const userKey = directMessageId(userWrapper);
-      const assistantKey = directMessageId(assistantWrapper);
-      if (!userKey || !assistantKey) return { kind: 'unsafe' };
-
-      const userTurnKey = turnKeyOf(userWrapper);
-      const assistantTurnKey = turnKeyOf(assistantWrapper);
-      const withinTurn = (index: number, turnKey: string) =>
-        wrappers.slice(0, index).filter((candidate: any) => turnKeyOf(candidate) === turnKey).length;
-      const userInput = createCurrentExtractionInput({
-        wrapper: userWrapper,
-        role: 'user',
-        key: userKey,
-        turnKey: userTurnKey,
-        withinTurn: withinTurn(lastUserIndex, userTurnKey),
-        cot: null,
-      });
-      const assistantIndex = wrappers.indexOf(assistantWrapper);
-      const assistantInput = createCurrentExtractionInput({
-        wrapper: assistantWrapper,
-        role: 'assistant',
-        key: assistantKey,
-        turnKey: assistantTurnKey,
-        withinTurn: withinTurn(assistantIndex, assistantTurnKey),
-        cot: cotByOwner.get(assistantWrapper) || null,
-      });
-      if (!assistantInput.rendered) return { kind: 'unsafe' };
-      // Generated images and deep-research frames have separate ownership/identity rules in the API snapshot.
-      if (
-        userInput.imageUrls.length > 0 ||
-        assistantInput.imageUrls.length > 0 ||
-        assistantInput.hasDeepResearch ||
-        assistantInput.iframeUrl
-      ) {
-        return { kind: 'unsafe' };
-      }
-
-      const userMessage = extractManualMessage(userInput, 0);
-      const assistantMessage = extractManualMessage(assistantInput, 1);
-      if (!userMessage || !assistantMessage) return { kind: 'unsafe' };
-      return {
-        kind: 'candidate',
-        conversationId: currentConversationId,
-        userMessage,
-        assistantMessage,
-      };
-    } catch (_error) {
-      return { kind: 'unsafe' };
-    }
-  }
-
   async function harvestRenderedInto(
     accumulator: PreparedAccumulator<any>,
     _root: any,
@@ -1031,7 +940,6 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     isCaptureAvailable: isConversationSurfaceUrl,
     getRoot: getConversationRoot,
     prepareManualCapture,
-    captureApiLiveTurn,
     enrichApiSnapshotWithRenderedGraphics,
     __test: {
       sampleIdentityGuard,

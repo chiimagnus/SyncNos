@@ -386,9 +386,14 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
         });
       }
     } else if (sourceType === 'chat') {
+      const restoreCachedChatgptImages = msg.deferRemoteSync !== true;
       const inlineKeys = new Set<string>();
       for (const message of messages) {
-        if (/\]\(data:image\//i.test(String(message?.contentMarkdown || '')) && message?.messageKey) {
+        const markdown = String(message?.contentMarkdown || '');
+        if (
+          message?.messageKey &&
+          (/\]\(data:image\//i.test(markdown) || (restoreCachedChatgptImages && markdown.includes('chatgpt-file://')))
+        ) {
           inlineKeys.add(String(message.messageKey));
         }
       }
@@ -400,10 +405,10 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
             messages,
             onlyMessageKeys: inlineKeys,
             enableHttpImages: false,
-            enableChatgptImages: false,
+            enableChatgptImages: restoreCachedChatgptImages,
           });
           messages = inlined.messages;
-          imageWarningFlags = inlined.warningFlags.slice();
+          imageWarningFlags = inlined.warningFlags.filter((flag) => flag !== 'chatgpt_images_cache_incomplete');
         } catch (_error) {
           // Keep the original image data in the message if local caching fails.
         }
@@ -435,6 +440,13 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
       }
     }
     return router.ok(imageWarningFlags.length ? { ...res, imageWarningFlags } : res);
+  });
+
+  router.register(CORE_MESSAGE_TYPES.ENQUEUE_CONVERSATION_IMAGE_BACKFILL, async (msg) => {
+    const conversationId = Number(msg?.conversationId);
+    if (!Number.isSafeInteger(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
+    await deps.scheduleImageBackfill(conversationId);
+    return router.ok({ conversationId });
   });
 
   router.register(CORE_MESSAGE_TYPES.BACKFILL_CONVERSATION_IMAGES, async (msg) => {

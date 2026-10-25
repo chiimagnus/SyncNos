@@ -38,6 +38,7 @@ function createRouter(
   deps: {
     onConversationChanged?: ReturnType<typeof vi.fn>;
     onRemoteCleanupPending?: ReturnType<typeof vi.fn>;
+    scheduleImageBackfill?: ReturnType<typeof vi.fn>;
   } = {},
 ) {
   const router = createBackgroundRouter({
@@ -50,7 +51,7 @@ function createRouter(
   registerConversationHandlers(router as any, {
     onConversationChanged: deps.onConversationChanged || (async () => {}),
     onRemoteCleanupPending: deps.onRemoteCleanupPending || (async () => {}),
-    scheduleImageBackfill: async () => {},
+    scheduleImageBackfill: deps.scheduleImageBackfill || (async () => {}),
   });
   return router;
 }
@@ -72,6 +73,21 @@ afterEach(() => {
 });
 
 describe('conversations pagination handlers', () => {
+  it('enqueues image recovery without a message rewrite or remote sync', async () => {
+    const scheduleImageBackfill = vi.fn(async () => {});
+    const onConversationChanged = vi.fn();
+    const router = createRouter({ scheduleImageBackfill, onConversationChanged });
+    const result = await router.dispatch({ type: 'enqueueConversationImageBackfill', conversationId: 7 });
+    expect(result).toMatchObject({ ok: true, data: { conversationId: 7 } });
+    expect(scheduleImageBackfill).toHaveBeenCalledOnce();
+    expect(scheduleImageBackfill).toHaveBeenCalledWith(7);
+    expect(storageMocks.syncConversationMessages).not.toHaveBeenCalled();
+    expect(onConversationChanged).not.toHaveBeenCalled();
+    const invalid = await router.dispatch({ type: 'enqueueConversationImageBackfill', conversationId: 0 });
+    expect(invalid.ok).toBe(false);
+    expect(scheduleImageBackfill).toHaveBeenCalledOnce();
+  });
+
   it('saves partial paged messages without triggering remote sync until the final commit', async () => {
     storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
     const onConversationChanged = vi.fn();

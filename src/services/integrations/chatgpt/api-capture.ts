@@ -85,7 +85,8 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
 
   const retained: any[] = [];
   const seenIds = new Set<string>();
-  const parents = new Map<string, string>();
+  const childByParent = new Map<string, string>();
+  let hasAlternateBranches = false;
   let cursor = '';
   let title = '';
   let currentNode = '';
@@ -97,7 +98,7 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
       throw apiCaptureError('chatgpt_api_navigation_changed');
     }
   };
-  for (let page = 0; page < 100; page += 1) {
+  for (let page = 0; ; page += 1) {
     assertRoute();
     const data = await requestPageWithRetry(
       {
@@ -136,7 +137,11 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
       }
       pageIds.add(id);
       const parent = message?.metadata?.parent_id;
-      parents.set(id, typeof parent === 'string' ? parent : '');
+      if (typeof parent === 'string' && parent) {
+        const sibling = childByParent.get(parent);
+        if (sibling && sibling !== id) hasAlternateBranches = true;
+        childByParent.set(parent, id);
+      }
     }
     for (const id of pageIds) seenIds.add(id);
 
@@ -156,16 +161,6 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
       if (completed) throw apiCaptureError('chatgpt_api_no_visible_messages');
       cursor = firstId;
       continue;
-    }
-    let branchVerified = false;
-    if (completed) {
-      const chain = new Set<string>();
-      let node = currentNode;
-      while (node && parents.has(node) && !chain.has(node)) {
-        chain.add(node);
-        node = parents.get(node) || '';
-      }
-      branchVerified = !node && chain.size === seenIds.size && parents.size === seenIds.size;
     }
     let changedWhileFetching = false;
     if (completed) {
@@ -194,7 +189,7 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
       conversationUrl: sanitizedConversationUrl(initialUrl),
       capturedAt: input?.capturedAt,
     });
-    if (!completed || !branchVerified || changedWhileFetching) {
+    if (!completed || hasAlternateBranches || changedWhileFetching) {
       const meta = result.snapshot.captureMeta;
       result.snapshot.captureMeta = {
         ...meta,
@@ -203,7 +198,7 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
           new Set([
             ...(meta.reasons || []),
             ...(!completed ? ['chatgpt_api_paging'] : []),
-            ...(!branchVerified && completed ? ['chatgpt_api_branch_unverified'] : []),
+            ...(hasAlternateBranches ? ['chatgpt_api_branch_ambiguous'] : []),
             ...(changedWhileFetching ? ['chatgpt_api_conversation_changed'] : []),
           ]),
         ),
@@ -216,7 +211,7 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
     cursor = firstId;
   }
 
-  if (!completed || !lastResult) throw apiCaptureError('chatgpt_api_page_limit');
+  if (!lastResult) throw apiCaptureError('chatgpt_api_no_visible_messages');
   assertRoute();
   return lastResult;
 }
