@@ -107,6 +107,7 @@ export function registerUiMessageHandlers(router: AnyRouter, options: UiMessageH
       if (relayed.message) {
         return router.err(relayed.message, {
           code: relayed.code,
+          ...(relayed.status ? { status: relayed.status } : null),
         });
       }
       await ensureFallbackLocaleReady();
@@ -170,10 +171,16 @@ async function relayToActiveTab(tabId: number, type: string, payload?: Record<st
     }
 
     const message = String(apiResponse.error?.message || '').trim();
+    const extra = apiResponse.error?.extra as { code?: unknown; status?: unknown } | null | undefined;
+    const code =
+      typeof extra?.code === 'string' && /^chatgpt_api_[a-z0-9_]+$/.test(extra.code) ? extra.code : 'CAPTURE_FAILED';
+    const status = Number(extra?.status);
     return {
       ok: false as const,
-      code: 'CAPTURE_FAILED',
+      code,
       message,
+      status:
+        code !== 'CAPTURE_FAILED' && Number.isInteger(status) && status >= 100 && status <= 599 ? status : undefined,
     };
   } catch (_error) {
     return {

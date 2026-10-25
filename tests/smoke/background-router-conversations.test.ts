@@ -284,6 +284,67 @@ describe('background-router conversations', () => {
     });
   });
 
+  it('defers image backfill and remote sync until the final page of a paged chat capture', async () => {
+    storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
+    const scheduleImageBackfill = vi.fn(async () => {});
+    const onConversationChanged = vi.fn(async () => {});
+    const router = createRouter({ scheduleImageBackfill, onConversationChanged });
+    const payload = {
+      type: 'syncConversationMessages',
+      conversationId: 2002,
+      conversationSourceType: 'chat',
+      mode: 'append',
+      messages: [{ messageKey: 'm1', role: 'assistant', contentMarkdown: '![](chatgpt-file://file_image_1)' }],
+      diff: { added: ['m1'], updated: [], removed: [] },
+    };
+
+    for (let page = 0; page < 2; page += 1) {
+      const result = await router.dispatch({ ...payload, deferRemoteSync: true });
+      expect(result.ok).toBe(true);
+      expect(onConversationChanged).not.toHaveBeenCalled();
+      expect(scheduleImageBackfill).not.toHaveBeenCalled();
+    }
+
+    const final = await router.dispatch(payload);
+    expect(final.ok).toBe(true);
+    expect(storageMocks.syncConversationMessages).toHaveBeenCalledTimes(3);
+    expect(onConversationChanged).toHaveBeenCalledTimes(1);
+    expect(onConversationChanged).toHaveBeenCalledWith(2002, 'syncConversationMessages');
+    expect(scheduleImageBackfill).toHaveBeenCalledOnce();
+    expect(scheduleImageBackfill).toHaveBeenCalledWith(2002);
+  });
+
+  it('reuses cached ChatGPT images during the final snapshot without downloading or changing cache settings', async () => {
+    storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
+    const original = [{ messageKey: 'm1', role: 'user', contentMarkdown: '![](chatgpt-file://file_1)' }];
+    imageInlineMocks.inlineChatImagesInMessages.mockImplementation(async (input: any) => {
+      expect(input.enableChatgptImages).toBe(true);
+      expect(input.downloadChatgptImages).toBeUndefined();
+      return {
+        messages: [{ ...input.messages[0], contentMarkdown: '![](syncnos-asset://7)' }],
+        inlinedCount: 1,
+        fromCacheCount: 1,
+        downloadedCount: 0,
+        inlinedBytes: 12,
+        warningFlags: [],
+      };
+    });
+    const router = createRouter();
+    const response = await router.dispatch({
+      type: 'syncConversationMessages',
+      conversationId: 123,
+      conversationSourceType: 'chat',
+      mode: 'snapshot',
+      messages: original,
+    });
+    expect(response.ok).toBe(true);
+    expect(storageMocks.syncConversationMessages).toHaveBeenCalledWith(
+      123,
+      [expect.objectContaining({ contentMarkdown: '![](syncnos-asset://7)' })],
+      { mode: 'snapshot', diff: null },
+    );
+  });
+
   it('persists AI chat messages before durably enqueueing image backfill and never downloads in the save request', async () => {
     storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
     let releaseSchedule: (() => void) | null = null;
@@ -313,7 +374,13 @@ describe('background-router conversations', () => {
     expect(storageMocks.syncConversationMessages.mock.invocationCallOrder[0]).toBeLessThan(
       scheduleImageBackfill.mock.invocationCallOrder[0]!,
     );
-    expect(imageInlineMocks.inlineChatImagesInMessages).not.toHaveBeenCalled();
+    expect(imageInlineMocks.inlineChatImagesInMessages).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationId: 2002,
+        enableChatgptImages: true,
+      }),
+    );
+    expect(imageInlineMocks.inlineChatImagesInMessages.mock.calls[0]?.[0]).not.toHaveProperty('downloadChatgptImages');
     expect(backfillJobMocks.backfillConversationImages).not.toHaveBeenCalled();
 
     releaseSchedule?.();
@@ -411,7 +478,7 @@ describe('background-router conversations', () => {
         conversationId: 2003,
         onlyMessageKeys: new Set(['m1']),
         enableHttpImages: false,
-        enableChatgptImages: false,
+        enableChatgptImages: true,
       }),
     );
   });

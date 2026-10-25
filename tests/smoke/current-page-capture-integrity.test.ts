@@ -27,6 +27,10 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+function verifiedApiResult(snapshot: any) {
+  return { snapshot, verifyCurrent: vi.fn(async () => {}) };
+}
+
 function chatSnapshot(options?: {
   completeness?: 'complete' | 'partial';
   verified?: boolean;
@@ -57,7 +61,6 @@ function createHarness(input: {
   video?: any;
   url?: string;
   syncResponse?: any;
-  liveTurn?: () => any;
   enrich?: (snapshot: any) => any;
   collectorAvailable?: boolean;
   availabilityError?: string;
@@ -84,8 +87,6 @@ function createHarness(input: {
     },
   };
   if (input.prepare) collector.prepareManualCapture = input.prepare;
-  if (input.collectorId === 'chatgpt') collector.captureApiLiveTurn = input.liveTurn || (() => ({ kind: 'none' }));
-  else if (input.liveTurn) collector.captureApiLiveTurn = input.liveTurn;
   if (input.enrich) collector.enrichApiSnapshotWithRenderedGraphics = input.enrich;
   if (input.url) vi.stubGlobal('location', { href: input.url });
   const videoCapture = {
@@ -350,7 +351,7 @@ describe('current page capture integrity routing', () => {
   it('treats an enabled durable ChatGPT API route as available without consulting DOM availability', async () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
     const snapshot = chatSnapshot();
-    chatgptApiMocks.capture.mockResolvedValue({ snapshot });
+    chatgptApiMocks.capture.mockResolvedValue(verifiedApiResult(snapshot));
     const harness = createHarness({
       collectorId: 'chatgpt',
       snapshot,
@@ -382,7 +383,7 @@ describe('current page capture integrity routing', () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
     const prepare = vi.fn();
     const snapshot = chatSnapshot({ markdown: 'hello\n\n![](chatgpt-file://file_1)' });
-    chatgptApiMocks.capture.mockResolvedValue({ snapshot });
+    chatgptApiMocks.capture.mockResolvedValue(verifiedApiResult(snapshot));
     const harness = createHarness({
       collectorId: 'chatgpt',
       snapshot,
@@ -405,7 +406,113 @@ describe('current page capture integrity routing', () => {
     expect(result).toMatchObject({ captureCompleteness: 'complete' });
   });
 
-  it('keeps an explicitly finalized backend turn canonical without consulting DOM live-tail', async () => {
+  it('persists each paged ChatGPT snapshot with append only and defers remote sync until completion', async () => {
+    chatgptApiMocks.readEnabled.mockResolvedValue(true);
+    const first = chatSnapshot({ completeness: 'partial' });
+    const second = chatSnapshot({ completeness: 'partial' });
+    second.messages.unshift({ messageKey: 'older', role: 'user', contentMarkdown: 'older', sequence: 0 });
+    second.messages[1].sequence = 1;
+    const final = {
+      ...second,
+      captureMeta: { ...second.captureMeta, reasons: ['chatgpt_api_parent_links_unresolved'] },
+    };
+    chatgptApiMocks.capture.mockImplementation(async ({ onPage }: any) => {
+      await onPage({ snapshot: first }, { page: 1, completed: false });
+      await onPage({ snapshot: second }, { page: 2, completed: true });
+      return verifiedApiResult(final);
+    });
+    const harness = createHarness({ collectorId: 'chatgpt', url: 'https://chatgpt.com/c/conversation-1' });
+
+    await harness.service.captureCurrentPage();
+
+    const writes = harness.calls.filter(({ type }) => type === 'syncConversationMessages');
+    expect(writes).toHaveLength(3);
+    expect(writes.map(({ payload }) => payload?.mode)).toEqual(['append', 'append', 'append']);
+    expect(writes.map(({ payload }) => payload?.deferRemoteSync)).toEqual([true, true, undefined]);
+    expect(writes[0].payload.diff.added).toEqual(['m1']);
+    expect(writes[1].payload.diff.added).toEqual(['older', 'm1']);
+    expect(writes[2].payload.diff.added).toEqual(['older', 'm1']);
+    expect(writes.every(({ payload }) => !payload.diff.removed.length)).toBe(true);
+    expect(
+      writes.every(({ payload }) =>
+        payload.messages.every((message: any) => message.captureMergePolicy === 'preserve-existing-content'),
+      ),
+    ).toBe(true);
+  });
+
+  it('stages a fully paged result as append and commits a single final snapshot after enrichment', async () => {
+    chatgptApiMocks.readEnabled.mockResolvedValue(true);
+    const staged = chatSnapshot({ completeness: 'complete' });
+    chatgptApiMocks.capture.mockImplementation(async ({ onPage }: any) => {
+      await onPage({ snapshot: staged }, { page: 1, completed: true });
+      return verifiedApiResult(staged);
+    });
+    const enrich = vi.fn(async (page) => page);
+    const harness = createHarness({ collectorId: 'chatgpt', url: 'https://chatgpt.com/c/conversation-1', enrich });
+    const result = await harness.service.captureCurrentPage();
+    const writes = harness.calls.filter(({ type }) => type === 'syncConversationMessages');
+    expect(writes.map(({ payload }) => payload.mode)).toEqual(['append', 'snapshot']);
+    expect(writes[0].payload.messages[0].captureMergePolicy).toBe('preserve-existing-content');
+    expect(writes[1].payload.messages[0].captureMergePolicy).toBeUndefined();
+    expect(staged.messages[0].captureMergePolicy).toBeUndefined();
+    expect(enrich).toHaveBeenCalledOnce();
+    expect(result.captureCompleteness).toBe('complete');
+  });
+
+  it('does not replace existing history when final graphic enrichment fails after a complete API page', async () => {
+    chatgptApiMocks.readEnabled.mockResolvedValue(true);
+    const staged = chatSnapshot({ completeness: 'complete' });
+    chatgptApiMocks.capture.mockImplementation(async ({ onPage }: any) => {
+      await onPage({ snapshot: staged }, { page: 1, completed: true });
+      return verifiedApiResult(staged);
+    });
+    const enrich = vi.fn(async () => {
+      throw new Error('graphics failed');
+    });
+    const harness = createHarness({ collectorId: 'chatgpt', url: 'https://chatgpt.com/c/conversation-1', enrich });
+    await expect(harness.service.captureCurrentPage()).rejects.toThrow('graphics failed');
+    const writes = harness.calls.filter(({ type }) => type === 'syncConversationMessages');
+    expect(writes.map(({ payload }) => payload.mode)).toEqual(['append']);
+    expect(writes[0].payload.diff.removed).toEqual([]);
+    expect(harness.calls.some(({ type }) => type === 'enqueueConversationImageBackfill')).toBe(true);
+  });
+
+  it('retains previously saved ChatGPT pages after a later API request fails', async () => {
+    chatgptApiMocks.readEnabled.mockResolvedValue(true);
+    chatgptApiMocks.capture.mockImplementation(async ({ onPage }: any) => {
+      await onPage({ snapshot: chatSnapshot({ completeness: 'partial' }) }, { page: 1, completed: false });
+      throw Object.assign(new Error('chatgpt_api_page_http'), { code: 'chatgpt_api_page_http', status: 503 });
+    });
+    const harness = createHarness({ collectorId: 'chatgpt', url: 'https://chatgpt.com/c/conversation-1' });
+
+    await expect(harness.service.captureCurrentPage()).rejects.toMatchObject({ code: 'chatgpt_api_page_http' });
+    const writes = harness.calls.filter(({ type }) => type === 'syncConversationMessages');
+    expect(writes).toHaveLength(1);
+    expect(writes[0].payload).toMatchObject({ mode: 'append', deferRemoteSync: true });
+    expect(writes[0].payload.diff.removed).toEqual([]);
+    expect(harness.calls.filter(({ type }) => type === 'enqueueConversationImageBackfill')).toEqual([
+      { type: 'enqueueConversationImageBackfill', payload: { conversationId: 7 } },
+    ]);
+    expect(harness.capture).not.toHaveBeenCalled();
+  });
+
+  it('does not let image recovery failure mask the original paged API error', async () => {
+    chatgptApiMocks.readEnabled.mockResolvedValue(true);
+    chatgptApiMocks.capture.mockImplementation(async ({ onPage }: any) => {
+      await onPage({ snapshot: chatSnapshot({ completeness: 'partial' }) }, { page: 1, completed: false });
+      throw Object.assign(new Error('chatgpt_api_page_http'), { code: 'chatgpt_api_page_http', status: 503 });
+    });
+    const harness = createHarness({ collectorId: 'chatgpt', url: 'https://chatgpt.com/c/conversation-1' });
+    const defaultSend = harness.runtime.send.getMockImplementation()!;
+    harness.runtime.send.mockImplementation(async (type, payload) => {
+      if (type === 'enqueueConversationImageBackfill') throw new Error('queue unavailable');
+      return defaultSend(type, payload);
+    });
+    await expect(harness.service.captureCurrentPage()).rejects.toMatchObject({ code: 'chatgpt_api_page_http' });
+    expect(harness.runtime.send).toHaveBeenCalledWith('enqueueConversationImageBackfill', { conversationId: 7 });
+  });
+
+  it('persists a finalized backend turn directly without the obsolete DOM overlay', async () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
     const snapshot = chatSnapshot();
     snapshot.messages.push({
@@ -414,41 +521,46 @@ describe('current page capture integrity routing', () => {
       contentMarkdown: 'canonical backend answer',
       sequence: 1,
     });
-    const liveTurn = vi.fn(() => ({
-      kind: 'candidate',
-      conversationId: 'conversation-1',
-      userMessage: { messageKey: 'm1', role: 'user', contentMarkdown: 'hello', sequence: 0, updatedAt: 1 },
-      assistantMessage: {
-        messageKey: 'assistant-live',
-        role: 'assistant',
-        contentMarkdown: 'different DOM rendering',
-        sequence: 1,
-        updatedAt: 2,
-      },
-    }));
-    chatgptApiMocks.capture.mockResolvedValue({
-      snapshot,
-      currentTurnState: 'finalized',
-      currentTurnId: 'turn-backend',
-    });
+    chatgptApiMocks.capture.mockResolvedValue(verifiedApiResult(snapshot));
     const harness = createHarness({
       collectorId: 'chatgpt',
       snapshot,
-      liveTurn,
       url: 'https://chatgpt.com/c/conversation-1',
     });
 
     const result = await harness.service.captureCurrentPage();
 
-    expect(liveTurn).not.toHaveBeenCalled();
     expect(harness.calls[1].payload).toMatchObject({ mode: 'snapshot', diff: null });
     expect(result).toMatchObject({ captureCompleteness: 'complete' });
+  });
+
+  it('does not destructively commit when the ChatGPT head changes during graphic enrichment', async () => {
+    chatgptApiMocks.readEnabled.mockResolvedValue(true);
+    const snapshot = chatSnapshot();
+    const verifyCurrent = vi.fn(async () => {
+      throw Object.assign(new Error('chatgpt_api_conversation_changed'), { code: 'chatgpt_api_conversation_changed' });
+    });
+    chatgptApiMocks.capture.mockImplementation(async ({ onPage }: any) => {
+      await onPage({ snapshot }, { page: 1, completed: true });
+      return { snapshot, verifyCurrent };
+    });
+    const enrich = vi.fn(async (value) => value);
+    const harness = createHarness({ collectorId: 'chatgpt', url: 'https://chatgpt.com/c/conversation-1', enrich });
+    await expect(harness.service.captureCurrentPage()).rejects.toMatchObject({
+      code: 'chatgpt_api_conversation_changed',
+    });
+    expect(enrich).toHaveBeenCalledOnce();
+    expect(verifyCurrent).toHaveBeenCalledOnce();
+    expect(
+      harness.calls.filter(({ type }) => type === 'syncConversationMessages').map(({ payload }) => payload.mode),
+    ).toEqual(['append']);
+    expect(harness.calls.filter(({ type }) => type === 'enqueueConversationImageBackfill')).toHaveLength(1);
   });
 
   it('persists API visual media enrichment before the same canonical save', async () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
     const snapshot = chatSnapshot();
-    chatgptApiMocks.capture.mockResolvedValue({ snapshot, currentTurnState: 'finalized' });
+    chatgptApiMocks.capture.mockResolvedValue(verifiedApiResult(snapshot));
     const enrich = vi.fn(async (current) => ({
       ...current,
       messages: [{ ...current.messages[0], contentMarkdown: '加上图表资源' }],
@@ -462,68 +574,6 @@ describe('current page capture integrity routing', () => {
     await harness.service.captureCurrentPage();
     expect(enrich).toHaveBeenCalledWith(snapshot);
     expect(harness.calls[1].payload.messages[0].contentMarkdown).toBe('加上图表资源');
-  });
-
-  it('augments an enabled API snapshot with only the current stable live turn and persists it as partial append', async () => {
-    chatgptApiMocks.readEnabled.mockResolvedValue(true);
-    const snapshot = chatSnapshot();
-    chatgptApiMocks.capture.mockResolvedValue({ snapshot, currentTurnState: 'open' });
-    const liveTurn = vi.fn(() => ({
-      kind: 'candidate',
-      conversationId: 'conversation-1',
-      userMessage: { messageKey: 'm1', role: 'user', contentMarkdown: 'hello', sequence: 0, updatedAt: 1 },
-      assistantMessage: {
-        messageKey: 'assistant-live',
-        role: 'assistant',
-        contentMarkdown: 'visible streaming answer',
-        sequence: 1,
-        updatedAt: 2,
-      },
-    }));
-    const prepare = vi.fn();
-    const harness = createHarness({
-      collectorId: 'chatgpt',
-      snapshot,
-      prepare,
-      liveTurn,
-      url: 'https://chatgpt.com/c/conversation-1',
-    });
-
-    const result = await harness.service.captureCurrentPage();
-
-    expect(liveTurn).toHaveBeenCalledWith({ expectedConversationId: 'conversation-1' });
-    expect(prepare).not.toHaveBeenCalled();
-    expect(harness.capture).not.toHaveBeenCalled();
-    expect(harness.calls[1].payload).toMatchObject({
-      mode: 'append',
-      diff: { added: ['m1', 'assistant-live'], updated: [], removed: [] },
-      messages: [
-        expect.objectContaining({ messageKey: 'm1', contentMarkdown: 'hello' }),
-        expect.objectContaining({ messageKey: 'assistant-live', contentMarkdown: 'visible streaming answer' }),
-      ],
-    });
-    expect(result).toMatchObject({
-      captureCompleteness: 'partial',
-      captureReasons: ['chatgpt_api_live_tail_unconfirmed'],
-    });
-  });
-
-  it('fails closed before persistence when an open API turn live-tail reader observes another durable conversation', async () => {
-    chatgptApiMocks.readEnabled.mockResolvedValue(true);
-    const snapshot = chatSnapshot();
-    chatgptApiMocks.capture.mockResolvedValue({ snapshot, currentTurnState: 'open' });
-    const harness = createHarness({
-      collectorId: 'chatgpt',
-      snapshot,
-      liveTurn: () => ({ kind: 'identity_changed' }),
-      url: 'https://chatgpt.com/c/conversation-1',
-    });
-
-    await expect(harness.service.captureCurrentPage()).rejects.toMatchObject({
-      message: t('chatgptApiCaptureNavigationChanged'),
-      code: 'chatgpt_api_navigation_changed',
-    });
-    expect(harness.calls).toEqual([]);
   });
 
   it('uses DOM directly for temporary ChatGPT routes even when Advanced API is enabled', async () => {
@@ -546,7 +596,7 @@ describe('current page capture integrity routing', () => {
   it('does not silently run DOM capture when enabled durable API capture fails', async () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
     chatgptApiMocks.capture.mockRejectedValue(
-      Object.assign(new Error('chatgpt_api_mapping_http'), { code: 'chatgpt_api_mapping_http', status: 503 }),
+      Object.assign(new Error('chatgpt_api_page_http'), { code: 'chatgpt_api_page_http', status: 503 }),
     );
     const prepare = vi.fn();
     const harness = createHarness({
@@ -558,7 +608,7 @@ describe('current page capture integrity routing', () => {
 
     await expect(harness.service.captureCurrentPage()).rejects.toMatchObject({
       message: t('chatgptApiCaptureTemporarilyUnavailable'),
-      code: 'chatgpt_api_mapping_http',
+      code: 'chatgpt_api_page_http',
       status: 503,
     });
     expect(prepare).not.toHaveBeenCalled();
@@ -569,7 +619,7 @@ describe('current page capture integrity routing', () => {
   it('maps ChatGPT API rate limits to a user-facing retry-later message', async () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
     chatgptApiMocks.capture.mockRejectedValue(
-      Object.assign(new Error('chatgpt_api_mapping_http'), { code: 'chatgpt_api_mapping_http', status: 429 }),
+      Object.assign(new Error('chatgpt_api_page_http'), { code: 'chatgpt_api_page_http', status: 429 }),
     );
     const harness = createHarness({
       collectorId: 'chatgpt',
@@ -579,7 +629,7 @@ describe('current page capture integrity routing', () => {
 
     await expect(harness.service.captureCurrentPage()).rejects.toMatchObject({
       message: t('chatgptApiCaptureRateLimited'),
-      code: 'chatgpt_api_mapping_http',
+      code: 'chatgpt_api_page_http',
       status: 429,
     });
   });
@@ -623,9 +673,7 @@ describe('current page capture integrity routing', () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
     chatgptApiMocks.capture.mockImplementation(async () => {
       vi.stubGlobal('location', { href: 'https://chatgpt.com/c/conversation-2' });
-      return {
-        snapshot: chatSnapshot(),
-      };
+      return verifiedApiResult(chatSnapshot());
     });
     const harness = createHarness({
       collectorId: 'chatgpt',
@@ -643,7 +691,7 @@ describe('current page capture integrity routing', () => {
   it('keeps ChatGPT image references independent from image-cache success during persistence', async () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
     const snapshot = chatSnapshot({ markdown: '![](chatgpt-file://file_1)' });
-    chatgptApiMocks.capture.mockResolvedValue({ snapshot });
+    chatgptApiMocks.capture.mockResolvedValue(verifiedApiResult(snapshot));
     const harness = createHarness({
       collectorId: 'chatgpt',
       snapshot,
@@ -675,9 +723,7 @@ describe('current page capture integrity routing', () => {
 
   it('finishes persistence for the captured conversation if SPA navigation changes after the write has started', async () => {
     chatgptApiMocks.readEnabled.mockResolvedValue(true);
-    chatgptApiMocks.capture.mockResolvedValue({
-      snapshot: chatSnapshot(),
-    });
+    chatgptApiMocks.capture.mockResolvedValue(verifiedApiResult(chatSnapshot()));
     const harness = createHarness({
       collectorId: 'chatgpt',
       snapshot: chatSnapshot(),
@@ -727,7 +773,7 @@ describe('current page capture integrity routing', () => {
     });
   });
 
-  it('preserves COT plus answer through final-live partial append with default replace semantics', async () => {
+  it('preserves COT plus answer through partial append without overwriting existing content', async () => {
     const contentMarkdown = '**Visible reasoning summary**\n\nFinal assistant answer';
     const snapshot = {
       ...chatSnapshot({ completeness: 'partial' }),
@@ -764,7 +810,7 @@ describe('current page capture integrity routing', () => {
       contentMarkdown,
       captureSequencePolicy: 'reconcile-existing-order',
     });
-    expect(sync?.payload.messages[0]).not.toHaveProperty('captureMergePolicy');
+    expect(sync?.payload.messages[0]).toHaveProperty('captureMergePolicy', 'preserve-existing-content');
     expect(sync?.payload.messages[0]).not.toHaveProperty('contentText');
   });
 

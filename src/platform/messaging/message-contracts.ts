@@ -4,6 +4,7 @@ export const CORE_MESSAGE_TYPES = {
   UPDATE_CONVERSATION_URL: 'updateConversationUrl',
   SYNC_CONVERSATION_MESSAGES: 'syncConversationMessages',
   BACKFILL_CONVERSATION_IMAGES: 'backfillConversationImages',
+  ENQUEUE_CONVERSATION_IMAGE_BACKFILL: 'enqueueConversationImageBackfill',
   GET_CONVERSATION_LIST_BOOTSTRAP: 'getConversationListBootstrap',
   GET_CONVERSATION_LIST_PAGE: 'getConversationListPage',
   FIND_CONVERSATION_BY_SOURCE_AND_KEY: 'findConversationBySourceAndKey',
@@ -85,6 +86,7 @@ export const OPEN_TARGET_MESSAGE_TYPES = {
 } as const;
 
 export const CHATGPT_MESSAGE_TYPES = {
+  FETCH_API_PAGE: 'chatgptFetchApiPage',
   EXTRACT_DEEP_RESEARCH: 'chatgptExtractDeepResearch',
   RESOLVE_IMAGE_URLS: 'chatgptResolveImageUrls',
 } as const;

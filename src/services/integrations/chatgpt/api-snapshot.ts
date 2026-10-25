@@ -6,19 +6,9 @@ import {
   chatgptFileIdFromAssetPointer,
 } from '@services/shared/chatgpt-image-identity';
 
-type ChatgptMappingNode = {
-  id?: unknown;
-  parent?: unknown;
-  message?: any;
-};
+type ChatgptApiCurrentTurnState = 'finalized' | 'open' | 'unknown';
 
-export type ChatgptApiCurrentTurnState = 'finalized' | 'open' | 'unknown';
-
-export type ChatgptApiSnapshotResult = {
-  snapshot: any;
-  currentTurnState: ChatgptApiCurrentTurnState;
-  currentTurnId: string;
-};
+export type ChatgptApiSnapshotResult = { snapshot: any };
 
 type PendingImage = {
   fileId: string;
@@ -31,7 +21,6 @@ type PendingAuxiliary = {
   markdown: string;
 };
 
-const INTERNAL_CONTENT_TYPES = new Set(['model_editable_context']);
 const SCHEMA_DRIFT_REASON = 'chatgpt_api_schema_drift_partial';
 const UNOWNED_AUXILIARY_REASON = 'chatgpt_api_unowned_auxiliary_omitted';
 const UNFINISHED_TURN_REASON = 'chatgpt_api_unfinished_turn_partial';
@@ -69,6 +58,15 @@ function primitivePartText(part: unknown): string {
   if (typeof record.text === 'string') return record.text;
   if (typeof record.content === 'string') return record.content;
   return '';
+}
+
+function isFilePart(part: unknown): part is Record<string, unknown> {
+  return (
+    !!part &&
+    typeof part === 'object' &&
+    !Array.isArray(part) &&
+    stableString((part as Record<string, unknown>).content_type) === 'file_asset_pointer'
+  );
 }
 
 function isImagePart(part: unknown): part is Record<string, unknown> {
@@ -154,46 +152,153 @@ function clientWidgetReference(reference: any, onSchemaDrift: SchemaDriftReporte
   return '';
 }
 
+function transformOutsideInlineCode(text: string, transform: (text: string) => string): string {
+  let output = '';
+  let last = 0;
+  let index = 0;
+  while (index < text.length) {
+    if (text[index] !== '`') {
+      index += 1;
+      continue;
+    }
+    let openerEnd = index;
+    while (text[openerEnd] === '`') openerEnd += 1;
+    const delimiterLength = openerEnd - index;
+    let cursor = openerEnd;
+    let closerEnd = -1;
+    while (cursor < text.length) {
+      const start = text.indexOf('`', cursor);
+      if (start < 0) break;
+      let end = start;
+      while (text[end] === '`') end += 1;
+      if (end - start === delimiterLength) {
+        closerEnd = end;
+        break;
+      }
+      cursor = end;
+    }
+    if (closerEnd < 0) {
+      index = openerEnd;
+      continue;
+    }
+    output += transform(text.slice(last, index)) + text.slice(index, closerEnd);
+    last = closerEnd;
+    index = closerEnd;
+  }
+  return output + transform(text.slice(last));
+}
+
+function transformOutsideCodeFences(
+  markdown: string,
+  transform: (text: string) => string,
+  preserveStructuredLayout = false,
+): string {
+  const result: string[] = [];
+  let outside: string[] = [];
+  let fenceChar = '';
+  let fenceLength = 0;
+  let layoutDepth = 0;
+  let indentedCode = false;
+  let previousBlank = true;
+  const flush = () => {
+    if (!outside.length) return;
+    const content = outside.join('\n');
+    const hasLayoutRoot = /(?:^|\n) {0,3}<(?:row|box|col|grid|flow|card|carousel)\b[^>]*>\s*(?:\n|$)/.test(content);
+    result.push(
+      preserveStructuredLayout && hasLayoutRoot ? transform(content) : transformOutsideInlineCode(content, transform),
+    );
+    outside = [];
+  };
+  for (const line of markdown.split('\n')) {
+    const marker = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+    const blank = !line.trim();
+    const indented = /^( {4}|\t)/.test(line);
+    const layoutOpen =
+      /^\s*<(?:row|box|col|grid|grid-item|flow|flow-item|card|carousel|carousel-item|text|title|caption|badge)\b[^>]*>\s*$/.test(
+        line,
+      );
+    const layoutClose =
+      /^\s*<\/(?:row|box|col|grid|grid-item|flow|flow-item|card|carousel|carousel-item|text|title|caption|badge)>\s*$/.test(
+        line,
+      );
+    if (!fenceLength) {
+      if (indentedCode) {
+        if (blank || indented) {
+          result.push(line);
+          previousBlank = blank;
+          continue;
+        }
+        indentedCode = false;
+      }
+      if (indented && previousBlank && !layoutDepth) {
+        flush();
+        result.push(line);
+        indentedCode = true;
+        previousBlank = false;
+        continue;
+      }
+      if (!marker) {
+        outside.push(line);
+        if (layoutOpen && (layoutDepth > 0 || !indented)) layoutDepth += 1;
+        if (layoutClose && layoutDepth > 0) layoutDepth -= 1;
+        previousBlank = blank;
+        continue;
+      }
+      flush();
+      fenceChar = marker[1]![0]!;
+      fenceLength = marker[1]!.length;
+    } else if (marker && marker[1]![0] === fenceChar && marker[1]!.length >= fenceLength && !marker[2]!.trim()) {
+      fenceLength = 0;
+    }
+    result.push(line);
+    previousBlank = blank;
+  }
+  flush();
+  return result.join('\n');
+}
+
 function renderContentReferences(message: any, text: string, onSchemaDrift: SchemaDriftReporter): string {
-  let output = text;
   const rawReferences = message?.metadata?.content_references;
   if (rawReferences != null && !Array.isArray(rawReferences)) {
     onSchemaDrift();
   }
   const references = Array.isArray(rawReferences) ? rawReferences : [];
-  const replaced = new Set<string>();
+  return transformOutsideCodeFences(text, (outside) => {
+    let output = outside;
+    const replaced = new Set<string>();
 
-  for (const reference of references) {
-    if (!reference || typeof reference !== 'object' || Array.isArray(reference)) {
+    for (const reference of references) {
+      if (!reference || typeof reference !== 'object' || Array.isArray(reference)) {
+        onSchemaDrift();
+        continue;
+      }
+      const type = stableString(reference.type).toLowerCase();
+      const matched = stableString(reference.matched_text);
+      if (type === 'sources_footnote' || !matched || replaced.has(matched) || !matched.includes('')) continue;
+      if (!output.includes(matched)) continue;
+
+      let replacement = '';
+      if (type === 'grouped_webpages') {
+        replacement = groupedWebpageReference(reference, onSchemaDrift);
+      } else if (type === 'client_defined_widget') {
+        replacement = clientWidgetReference(reference, onSchemaDrift);
+      } else if (type === 'hidden') {
+        replacement = '';
+      } else {
+        replacement = markdownReferenceAlt(reference.alt);
+        if (!replacement) onSchemaDrift();
+      }
+      output = output.split(matched).join(replacement);
+      replaced.add(matched);
+    }
+
+    const internalTokens = /[^]*/g;
+    if (internalTokens.test(output)) {
       onSchemaDrift();
-      continue;
+      output = output.replace(internalTokens, '');
     }
-    const type = stableString(reference.type).toLowerCase();
-    const matched = stableString(reference.matched_text);
-    if (type === 'sources_footnote' || !matched || replaced.has(matched) || !matched.includes('')) continue;
-    if (!output.includes(matched)) continue;
-
-    let replacement = '';
-    if (type === 'grouped_webpages') {
-      replacement = groupedWebpageReference(reference, onSchemaDrift);
-    } else if (type === 'client_defined_widget') {
-      replacement = clientWidgetReference(reference, onSchemaDrift);
-    } else if (type === 'hidden') {
-      replacement = '';
-    } else {
-      replacement = markdownReferenceAlt(reference.alt);
-      if (!replacement) onSchemaDrift();
-    }
-    output = output.split(matched).join(replacement);
-    replaced.add(matched);
-  }
-
-  const internalTokens = /[^]*/g;
-  if (internalTokens.test(output)) {
-    onSchemaDrift();
-    output = output.replace(internalTokens, '');
-  }
-  return output;
+    return output;
+  });
 }
 
 function normalizeRichUiMarkup(markdown: string): string {
@@ -204,37 +309,29 @@ function normalizeRichUiMarkup(markdown: string): string {
   ) {
     return markdown;
   }
-  const result: string[] = [];
-  let outside: string[] = [];
-  let fence = '';
-  const flush = () => {
-    if (!outside.length) return;
-    result.push(normalizeDilMarkdown(structuredRichUiMarkdown(outside.join('\n'))));
-    outside = [];
-  };
-  for (const line of markdown.split('\n')) {
-    const marker = line.match(/^\s*(`{3,}|~{3,})/);
-    if (marker) {
-      flush();
-      const kind = marker[1]![0]!;
-      if (!fence) fence = kind;
-      else if (fence === kind) fence = '';
-      result.push(line);
-    } else if (fence) {
-      result.push(line);
-    } else {
-      outside.push(line);
-    }
-  }
-  flush();
-  return result.join('\n');
+  return transformOutsideCodeFences(
+    markdown,
+    (outside) => transformOutsideCodeFences(normalizeDilMarkdown(outside), structuredRichUiMarkdown),
+    true,
+  );
 }
 
-function renderTextParts(message: any, onSchemaDrift: SchemaDriftReporter): string {
+function renderTextParts(message: any, onSchemaDrift: SchemaDriftReporter, normalizeLayout = false): string {
+  const format = (source: string) =>
+    renderContentReferences(message, normalizeLayout ? normalizeRichUiMarkup(source) : source, onSchemaDrift);
   const parts = currentParts(message, onSchemaDrift);
   const output: string[] = [];
   for (const part of parts) {
     if (isImagePart(part)) continue;
+    if (isFilePart(part)) {
+      if (
+        !currentAttachments(message, onSchemaDrift).some(
+          (attachment) => stableString(attachment?.id) === chatgptFileIdFromAssetPointer(part.asset_pointer),
+        )
+      )
+        onSchemaDrift();
+      continue;
+    }
     const text = primitivePartText(part);
     if (text) {
       output.push(text);
@@ -242,7 +339,7 @@ function renderTextParts(message: any, onSchemaDrift: SchemaDriftReporter): stri
     }
     if (part != null && typeof part === 'object') onSchemaDrift();
   }
-  if (output.length) return renderContentReferences(message, output.join('\n'), onSchemaDrift);
+  if (output.length) return format(output.join('\n'));
 
   const content = message?.content;
   if (content && typeof content === 'object' && !Array.isArray(content)) {
@@ -250,7 +347,7 @@ function renderTextParts(message: any, onSchemaDrift: SchemaDriftReporter): stri
       const fallback = stableString(content[key]);
       if (!fallback) continue;
       onSchemaDrift();
-      return renderContentReferences(message, fallback, onSchemaDrift);
+      return format(fallback);
     }
     if (Object.keys(content).some((key) => key !== 'content_type' && key !== 'parts')) onSchemaDrift();
   }
@@ -357,6 +454,29 @@ function imageAlt(message: any, attachment: any): string {
   return stableString(attachment?.name) || stableString(message?.metadata?.image_gen_title);
 }
 
+function renderNonImageAttachments(message: any, onSchemaDrift: SchemaDriftReporter): string {
+  const attachments = currentAttachments(message, onSchemaDrift);
+  const text: string[] = [];
+  for (const attachment of attachments) {
+    const mimeType = stableString(attachment?.mime_type).toLowerCase();
+    if (mimeType.startsWith('image/')) continue;
+    const name = stableString(attachment?.name)
+      .replace(/[\r\n]/g, ' ')
+      .slice(0, 200);
+    if (
+      !stableString(attachment?.id) ||
+      !/^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/.test(mimeType) ||
+      !name
+    ) {
+      onSchemaDrift();
+      continue;
+    }
+    const codeFence = '`'.repeat(Math.max(1, ...(name.match(/`+/g) || []).map((run) => run.length + 1)));
+    text.push(`附件：${codeFence}${name}${codeFence}（${mimeType}）`);
+  }
+  return Array.from(new Set(text)).join('\n');
+}
+
 function hasUnsupportedAttachmentMetadata(
   message: any,
   images: PendingImage[],
@@ -369,7 +489,8 @@ function hasUnsupportedAttachmentMetadata(
     if (!attachment || typeof attachment !== 'object' || Array.isArray(attachment)) return true;
     const id = stableString(attachment.id);
     const mimeType = stableString(attachment.mime_type).toLowerCase();
-    if (!id || !mimeType.startsWith('image/')) return true;
+    if (!id || !mimeType) return true;
+    if (!mimeType.startsWith('image/')) return !stableString(attachment.name);
     return !imageFileIds.has(id);
   });
 }
@@ -400,37 +521,27 @@ function hasNonImagePartContent(message: any, onSchemaDrift: SchemaDriftReporter
   return parts.some((part: unknown) => !isImagePart(part));
 }
 
-function currentBranchNodes(mapping: unknown, currentNode: unknown): ChatgptMappingNode[] {
-  if (!mapping || typeof mapping !== 'object' || Array.isArray(mapping)) throw apiSnapshotError('mapping_invalid');
-  const nodes = mapping as Record<string, ChatgptMappingNode>;
-  let nodeId = stableString(currentNode);
-  if (!nodeId || !nodes[nodeId]) throw apiSnapshotError('mapping_current_node_invalid');
-
-  const branch: ChatgptMappingNode[] = [];
+function currentPageMessages(raw: unknown, currentNode: unknown): any[] {
+  if (!Array.isArray(raw) || !raw.length) throw apiSnapshotError('chatgpt_api_messages_invalid');
+  const lastId = stableString(raw.at(-1)?.id);
+  if (!lastId || lastId !== stableString(currentNode)) throw apiSnapshotError('chatgpt_api_current_node_invalid');
   const seen = new Set<string>();
-  while (nodeId) {
-    if (seen.has(nodeId)) throw apiSnapshotError('mapping_cycle');
-    seen.add(nodeId);
-    const node = nodes[nodeId];
-    if (!node) throw apiSnapshotError('mapping_parent_missing');
-    branch.push(node);
-    const parent = node.parent;
-    if (parent == null || parent === '') break;
-    nodeId = stableString(parent);
-    if (!nodeId) throw apiSnapshotError('mapping_parent_missing');
+  for (const message of raw) {
+    const id = stableString(message?.id);
+    if (!id || seen.has(id)) throw apiSnapshotError('chatgpt_api_message_id_invalid');
+    seen.add(id);
   }
-  branch.reverse();
-  return branch;
+  return raw;
 }
 
-function currentTurnInfo(branch: ChatgptMappingNode[]): {
+function currentTurnInfo(branch: any[]): {
   state: ChatgptApiCurrentTurnState;
   turnId: string;
 } {
   let executionTurnId = '';
   for (let index = branch.length - 1; index >= 0; index -= 1) {
-    const message = branch[index]?.message;
-    if (!message || isHidden(message) || INTERNAL_CONTENT_TYPES.has(contentType(message))) continue;
+    const message = branch[index];
+    if (!message || isHidden(message) || contentType(message) === 'model_editable_context') continue;
     const role = messageRole(message);
     if (role === 'system' || role === 'developer') continue;
     const turnId = messageTurnId(message);
@@ -455,15 +566,8 @@ function currentTurnInfo(branch: ChatgptMappingNode[]): {
   return { state: 'unknown', turnId: executionTurnId };
 }
 
-function responseConversationId(data: any): string {
-  return stableString(data?.conversation_id);
-}
-
 function appendBlocks(parts: string[]): string {
-  return parts
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .join('\n\n');
+  return parts.filter((part) => part.trim().length > 0).join('\n\n');
 }
 
 function safeImageAlt(value: unknown): string {
@@ -495,10 +599,10 @@ export function buildChatgptApiSnapshot(input: {
 }): ChatgptApiSnapshotResult {
   const conversationId = stableString(input.conversationId);
   if (!conversationId) throw apiSnapshotError('conversation_identity_invalid');
-  const responseId = responseConversationId(input.data);
+  const responseId = stableString(input.data?.conversation_id);
   if (!responseId || responseId !== conversationId) throw apiSnapshotError('conversation_identity_mismatch');
 
-  const branch = currentBranchNodes(input.data?.mapping, input.data?.current_node);
+  const branch = currentPageMessages(input.data?.messages, input.data?.current_node);
   const backendCurrentTurn = currentTurnInfo(branch);
   const capturedAt = Number.isFinite(input.capturedAt) ? Number(input.capturedAt) : Date.now();
   const messages: any[] = [];
@@ -506,10 +610,29 @@ export function buildChatgptApiSnapshot(input: {
   const partialReasons = new Set<string>();
   let pendingAuxiliary: PendingAuxiliary[] = [];
   let pendingImages: PendingImage[] = [];
+  let precedingUserId = '';
 
   const markSchemaDrift = () => partialReasons.add(SCHEMA_DRIFT_REASON);
   const markUnownedAuxiliary = () => partialReasons.add(UNOWNED_AUXILIARY_REASON);
-  if (backendCurrentTurn.state === 'open' && backendCurrentTurn.turnId) partialReasons.add(UNFINISHED_TURN_REASON);
+  const latestUserIndex = branch.findLastIndex((message) => messageRole(message) === 'user' && !isHidden(message));
+  const latestTurn = branch.slice(latestUserIndex + 1);
+  const hasFinal = latestTurn.some(
+    (message) =>
+      messageRole(message) === 'assistant' &&
+      message.recipient === 'all' &&
+      message.channel === 'final' &&
+      (message.status === 'finished_successfully' || message.metadata?.is_complete === true),
+  );
+  const isStreaming =
+    !hasFinal &&
+    latestTurn.some(
+      (message) =>
+        !isHidden(message) &&
+        messageRole(message) === 'assistant' &&
+        message.recipient === 'all' &&
+        (message.status === 'in_progress' || message.status === 'streaming' || message.metadata?.is_complete === false),
+    );
+  if (isStreaming) partialReasons.add(UNFINISHED_TURN_REASON);
 
   const flushPendingImages = () => {
     if (!pendingImages.length) return;
@@ -543,19 +666,21 @@ export function buildChatgptApiSnapshot(input: {
     }
   };
 
-  const flushPendingStableTurn = (unfinished: boolean) => {
+  const flushPendingStableTurn = () => {
     flushPendingImages();
     if (!pendingAuxiliary.length) return;
     const turnId = pendingAuxiliary[0]?.turnId || '';
     const ownsOneStableTurn = !!turnId && pendingAuxiliary.every((item) => item.turnId === turnId);
+    const ownsPrecedingUser = !!precedingUserId && pendingAuxiliary.every((item) => !item.turnId);
+    const ownerId = ownsOneStableTurn ? turnId : ownsPrecedingUser ? precedingUserId : '';
     const markdown = appendBlocks(pendingAuxiliary.map((item) => item.markdown));
     pendingAuxiliary = [];
-    if (!ownsOneStableTurn || !markdown) {
+    if (!ownerId || !markdown) {
       markUnownedAuxiliary();
       return;
     }
 
-    const key = `${CHATGPT_API_PROVISIONAL_TURN_KEY_PREFIX}${turnId}`;
+    const key = `${CHATGPT_API_PROVISIONAL_TURN_KEY_PREFIX}${ownerId}`;
     if (seenMessageKeys.has(key)) {
       markSchemaDrift();
       return;
@@ -568,7 +693,6 @@ export function buildChatgptApiSnapshot(input: {
       sequence: messages.length,
       updatedAt: capturedAt,
     });
-    if (unfinished) partialReasons.add(UNFINISHED_TURN_REASON);
   };
 
   const pendingMatchesTurn = (turnId: string): boolean => {
@@ -584,8 +708,7 @@ export function buildChatgptApiSnapshot(input: {
     if (!pendingMatchesTurn(turnId)) flushPendingWithoutOwner();
   };
 
-  for (const node of branch) {
-    const message = node?.message;
+  for (const message of branch) {
     if (!message || isHidden(message)) continue;
     const role = messageRole(message);
     const type = contentType(message);
@@ -593,12 +716,12 @@ export function buildChatgptApiSnapshot(input: {
     const turnId = messageTurnId(message);
 
     if (role === 'system' || role === 'developer') continue;
-    if (INTERNAL_CONTENT_TYPES.has(type)) continue;
+    if (type === 'model_editable_context') continue;
 
     if (role === 'user') {
       // A later user message proves the preceding assistant turn is closed even when ChatGPT never emitted a final node.
       // Keep its visible reasoning/progress under the stable turn id instead of discarding it.
-      flushPendingStableTurn(false);
+      flushPendingStableTurn();
       if (!id) {
         markSchemaDrift();
         continue;
@@ -607,12 +730,17 @@ export function buildChatgptApiSnapshot(input: {
       const parts = currentParts(message, markSchemaDrift);
       const images = collectMessageImages(message, markSchemaDrift);
       const attachments = currentAttachments(message, markSchemaDrift);
-      if ((images.length || attachments.length) && type !== 'multimodal_text') markSchemaDrift();
+      if (images.length && type !== 'multimodal_text') markSchemaDrift();
       if (hasUnsupportedAttachmentMetadata(message, images, markSchemaDrift)) markSchemaDrift();
-      const markdown = appendBlocks([renderTextParts(message, markSchemaDrift), renderImageBlocks(images)]);
+      const markdown = appendBlocks([
+        renderTextParts(message, markSchemaDrift),
+        renderImageBlocks(images),
+        renderNonImageAttachments(message, markSchemaDrift),
+      ]);
       const hasOpaquePayload = parts.length > 0 || attachments.length > 0;
       if (!markdown && !hasOpaquePayload) continue;
       if (seenMessageKeys.has(id)) throw apiSnapshotError('duplicate_message_key');
+      precedingUserId = id;
       seenMessageKeys.add(id);
       messages.push({
         messageKey: id,
@@ -639,8 +767,9 @@ export function buildChatgptApiSnapshot(input: {
 
         const markdown = appendBlocks([
           ...pendingAuxiliary.map((item) => item.markdown),
-          normalizeRichUiMarkup(renderTextParts(message, markSchemaDrift)),
+          renderTextParts(message, markSchemaDrift, true),
           renderImageBlocks(pendingImages),
+          renderNonImageAttachments(message, markSchemaDrift),
         ]);
         let imageOwnerKey = buildChatgptGeneratedImageMessageKey(pendingImages.map((image) => image.fileId));
         if (pendingImages.length && !imageOwnerKey) {
@@ -714,7 +843,13 @@ export function buildChatgptApiSnapshot(input: {
       const images = collectMessageImages(message, markSchemaDrift);
       if (message.recipient !== 'all' || type !== 'multimodal_text') markSchemaDrift();
       if (hasNonImagePartContent(message, markSchemaDrift)) markSchemaDrift();
-      if (hasUnsupportedAttachmentMetadata(message, images, markSchemaDrift)) markSchemaDrift();
+      if (
+        hasUnsupportedAttachmentMetadata(message, images, markSchemaDrift) ||
+        currentAttachments(message, markSchemaDrift).some(
+          (attachment) => !stableString(attachment?.mime_type).startsWith('image/'),
+        )
+      )
+        markSchemaDrift();
       pendingImages.push(...images);
       continue;
     }
@@ -722,7 +857,7 @@ export function buildChatgptApiSnapshot(input: {
     markSchemaDrift();
   }
 
-  flushPendingStableTurn(true);
+  flushPendingStableTurn();
   if (!messages.length) throw apiSnapshotError('no_visible_messages');
 
   const title = stableString(input.data?.title) || 'ChatGPT';
@@ -743,9 +878,5 @@ export function buildChatgptApiSnapshot(input: {
     },
   };
 
-  return {
-    snapshot,
-    currentTurnState: backendCurrentTurn.state,
-    currentTurnId: backendCurrentTurn.turnId,
-  };
+  return { snapshot };
 }
