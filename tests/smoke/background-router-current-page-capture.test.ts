@@ -64,6 +64,35 @@ describe('background-router current page capture relay', () => {
     expect(response.error?.extra).toEqual({ code: 'CAPTURE_FAILED' });
   });
 
+  it('forwards safe ChatGPT API diagnostic codes without exposing arbitrary error fields', async () => {
+    vi.mocked(tabsQuery).mockResolvedValue([{ id: 31, url: 'https://chatgpt.com/c/123' }] as any);
+    vi.mocked(tabsSendMessage).mockResolvedValue({
+      ok: false,
+      data: null,
+      error: {
+        message: 'Advanced capture temporarily unavailable',
+        extra: { code: 'chatgpt_api_page_http', status: 503, accessToken: 'must-not-escape' },
+      },
+    } as any);
+    const router = createTestBackgroundRouter();
+    expect(await router.dispatch({ type: 'captureActiveTabCurrentPage' })).toMatchObject({
+      ok: false,
+      error: {
+        message: 'Advanced capture temporarily unavailable',
+        extra: { code: 'chatgpt_api_page_http', status: 503 },
+      },
+    });
+    vi.mocked(tabsSendMessage).mockResolvedValue({
+      ok: false,
+      data: null,
+      error: { message: 'Opaque internal error', extra: { code: 'MY_SECRET_CODE', status: 503 } },
+    } as any);
+    expect(await router.dispatch({ type: 'captureActiveTabCurrentPage' })).toMatchObject({
+      ok: false,
+      error: { extra: { code: 'CAPTURE_FAILED' } },
+    });
+  });
+
   it('relays shortcut capture through the canonical capture command', async () => {
     vi.mocked(tabsQuery).mockResolvedValue([{ id: 11, url: 'https://example.com/article' }] as any);
     vi.mocked(tabsSendMessage).mockResolvedValue({ ok: true, data: { title: 'Saved' }, error: null });

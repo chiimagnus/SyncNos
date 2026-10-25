@@ -157,6 +157,30 @@ describe('current-page-capture content handlers', () => {
     });
   });
 
+  it('retains safe ChatGPT API error code and HTTP status across the content response', async () => {
+    const runtime = setupListener();
+    registerCurrentPageCaptureContentHandlers(
+      {
+        getCurrentPageCaptureState: vi.fn(),
+        captureCurrentPage: vi.fn(async () => {
+          throw Object.assign(new Error('Advanced capture temporarily unavailable'), {
+            code: 'chatgpt_api_page_http',
+            status: 503,
+          });
+        }),
+      } as any,
+      { localeReady: Promise.resolve() },
+    );
+    expect(await dispatch(runtime.getListener(), { type: 'captureCurrentPage' })).toEqual({
+      ok: false,
+      data: null,
+      error: {
+        message: 'Advanced capture temporarily unavailable',
+        extra: { code: 'chatgpt_api_page_http', status: 503 },
+      },
+    });
+  });
+
   it('removes its registered listener on cleanup', () => {
     const runtime = setupListener();
     const cleanup = registerCurrentPageCaptureContentHandlers(

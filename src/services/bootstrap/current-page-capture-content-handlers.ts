@@ -23,7 +23,19 @@ export function registerCurrentPageCaptureContentHandlers(
       .catch(() => undefined)
       .then(() => run())
       .then((data) => sendResponse(ok(data)))
-      .catch((error) => sendResponse(err((error as any)?.message ?? error)));
+      .catch((error) => {
+        const code = (error as any)?.code;
+        const status = Number((error as any)?.status);
+        const safeCode = typeof code === 'string' && /^chatgpt_api_[a-z0-9_]+$/.test(code) ? code : '';
+        sendResponse(
+          err(
+            (error as any)?.message ?? error,
+            safeCode
+              ? { code: safeCode, ...(Number.isInteger(status) && status >= 100 && status <= 599 ? { status } : null) }
+              : undefined,
+          ),
+        );
+      });
     return true;
   };
 
