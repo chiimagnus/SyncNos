@@ -438,7 +438,9 @@ function ensureButtonInteractions(btn: HTMLElement) {
     }
 
     if (finalCount === 2) {
-      readOnDoubleClick(btn)?.();
+      const onDoubleClick = readOnDoubleClick(btn);
+      if (onDoubleClick) onDoubleClick();
+      else readOnClick(btn)?.();
       return;
     }
 

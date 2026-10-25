@@ -19,6 +19,39 @@ async function waitFor(predicate: () => boolean) {
   }
 }
 
+function setupListener() {
+  let listener: any = null;
+  const removeListener = vi.fn();
+  // @ts-expect-error test global
+  globalThis.chrome = {
+    runtime: {
+      onMessage: {
+        addListener: vi.fn((registered: any) => {
+          listener = registered;
+        }),
+        removeListener,
+      },
+    },
+  };
+  return {
+    getListener: () => {
+      if (!listener) throw new Error('capture content listener not registered');
+      return listener;
+    },
+    removeListener,
+  };
+}
+
+async function dispatch(listener: any, message: any) {
+  let response: any = null;
+  const handled = listener(message, {}, (next: any) => {
+    response = next;
+  });
+  expect(handled).toBe(true);
+  await waitFor(() => response !== null);
+  return response;
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
   // @ts-expect-error test global cleanup
@@ -26,324 +59,114 @@ afterEach(() => {
 });
 
 describe('current-page-capture content handlers', () => {
-  it('shows inpage tip progress when capture is triggered from context menu', async () => {
-    let registeredListener: any = null;
-    const addListener = vi.fn((listener: any) => {
-      registeredListener = listener;
-    });
-
-    // @ts-expect-error test global
-    globalThis.chrome = {
-      runtime: {
-        onMessage: {
-          addListener,
-          removeListener: vi.fn(),
-        },
-      },
-    };
-
-    const captureCurrentPage = vi.fn(async (input?: any) => {
-      input?.onProgress?.({ message: 'Saving...', kind: 'default' });
-      input?.onProgress?.({ message: 'Saved: Hello', kind: 'default' });
-      return { title: 'Hello' };
-    });
-
-    const showSaveTip = vi.fn();
-
-    registerCurrentPageCaptureContentHandlers(
-      {
-        // Not used in this test.
-        getCurrentPageCaptureState: vi.fn(),
-        captureCurrentPage,
-      } as any,
-      { inpageTip: { showSaveTip }, localeReady: Promise.resolve() },
-    );
-
-    expect(addListener).toHaveBeenCalledTimes(1);
-
-    let response: any = null;
-    const returned = registeredListener?.(
-      { type: 'captureCurrentPage', payload: { source: 'contextmenu' } },
-      {},
-      (value: any) => {
-        response = value;
-      },
-    );
-
-    expect(returned).toBe(true);
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(captureCurrentPage).toHaveBeenCalledTimes(1);
-    expect(showSaveTip).toHaveBeenCalledWith('Saving...', { kind: 'default' });
-    expect(showSaveTip).toHaveBeenCalledWith('Saved: Hello', { kind: 'default' });
-    expect(response?.ok).toBe(true);
-    expect(response?.data).toEqual({ title: 'Hello' });
-  });
-
-  it('routes video context-menu progress through the unified current-page handler', async () => {
-    let registeredListener: any = null;
-    // @ts-expect-error test global
-    globalThis.chrome = {
-      runtime: {
-        onMessage: {
-          addListener: vi.fn((listener: any) => {
-            registeredListener = listener;
-          }),
-          removeListener: vi.fn(),
-        },
-      },
-    };
-
-    const captureCurrentPage = vi.fn(async (input?: any) => {
-      input?.onProgress?.({
-        message: 'No subtitles. Video info saved.',
-        kind: 'default',
-      });
-      return {
-        kind: 'video',
-        label: 'Fetch Video Transcript',
-        collectorId: 'video',
-        conversationId: 42,
-        isNew: true,
-        subtitleStatus: 'empty',
-      };
-    });
-    const showSaveTip = vi.fn();
+  it.each([
+    ['popup', undefined],
+    ['context menu', { source: 'contextmenu' }],
+    ['shortcut', { source: 'shortcut' }],
+  ])('routes %s capture through the same service state', async (_name, payload) => {
+    const runtime = setupListener();
+    const captureCurrentPage = vi.fn(async () => ({ kind: 'chat', title: 'Saved' }));
     registerCurrentPageCaptureContentHandlers({ getCurrentPageCaptureState: vi.fn(), captureCurrentPage } as any, {
-      inpageTip: { showSaveTip },
       localeReady: Promise.resolve(),
     });
 
+    const result = await dispatch(runtime.getListener(), {
+      type: 'captureCurrentPage',
+      ...(payload ? { payload } : null),
+    });
+
+    expect(result).toEqual({ ok: true, data: { kind: 'chat', title: 'Saved' }, error: null });
+    expect(captureCurrentPage).toHaveBeenCalledOnce();
+    expect(captureCurrentPage).toHaveBeenCalledWith();
+  });
+
+  it('passes the video metadata result unchanged', async () => {
+    const runtime = setupListener();
+    const result = {
+      kind: 'video',
+      label: 'Fetch Video Transcript',
+      collectorId: 'video',
+      conversationId: 42,
+      isNew: true,
+      subtitleStatus: 'empty',
+    };
+    registerCurrentPageCaptureContentHandlers(
+      { getCurrentPageCaptureState: vi.fn(), captureCurrentPage: vi.fn(async () => result) } as any,
+      { localeReady: Promise.resolve() },
+    );
+
+    expect((await dispatch(runtime.getListener(), { type: 'captureCurrentPage' })).data).toEqual(result);
+  });
+
+  it('registers the listener before locale is ready, then returns the current activity', async () => {
+    const locale = deferred<void>();
+    const runtime = setupListener();
+    const getCurrentPageCaptureState = vi.fn(async () => ({ kind: 'chat', activity: { phase: 'capturing' } }));
+    registerCurrentPageCaptureContentHandlers({ getCurrentPageCaptureState, captureCurrentPage: vi.fn() } as any, {
+      localeReady: locale.promise,
+    });
+
     let response: any = null;
     expect(
-      registeredListener?.({ type: 'captureCurrentPage', payload: { source: 'contextmenu' } }, {}, (value: any) => {
-        response = value;
+      runtime.getListener()({ type: 'getCurrentPageCaptureState' }, {}, (next: any) => {
+        response = next;
       }),
     ).toBe(true);
-    await waitFor(() => response?.ok === true);
-
-    expect(captureCurrentPage).toHaveBeenCalledTimes(1);
-    expect(showSaveTip).toHaveBeenCalledWith('No subtitles. Video info saved.', {
-      kind: 'default',
-    });
-    expect(response?.data).toMatchObject({ kind: 'video', subtitleStatus: 'empty', conversationId: 42, isNew: true });
-  });
-
-  it('returns a disposer for the registered runtime listener', () => {
-    const removeListener = vi.fn();
-    let registeredListener: any = null;
-    // @ts-expect-error test global
-    globalThis.chrome = {
-      runtime: {
-        onMessage: {
-          addListener: vi.fn((listener: any) => {
-            registeredListener = listener;
-          }),
-          removeListener,
-        },
-      },
-    };
-
-    const cleanup = registerCurrentPageCaptureContentHandlers(
-      {
-        getCurrentPageCaptureState: vi.fn(),
-        captureCurrentPage: vi.fn(),
-      } as any,
-      { inpageTip: { showSaveTip: vi.fn() }, localeReady: Promise.resolve() },
-    );
-
-    expect(registeredListener).toEqual(expect.any(Function));
-    cleanup();
-    expect(removeListener).toHaveBeenCalledTimes(1);
-    expect(removeListener).toHaveBeenCalledWith(registeredListener);
-  });
-
-  it('registers capture listeners immediately and waits for locale before service work', async () => {
-    const locale = deferred<void>();
-    let registeredListener: any = null;
-    const addListener = vi.fn((listener: any) => {
-      registeredListener = listener;
-    });
-
-    // @ts-expect-error test global
-    globalThis.chrome = {
-      runtime: {
-        onMessage: {
-          addListener,
-          removeListener: vi.fn(),
-        },
-      },
-    };
-
-    const getCurrentPageCaptureState = vi.fn(async () => ({ kind: 'chat' }));
-    const captureCurrentPage = vi.fn(async () => ({ title: 'Hello' }));
-
-    registerCurrentPageCaptureContentHandlers(
-      {
-        getCurrentPageCaptureState,
-        captureCurrentPage,
-      } as any,
-      { inpageTip: { showSaveTip: vi.fn() }, localeReady: locale.promise },
-    );
-
-    expect(addListener).toHaveBeenCalledTimes(1);
-
-    let stateResponse: any = null;
-    expect(
-      registeredListener?.({ type: 'getCurrentPageCaptureState' }, {}, (value: any) => {
-        stateResponse = value;
-      }),
-    ).toBe(true);
-    for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    await Promise.resolve();
     expect(getCurrentPageCaptureState).not.toHaveBeenCalled();
 
     locale.resolve();
-    await waitFor(() => stateResponse?.ok === true);
-    expect(getCurrentPageCaptureState).toHaveBeenCalledTimes(1);
-    expect(stateResponse?.ok).toBe(true);
-    expect(stateResponse?.data).toEqual({ kind: 'chat' });
+    await waitFor(() => response?.ok === true);
+    expect(response.data).toEqual({ kind: 'chat', activity: { phase: 'capturing' } });
+    expect(getCurrentPageCaptureState).toHaveBeenCalledOnce();
   });
 
-  it('continues current-page work after locale readiness rejects', async () => {
+  it('keeps capture available when locale initialization fails', async () => {
     const locale = deferred<void>();
-    let registeredListener: any = null;
-
-    // @ts-expect-error test global
-    globalThis.chrome = {
-      runtime: {
-        onMessage: {
-          addListener: vi.fn((listener: any) => {
-            registeredListener = listener;
-          }),
-          removeListener: vi.fn(),
-        },
-      },
-    };
-
+    const runtime = setupListener();
     const captureCurrentPage = vi.fn(async () => ({ title: 'Fallback' }));
-    registerCurrentPageCaptureContentHandlers(
-      {
-        getCurrentPageCaptureState: vi.fn(),
-        captureCurrentPage,
-      } as any,
-      { inpageTip: { showSaveTip: vi.fn() }, localeReady: locale.promise },
-    );
-
+    registerCurrentPageCaptureContentHandlers({ getCurrentPageCaptureState: vi.fn(), captureCurrentPage } as any, {
+      localeReady: locale.promise,
+    });
     let response: any = null;
-    registeredListener?.({ type: 'captureCurrentPage', payload: { source: 'popup' } }, {}, (value: any) => {
-      response = value;
+    runtime.getListener()({ type: 'captureCurrentPage' }, {}, (next: any) => {
+      response = next;
     });
     locale.reject(new Error('locale failed'));
     await waitFor(() => response?.ok === true);
-
-    expect(captureCurrentPage).toHaveBeenCalledTimes(1);
-    expect(response?.ok).toBe(true);
-    expect(response?.data).toEqual({ title: 'Fallback' });
+    expect(captureCurrentPage).toHaveBeenCalledOnce();
+    expect(response.data).toEqual({ title: 'Fallback' });
   });
 
-  it('shows the same inpage progress for shortcut capture', async () => {
-    let registeredListener: any = null;
-    // @ts-expect-error test global
-    globalThis.chrome = {
-      runtime: {
-        onMessage: {
-          addListener: vi.fn((listener: any) => {
-            registeredListener = listener;
-          }),
-          removeListener: vi.fn(),
-        },
-      },
-    };
+  it('returns the same error envelope on failed captures', async () => {
+    const runtime = setupListener();
+    registerCurrentPageCaptureContentHandlers(
+      {
+        getCurrentPageCaptureState: vi.fn(),
+        captureCurrentPage: vi.fn(async () => {
+          throw new Error('Cannot capture this page');
+        }),
+      } as any,
+      { localeReady: Promise.resolve() },
+    );
 
-    const captureCurrentPage = vi.fn(async (input?: any) => {
-      input?.onProgress?.({ message: 'Saved by shortcut', kind: 'default' });
-      return { title: 'Shortcut' };
-    });
-    const showSaveTip = vi.fn();
-    registerCurrentPageCaptureContentHandlers({ getCurrentPageCaptureState: vi.fn(), captureCurrentPage } as any, {
-      inpageTip: { showSaveTip },
-      localeReady: Promise.resolve(),
-    });
-
-    let response: any = null;
-    registeredListener?.({ type: 'captureCurrentPage', payload: { source: 'shortcut' } }, {}, (value: any) => {
-      response = value;
-    });
-    await waitFor(() => response?.ok === true);
-
-    expect(showSaveTip).toHaveBeenCalledWith('Saved by shortcut', { kind: 'default' });
-    expect(response?.data).toEqual({ title: 'Shortcut' });
-  });
-
-  it('does not show an inpage tip for capture messages without an inpage source', async () => {
-    let registeredListener: any = null;
-    // @ts-expect-error test global
-    globalThis.chrome = {
-      runtime: {
-        onMessage: {
-          addListener: vi.fn((listener: any) => {
-            registeredListener = listener;
-          }),
-          removeListener: vi.fn(),
-        },
-      },
-    };
-
-    const captureCurrentPage = vi.fn(async (input?: any) => {
-      input?.onProgress?.({ message: 'Should stay hidden', kind: 'default' });
-      return { title: 'Popup' };
-    });
-    const showSaveTip = vi.fn();
-    registerCurrentPageCaptureContentHandlers({ getCurrentPageCaptureState: vi.fn(), captureCurrentPage } as any, {
-      inpageTip: { showSaveTip },
-      localeReady: Promise.resolve(),
-    });
-
-    let response: any = null;
-    registeredListener?.({ type: 'captureCurrentPage' }, {}, (value: any) => {
-      response = value;
-    });
-    await waitFor(() => response?.ok === true);
-
-    expect(captureCurrentPage).toHaveBeenCalledWith(undefined);
-    expect(showSaveTip).not.toHaveBeenCalled();
-  });
-
-  it('keeps the existing error envelope while surfacing shortcut capture errors', async () => {
-    let registeredListener: any = null;
-    // @ts-expect-error test global
-    globalThis.chrome = {
-      runtime: {
-        onMessage: {
-          addListener: vi.fn((listener: any) => {
-            registeredListener = listener;
-          }),
-          removeListener: vi.fn(),
-        },
-      },
-    };
-
-    const captureCurrentPage = vi.fn(async (input?: any) => {
-      input?.onProgress?.({ message: 'Cannot capture this page', kind: 'error' });
-      throw new Error('Cannot capture this page');
-    });
-    const showSaveTip = vi.fn();
-    registerCurrentPageCaptureContentHandlers({ getCurrentPageCaptureState: vi.fn(), captureCurrentPage } as any, {
-      inpageTip: { showSaveTip },
-      localeReady: Promise.resolve(),
-    });
-
-    let response: any = null;
-    registeredListener?.({ type: 'captureCurrentPage', payload: { source: 'shortcut' } }, {}, (value: any) => {
-      response = value;
-    });
-    await waitFor(() => response?.ok === false);
-
-    expect(showSaveTip).toHaveBeenCalledWith('Cannot capture this page', { kind: 'error' });
-    expect(response).toEqual({
+    expect(await dispatch(runtime.getListener(), { type: 'captureCurrentPage' })).toEqual({
       ok: false,
       data: null,
       error: { message: 'Cannot capture this page', extra: null },
     });
+  });
+
+  it('removes its registered listener on cleanup', () => {
+    const runtime = setupListener();
+    const cleanup = registerCurrentPageCaptureContentHandlers(
+      { getCurrentPageCaptureState: vi.fn(), captureCurrentPage: vi.fn() } as any,
+      { localeReady: Promise.resolve() },
+    );
+
+    const listener = runtime.getListener();
+    cleanup();
+    expect(runtime.removeListener).toHaveBeenCalledOnce();
+    expect(runtime.removeListener).toHaveBeenCalledWith(listener);
   });
 });

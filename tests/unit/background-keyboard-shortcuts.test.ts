@@ -40,7 +40,6 @@ describe('background keyboard shortcuts', () => {
     expect(dispatchMessage).toHaveBeenCalledTimes(1);
     expect(dispatchMessage).toHaveBeenCalledWith({
       type: UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE,
-      source: 'shortcut',
     });
     expect(openTab).not.toHaveBeenCalled();
   });

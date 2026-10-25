@@ -91,6 +91,12 @@ function createHarness(options: {
   const currentPageCapture = createCurrentPageCaptureService({
     runtime,
     collectorsRegistry,
+    onActivity: (activity) => {
+      tipCalls.push({
+        text: activity.message,
+        options: { kind: activity.kind === 'error' ? 'error' : 'default', expiresAt: activity.expiresAt },
+      });
+    },
   });
 
   const controller = createContentController({

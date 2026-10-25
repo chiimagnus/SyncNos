@@ -143,10 +143,7 @@ describe('clipper context menu runtime settings', () => {
     api.emitClick('syncnos_clipper_save_current_page');
     await flush();
 
-    expect(tabsMocks.send).toHaveBeenCalledWith(7, {
-      type: 'captureCurrentPage',
-      payload: { source: 'contextmenu' },
-    });
+    expect(tabsMocks.send).toHaveBeenCalledWith(7, { type: 'captureCurrentPage' });
     expect(api.create.mock.calls.map(([value]: any[]) => value?.id)).not.toContain(
       'syncnos_clipper_save_video_transcript',
     );

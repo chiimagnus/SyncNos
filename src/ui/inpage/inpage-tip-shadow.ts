@@ -1,8 +1,8 @@
 import inpageTipCssRaw from '@ui/styles/inpage-tip.css?raw';
 import tokensCssRaw from '@ui/styles/tokens.css?raw';
+import { CAPTURE_ACTIVITY_VISIBLE_MS } from '@services/shared/capture-tip';
 const BUBBLE_ID = 'webclipper-inpage-bubble';
 const INPAGE_BTN_ID = 'webclipper-inpage-btn';
-const VISIBLE_MS = 1800;
 const ANIM_CLASS = 'is-enter';
 const VIEWPORT_PAD = 10;
 const ANCHOR_GAP = 10;
@@ -20,7 +20,7 @@ type TipKind = 'default' | 'error';
 const state = {
   hideTimer: null as any,
   animTimer: null as any,
-  rafId: null as any,
+  followTimer: null as ReturnType<typeof setTimeout> | null,
   visibleUntil: 0,
 };
 
@@ -195,35 +195,21 @@ function positionBubble(el: HTMLElement) {
 }
 
 function stopFollowLoop() {
-  const caf =
-    typeof (globalThis as any).cancelAnimationFrame === 'function'
-      ? (globalThis as any).cancelAnimationFrame.bind(globalThis)
-      : clearTimeout;
-  if (state.rafId != null) {
-    caf(state.rafId);
-    state.rafId = null;
+  if (state.followTimer != null) {
+    clearTimeout(state.followTimer);
+    state.followTimer = null;
   }
 }
 
 function startFollowLoop(el: HTMLElement) {
   stopFollowLoop();
-  const raf =
-    typeof (globalThis as any).requestAnimationFrame === 'function'
-      ? (globalThis as any).requestAnimationFrame.bind(globalThis)
-      : (cb: any) => setTimeout(cb, 16);
   const tick = () => {
-    if (!el || !(el as any).isConnected) {
-      state.rafId = null;
-      return;
-    }
+    state.followTimer = null;
+    if (!el.isConnected || Date.now() >= state.visibleUntil) return;
     positionBubble(el);
-    if (Date.now() < state.visibleUntil) {
-      state.rafId = raf(tick);
-      return;
-    }
-    state.rafId = null;
+    state.followTimer = setTimeout(tick, 100);
   };
-  state.rafId = raf(tick);
+  state.followTimer = setTimeout(tick, 100);
 }
 
 function resetTimers() {
@@ -260,20 +246,21 @@ function replayEnterAnimation(el: HTMLElement) {
   }, 340);
 }
 
-function showSaveTip(text: unknown, options?: { kind?: TipKind }) {
-  const opts = options && typeof options === 'object' ? options : {};
+function showSaveTip(text: unknown, options?: { kind?: TipKind; expiresAt?: number | null }) {
   const el = ensureBubble();
   if (!el) return;
   resetTimers();
-  setTextAndKind(el, text, (opts as any).kind);
+  setTextAndKind(el, text, options?.kind);
   positionBubble(el);
   replayEnterAnimation(el);
 
-  state.visibleUntil = Date.now() + VISIBLE_MS;
+  const expiresAt =
+    options?.expiresAt === null ? null : (options?.expiresAt ?? Date.now() + CAPTURE_ACTIVITY_VISIBLE_MS);
+  state.visibleUntil = expiresAt ?? Infinity;
   startFollowLoop(el);
-  state.hideTimer = setTimeout(() => {
-    removeBubble();
-  }, VISIBLE_MS);
+  if (expiresAt !== null) {
+    state.hideTimer = setTimeout(removeBubble, Math.max(0, expiresAt - Date.now()));
+  }
 }
 
 export const inpageTipApi = { showSaveTip, cleanup: removeBubble };

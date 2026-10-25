@@ -2,17 +2,12 @@ import { CURRENT_PAGE_MESSAGE_TYPES } from '@platform/messaging/message-contract
 import { err, ok, type ApiResponse } from '@services/bootstrap/content-handler-response';
 import type { CurrentPageCaptureService } from '@services/bootstrap/current-page-capture';
 
-type InpageTipApi = {
-  showSaveTip: (text: unknown, options?: { kind?: 'default' | 'error' }) => void;
-};
-
 type CurrentPageCaptureContentHandlerOptions = {
-  inpageTip: InpageTipApi;
   localeReady: Promise<unknown>;
 };
 
 export function registerCurrentPageCaptureContentHandlers(
-  service: CurrentPageCaptureService,
+  service: Pick<CurrentPageCaptureService, 'getCurrentPageCaptureState' | 'captureCurrentPage'>,
   options: CurrentPageCaptureContentHandlerOptions,
 ) {
   const runtime = (globalThis as any).chrome?.runtime ?? (globalThis as any).browser?.runtime;
@@ -33,27 +28,9 @@ export function registerCurrentPageCaptureContentHandlers(
     }
 
     if (msg.type === CURRENT_PAGE_MESSAGE_TYPES.CAPTURE) {
-      const source = String(msg?.payload?.source || '')
-        .trim()
-        .toLowerCase();
-      const inpageTip = options.inpageTip;
-      const showTip = source === 'contextmenu' || source === 'shortcut';
-
       localeReady
         .catch(() => undefined)
-        .then(() =>
-          service.captureCurrentPage(
-            showTip
-              ? {
-                  onProgress: (progress) => {
-                    inpageTip.showSaveTip(progress.message, {
-                      kind: progress.kind === 'error' ? 'error' : 'default',
-                    });
-                  },
-                }
-              : undefined,
-          ),
-        )
+        .then(() => service.captureCurrentPage())
         .then((data) => sendResponse(ok(data)))
         .catch((error) => {
           sendResponse(err((error as any)?.message ?? error));

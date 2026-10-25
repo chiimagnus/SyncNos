@@ -51,6 +51,13 @@ export default defineContentScript({
       runtime,
       collectorsRegistry,
       videoCapture: videoTranscriptCapture,
+      onActivity: (activity) => {
+        if (lifecycle.isDisposed()) return;
+        inpageTipApi.showSaveTip(activity.message, {
+          kind: activity.kind === 'error' ? 'error' : 'default',
+          expiresAt: activity.expiresAt,
+        });
+      },
     });
     const incrementalEngine = createAutoSaveIncrementalEngine();
     let captureCurrentPage = currentPageCapture.captureCurrentPage;
@@ -59,10 +66,9 @@ export default defineContentScript({
       registerCurrentPageCaptureContentHandlers(
         {
           getCurrentPageCaptureState: currentPageCapture.getCurrentPageCaptureState,
-          captureCurrentPage: (input) => captureCurrentPage(input),
+          captureCurrentPage: () => captureCurrentPage(),
         },
         {
-          inpageTip: inpageTipApi,
           localeReady,
         },
       ),

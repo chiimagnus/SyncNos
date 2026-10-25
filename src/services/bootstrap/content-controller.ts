@@ -1,8 +1,8 @@
 import type { CurrentPageCaptureService } from '@services/bootstrap/current-page-capture';
 import { AI_CHAT_AUTO_SAVE_COLLECTOR_IDS } from '@collectors/ai-chat-sites';
 import { resolveActiveCollector, type CollectorRegistryLike } from '@collectors/registry';
-import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
 import { resolveCaptureIntegrity } from '@services/shared/capture-integrity';
+import { t } from '@i18n';
 import { storageGet, storageOnChanged } from '@services/shared/storage';
 import { CORE_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { reconcileAutoSaveBackfill } from '@services/conversations/content/autosave-backfill-reconciler';
@@ -83,18 +83,8 @@ export function createContentController(deps: Deps) {
   const incrementalEngine = deps.incrementalEngine;
   const itemMention = deps.itemMention;
 
-  function toTipKind(kind?: unknown): 'default' | 'error' | undefined {
-    const value = String(kind || '')
-      .trim()
-      .toLowerCase();
-    if (!value) return undefined;
-    if (value === 'ok') return 'default';
-    if (value === 'default' || value === 'error') return value;
-    return undefined;
-  }
-
-  function showInpageTip(text: string, kind?: string) {
-    inpageTip.showSaveTip(text, { kind: toTipKind(kind) });
+  function showInpageTip(text: string) {
+    inpageTip.showSaveTip(text);
   }
 
   function send(type: string, payload?: Record<string, unknown>) {
@@ -489,21 +479,23 @@ export function createContentController(deps: Deps) {
       let manualSlot: ManualPersistenceSlot | null = null;
       try {
         manualSlot = await enterManualPersistence(ownerToken, () => !stopped && isCurrentResidentOwner(ownerToken));
-        if (!manualSlot) return;
+        if (!manualSlot) {
+          if (!stopped && isCurrentResidentOwner(ownerToken)) {
+            const activity = await currentPageCapture.getCurrentPageCaptureState().catch(() => null);
+            if (!stopped && isCurrentResidentOwner(ownerToken) && activity?.activity?.phase !== 'capturing') {
+              showInpageTip(t('fetchingDots'));
+            }
+          }
+          return;
+        }
         setResidentSaving(true);
         try {
-          await currentPageCapture.captureCurrentPage({
-            onProgress: (progress) => {
-              if (!stopped && isCurrentResidentOwner(ownerToken)) {
-                showInpageTip(progress.message, progress.kind === 'default' ? 'ok' : progress.kind);
-              }
-            },
-          });
+          await currentPageCapture.captureCurrentPage();
         } finally {
           setResidentSaving(false);
         }
       } catch (_error) {
-        // tip already shown in progress callback
+        // Capture errors are reported by the shared activity state.
       } finally {
         if (manualSlot) exitManualPersistence(manualSlot);
       }
@@ -708,10 +700,7 @@ export function createContentController(deps: Deps) {
           }
 
           if (saved && isCurrentResidentOwner(ownerToken) && !stopped && (incrementalChanged || backfill.changed)) {
-            showInpageTip(
-              buildCaptureSuccessTipMessage({ isNew: saved.isNew, title: merged.snapshot?.conversation?.title }),
-              'ok',
-            );
+            currentPageCapture.reportAutoSave({ isNew: saved.isNew, title: merged.snapshot?.conversation?.title });
           }
         } finally {
           setResidentSaving(false);
@@ -757,14 +746,12 @@ export function createContentController(deps: Deps) {
   }
 
   return {
-    async captureCurrentPage(
-      input?: Parameters<CurrentPageCaptureService['captureCurrentPage']>[0],
-    ): ReturnType<CurrentPageCaptureService['captureCurrentPage']> {
+    async captureCurrentPage(): ReturnType<CurrentPageCaptureService['captureCurrentPage']> {
       const manualSlot = await enterManualPersistence(null, () => true);
       if (!manualSlot) throw new Error('manual_capture_in_progress');
       inpageButton.setSaving(true);
       try {
-        return await currentPageCapture.captureCurrentPage(input);
+        return await currentPageCapture.captureCurrentPage();
       } finally {
         inpageButton.setSaving(false);
         exitManualPersistence(manualSlot);

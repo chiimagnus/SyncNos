@@ -43,6 +43,7 @@ describe('inpage-tip speech bubble', () => {
   });
 
   afterEach(() => {
+    inpageTipApi.cleanup();
     vi.useRealTimers();
     // @ts-expect-error test global cleanup
     delete global.window;
@@ -156,7 +157,7 @@ describe('inpage-tip speech bubble', () => {
     expect(bubble?.style.top).toMatch(/px$/);
   });
 
-  it('removes bubble after 1800ms', () => {
+  it('removes settled bubbles after 5000ms', () => {
     vi.useFakeTimers();
     appendIconRect({ left: 20, right: 60, top: 400, bottom: 440, width: 40, height: 40 });
     const api = loadInpageTip();
@@ -164,7 +165,25 @@ describe('inpage-tip speech bubble', () => {
     api.showSaveTip('Loading full history...', { kind: 'loading' });
     expect(document.getElementById('webclipper-inpage-bubble')).toBeTruthy();
 
-    vi.advanceTimersByTime(1801);
+    vi.advanceTimersByTime(5001);
+    expect(document.getElementById('webclipper-inpage-bubble')).toBeNull();
+  });
+
+  it('keeps capturing feedback visible until it settles, then uses the same expiry as Popup', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-25T12:00:00Z'));
+    appendIconRect({ left: 20, right: 60, top: 400, bottom: 440, width: 40, height: 40 });
+    const api = loadInpageTip();
+
+    api.showSaveTip('Fetching...', { expiresAt: null });
+    vi.advanceTimersByTime(25_000);
+    expect(document.getElementById('webclipper-inpage-bubble')?.shadowRoot?.textContent).toContain('Fetching...');
+
+    const expiresAt = Date.now() + 5_000;
+    api.showSaveTip('Saved', { expiresAt });
+    vi.advanceTimersByTime(4_999);
+    expect(document.getElementById('webclipper-inpage-bubble')?.shadowRoot?.textContent).toContain('Saved');
+    vi.advanceTimersByTime(2);
     expect(document.getElementById('webclipper-inpage-bubble')).toBeNull();
   });
 

@@ -89,7 +89,7 @@ export function registerUiMessageHandlers(router: AnyRouter, options: UiMessageH
     return router.ok(relayed.data);
   });
 
-  router.register(UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE, async (msg: any) => {
+  router.register(UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE, async () => {
     const activeTab = await getActiveTabRaw();
     if (activeTab.kind !== 'tab') {
       await ensureFallbackLocaleReady();
@@ -102,11 +102,7 @@ export function registerUiMessageHandlers(router: AnyRouter, options: UiMessageH
       });
     }
 
-    const relayed = await relayToActiveTab(
-      activeTab.tab.id,
-      CURRENT_PAGE_MESSAGE_TYPES.CAPTURE,
-      msg?.source === 'shortcut' ? { source: 'shortcut' } : undefined,
-    );
+    const relayed = await relayToActiveTab(activeTab.tab.id, CURRENT_PAGE_MESSAGE_TYPES.CAPTURE);
     if (!relayed.ok) {
       if (relayed.message) {
         return router.err(relayed.message, {

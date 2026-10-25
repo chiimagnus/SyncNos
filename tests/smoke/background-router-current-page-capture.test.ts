@@ -64,21 +64,20 @@ describe('background-router current page capture relay', () => {
     expect(response.error?.extra).toEqual({ code: 'CAPTURE_FAILED' });
   });
 
-  it('relays shortcut capture with only the controlled shortcut source', async () => {
+  it('relays shortcut capture through the canonical capture command', async () => {
     vi.mocked(tabsQuery).mockResolvedValue([{ id: 11, url: 'https://example.com/article' }] as any);
     vi.mocked(tabsSendMessage).mockResolvedValue({ ok: true, data: { title: 'Saved' }, error: null });
 
     const router = createTestBackgroundRouter();
-    const response = await router.dispatch({ type: 'captureActiveTabCurrentPage', source: 'shortcut' });
+    const response = await router.dispatch({ type: 'captureActiveTabCurrentPage' });
 
     expect(response.ok).toBe(true);
     expect(tabsSendMessage).toHaveBeenCalledWith(11, {
       type: 'captureCurrentPage',
-      payload: { source: 'shortcut' },
     });
   });
 
-  it('keeps capture messages without a source payload for existing callers', async () => {
+  it('uses the same capture command regardless of caller metadata', async () => {
     vi.mocked(tabsQuery).mockResolvedValue([{ id: 12, url: 'https://example.com/article' }] as any);
     vi.mocked(tabsSendMessage).mockResolvedValue({ ok: true, data: { title: 'Saved' }, error: null });
 

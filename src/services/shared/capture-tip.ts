@@ -1,6 +1,7 @@
 import { t } from '@i18n';
 
 export const CAPTURE_TIP_TITLE_MAX_CHARS = 48;
+export const CAPTURE_ACTIVITY_VISIBLE_MS = 5_000;
 
 function normalizeTitle(value: unknown): string {
   return String(value || '')

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { createContentController } from '@services/bootstrap/content-controller.ts';
 import { createCurrentPageCaptureService } from '@services/bootstrap/current-page-capture.ts';
+import { t } from '@i18n';
 
 vi.mock('@services/integrations/chatgpt/api-capture-settings', () => ({
   readChatgptApiCaptureEnabled: vi.fn(async () => false),
@@ -70,6 +71,12 @@ function createHarness(options?: {
         subtitleStatus: 'ok' as const,
       })),
     },
+    onActivity: (activity) => {
+      tipCalls.push({
+        text: activity.message,
+        opts: { kind: activity.kind === 'error' ? 'error' : 'default', expiresAt: activity.expiresAt },
+      });
+    },
   });
 
   const controller = createContentController({
@@ -115,6 +122,7 @@ function createHarness(options?: {
   return {
     tipCalls,
     sendCalls,
+    getCaptureState: currentPageCapture.getCurrentPageCaptureState,
     runTick: async () => {
       if (tickRef) await tickRef();
       for (let i = 0; i < 16; i += 1) await Promise.resolve();
@@ -299,6 +307,7 @@ describe('content-controller inpage combo', () => {
     expect(harness.sendCalls.some((c) => c.type === 'upsertConversation')).toBe(true);
     expect(harness.sendCalls.some((c) => c.type === 'syncConversationMessages')).toBe(true);
     expect(harness.tipCalls.some((c) => String(c.text) === 'Saved')).toBe(true);
+    expect((await harness.getCaptureState()).activity).toMatchObject({ phase: 'settled', kind: 'success' });
   });
 
   it('skips auto-save when chatgpt deep research message is still a placeholder', async () => {
@@ -480,6 +489,7 @@ describe('content-controller inpage combo', () => {
     for (let i = 0; i < 8; i += 1) await Promise.resolve();
 
     expect(harness.sendCalls.filter((c) => c.type === 'upsertConversation')).toHaveLength(1);
+    expect(harness.tipCalls.filter((c) => c.text === t('fetchingDots'))).toHaveLength(1);
 
     resolveUpsert(undefined);
     await firstClick;
