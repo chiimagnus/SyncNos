@@ -197,17 +197,27 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
       continue;
     }
     const changedWhileFetching = completed && !(await latestMatches());
-    const result = buildChatgptApiSnapshot({
-      data: {
-        conversation_id: route.conversationId,
-        title,
-        current_node: retained.at(-1)?.id,
-        messages: retained,
-      },
-      conversationId: route.conversationId,
-      conversationUrl: sanitizedConversationUrl(initialUrl),
-      capturedAt: input?.capturedAt,
-    });
+    let result: ChatgptApiSnapshotResult;
+    try {
+      result = buildChatgptApiSnapshot({
+        data: {
+          conversation_id: route.conversationId,
+          title,
+          current_node: retained.at(-1)?.id,
+          messages: retained,
+        },
+        conversationId: route.conversationId,
+        conversationUrl: sanitizedConversationUrl(initialUrl),
+        capturedAt: input?.capturedAt,
+      });
+    } catch (error) {
+      // Commentary without a stable owner may only become saveable after older pages arrive.
+      if (!completed && (error as any)?.code === 'no_visible_messages') {
+        cursor = firstId;
+        continue;
+      }
+      throw error;
+    }
     if (!completed || currentNodeInProgress || hasAlternateBranches || changedWhileFetching) {
       const meta = result.snapshot.captureMeta;
       result.snapshot.captureMeta = {

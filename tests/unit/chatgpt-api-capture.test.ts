@@ -2119,6 +2119,29 @@ describe('ChatGPT paged API transport', () => {
     });
   });
 
+  it('continues paging when the newest page contains only unowned visible commentary', async () => {
+    const commentary = message({
+      id: 'assistant-commentary',
+      role: 'assistant',
+      channel: 'commentary',
+      contentType: 'text',
+      parts: ['Working through a long answer'],
+    });
+    const user = message({ id: 'user-owner', role: 'user', parts: ['question'] });
+    const { requestPage } = requestPages([responsePage([commentary], true, true), responsePage([user], false)]);
+    const staged: string[][] = [];
+    const result = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage,
+      onPage: async ({ snapshot }) => staged.push(snapshot.messages.map((item: any) => item.messageKey)),
+    });
+    expect(result.snapshot.messages.map((item: any) => item.messageKey)).toEqual([
+      'user-owner',
+      'chatgpt-turn:user-owner',
+    ]);
+    expect(staged).toEqual([['user-owner', 'chatgpt-turn:user-owner']]);
+  });
+
   it('defers persistence until any page actually yields a visible user or assistant', async () => {
     const tool = message({ id: 'tool-only', role: 'tool', parts: ['internal'], hidden: true });
     const { requestPage } = requestPages([responsePage([tool], true, true), responsePage(older, false)]);
