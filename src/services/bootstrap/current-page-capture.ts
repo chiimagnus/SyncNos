@@ -384,6 +384,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         if (typeof target.collector.enrichApiSnapshotWithRenderedGraphics === 'function') {
           snapshot = await target.collector.enrichApiSnapshotWithRenderedGraphics(snapshot);
         }
+        if (snapshot?.captureMeta?.completeness === 'complete') await apiCapture.verifyCurrent();
       } else {
         let preparedCapture: unknown;
         if (typeof target.collector.prepareManualCapture === 'function') {

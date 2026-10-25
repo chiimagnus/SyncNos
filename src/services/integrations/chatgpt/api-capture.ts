@@ -4,6 +4,7 @@ import { sendMessage } from '@platform/runtime/runtime';
 import { buildChatgptApiSnapshot, type ChatgptApiSnapshotResult } from '@services/integrations/chatgpt/api-snapshot';
 
 type PageProgress = { page: number; completed: boolean; messagesFetched: number };
+type CaptureResult = ChatgptApiSnapshotResult & { verifyCurrent: () => Promise<void> };
 type PageRequest = { conversationId: string; before?: string; numTurns: number; timeoutMs: number };
 
 function apiCaptureError(code: string, status?: number): Error & { code: string; status?: number } {
@@ -75,7 +76,7 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
   timeoutMs?: number;
   capturedAt?: number;
   onPage?: (result: ChatgptApiSnapshotResult, progress: PageProgress) => Promise<void>;
-}): Promise<ChatgptApiSnapshotResult> {
+}): Promise<CaptureResult> {
   const readCurrentUrl = input?.readCurrentUrl || (() => String(globalThis.location?.href || ''));
   const fetchPage = input?.requestPage || requestPageThroughBackground;
   const timeoutMs = Math.max(1, Number(input?.timeoutMs) || 30_000);
@@ -97,6 +98,18 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
     if (parseChatgptDurableConversationRoute(readCurrentUrl())?.conversationId !== route.conversationId) {
       throw apiCaptureError('chatgpt_api_navigation_changed');
     }
+  };
+  const latestNode = async (): Promise<string> => {
+    assertRoute();
+    const head = await requestPageWithRetry(
+      { conversationId: route.conversationId, numTurns: 1, timeoutMs },
+      fetchPage,
+    );
+    assertRoute();
+    if (head?.conversation_id !== route.conversationId || typeof head.current_node !== 'string' || !head.current_node) {
+      throw apiCaptureError('chatgpt_api_conversation_identity');
+    }
+    return head.current_node;
   };
   for (let page = 0; ; page += 1) {
     assertRoute();
@@ -162,22 +175,7 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
       cursor = firstId;
       continue;
     }
-    let changedWhileFetching = false;
-    if (completed) {
-      const head = await requestPageWithRetry(
-        {
-          conversationId: route.conversationId,
-          numTurns: 1,
-          timeoutMs,
-        },
-        fetchPage,
-      );
-      assertRoute();
-      if (head?.conversation_id !== route.conversationId || !head?.current_node) {
-        throw apiCaptureError('chatgpt_api_conversation_identity');
-      }
-      changedWhileFetching = head.current_node !== currentNode;
-    }
+    const changedWhileFetching = completed && (await latestNode()) !== currentNode;
     const result = buildChatgptApiSnapshot({
       data: {
         conversation_id: route.conversationId,
@@ -213,5 +211,10 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
 
   if (!lastResult) throw apiCaptureError('chatgpt_api_no_visible_messages');
   assertRoute();
-  return lastResult;
+  return {
+    ...lastResult,
+    verifyCurrent: async () => {
+      if ((await latestNode()) !== currentNode) throw apiCaptureError('chatgpt_api_conversation_changed');
+    },
+  };
 }

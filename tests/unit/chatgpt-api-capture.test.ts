@@ -1713,6 +1713,20 @@ describe('ChatGPT paged API transport', () => {
     expect(result.snapshot.conversation.url).toBe(base);
   });
 
+  it('rechecks the same ChatGPT head before destructive persistence', async () => {
+    let latestNode = 'assistant-2';
+    const page = responsePage(newer, false, true);
+    const requestPage = vi.fn(async ({ numTurns }: { numTurns: number }) =>
+      numTurns === 1 ? { conversation_id: 'conversation-1', current_node: latestNode } : page,
+    );
+    const result = await captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage });
+    expect(result.snapshot.captureMeta.completeness).toBe('complete');
+    await expect(result.verifyCurrent?.()).resolves.toBeUndefined();
+    latestNode = 'assistant-replaced-during-enrichment';
+    await expect(result.verifyCurrent?.()).rejects.toMatchObject({ code: 'chatgpt_api_conversation_changed' });
+    expect(requestPage).toHaveBeenCalledTimes(4);
+  });
+
   it('completes when pagination reaches history end even if parent links are missing', async () => {
     const history = structuredClone([...older, ...newer]);
     history[1]!.metadata.parent_id = 'node-not-returned';
