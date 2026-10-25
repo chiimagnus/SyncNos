@@ -156,6 +156,16 @@ describe('createMarkdownRenderer', () => {
     expect(html).toContain('katex');
   });
 
+  it('renders bracket and dollar math together without interpreting fenced code as math', () => {
+    const md = createKatexMarkdownRenderer();
+    const html = md.render('Inline \\(K_I\\) and $E=mc^2$\n\n\\[\nK=\\frac{P}{A}\n\\]');
+    expect(html).toContain('katex-display');
+    expect((html.match(/class="katex"/g) || []).length).toBeGreaterThanOrEqual(2);
+    const code = md.render('~~~latex\n\\(literal\\)\n~~~');
+    expect(code).toContain('<code');
+    expect(code).not.toContain('class="katex"');
+  });
+
   it('degrades image tokens without creating img elements when images are disabled', () => {
     const md = createMarkdownRenderer({ renderImages: false });
     const html = md.render(
@@ -203,6 +213,11 @@ describe('markdownLikelyContainsMath', () => {
   it('detects supported inline and block dollar math', () => {
     expect(markdownLikelyContainsMath('x = $E=mc^2$')).toBe(true);
     expect(markdownLikelyContainsMath('$$\nx^2\n$$')).toBe(true);
+  });
+
+  it('detects bracket math used in ChatGPT rich responses', () => {
+    expect(markdownLikelyContainsMath('Inline \\(K_I\\)')).toBe(true);
+    expect(markdownLikelyContainsMath('Block \\[K_I=\\frac{P}{A}\\]')).toBe(true);
   });
 
   it('ignores ordinary or unmatched dollar text', () => {

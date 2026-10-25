@@ -1,4 +1,5 @@
 import { ChatMessageBubble } from '@ui/shared/ChatMessageBubble';
+import { normalizeDilMarkdown } from '@services/shared/dil-markdown';
 import { t } from '@i18n';
 import { useSyncnosAssetSrcMap } from '@viewmodels/conversations/useSyncnosAssetSrcMap';
 import { useChatgptFileSrcMap } from '@viewmodels/conversations/useChatgptFileSrcMap';
@@ -22,6 +23,7 @@ export function ChatDetailView({
   setMessagesRootRef,
 }: ChatDetailViewProps) {
   const detailConversationId = Number((detail as any)?.conversationId || (selected as any)?.id || activeId);
+  const isChatgpt = String(selected?.source || selected?.listSourceKey || '').toLowerCase() === 'chatgpt';
   const markdowns = Array.isArray(detail?.messages)
     ? detail.messages.map((message: any) => String(message?.contentMarkdown || ''))
     : [];
@@ -51,6 +53,7 @@ export function ChatDetailView({
               const messageId = Number.isFinite(rawMessageId) ? Math.trunc(rawMessageId) : null;
               const outlineIndex = messageId == null ? null : outlineIndexByMessageId.get(messageId) || null;
               const text = String((m as any).contentMarkdown || '');
+              const displayText = isChatgpt && role === 'assistant' ? normalizeDilMarkdown(text) : text;
 
               if (role === 'user' && messageId != null) {
                 return (
@@ -63,7 +66,7 @@ export function ChatDetailView({
                   >
                     <ChatMessageBubble
                       role={(m as any).role}
-                      markdown={text}
+                      markdown={displayText}
                       syncnosAssetSrcById={assetSrcById}
                       chatgptFileSrcById={chatgptFileSrcById}
                     />
@@ -75,7 +78,7 @@ export function ChatDetailView({
                 <ChatMessageBubble
                   key={String((m as any).id)}
                   role={(m as any).role}
-                  markdown={text}
+                  markdown={displayText}
                   syncnosAssetSrcById={assetSrcById}
                   chatgptFileSrcById={chatgptFileSrcById}
                 />

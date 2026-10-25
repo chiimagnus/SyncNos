@@ -1,4 +1,5 @@
 import { normalizeText as normalizeTextShared } from '@services/shared/normalize.ts';
+import { normalizeDilMarkdown } from '@services/shared/dil-markdown';
 import { replaceMathElementsWithLatexText } from '@collectors/formula-utils.ts';
 
 function normalizeMarkdown(markdown: any): any {
@@ -840,7 +841,7 @@ function htmlToMarkdown(root: any): any {
 
     const rendered = renderChildren(node, ctx);
     if (RICH_LAYOUT_COMPONENTS.has(String(node.getAttribute?.('data-d-component') || ''))) {
-      const content = normalizeMarkdown(rendered);
+      const content = normalizeMarkdown(normalizeDilMarkdown(`<box>\n${rendered}\n</box>`));
       return content ? `\n\n${content}\n\n` : '';
     }
     return rendered;
@@ -852,7 +853,7 @@ function htmlToMarkdown(root: any): any {
 function extractRenderedMarkdown(root: any): any {
   const cloned = sanitizeRenderedClone(root);
   if (!cloned) return '';
-  return htmlToMarkdown(cloned) || '';
+  return normalizeDilMarkdown(htmlToMarkdown(cloned)) || '';
 }
 
 function extractRenderedText(root: any): any {

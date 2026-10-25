@@ -1,4 +1,5 @@
 import { structuredRichUiMarkdown } from '@services/integrations/chatgpt/rich-ui-data';
+import { normalizeDilMarkdown } from '@services/shared/dil-markdown';
 import {
   buildChatgptFileCacheKey,
   buildChatgptGeneratedImageMessageKey,
@@ -197,7 +198,7 @@ function renderContentReferences(message: any, text: string, onSchemaDrift: Sche
 
 function normalizeRichUiMarkup(markdown: string): string {
   if (
-    !/<(?:Chart|MapWidgetV2|box|row|col|grid|grid-item|flow|flow-item|card|table|carousel|text|title|caption|badge)\b/.test(
+    !/<(?:Chart|MapWidgetV2|box|row|col|grid|grid-item|flow|flow-item|card|table|carousel|text|title|caption|badge|divider|Cite|Link|Entity|AsyncImage|icon)\b/.test(
       markdown,
     )
   ) {
@@ -208,25 +209,7 @@ function normalizeRichUiMarkup(markdown: string): string {
   let fence = '';
   const flush = () => {
     if (!outside.length) return;
-    result.push(
-      structuredRichUiMarkdown(outside.join('\n'))
-        .split('\n')
-        .map((line) =>
-          line
-            .replace(/<Entity\b[^>]*\bvalue="([^"]+)"[^>]*\/>/g, '$1')
-            .replace(/<AsyncImage\b[^>]*\bquery="([^"]+)"[^>]*\/>/g, '图片：$1')
-            .replace(/<icon\b[^>]*\bname="([^"]+)"[^>]*\/>/g, (_match, name: string) =>
-              name === 'arrow-down' ? '↓' : '',
-            )
-            .replace(/<\/(?:box|row|col|grid-item|flow-item|carousel-item)>/g, '\n\n')
-            .replace(
-              /<\/?(?:box|row|col|grid|grid-item|flow|flow-item|card|table|table-row|table-cell|carousel|carousel-item|text|title|caption|badge)\b[^>]*>/g,
-              '',
-            )
-            .replace(/^\s+$/, ''),
-        )
-        .join('\n'),
-    );
+    result.push(normalizeDilMarkdown(structuredRichUiMarkdown(outside.join('\n'))));
     outside = [];
   };
   for (const line of markdown.split('\n')) {

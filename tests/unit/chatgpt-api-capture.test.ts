@@ -255,6 +255,39 @@ describe('ChatGPT API snapshot', () => {
     expect(result.snapshot.captureMeta.completeness).toBe('complete');
   });
 
+  it('preserves rich ChatGPT steps, references and tables as readable Markdown', () => {
+    const source = [
+      '## Abaqus 流程',
+      '<row align="start">',
+      '  <box flex="1">',
+      '      **第 1 步：建立试样**',
+      '',
+      '      | 参数 | 数值 |',
+      '      | --- | --- |',
+      '      | 半径 | 25 mm |',
+      '',
+      '      求解 \\(K\\)。',
+      '  </box>',
+      '</row>',
+      '<divider color="subtle"/>',
+      '参考 <Cite ref="turn0search0"/>',
+      '<Link url="https://example.com/paper" title="论文"/>',
+    ].join('\n');
+    const result = build(
+      mappingFrom([
+        message({ id: 'user-1', role: 'user', parts: ['q'] }),
+        message({ id: 'assistant-1', role: 'assistant', channel: 'final', parts: [source] }),
+      ]),
+    );
+    const markdown = result.snapshot.messages[1].contentMarkdown;
+    expect(markdown).toContain('| 半径 | 25 mm |');
+    expect(markdown).toContain('**第 1 步：建立试样**');
+    expect(markdown).toContain('[论文](<https://example.com/paper>)');
+    expect(markdown).toContain('（引用见原对话）');
+    expect(markdown).not.toMatch(/^ {4,}\*\*第 1 步/m);
+    expect(markdown).not.toMatch(/<(?:row|box|divider|Cite|Link)\b/);
+  });
+
   it('downgrades malformed parts and attachment containers without aborting the conversation', () => {
     const malformedParts = mappingFrom([
       message({ id: 'user-1', role: 'user', parts: ['q'] }),

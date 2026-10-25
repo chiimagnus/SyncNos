@@ -22,10 +22,11 @@ export type MarkdownMathRuntime = {
 
 const MATH_BLOCK_RE = /\$\$[\s\S]+?\$\$/;
 const MATH_INLINE_RE = /(^|[^\\])\$(?!\$)[^$\n]+?\$(?!\$)/;
+const MATH_BRACKET_RE = /\\\([^\n]+?\\\)|\\\[[\s\S]+?\\\]/;
 
 export function markdownLikelyContainsMath(markdown: string): boolean {
   if (!markdown) return false;
-  return MATH_BLOCK_RE.test(markdown) || MATH_INLINE_RE.test(markdown);
+  return MATH_BLOCK_RE.test(markdown) || MATH_INLINE_RE.test(markdown) || MATH_BRACKET_RE.test(markdown);
 }
 
 export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, mathRuntime?: MarkdownMathRuntime) {
@@ -60,7 +61,7 @@ export function createMarkdownRenderer(options: MarkdownRendererOptions = {}, ma
   if (mathRuntime) {
     inst.use(mathRuntime.texmathPlugin as any, {
       engine: mathRuntime.katexEngine as any,
-      delimiters: 'dollars',
+      delimiters: ['dollars', 'brackets'],
       katexOptions: {
         throwOnError: false,
         strict: 'ignore',

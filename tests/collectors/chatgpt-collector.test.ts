@@ -513,6 +513,35 @@ describe('chatgpt current DOM', () => {
     expect(markdown).not.toContain('M0 0');
   });
 
+  it('converts rendered rich-layout text and visible citation markers without creating code blocks', async () => {
+    const dom = current2026Dom({
+      assistantBlocks: [
+        '<div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary">',
+        '  <div data-d-component="row">',
+        '    <div data-d-component="box"><svg data-d-component="icon"><path d="M0 0"/></svg></div>',
+        '    <div data-d-component="box">',
+        '          **第 1 步：建立试样**',
+        '',
+        '          | 参数 | 数值 |',
+        '          | --- | --- |',
+        '          | 半径 | 25 mm |',
+        '    </div>',
+        '  </div>',
+        '  <p>&lt;divider color="subtle"/&gt;</p>',
+        '  <p>参考 &lt;Cite ref="turn0search0"/&gt;</p>',
+        '</div>',
+      ].join('\n'),
+    });
+    const snapshot = (await capturePrepared(currentDef(dom))) as any;
+    const markdown = snapshot.messages[1].contentMarkdown;
+    expect(markdown).toContain('**第 1 步：建立试样**');
+    expect(markdown).toContain('| 半径 | 25 mm |');
+    expect(markdown).toContain('（引用见原对话）');
+    expect(markdown).toContain('---');
+    expect(markdown).not.toMatch(/^ {4,}\*\*第 1 步/m);
+    expect(markdown).not.toContain('<divider');
+  });
+
   it('uses current document title for durable chats without a rendered history link', async () => {
     const dom = currentDom({
       url: 'https://chatgpt.com/c/current-durable-conversation',
