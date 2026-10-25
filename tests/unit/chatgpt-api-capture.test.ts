@@ -1790,6 +1790,7 @@ describe('ChatGPT paged API transport', () => {
           return {
             conversation_id: 'conversation-1',
             current_node: options?.latestNode || first?.current_node,
+            messages: first?.messages?.slice(-1),
           };
         const page = pages.shift();
         if (page === undefined) throw new Error('unexpected API page');
@@ -1835,7 +1836,9 @@ describe('ChatGPT paged API transport', () => {
     let latestNode = 'assistant-2';
     const page = responsePage(newer, false, true);
     const requestPage = vi.fn(async ({ numTurns }: { numTurns: number }) =>
-      numTurns === 1 ? { conversation_id: 'conversation-1', current_node: latestNode } : page,
+      numTurns === 1
+        ? { conversation_id: 'conversation-1', current_node: latestNode, messages: page.messages.slice(-1) }
+        : page,
     );
     const result = await captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage });
     expect(result.snapshot.captureMeta.completeness).toBe('complete');
@@ -1843,6 +1846,29 @@ describe('ChatGPT paged API transport', () => {
     latestNode = 'assistant-replaced-during-enrichment';
     await expect(result.verifyCurrent?.()).rejects.toMatchObject({ code: 'chatgpt_api_conversation_changed' });
     expect(requestPage).toHaveBeenCalledTimes(4);
+  });
+
+  it('rejects a same-ID head whose content or completion state changes after pagination', async () => {
+    const first = responsePage(newer, false, true);
+    let changedText = 'new answer';
+    let changedStatus = 'finished_successfully';
+    const requestPage = vi.fn(async ({ numTurns }: { numTurns: number }) =>
+      numTurns === 1
+        ? {
+            conversation_id: 'conversation-1',
+            current_node: 'assistant-2',
+            messages: [{ ...newer[1], content: { content_type: 'text', parts: [changedText] }, status: changedStatus }],
+          }
+        : first,
+    );
+    const result = await captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage });
+    expect(result.snapshot.captureMeta.completeness).toBe('complete');
+    await expect(result.verifyCurrent()).resolves.toBeUndefined();
+    changedText = 'updated after the first head check';
+    await expect(result.verifyCurrent()).rejects.toMatchObject({ code: 'chatgpt_api_conversation_changed' });
+    changedText = 'new answer';
+    changedStatus = 'in_progress';
+    await expect(result.verifyCurrent()).rejects.toMatchObject({ code: 'chatgpt_api_conversation_changed' });
   });
 
   it('completes when pagination reaches history end even if parent links are missing', async () => {

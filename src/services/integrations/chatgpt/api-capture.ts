@@ -54,6 +54,16 @@ async function requestPageWithRetry(
   throw apiCaptureError('chatgpt_api_page_network');
 }
 
+function currentNodeSignature(message: any): string {
+  return JSON.stringify([
+    message?.content,
+    message?.status,
+    message?.end_turn,
+    message?.metadata?.is_complete,
+    message?.metadata?.parent_id,
+  ]);
+}
+
 function sanitizedConversationUrl(rawUrl: string): string {
   const url = new URL(rawUrl);
   url.search = '';
@@ -91,6 +101,7 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
   let cursor = '';
   let title = '';
   let currentNode = '';
+  let capturedNodeSignature = '';
   let currentNodeInProgress = false;
   let lastResult: ChatgptApiSnapshotResult | null = null;
   let completed = false;
@@ -100,7 +111,7 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
       throw apiCaptureError('chatgpt_api_navigation_changed');
     }
   };
-  const latestNode = async (): Promise<string> => {
+  const latestMatches = async (): Promise<boolean> => {
     assertRoute();
     const head = await requestPageWithRetry(
       { conversationId: route.conversationId, numTurns: 1, timeoutMs },
@@ -110,7 +121,11 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
     if (head?.conversation_id !== route.conversationId || typeof head.current_node !== 'string' || !head.current_node) {
       throw apiCaptureError('chatgpt_api_conversation_identity');
     }
-    return head.current_node;
+    if (head.current_node !== currentNode) return false;
+    if (!Array.isArray(head.messages)) throw apiCaptureError('chatgpt_api_page_schema');
+    const currentMessage = head.messages.find((message: any) => message?.id === currentNode);
+    if (!currentMessage) throw apiCaptureError('chatgpt_api_page_schema');
+    return currentNodeSignature(currentMessage) === capturedNodeSignature;
   };
   for (let page = 0; ; page += 1) {
     assertRoute();
@@ -137,6 +152,7 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
       if (!currentNode || currentNode !== messages.at(-1)?.id)
         throw apiCaptureError('chatgpt_api_current_node_invalid');
       const latest = messages.at(-1);
+      capturedNodeSignature = currentNodeSignature(latest);
       currentNodeInProgress =
         latest?.status === 'in_progress' || latest?.status === 'streaming' || latest?.metadata?.is_complete === false;
     }
@@ -179,7 +195,7 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
       cursor = firstId;
       continue;
     }
-    const changedWhileFetching = completed && (await latestNode()) !== currentNode;
+    const changedWhileFetching = completed && !(await latestMatches());
     const result = buildChatgptApiSnapshot({
       data: {
         conversation_id: route.conversationId,
@@ -219,7 +235,7 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
   return {
     ...lastResult,
     verifyCurrent: async () => {
-      if ((await latestNode()) !== currentNode) throw apiCaptureError('chatgpt_api_conversation_changed');
+      if (!(await latestMatches())) throw apiCaptureError('chatgpt_api_conversation_changed');
     },
   };
 }
