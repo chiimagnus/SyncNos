@@ -424,6 +424,43 @@ describe('ChatGPT API snapshot', () => {
     expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
   });
 
+  it('leaves indented Markdown code intact while converting Rich UI outside it', () => {
+    const literal = '    <box><text>Literal code</text></box>';
+    const cite = 'citeturn1search0';
+    const source = [
+      'before',
+      '',
+      literal,
+      `    ${cite}`,
+      '',
+      `outside ${cite} <box><text>Rendered prose</text></box>`,
+    ].join('\n');
+    const result = build(
+      pagedFrom([
+        message({ id: 'user', role: 'user', parts: ['question'] }),
+        message({
+          id: 'assistant',
+          role: 'assistant',
+          channel: 'final',
+          parts: [source],
+          contentReferences: [
+            {
+              type: 'grouped_webpages',
+              matched_text: cite,
+              items: [{ attribution: 'Paper', url: 'https://example.com/paper' }],
+            },
+          ],
+        }),
+      ]),
+    );
+    const saved = result.snapshot.messages[1].contentMarkdown;
+    expect(saved).toContain(literal);
+    expect(saved).toContain(`    ${cite}`);
+    expect(saved).toContain('outside [Paper](https://example.com/paper)');
+    expect(saved).not.toContain('<box><text>Rendered prose</text></box>');
+    expect(result.snapshot.captureMeta.completeness).toBe('complete');
+  });
+
   it('keeps four-backtick fences intact when the code contains shorter backtick lines and Rich UI tags', () => {
     const source = [
       'before',

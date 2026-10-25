@@ -54,7 +54,7 @@ Grok 目前**不支持自动保存**：长对话的初始化和后台渲染可�
 - 正文保存不得等待图片网络。临时 signed URL、session credential 或原始私有 backend response 不作为持久内容。
 - ChatGPT 的轮次分组布局与独立 user/assistant 消息布局使用各自实际的角色和消息身份；历史扫描从真实消息所在的滚动容器开始，无法确认消息身份或历史顶部时只能 partial-safe，不能以可见窗口覆盖已存历史。
 - ChatGPT 手动 DOM 采集的 SVG/Canvas 图表尽量转换为静态 PNG 并复用现有图片缓存；保留新式卡片/流程的阅读顺序及可识别控件状态，不保存可执行交互代码。图形无法转换时保留明确占位，不能宣称已保留原图。
-- ChatGPT 的富组件布局在 DOM / Advanced API 采集时统一还原为无多余缩进的 Markdown；分隔线、引用与可用链接转换为可阅读形式，不执行原始组件，不改写行内代码和代码围栏。
+- ChatGPT 的富组件布局在 DOM / Advanced API 采集时统一还原为无多余缩进的 Markdown；分隔线、引用与可用链接转换为可阅读形式，不执行原始组件，不改写行内代码或代码块（含缩进代码）。
 - ChatGPT Advanced API 采集使用网页当前的分页接口：先读取 `conversations/{id}` 获取会话身份与最近消息，再以 `messages?before=` 游标向前读取。请求由 Background 在同一 ChatGPT 标签页的 MAIN world 执行，登录 Token 不经过 Content Script 或持久化；每页通过稳定消息 ID 只追加暂存，不触发图片补全或远端同步；读到 `has_previous_page=false`、游标和消息 ID 无重复、会话当前节点未变化且无分支冲突时，才完成最终快照提交并调度后续任务。`metadata.parent_id` 在分页响应中可能缺失，不能单凭父链缺口判为未抓全。中途失败保留已写入页，并在用户开启图片缓存时调度图片补全；真正未完成或存在歧义时保持 partial-safe，不用旧的完整 Mapping API。手动 DOM 扫描即使滚到顶部也无法证明已加载所有历史，不能以此覆盖本地记录。
 - ChatGPT Advanced API 把可识别的 Rich UI 布局标记、Chart 数据、地图地点与原生 UI 表格转为 Markdown 数据，并仅按已确认的消息 ID 补充当前渲染 DOM 的 SVG/Canvas 图片；历史消息未渲染时不伪造截图。DOM 捕获 Recharts 时优先从其无障碍列表提取精确数据表，再附加静态图像；无法解析的数据保留原文，不从像素推断数值。内嵌 PNG 必须像其他本地数据图片一样进入图片缓存，不受远程下载开关控制。非图片附件保留文件名与类型，不自动下载文件二进制内容。DOM 标题遵循上文会话身份校验规则，不从浮动聊天或无关跳转链接推断标题。
 

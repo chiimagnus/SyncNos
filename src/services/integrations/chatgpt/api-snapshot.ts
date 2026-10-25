@@ -194,16 +194,36 @@ function transformOutsideCodeFences(markdown: string, transform: (text: string) 
   let outside: string[] = [];
   let fenceChar = '';
   let fenceLength = 0;
+  let indentedCode = false;
+  let previousBlank = true;
   const flush = () => {
     if (!outside.length) return;
     result.push(transformOutsideInlineCode(outside.join('\n'), transform));
     outside = [];
   };
   for (const line of markdown.split('\n')) {
-    const marker = line.match(/^\s*(`{3,}|~{3,})(.*)$/);
+    const marker = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+    const blank = !line.trim();
+    const indented = /^( {4}|\t)/.test(line);
     if (!fenceLength) {
+      if (indentedCode) {
+        if (blank || indented) {
+          result.push(line);
+          previousBlank = blank;
+          continue;
+        }
+        indentedCode = false;
+      }
+      if (indented && previousBlank) {
+        flush();
+        result.push(line);
+        indentedCode = true;
+        previousBlank = false;
+        continue;
+      }
       if (!marker) {
         outside.push(line);
+        previousBlank = blank;
         continue;
       }
       flush();
@@ -213,6 +233,7 @@ function transformOutsideCodeFences(markdown: string, transform: (text: string) 
       fenceLength = 0;
     }
     result.push(line);
+    previousBlank = blank;
   }
   flush();
   return result.join('\n');
