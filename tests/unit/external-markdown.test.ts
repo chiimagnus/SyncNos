@@ -40,6 +40,26 @@ describe('formatConversationMarkdownForExternalOutput', () => {
     expect(markdown).not.toContain('## transcript');
   });
 
+  it('normalizes saved ChatGPT rich components before external Markdown output', async () => {
+    const raw = [
+      '<row><box>**方法概述**</box></row>',
+      '<divider color="subtle"/>',
+      '资料 <Cite ref="turn0search0"/>',
+    ].join('\n');
+    const markdown = await formatConversationMarkdownForExternalOutput(
+      { id: 3, source: 'chatgpt', sourceType: 'chat', conversationKey: 'chat-3', title: 'Chat', lastActivityAt: 1 },
+      {
+        conversationId: 3,
+        messages: [{ id: 3, conversationId: 3, messageKey: 'm1', role: 'assistant', contentMarkdown: raw }],
+      },
+    );
+    expect(markdown).toContain('**方法概述**');
+    expect(markdown).toContain('---');
+    expect(markdown).toContain('（引用见原对话）');
+    expect(markdown).not.toContain('<divider');
+    expect(markdown).not.toContain('<Cite');
+  });
+
   it('materializes internal image references without leaking embedded image payloads', async () => {
     const markdown = await formatConversationMarkdownForExternalOutput(
       {

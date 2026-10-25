@@ -31,6 +31,36 @@ describe('feishu docx markdown formatter', () => {
     expect(out).not.toContain('\n## assistant\n');
   });
 
+  it('uses normalized Markdown for historical ChatGPT assistant rich components', async () => {
+    const markdown = await formatConversationMarkdownForFeishuDocxSync(
+      {
+        id: 1,
+        source: 'chatgpt',
+        sourceType: 'chat',
+        conversationKey: 'chat-1',
+        title: 'Chat',
+        lastActivityAt: 1,
+      } as any,
+      {
+        conversationId: 1,
+        messages: [
+          {
+            id: 1,
+            conversationId: 1,
+            messageKey: 'assistant-1',
+            role: 'assistant',
+            contentMarkdown: '<divider color="subtle"/>\n\n      **步骤正文**',
+          },
+        ],
+      } as any,
+    );
+    expect(markdown).toContain('# assistant\n');
+    expect(markdown).toContain('---');
+    expect(markdown).toContain('**步骤正文**');
+    expect(markdown).not.toContain('<divider');
+    expect(markdown).not.toMatch(/^ {4,}\*\*步骤正文/m);
+  });
+
   it('uses H1 for article Content section in Feishu sync output', async () => {
     const out = await formatConversationMarkdownForFeishuDocxSync(
       {

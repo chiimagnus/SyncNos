@@ -134,6 +134,50 @@ describe('local markdown export', () => {
     expect(markdown).not.toContain('![malformed](syncnos-asset://nope)');
   });
 
+  it('exports existing ChatGPT rich-layout messages as proper Markdown without altering user input', async () => {
+    const c = {
+      ...conversation(1, 'Chat'),
+      source: 'chatgpt',
+      sourceType: 'chat',
+      conversationKey: 'conversation-1',
+    };
+    const raw = [
+      '<row>',
+      '  <box>',
+      '      **第 1 步：建立试样**',
+      '',
+      '      | 参数 | 数值 |',
+      '      | --- | --- |',
+      '      | 半径 | 25 mm |',
+      '  </box>',
+      '</row>',
+      '<divider color="subtle"/>',
+      '资料 <Link url="https://example.com/paper" title="论文"/> <Cite ref="turn0search0"/>',
+      '~~~html',
+      '<Cite ref="literal"/>',
+      '~~~',
+    ].join('\n');
+    mocks.getConversationDetail.mockResolvedValue({
+      conversationId: 1,
+      messages: [
+        { messageKey: 'user-1', role: 'user', contentMarkdown: '<box>literal user input</box>' },
+        { messageKey: 'assistant-1', role: 'assistant', contentMarkdown: raw },
+      ],
+    });
+
+    await buildConversationsMarkdownZipExport({ conversations: [c] });
+    const markdown = String(capturedFiles().find((file) => file.name.endsWith('.md'))?.data || '');
+
+    expect(markdown).toContain('<box>literal user input</box>');
+    expect(markdown).toContain('**第 1 步：建立试样**');
+    expect(markdown).toContain('| 半径 | 25 mm |');
+    expect(markdown).toContain('[论文](<https://example.com/paper>)');
+    expect(markdown).toContain('（引用见原对话）');
+    expect(markdown).toContain('~~~html\n<Cite ref="literal"/>\n~~~');
+    expect(markdown).not.toMatch(/^ {4,}\*\*第 1 步/m);
+    expect(markdown).not.toContain('<divider');
+  });
+
   it('materializes uncached ChatGPT image references as export attachments without leaking internal URLs', async () => {
     const c = {
       ...conversation(1, 'Chat'),

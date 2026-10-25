@@ -1,5 +1,6 @@
 import type { Conversation, ConversationMessage } from '@services/conversations/domain/models';
 import { formatVideoChaptersMarkdown } from '@services/conversations/domain/video-content';
+import { normalizeDilMarkdown } from '@services/shared/dil-markdown';
 
 function isNonEmptyString(v: unknown): v is string {
   return typeof v === 'string' && v.trim().length > 0;
@@ -143,12 +144,14 @@ function formatChatMarkdown(
   lines.push('');
   const messageHeadingLevel = clampHeadingLevel(options.chatMessageHeadingLevel, 2);
   const messageHeading = headingPrefix(messageHeadingLevel);
+  const isChatgpt = String(c.source || c.listSourceKey || '').toLowerCase() === 'chatgpt';
   for (const m of messages || []) {
     const role = (m as any).role || 'assistant';
     const authorName = role === 'user' && isNonEmptyString((m as any).authorName) ? String((m as any).authorName) : '';
     lines.push(`${messageHeading} ${role === 'user' ? authorName || 'You' : role}`);
     lines.push('');
-    lines.push(String((m as any).contentMarkdown || ''));
+    const raw = String((m as any).contentMarkdown || '');
+    lines.push(isChatgpt && role === 'assistant' ? normalizeDilMarkdown(raw) : raw);
     lines.push('');
   }
   return lines.join('\n');
