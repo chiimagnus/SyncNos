@@ -2,7 +2,6 @@ import type { CurrentPageCaptureService } from '@services/bootstrap/current-page
 import { AI_CHAT_AUTO_SAVE_COLLECTOR_IDS } from '@collectors/ai-chat-sites';
 import { resolveActiveCollector, type CollectorRegistryLike } from '@collectors/registry';
 import { resolveCaptureIntegrity } from '@services/shared/capture-integrity';
-import { t } from '@i18n';
 import { storageGet, storageOnChanged } from '@services/shared/storage';
 import { CORE_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { reconcileAutoSaveBackfill } from '@services/conversations/content/autosave-backfill-reconciler';
@@ -479,15 +478,7 @@ export function createContentController(deps: Deps) {
       let manualSlot: ManualPersistenceSlot | null = null;
       try {
         manualSlot = await enterManualPersistence(ownerToken, () => !stopped && isCurrentResidentOwner(ownerToken));
-        if (!manualSlot) {
-          if (!stopped && isCurrentResidentOwner(ownerToken)) {
-            const activity = await currentPageCapture.getCurrentPageCaptureState().catch(() => null);
-            if (!stopped && isCurrentResidentOwner(ownerToken) && activity?.activity?.phase !== 'capturing') {
-              showInpageTip(t('fetchingDots'));
-            }
-          }
-          return;
-        }
+        if (!manualSlot) return;
         setResidentSaving(true);
         try {
           await currentPageCapture.captureCurrentPage();

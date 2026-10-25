@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { createContentController } from '@services/bootstrap/content-controller.ts';
 import { createCurrentPageCaptureService } from '@services/bootstrap/current-page-capture.ts';
-import { t } from '@i18n';
 
 vi.mock('@services/integrations/chatgpt/api-capture-settings', () => ({
   readChatgptApiCaptureEnabled: vi.fn(async () => false),
@@ -72,6 +71,7 @@ function createHarness(options?: {
       })),
     },
     onActivity: (activity) => {
+      if (activity.phase !== 'settled') return;
       tipCalls.push({
         text: activity.message,
         opts: { kind: activity.kind === 'error' ? 'error' : 'default', expiresAt: activity.expiresAt },
@@ -489,7 +489,8 @@ describe('content-controller inpage combo', () => {
     for (let i = 0; i < 8; i += 1) await Promise.resolve();
 
     expect(harness.sendCalls.filter((c) => c.type === 'upsertConversation')).toHaveLength(1);
-    expect(harness.tipCalls.filter((c) => c.text === t('fetchingDots'))).toHaveLength(1);
+    expect((await harness.getCaptureState()).activity).toMatchObject({ phase: 'capturing' });
+    expect(harness.tipCalls).toHaveLength(0);
 
     resolveUpsert(undefined);
     await firstClick;

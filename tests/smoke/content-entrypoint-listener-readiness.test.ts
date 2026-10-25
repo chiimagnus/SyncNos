@@ -165,7 +165,7 @@ describe('content entrypoint listener readiness', () => {
     expect(response?.data).toEqual({ title: 'gated' });
   });
 
-  it('routes shared capture activity to the inpage bubble and respects cleanup', async () => {
+  it('leaves capturing feedback to the animated icon and shows settled results in the bubble', async () => {
     mocks.initializeLocale.mockResolvedValue(undefined);
     const main = await loadContentMain();
     await main();
@@ -174,10 +174,8 @@ describe('content entrypoint listener readiness', () => {
     expect(callback).toBeTypeOf('function');
 
     callback({ phase: 'capturing', kind: 'info', message: 'Fetching...', expiresAt: null });
-    expect(mocks.showInpageTip).toHaveBeenCalledWith('Fetching...', {
-      kind: 'default',
-      expiresAt: null,
-    });
+    expect(mocks.cleanupInpageTip).toHaveBeenCalledTimes(1);
+    expect(mocks.showInpageTip).not.toHaveBeenCalled();
 
     const expiresAt = Date.now() + 5_000;
     callback({ phase: 'settled', kind: 'error', message: 'Capture failed', expiresAt });
@@ -186,8 +184,15 @@ describe('content entrypoint listener readiness', () => {
       expiresAt,
     });
 
-    mocks.lifecycleIsDisposed.mockReturnValue(true);
     callback({ phase: 'settled', kind: 'success', message: 'Saved', expiresAt });
+    expect(mocks.showInpageTip).toHaveBeenLastCalledWith('Saved', {
+      kind: 'default',
+      expiresAt,
+    });
+
+    mocks.lifecycleIsDisposed.mockReturnValue(true);
+    callback({ phase: 'capturing', kind: 'info', message: 'Fetching again...', expiresAt: null });
+    expect(mocks.cleanupInpageTip).toHaveBeenCalledTimes(1);
     expect(mocks.showInpageTip).toHaveBeenCalledTimes(2);
   });
 

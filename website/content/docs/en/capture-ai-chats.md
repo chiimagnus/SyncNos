@@ -17,7 +17,7 @@ Manual capture actively retrieves the history that the current site can safely v
 
 1. Open the target conversation.
 2. Use **Fetch AI Chat** in the popup, the in-page floating icon, the context menu, or a configured capture shortcut.
-3. Capture progress and the result or error appear briefly; verify the saved content in the [local library](/docs/en/library/).
+3. The in-page icon bounces during capture and displays a result or error bubble afterward; the popup still shows textual progress. Verify the saved content in the [local library](/docs/en/library/).
 
 Platforms listed with auto-save can enable it under **Settings → General → Auto-save**. Auto-save only appends or updates messages that can be identified safely in the current window; it does not scroll the page to backfill older history. Use manual capture when you want SyncNos to retrieve long-chat history.
 

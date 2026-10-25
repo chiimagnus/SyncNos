@@ -53,6 +53,10 @@ export default defineContentScript({
       videoCapture: videoTranscriptCapture,
       onActivity: (activity) => {
         if (lifecycle.isDisposed()) return;
+        if (activity.phase === 'capturing') {
+          inpageTipApi.cleanup();
+          return;
+        }
         inpageTipApi.showSaveTip(activity.message, {
           kind: activity.kind === 'error' ? 'error' : 'default',
           expiresAt: activity.expiresAt,
