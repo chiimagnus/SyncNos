@@ -59,7 +59,7 @@ export default defineContentScript({
         }
         inpageTipApi.showSaveTip(activity.message, {
           kind: activity.kind === 'error' ? 'error' : 'default',
-          expiresAt: activity.expiresAt,
+          expiresAt: activity.expiresAt ?? undefined,
         });
       },
     });

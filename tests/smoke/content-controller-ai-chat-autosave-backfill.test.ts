@@ -178,9 +178,37 @@ function makeSnapshot(conversationKey: string, contents: string[]) {
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('content-controller ai chat autosave backfill', () => {
+  it('does not display a previous conversation autosave result after SPA navigation during persistence', async () => {
+    vi.stubGlobal('location', { href: 'https://gemini.google.com/app/previous' });
+    const writeStarted = deferred<void>();
+    const finishWrite = deferred<void>();
+    const harness = createHarness({
+      snapshots: [makeSnapshot('previous', ['Old message'])],
+      incrementalImpl: (snapshot) => ({ changed: true, snapshot }),
+      sendImpl: async (type) => {
+        if (type !== 'syncConversationMessages') return undefined;
+        writeStarted.resolve();
+        await finishWrite.promise;
+        return { ok: true, data: { upserted: 1 } };
+      },
+    });
+
+    await harness.settle();
+    const run = harness.runTick();
+    await writeStarted.promise;
+    vi.stubGlobal('location', { href: 'https://gemini.google.com/app/current' });
+    finishWrite.resolve();
+    await run;
+    await harness.settle();
+
+    expect(harness.sendCalls.filter(({ type }) => type === 'syncConversationMessages')).toHaveLength(1);
+    expect(harness.tipCalls).toHaveLength(0);
+  });
+
   it('writes page window once when local tail is empty', async () => {
     const snapshot = makeSnapshot('c-empty', ['A', 'B']);
     const harness = createHarness({

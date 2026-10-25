@@ -625,6 +625,7 @@ export function createContentController(deps: Deps) {
 
     async function runAutoSaveTick() {
       if (stopped) return;
+      const pageUrl = String(globalThis.location?.href || '');
       const generation = liveGeneration;
       let backfill: Awaited<ReturnType<typeof maybeRunBackfill>> | null = null;
 
@@ -691,7 +692,10 @@ export function createContentController(deps: Deps) {
           }
 
           if (saved && isCurrentResidentOwner(ownerToken) && !stopped && (incrementalChanged || backfill.changed)) {
-            currentPageCapture.reportAutoSave({ isNew: saved.isNew, title: merged.snapshot?.conversation?.title });
+            currentPageCapture.reportAutoSave(
+              { isNew: saved.isNew, title: merged.snapshot?.conversation?.title },
+              pageUrl,
+            );
           }
         } finally {
           setResidentSaving(false);

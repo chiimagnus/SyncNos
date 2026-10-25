@@ -668,6 +668,7 @@ function cleanupButtons(activeCollectorId: string) {
 function setSaving(saving: boolean) {
   const el = document.getElementById(INPAGE_BTN_ID) as HTMLElement | null;
   if (!el) return;
+  el.setAttribute('aria-busy', String(saving));
   if (saving) el.classList.add('is-saving');
   else el.classList.remove('is-saving');
 }

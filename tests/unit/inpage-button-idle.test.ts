@@ -53,6 +53,23 @@ describe('inpage button idle fade', () => {
     cleanupDom();
   });
 
+  it('exposes a persistent accessible busy state across observer refreshes without requiring motion', () => {
+    inpageButtonApi.ensureInpageButton({ collectorId: 'chatgpt' });
+    const btn = document.getElementById('webclipper-inpage-btn') as HTMLElement;
+    expect(btn?.getAttribute('aria-busy')).toBeNull();
+
+    inpageButtonApi.setSaving(true);
+    expect(btn.classList.contains('is-saving')).toBe(true);
+    expect(btn.getAttribute('aria-busy')).toBe('true');
+    inpageButtonApi.ensureInpageButton({ collectorId: 'chatgpt' });
+    expect(document.getElementById('webclipper-inpage-btn')).toBe(btn);
+    expect(btn.getAttribute('aria-busy')).toBe('true');
+
+    inpageButtonApi.setSaving(false);
+    expect(btn.classList.contains('is-saving')).toBe(false);
+    expect(btn.getAttribute('aria-busy')).toBe('false');
+  });
+
   it('fades after 10s without button interaction and only button interaction restores it', () => {
     inpageButtonApi.ensureInpageButton({ collectorId: 'chatgpt' });
 

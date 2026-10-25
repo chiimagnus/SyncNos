@@ -230,7 +230,7 @@ describe('current page capture integrity routing', () => {
 
   it('reports durable automatic saves through the same activity without starting a manual capture', async () => {
     const harness = createHarness({ collectorId: 'gemini', snapshot: chatSnapshot({ source: 'gemini' }) });
-    harness.service.reportAutoSave({ isNew: false, title: 'Auto saved' });
+    harness.service.reportAutoSave({ isNew: false, title: 'Auto saved' }, String(globalThis.location?.href || ''));
 
     const state = await harness.service.getCurrentPageCaptureState();
     expect(state.activity).toMatchObject({ phase: 'settled', kind: 'success' });

@@ -424,8 +424,8 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     }
   }
 
-  function reportAutoSave(result: { isNew: boolean; title?: unknown }) {
-    setCaptureActivity('settled', 'success', buildCaptureSuccessTipMessage(result));
+  function reportAutoSave(result: { isNew: boolean; title?: unknown }, pageUrl: string) {
+    setCaptureActivity('settled', 'success', buildCaptureSuccessTipMessage(result), pageUrl);
   }
 
   async function getCurrentPageCaptureState(): Promise<CurrentPageCaptureState> {

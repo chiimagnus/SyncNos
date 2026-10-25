@@ -203,9 +203,14 @@ function stopFollowLoop() {
 
 function startFollowLoop(el: HTMLElement) {
   stopFollowLoop();
+  const pageUrl = String(globalThis.location?.href || '');
   const tick = () => {
     state.followTimer = null;
     if (!el.isConnected || Date.now() >= state.visibleUntil) return;
+    if (pageUrl !== String(globalThis.location?.href || '')) {
+      removeBubble();
+      return;
+    }
     positionBubble(el);
     state.followTimer = setTimeout(tick, 100);
   };
@@ -246,7 +251,7 @@ function replayEnterAnimation(el: HTMLElement) {
   }, 340);
 }
 
-function showSaveTip(text: unknown, options?: { kind?: TipKind; expiresAt?: number | null }) {
+function showSaveTip(text: unknown, options?: { kind?: TipKind; expiresAt?: number }) {
   const el = ensureBubble();
   if (!el) return;
   resetTimers();
@@ -254,13 +259,10 @@ function showSaveTip(text: unknown, options?: { kind?: TipKind; expiresAt?: numb
   positionBubble(el);
   replayEnterAnimation(el);
 
-  const expiresAt =
-    options?.expiresAt === null ? null : (options?.expiresAt ?? Date.now() + CAPTURE_ACTIVITY_VISIBLE_MS);
-  state.visibleUntil = expiresAt ?? Infinity;
+  const expiresAt = options?.expiresAt ?? Date.now() + CAPTURE_ACTIVITY_VISIBLE_MS;
+  state.visibleUntil = expiresAt;
   startFollowLoop(el);
-  if (expiresAt !== null) {
-    state.hideTimer = setTimeout(removeBubble, Math.max(0, expiresAt - Date.now()));
-  }
+  state.hideTimer = setTimeout(removeBubble, Math.max(0, expiresAt - Date.now()));
 }
 
 export const inpageTipApi = { showSaveTip, cleanup: removeBubble };

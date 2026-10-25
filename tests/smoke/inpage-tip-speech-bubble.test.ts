@@ -45,6 +45,7 @@ describe('inpage-tip speech bubble', () => {
   afterEach(() => {
     inpageTipApi.cleanup();
     vi.useRealTimers();
+    vi.unstubAllGlobals();
     // @ts-expect-error test global cleanup
     delete global.window;
     // @ts-expect-error test global cleanup
@@ -169,21 +170,31 @@ describe('inpage-tip speech bubble', () => {
     expect(document.getElementById('webclipper-inpage-bubble')).toBeNull();
   });
 
-  it('keeps capturing feedback visible until it settles, then uses the same expiry as Popup', () => {
+  it('removes an existing result bubble when the conversation URL changes', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('location', { href: 'https://chatgpt.com/c/previous' });
+    appendIconRect({ left: 20, right: 60, top: 400, bottom: 440, width: 40, height: 40 });
+    const api = loadInpageTip();
+
+    api.showSaveTip('Saved previous conversation');
+    expect(document.getElementById('webclipper-inpage-bubble')).toBeTruthy();
+    vi.stubGlobal('location', { href: 'https://chatgpt.com/c/current' });
+    vi.advanceTimersByTime(101);
+    expect(document.getElementById('webclipper-inpage-bubble')).toBeNull();
+  });
+
+  it('replaces previous result feedback and expires at the new absolute deadline', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-25T12:00:00Z'));
     appendIconRect({ left: 20, right: 60, top: 400, bottom: 440, width: 40, height: 40 });
     const api = loadInpageTip();
 
-    api.showSaveTip('Fetching...', { expiresAt: null });
-    vi.advanceTimersByTime(25_000);
-    expect(document.getElementById('webclipper-inpage-bubble')?.shadowRoot?.textContent).toContain('Fetching...');
-
-    const expiresAt = Date.now() + 5_000;
-    api.showSaveTip('Saved', { expiresAt });
-    vi.advanceTimersByTime(4_999);
+    api.showSaveTip('Updated', { expiresAt: Date.now() + 3_000 });
+    vi.advanceTimersByTime(2_000);
+    api.showSaveTip('Saved', { expiresAt: Date.now() + 5_000 });
+    vi.advanceTimersByTime(3_001);
     expect(document.getElementById('webclipper-inpage-bubble')?.shadowRoot?.textContent).toContain('Saved');
-    vi.advanceTimersByTime(2);
+    vi.advanceTimersByTime(2_000);
     expect(document.getElementById('webclipper-inpage-bubble')).toBeNull();
   });
 
