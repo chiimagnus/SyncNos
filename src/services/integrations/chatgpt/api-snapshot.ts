@@ -372,13 +372,18 @@ function renderNonImageAttachments(message: any, onSchemaDrift: SchemaDriftRepor
     const mimeType = stableString(attachment?.mime_type).toLowerCase();
     if (mimeType.startsWith('image/')) continue;
     const name = stableString(attachment?.name)
-      .replace(/[\r\n`<>]/g, '')
+      .replace(/[\r\n]/g, ' ')
       .slice(0, 200);
-    if (!stableString(attachment?.id) || !mimeType || !name) {
+    if (
+      !stableString(attachment?.id) ||
+      !/^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/.test(mimeType) ||
+      !name
+    ) {
       onSchemaDrift();
       continue;
     }
-    text.push(`附件：${name}（${mimeType}）`);
+    const codeFence = '`'.repeat(Math.max(1, ...(name.match(/`+/g) || []).map((run) => run.length + 1)));
+    text.push(`附件：${codeFence}${name}${codeFence}（${mimeType}）`);
   }
   return Array.from(new Set(text)).join('\n');
 }

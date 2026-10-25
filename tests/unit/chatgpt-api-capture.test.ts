@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import MarkdownIt from 'markdown-it';
 
 import { captureCurrentChatgptConversationViaApi } from '@services/integrations/chatgpt/api-capture';
 import { buildChatgptApiSnapshot } from '@services/integrations/chatgpt/api-snapshot';
@@ -1526,6 +1527,47 @@ describe('ChatGPT API snapshot', () => {
     expect(result.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
   });
 
+  it('does not interpret an attachment filename as executable Markdown', () => {
+    const filename = '![track](https://example.com/pixel.png)_[x].json';
+    const result = build(
+      pagedFrom([
+        message({
+          id: 'user-1',
+          role: 'user',
+          parts: ['see file'],
+          attachments: [{ id: 'file_data', name: filename, mime_type: 'application/json' }],
+        }),
+      ]),
+    );
+    const markdown = result.snapshot.messages[0].contentMarkdown;
+    expect(markdown).toContain('see file');
+    expect(markdown).toContain('`![track](https://example.com/pixel.png)_[x].json`');
+    const tokens = new MarkdownIt({ linkify: true }).parse(markdown, {});
+    const inline = tokens.flatMap((token) => token.children || []);
+    expect(inline.some((token) => token.type === 'image' || token.type === 'link_open')).toBe(false);
+    expect(result.snapshot.captureMeta.completeness).toBe('complete');
+
+    const backtickName = 'a``b_[file].md';
+    const backtick = build(
+      pagedFrom([
+        message({
+          id: 'user-backtick',
+          role: 'user',
+          parts: ['attached'],
+          attachments: [{ id: 'file_backtick', name: backtickName, mime_type: 'text/markdown' }],
+        }),
+      ]),
+    );
+    const backtickTokens = new MarkdownIt({ linkify: true }).parse(backtick.snapshot.messages[0].contentMarkdown, {});
+    expect(
+      backtickTokens
+        .flatMap((token) => token.children || [])
+        .filter((token) => token.type === 'code_inline')
+        .map((token) => token.content),
+    ).toEqual([backtickName]);
+    expect(backtick.snapshot.captureMeta.completeness).toBe('complete');
+  });
+
   it('keeps non-image attachments as readable filename and type without treating a complete history as partial', () => {
     const nonImage = pagedFrom([
       message({
@@ -1541,7 +1583,7 @@ describe('ChatGPT API snapshot', () => {
       expect.objectContaining({
         messageKey: 'user-file',
         role: 'user',
-        contentMarkdown: 'see file\n\n附件：document.pdf（application/pdf）',
+        contentMarkdown: 'see file\n\n附件：`document.pdf`（application/pdf）',
       }),
     ]);
     expect(nonImageResult.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
@@ -1557,7 +1599,7 @@ describe('ChatGPT API snapshot', () => {
     ]);
     expect(build(jsonData).snapshot).toMatchObject({
       messages: [
-        expect.objectContaining({ contentMarkdown: 'attached dataset\n\n附件：data.json（application/json）' }),
+        expect.objectContaining({ contentMarkdown: 'attached dataset\n\n附件：`data.json`（application/json）' }),
       ],
       captureMeta: { completeness: 'complete', identityVerified: true },
     });
