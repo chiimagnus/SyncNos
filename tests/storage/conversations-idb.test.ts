@@ -4434,7 +4434,7 @@ describe('ChatGPT paged saves through real IndexedDB message ordering', () => {
     const run = captureCurrentChatgptConversationViaApi({
       readCurrentUrl: () => `https://chatgpt.com/c/${conversationId}`,
       requestPage,
-      onPage: async ({ snapshot }, progress) => {
+      onPage: async ({ snapshot }) => {
         const integrity = resolveCaptureIntegrity('chatgpt', {
           ...snapshot,
           captureMeta: { ...snapshot.captureMeta, completeness: 'partial' },
@@ -4444,7 +4444,8 @@ describe('ChatGPT paged saves through real IndexedDB message ordering', () => {
         staged.push(integrity.snapshot.messages.map((item: any) => item.messageKey));
         await syncConversationMessages(id, integrity.snapshot.messages, integrity.persistence);
         const current = (await getMessagesByConversationId(id)).map((item) => item.messageKey);
-        const expectedCurrent = Array.from({ length: progress.page }, (_, index) => 4 - progress.page + index).flatMap(
+        const stageCount = staged.length;
+        const expectedCurrent = Array.from({ length: stageCount }, (_, index) => 4 - stageCount + index).flatMap(
           (number) => [`user-${number}`, `assistant-${number}`],
         );
         expect(current).toEqual(expectedCurrent);

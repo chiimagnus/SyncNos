@@ -3,7 +3,6 @@ import { CHATGPT_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { sendMessage } from '@platform/runtime/runtime';
 import { buildChatgptApiSnapshot, type ChatgptApiSnapshotResult } from '@services/integrations/chatgpt/api-snapshot';
 
-type PageProgress = { page: number; completed: boolean; messagesFetched: number };
 type CaptureResult = ChatgptApiSnapshotResult & { verifyCurrent: () => Promise<void> };
 type PageRequest = { conversationId: string; before?: string; numTurns: number; timeoutMs: number };
 
@@ -85,7 +84,7 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
   requestPage?: (request: PageRequest) => Promise<any>;
   timeoutMs?: number;
   capturedAt?: number;
-  onPage?: (result: ChatgptApiSnapshotResult, progress: PageProgress) => Promise<void>;
+  onPage?: (result: ChatgptApiSnapshotResult) => Promise<void>;
 }): Promise<CaptureResult> {
   const readCurrentUrl = input?.readCurrentUrl || (() => String(globalThis.location?.href || ''));
   const fetchPage = input?.requestPage || requestPageThroughBackground;
@@ -104,8 +103,6 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
   let currentNode = '';
   let capturedNodeSignature = '';
   let currentNodeInProgress = false;
-  let lastResult: ChatgptApiSnapshotResult | null = null;
-  let completed = false;
 
   const assertRoute = () => {
     if (parseChatgptDurableConversationRoute(readCurrentUrl())?.conversationId !== route.conversationId) {
@@ -163,13 +160,12 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
     if (!firstId || !lastId || pageInfo.start_cursor !== firstId || pageInfo.end_cursor !== lastId) {
       throw apiCaptureError('chatgpt_api_page_cursor_invalid');
     }
-    const pageIds = new Set<string>();
     for (const message of messages) {
       const id = message?.id;
-      if (typeof id !== 'string' || !id || pageIds.has(id) || seenIds.has(id)) {
+      if (typeof id !== 'string' || !id || seenIds.has(id)) {
         throw apiCaptureError('chatgpt_api_page_duplicate_id');
       }
-      pageIds.add(id);
+      seenIds.add(id);
       const parent = message?.metadata?.parent_id;
       if (typeof parent === 'string' && parent) {
         const sibling = childByParent.get(parent);
@@ -177,14 +173,12 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
         childByParent.set(parent, id);
       }
     }
-    for (const id of pageIds) seenIds.add(id);
-
     const visible = messages.filter(retainForRendering);
     if (page === 0 && !visible.some((message: any) => message.id === currentNode)) {
       visible.push(messages.at(-1));
     }
     retained.unshift(...visible);
-    completed = pageInfo.has_previous_page === false;
+    const completed = pageInfo.has_previous_page === false;
     if (
       !retained.some(
         (message) =>
@@ -251,25 +245,19 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
       }
       if (toStage.size) {
         const batch = messages.filter((message) => toStage.has(message.messageKey));
-        await input.onPage(
-          { snapshot: { ...result.snapshot, messages: batch } },
-          { page: page + 1, completed, messagesFetched: seenIds.size },
-        );
+        await input.onPage({ snapshot: { ...result.snapshot, messages: batch } });
         for (const message of batch) stagedContent.set(message.messageKey, message.contentMarkdown);
       }
     }
-    lastResult = result;
-    if (completed) break;
-    if (cursor === firstId) throw apiCaptureError('chatgpt_api_page_cursor_invalid');
+    if (completed) {
+      assertRoute();
+      return {
+        ...result,
+        verifyCurrent: async () => {
+          if (!(await latestMatches())) throw apiCaptureError('chatgpt_api_conversation_changed');
+        },
+      };
+    }
     cursor = firstId;
   }
-
-  if (!lastResult) throw apiCaptureError('chatgpt_api_no_visible_messages');
-  assertRoute();
-  return {
-    ...lastResult,
-    verifyCurrent: async () => {
-      if (!(await latestMatches())) throw apiCaptureError('chatgpt_api_conversation_changed');
-    },
-  };
 }

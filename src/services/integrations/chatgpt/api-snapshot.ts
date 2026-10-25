@@ -21,7 +21,6 @@ type PendingAuxiliary = {
   markdown: string;
 };
 
-const INTERNAL_CONTENT_TYPES = new Set(['model_editable_context']);
 const SCHEMA_DRIFT_REASON = 'chatgpt_api_schema_drift_partial';
 const UNOWNED_AUXILIARY_REASON = 'chatgpt_api_unowned_auxiliary_omitted';
 const UNFINISHED_TURN_REASON = 'chatgpt_api_unfinished_turn_partial';
@@ -542,7 +541,7 @@ function currentTurnInfo(branch: any[]): {
   let executionTurnId = '';
   for (let index = branch.length - 1; index >= 0; index -= 1) {
     const message = branch[index];
-    if (!message || isHidden(message) || INTERNAL_CONTENT_TYPES.has(contentType(message))) continue;
+    if (!message || isHidden(message) || contentType(message) === 'model_editable_context') continue;
     const role = messageRole(message);
     if (role === 'system' || role === 'developer') continue;
     const turnId = messageTurnId(message);
@@ -565,10 +564,6 @@ function currentTurnInfo(branch: any[]): {
     return { state: 'unknown', turnId };
   }
   return { state: 'unknown', turnId: executionTurnId };
-}
-
-function responseConversationId(data: any): string {
-  return stableString(data?.conversation_id);
 }
 
 function appendBlocks(parts: string[]): string {
@@ -604,7 +599,7 @@ export function buildChatgptApiSnapshot(input: {
 }): ChatgptApiSnapshotResult {
   const conversationId = stableString(input.conversationId);
   if (!conversationId) throw apiSnapshotError('conversation_identity_invalid');
-  const responseId = responseConversationId(input.data);
+  const responseId = stableString(input.data?.conversation_id);
   if (!responseId || responseId !== conversationId) throw apiSnapshotError('conversation_identity_mismatch');
 
   const branch = currentPageMessages(input.data?.messages, input.data?.current_node);
@@ -721,7 +716,7 @@ export function buildChatgptApiSnapshot(input: {
     const turnId = messageTurnId(message);
 
     if (role === 'system' || role === 'developer') continue;
-    if (INTERNAL_CONTENT_TYPES.has(type)) continue;
+    if (type === 'model_editable_context') continue;
 
     if (role === 'user') {
       // A later user message proves the preceding assistant turn is closed even when ChatGPT never emitted a final node.

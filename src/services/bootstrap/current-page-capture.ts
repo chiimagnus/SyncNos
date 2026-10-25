@@ -310,7 +310,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
 
   async function captureCurrentPage(): Promise<CurrentPageCaptureResult> {
     const pageUrl = currentUrl();
-    const savedPagedConversationIds = new Set<number>();
+    let savedPagedConversationId: number | null = null;
     setCaptureActivity('capturing', 'info', t('fetchingDots'), pageUrl);
 
     try {
@@ -375,7 +375,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
               deferRemoteSync: true,
             });
             if (!savedPage) throw new Error('chatgpt_api_no_safe_messages');
-            savedPagedConversationIds.add(savedPage.conversationId);
+            savedPagedConversationId = savedPage.conversationId;
             firstPageIsNew ??= savedPage.isNew;
           },
         });
@@ -433,9 +433,11 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         captureReasons: saved.captureReasons,
       };
     } catch (error) {
-      for (const conversationId of savedPagedConversationIds) {
+      if (savedPagedConversationId !== null) {
         try {
-          await send(CORE_MESSAGE_TYPES.ENQUEUE_CONVERSATION_IMAGE_BACKFILL, { conversationId });
+          await send(CORE_MESSAGE_TYPES.ENQUEUE_CONVERSATION_IMAGE_BACKFILL, {
+            conversationId: savedPagedConversationId,
+          });
         } catch (_error) {
           // Image recovery must not hide the original capture failure.
         }

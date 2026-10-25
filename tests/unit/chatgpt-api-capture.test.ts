@@ -1962,8 +1962,6 @@ describe('ChatGPT paged API transport', () => {
       'assistant-1',
       'user-2',
     ]);
-    expect(onPage.mock.calls[0][1]).toMatchObject({ page: 1, completed: false, messagesFetched: 2 });
-    expect(onPage.mock.calls[1][1]).toMatchObject({ page: 2, completed: true, messagesFetched: 4 });
     expect(result.snapshot.captureMeta).toMatchObject({ completeness: 'complete', identityVerified: true });
     expect(result.snapshot.conversation.url).toBe(base);
   });
@@ -2122,8 +2120,8 @@ describe('ChatGPT paged API transport', () => {
       captureCurrentChatgptConversationViaApi({
         readCurrentUrl: () => base,
         requestPage,
-        onPage: async (_snapshot, progress) => {
-          saved.push(progress.page);
+        onPage: async () => {
+          saved.push(saved.length + 1);
         },
       }),
     ).rejects.toMatchObject({ code: 'chatgpt_api_page_http', status: 503 });
