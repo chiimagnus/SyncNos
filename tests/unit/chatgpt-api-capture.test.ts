@@ -1894,6 +1894,32 @@ describe('ChatGPT paged API transport', () => {
     expect(result.snapshot.captureMeta.completeness).toBe('complete');
   });
 
+  it('does not classify an active tool pipeline as complete when its nodes are not user-visible', async () => {
+    for (const active of [
+      message({ id: 'tool-running', role: 'tool', contentType: 'code', status: 'in_progress', hidden: true }),
+      message({
+        id: 'assistant-tool-call',
+        role: 'assistant',
+        recipient: 'python',
+        contentType: 'code',
+        status: 'in_progress',
+      }),
+    ]) {
+      const page = responsePage(
+        [message({ id: 'user-latest', role: 'user', parts: ['calculate'] }), active],
+        false,
+        true,
+      );
+      const { requestPage } = requestPages([page]);
+      const result = await captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage });
+      expect(result.snapshot.messages.map((m: any) => m.messageKey)).toEqual(['user-latest']);
+      expect(result.snapshot.captureMeta).toMatchObject({
+        completeness: 'partial',
+        reasons: expect.arrayContaining(['chatgpt_api_unfinished_turn_partial']),
+      });
+    }
+  });
+
   it('keeps an already saved page if later requests fail, retries transient failures only once', async () => {
     const apiError = (status: number) =>
       Object.assign(new Error('chatgpt_api_page_http'), {

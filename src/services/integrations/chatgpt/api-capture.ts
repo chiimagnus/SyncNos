@@ -91,6 +91,7 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
   let cursor = '';
   let title = '';
   let currentNode = '';
+  let currentNodeInProgress = false;
   let lastResult: ChatgptApiSnapshotResult | null = null;
   let completed = false;
 
@@ -135,6 +136,9 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
       currentNode = String(data.current_node || '');
       if (!currentNode || currentNode !== messages.at(-1)?.id)
         throw apiCaptureError('chatgpt_api_current_node_invalid');
+      const latest = messages.at(-1);
+      currentNodeInProgress =
+        latest?.status === 'in_progress' || latest?.status === 'streaming' || latest?.metadata?.is_complete === false;
     }
 
     const firstId = messages[0]?.id;
@@ -187,7 +191,7 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
       conversationUrl: sanitizedConversationUrl(initialUrl),
       capturedAt: input?.capturedAt,
     });
-    if (!completed || hasAlternateBranches || changedWhileFetching) {
+    if (!completed || currentNodeInProgress || hasAlternateBranches || changedWhileFetching) {
       const meta = result.snapshot.captureMeta;
       result.snapshot.captureMeta = {
         ...meta,
@@ -196,6 +200,7 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
           new Set([
             ...(meta.reasons || []),
             ...(!completed ? ['chatgpt_api_paging'] : []),
+            ...(currentNodeInProgress ? ['chatgpt_api_unfinished_turn_partial'] : []),
             ...(hasAlternateBranches ? ['chatgpt_api_branch_ambiguous'] : []),
             ...(changedWhileFetching ? ['chatgpt_api_conversation_changed'] : []),
           ]),
