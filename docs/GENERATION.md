@@ -9,7 +9,7 @@
 | Commit hash | `da8563456dcc0d7b419099e229f69c075078d624` |
 | Reconciled at | `2026-10-03` |
 
-该 commit 是本轮文档核对的源码基线。会频繁变化的版本号、权限列表、schema、默认路径和 browser target 继续由源码、配置和测试拥有。
+这是 2026-10-03 的文档核对基线，不代表后续功能状态。版本号、权限、schema、默认路径及 browser target 以当前源码、配置和测试为准。
 
 ## Long-term owners
 

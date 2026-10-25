@@ -1,6 +1,6 @@
 ---
 name: syncnos-zh
-description: "使用 SyncNos Web Clipper（网页剪藏器）及其 `syncnos` CLI 与浏览器插件交互：采集、查询和管理内容，处理评论与设置，同步 Provider，以及打开、导出和备份数据。"
+description: "使用 syncnos CLI 采集、查找、管理、同步、导出或备份 SyncNos 浏览器扩展中的内容。"
 ---
 
 # SyncNos
@@ -22,7 +22,7 @@ description: "使用 SyncNos Web Clipper（网页剪藏器）及其 `syncnos` CL
 
 ## 关键操作
 
-- `capture` 处理当前 active page；若目标页未激活，只用浏览器能力切换 tab，不重写 collector。
+- `capture` 处理当前 active page；若目标页未激活，只用浏览器能力切换 tab，不重写 collector。ChatGPT 高级采集报错时，前几页可能已保存；重试前先查询本地条目，不要当成全部回滚。
 - 评论 root/reply/delete 走 CLI。root/reply 正文可以直接传 Markdown 和 `$...$` / `$$...$$` 数学公式源码；Markdown 图片语法不代表评论附件能力。CLI 创建的 root/reply 作者自动记为 `<About You 用户名>' CLI`，未配置用户名时记为 `CLI`，不接受调用方覆盖作者；网页选区评论走 browser-required 流程，不伪造 locator。
 - 修改设置前先运行 `settings schema`，只操作 public key。
 - Provider 认证/配置只走 CLI 暴露接口，不直接读取底层凭据。

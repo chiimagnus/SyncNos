@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last Updated: 2026-10-03**
+**Last Updated: 2026-10-25**
 
 This policy covers SyncNos WebClipper on supported Chromium, Firefox-family, and Safari builds.
 
@@ -36,7 +36,7 @@ External sync is optional. Each provider can be synchronized manually and may al
 
 ### ChatGPT Advanced capture
 
-When you explicitly enable ChatGPT Advanced capture and manually save the current conversation, SyncNos uses your current signed-in ChatGPT session to request that conversation from ChatGPT's non-public current-conversation backend API. This mode does not add background polling or automatic ChatGPT capture. Backend content that can be assigned safely is preserved even when an unfamiliar schema shape makes the result partial; identity or conversation-tree integrity failures still stop the capture instead of guessing.
+When you enable ChatGPT Advanced capture and manually save a signed-in conversation, SyncNos retrieves its history in pages through ChatGPT's non-public backend. This does not enable automatic capture or background polling. Messages from completed pages may remain saved if a later request fails. Unfinished replies, uncertain branches, or unfamiliar content structures are saved conservatively rather than used to replace existing history; unsafe identity or page responses stop the capture.
 
 Conversation text and durable image identity are saved independently from image downloads. Automatic local image caching follows the general AI image-cache setting and runs after the conversation save; when it is disabled, an uncached ChatGPT image may be resolved on demand for display, export, or provider sync. A failed image resolution/cache attempt does not turn successfully persisted text into a failed or incomplete capture. Ordinary tool screenshots and visual execution artifacts are not stored as conversation images.
 

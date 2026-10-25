@@ -27,12 +27,12 @@ Notion AI file messages are saved conservatively; some attachment details may be
 
 ## ChatGPT Advanced capture
 
-ChatGPT uses page capture by default. **Settings → General → ChatGPT Advanced capture** enables an alternative manual capture path.
+ChatGPT saves messages from the current page by default. For longer history, enable **Settings → General → ChatGPT Advanced capture**. You must be signed in to ChatGPT; shared links and temporary chats are not supported.
 
-- **Page capture**: saves the conversation from the current page and loads older history when needed.
-- **Advanced capture**: better for long conversations and the current branch, but it cannot recover reasoning or generation progress that ChatGPT did not keep.
+- **Page capture**: attempts to load accessible older messages but cannot guarantee the full history. Previously saved messages are not deleted.
+- **Advanced capture**: fetches history page by page, preserving recognizable reasoning summaries, generation progress, charts, and other content when ChatGPT provides them. Content ChatGPT no longer exposes cannot be recovered.
 
-Advanced capture does not silently fall back to page capture. Disable it and save again if you want the page path.
+If capture stops partway through, already saved messages remain. Unfinished replies or ambiguous branches do not overwrite existing history. Check your sign-in and retry after a failure. Advanced capture does not silently switch to page capture; disabling it uses the page path, which may still miss older messages.
 
 ## Images and reuse
 
