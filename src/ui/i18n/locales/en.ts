@@ -410,6 +410,7 @@ export const en = {
   backupOrphanedHint: 'Restore missing conversations for review, or reopen those already recovered. Original messages are unchanged.',
   backupOrphanedReview: 'Restore and view',
   backupOrphanedView: 'View',
+  backupOrphanedPending: 'Not yet recovered',
   backupOrphanedRecovered: 'Recovered',
   backupOrphanedCount: 'messages',
   backupOrphanedLoadFailed: 'Could not inspect orphaned messages or recovered conversations.',

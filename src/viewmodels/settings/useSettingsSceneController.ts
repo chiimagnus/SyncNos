@@ -6,7 +6,6 @@ import {
   recoverOrphanConversation,
   type OrphanMessageGroup,
 } from '@services/conversations/client/repo';
-import { buildConversationRouteFromLoc, encodeConversationLoc } from '@services/shared/conversation-loc';
 import { LAST_BACKUP_EXPORT_AT_STORAGE_KEY } from '@services/sync/backup/backup-utils';
 import { importBackupZipMerge, type ImportProgress, type ImportStats } from '@services/sync/backup/import';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
@@ -28,6 +27,7 @@ import { MARKDOWN_READING_PROFILE_STORAGE_KEY } from '@services/protocols/markdo
 import { send } from '@services/shared/runtime';
 import { storageGet, storageOnChanged, storageSet } from '@services/shared/storage';
 import { downloadBlobFile, openOrFocusExtensionAppTab } from '@services/shared/webext';
+import type { Conversation } from '@services/conversations/domain/models';
 import { setSyncProviderEnabled, syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
 import { GITHUB_AUTH_STATE_KEY } from '@services/sync/github/auth/auth-store';
 import { autoSyncEnabledStorageKey, setAutoSyncEnabled } from '@services/sync/auto-sync/auto-sync-settings';
@@ -2013,21 +2013,19 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     };
   }, [activeSection]);
 
-  const handleReviewOrphanConversation = useCallback(
-    async (conversationId: number) => {
-      await runTask(
+  const handleRecoverOrphanConversation = useCallback(
+    async (conversationId: number): Promise<Conversation | null> => {
+      let recovered: Conversation | null = null;
+      const success = await runTask(
         async () => {
-          const recovered = await recoverOrphanConversation(conversationId);
+          recovered = await recoverOrphanConversation(conversationId);
           setOrphanMessageGroups((groups) =>
             groups.map((group) => (group.conversationId === conversationId ? { ...group, recovered: true } : group)),
           );
-          const route = buildConversationRouteFromLoc(
-            encodeConversationLoc({ source: recovered.source, conversationKey: recovered.conversationKey }),
-          );
-          await openOrFocusExtensionAppTab({ route });
         },
         { fallbackMessage: t('backupOrphanedLoadFailed') },
       );
+      return success ? recovered : null;
     },
     [runTask],
   );
@@ -2299,7 +2297,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     importErrorDetail,
     orphanMessageGroups,
     orphanLoadError,
-    handleReviewOrphanConversation,
+    handleRecoverOrphanConversation,
     importStats,
     lastBackupExportAt,
     includeSensitiveBackupData,

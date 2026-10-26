@@ -153,7 +153,7 @@ export function SettingsScene(props: SettingsSceneProps) {
     importErrorDetail,
     orphanMessageGroups,
     orphanLoadError,
-    handleReviewOrphanConversation,
+    handleRecoverOrphanConversation,
     importStats,
     lastBackupExportAt,
     includeSensitiveBackupData,
@@ -425,9 +425,7 @@ export function SettingsScene(props: SettingsSceneProps) {
           importErrorDetail={importErrorDetail}
           orphanMessageGroups={orphanMessageGroups}
           orphanLoadError={orphanLoadError}
-          onReviewOrphanConversation={(id) => {
-            void handleReviewOrphanConversation(id);
-          }}
+          onRecoverOrphanConversation={handleRecoverOrphanConversation}
           importStats={importStats}
           lastBackupExportAt={lastBackupExportAt}
           includeSensitiveData={includeSensitiveBackupData}

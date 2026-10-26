@@ -5,6 +5,13 @@ export const cardClassName =
 
 export const buttonClassName = buttonTintClassName();
 
+export const conversationJumpLinkClassName = [
+  'tw-group tw-flex tw-min-w-0 tw-items-center tw-truncate tw-text-left',
+  'tw-cursor-pointer tw-appearance-none tw-border-0 tw-bg-transparent tw-p-0',
+  'tw-text-sm tw-font-bold tw-text-[var(--text-primary)] hover:tw-opacity-85',
+  'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
+].join(' ');
+
 export const primaryButtonClassName = buttonFilledClassName();
 
 export const dangerButtonClassName = buttonDangerTintClassName();

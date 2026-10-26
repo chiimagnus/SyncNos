@@ -1,6 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ChevronRight } from 'lucide-react';
 
 import { t } from '@i18n';
 import { Area, AreaChart, Bar, BarChart, Cell, CartesianGrid, LabelList, Tooltip, XAxis, YAxis } from 'recharts';
@@ -14,7 +13,7 @@ import {
   INSIGHT_UNKNOWN_DATE_LABEL,
 } from '@viewmodels/settings/insight-stats';
 import type { InsightTimeRange } from '@viewmodels/settings/insight-stats';
-import { buttonClassName, cardClassName } from '@ui/settings/ui';
+import { buttonClassName, cardClassName, conversationJumpLinkClassName } from '@ui/settings/ui';
 import { useConversationsApp } from '@viewmodels/conversations/conversations-context';
 import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
 import { SelectMenu } from '@ui/shared/SelectMenu';
@@ -283,12 +282,7 @@ function TopRankedList<T extends InsightTopConversation | InsightTopCommentedCli
             <Link
               to={getLinkTo(item)}
               replace
-              className={[
-                'tw-group tw-flex tw-min-w-0 tw-items-center tw-gap-1 tw-text-left',
-                'tw-truncate tw-text-sm tw-font-bold tw-text-[var(--text-primary)]',
-                'hover:tw-opacity-85',
-                'focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]',
-              ].join(' ')}
+              className={conversationJumpLinkClassName}
               title={item.title}
               aria-label={item.title}
               onClick={(event) => {
@@ -300,12 +294,6 @@ function TopRankedList<T extends InsightTopConversation | InsightTopCommentedCli
               <span className="tw-min-w-0 tw-truncate tw-underline-offset-2 group-hover:tw-underline">
                 {item.title}
               </span>
-              <ChevronRight
-                size={14}
-                strokeWidth={2}
-                aria-hidden="true"
-                className="tw-shrink-0 tw-text-[var(--text-secondary)] tw-opacity-70 group-hover:tw-opacity-100"
-              />
             </Link>
             <div className="tw-mt-0.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{item.source}</div>
           </div>

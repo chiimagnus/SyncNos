@@ -407,6 +407,7 @@ export const zh: { [K in TranslationKey]: string } = {
   backupOrphanedHint: '可补建缺失的会话并查看，也可反复打开已恢复的会话；原始消息不会被修改。',
   backupOrphanedReview: '恢复并查看',
   backupOrphanedView: '查看',
+  backupOrphanedPending: '待恢复',
   backupOrphanedRecovered: '已恢复',
   backupOrphanedCount: '条消息',
   backupOrphanedLoadFailed: '无法检查孤立消息与已恢复会话。',

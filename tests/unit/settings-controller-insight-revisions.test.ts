@@ -72,7 +72,6 @@ vi.mock('@i18n', async (importOriginal) => ({
 }));
 
 import { useSettingsSceneController } from '@viewmodels/settings/useSettingsSceneController';
-import { decodeConversationLoc } from '@services/shared/conversation-loc';
 
 type Snapshot = ReturnType<typeof useSettingsSceneController>;
 type SettingsSection = Parameters<typeof useSettingsSceneController>[0]['activeSection'];
@@ -265,24 +264,37 @@ describe('Settings controller backup recovery navigation', () => {
     await renderController('backup');
     expect(latestSnapshot?.orphanMessageGroups).toEqual([orphan, imported]);
 
+    let recovered = null as Awaited<ReturnType<Snapshot['handleRecoverOrphanConversation']>>;
     await act(async () => {
-      await latestSnapshot!.handleReviewOrphanConversation(1730);
+      recovered = await latestSnapshot!.handleRecoverOrphanConversation(1730);
     });
+    expect(recovered).toMatchObject({ id: 1730, source: 'recovered', conversationKey: 'orphan-1730' });
     expect(latestSnapshot?.orphanMessageGroups).toEqual([{ ...orphan, recovered: true }, imported]);
-    expect(recoveryMocks.openTab).toHaveBeenCalledTimes(1);
-
-    await act(async () => {
-      await latestSnapshot!.handleReviewOrphanConversation(2200);
-    });
-    const secondRoute = recoveryMocks.openTab.mock.calls[1]?.[0]?.route as string;
-    const loc = new URLSearchParams(secondRoute.split('?')[1]).get('loc');
-    expect(decodeConversationLoc(loc)).toEqual({ source: 'recovered', conversationKey: 'orphan-1731' });
-    expect(latestSnapshot?.orphanMessageGroups).toHaveLength(2);
+    expect(recoveryMocks.recover).toHaveBeenCalledTimes(1);
+    expect(recoveryMocks.openTab).not.toHaveBeenCalled();
 
     await rerenderController('general');
     await rerenderController('backup');
     expect(latestSnapshot?.orphanMessageGroups).toEqual([{ ...orphan, recovered: true }, imported]);
     expect(recoveryMocks.list).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('Settings controller backup recovery errors', () => {
+  it('retains the pending entry and stays in settings when recovery fails', async () => {
+    const orphan = { conversationId: 1730, originalConversationId: 1730, messageCount: 10, recovered: false };
+    recoveryMocks.list.mockResolvedValue([orphan]);
+    recoveryMocks.recover.mockRejectedValue(new Error('cannot restore orphan conversation'));
+
+    await renderController('backup');
+    let result = null as Awaited<ReturnType<Snapshot['handleRecoverOrphanConversation']>>;
+    await act(async () => {
+      result = await latestSnapshot!.handleRecoverOrphanConversation(1730);
+    });
+    expect(result).toBeNull();
+    expect(latestSnapshot?.orphanMessageGroups).toEqual([orphan]);
+    expect(latestSnapshot?.error).toContain('cannot restore orphan conversation');
+    expect(recoveryMocks.openTab).not.toHaveBeenCalled();
   });
 });
 
