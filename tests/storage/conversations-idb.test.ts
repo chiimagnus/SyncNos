@@ -1152,7 +1152,9 @@ describe('conversations storage-idb', () => {
     );
     await txDone(transaction);
 
-    expect(await listOrphanMessageGroups()).toEqual([{ conversationId: id, messageCount: 1 }]);
+    expect(await listOrphanMessageGroups()).toEqual([
+      { conversationId: id, originalConversationId: id, messageCount: 1, recovered: false },
+    ]);
     expect(await getConversationById(id)).toBeNull();
     expect(await recoverOrphanConversation(id)).toMatchObject({
       id,
@@ -1160,13 +1162,55 @@ describe('conversations storage-idb', () => {
       conversationKey: 'orphan-317',
       originalConversationId: id,
     });
-    expect(await listOrphanMessageGroups()).toEqual([]);
+    expect(await listOrphanMessageGroups()).toEqual([
+      { conversationId: id, originalConversationId: id, messageCount: 1, recovered: true },
+    ]);
     expect(await recoverOrphanConversation(id)).toMatchObject({ id });
     expect(await getMessagesByConversationId(id)).toEqual([
       expect.objectContaining({ id: 1, messageKey: 'm1', contentMarkdown: 'original content' }),
     ]);
     expect(await getConversationById(id)).toMatchObject({ id, source: 'recovered' });
     await expect(recoverOrphanConversation(318)).rejects.toThrow('no orphan messages');
+  });
+
+  it('keeps previously recovered groups reviewable after import remaps their local IDs', async () => {
+    const recovered = await upsertConversation({
+      sourceType: 'chat',
+      source: 'recovered',
+      conversationKey: 'orphan-1731',
+      originalConversationId: 1731,
+      title: '#1731',
+      lastActivityAt: 100,
+    } as any);
+    await syncConversationMessages(recovered.id, [
+      { messageKey: 'm1', role: 'user', contentMarkdown: 'saved text', sequence: 0, updatedAt: 100 },
+    ]);
+    const ordinary = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'not-recovered',
+      lastActivityAt: 100,
+    });
+    await syncConversationMessages(ordinary.id, [
+      { messageKey: 'm2', role: 'user', contentMarkdown: 'ordinary text', sequence: 0, updatedAt: 100 },
+    ]);
+
+    const expected = [
+      {
+        conversationId: recovered.id,
+        originalConversationId: 1731,
+        messageCount: 1,
+        recovered: true,
+      },
+    ];
+    expect(await listOrphanMessageGroups()).toEqual(expected);
+    expect(await recoverOrphanConversation(recovered.id)).toMatchObject({
+      id: recovered.id,
+      source: 'recovered',
+      conversationKey: 'orphan-1731',
+    });
+    expect(await listOrphanMessageGroups()).toEqual(expected);
+    expect((await getMessagesByConversationId(recovered.id))[0]?.contentMarkdown).toBe('saved text');
   });
 
   it('keeps messages linked when deletion races with a message write', async () => {

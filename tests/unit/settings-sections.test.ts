@@ -899,20 +899,24 @@ describe('backup feedback', () => {
     const onReviewOrphanConversation = vi.fn();
     renderBackup({
       orphanMessageGroups: [
-        { conversationId: 1730, messageCount: 10 },
-        { conversationId: 1731, messageCount: 75 },
+        { conversationId: 1730, originalConversationId: 1730, messageCount: 10, recovered: false },
+        { conversationId: 2200, originalConversationId: 1731, messageCount: 75, recovered: true },
       ],
       onReviewOrphanConversation,
     });
 
     expect(document.body.textContent).toContain('#1730 · 10 messages');
-    expect(document.body.textContent).toContain('#1731 · 75 messages');
-    const buttons = Array.from(document.querySelectorAll('button')).filter(
+    expect(document.body.textContent).toContain('#1731 · 75 messages · Recovered');
+    const restore = Array.from(document.querySelectorAll('button')).find(
       (button) => button.textContent === 'Restore and view',
     );
-    expect(buttons).toHaveLength(2);
-    act(() => buttons[1].dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
-    expect(onReviewOrphanConversation).toHaveBeenCalledWith(1731);
+    const review = Array.from(document.querySelectorAll('button')).find((button) => button.textContent === 'View');
+    expect(restore).toBeTruthy();
+    expect(review).toBeTruthy();
+    act(() => restore!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
+    act(() => review!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
+    expect(onReviewOrphanConversation).toHaveBeenCalledWith(1730);
+    expect(onReviewOrphanConversation).toHaveBeenCalledWith(2200);
   });
 
   it('shows localized backup errors with the exact technical details visibly attached', () => {

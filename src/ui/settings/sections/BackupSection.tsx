@@ -1,6 +1,7 @@
 import type { RefObject } from 'react';
 
 import { t } from '@i18n';
+import type { OrphanMessageGroup } from '@services/conversations/client/repo';
 import { formatTime } from '@viewmodels/settings/utils';
 import { buttonClassName, cardClassName, checkboxClassName } from '@ui/settings/ui';
 
@@ -39,7 +40,7 @@ export function BackupSection(props: {
   importStatus: string;
   exportErrorDetail?: string;
   importErrorDetail?: string;
-  orphanMessageGroups?: { conversationId: number; messageCount: number }[];
+  orphanMessageGroups?: OrphanMessageGroup[];
   orphanLoadError?: string;
   onReviewOrphanConversation?: (conversationId: number) => void;
   importStats: any;
@@ -166,7 +167,8 @@ export function BackupSection(props: {
           {orphanMessageGroups.map((group) => (
             <div key={group.conversationId} className="tw-mt-2 tw-flex tw-items-center tw-justify-between tw-gap-2">
               <span className="tw-text-xs tw-text-[var(--text-primary)]">
-                #{group.conversationId} · {group.messageCount} {t('backupOrphanedCount')}
+                #{group.originalConversationId} · {group.messageCount} {t('backupOrphanedCount')}
+                {group.recovered ? ` · ${t('backupOrphanedRecovered')}` : ''}
               </span>
               <button
                 type="button"
@@ -174,7 +176,7 @@ export function BackupSection(props: {
                 disabled={busy}
                 onClick={() => onReviewOrphanConversation?.(group.conversationId)}
               >
-                {t('backupOrphanedReview')}
+                {t(group.recovered ? 'backupOrphanedView' : 'backupOrphanedReview')}
               </button>
             </div>
           ))}

@@ -11,6 +11,7 @@ const storageMocks = vi.hoisted(() => ({
   onChanged: vi.fn(),
 }));
 const insightSourceMocks = vi.hoisted(() => ({ get: vi.fn() }));
+const recoveryMocks = vi.hoisted(() => ({ list: vi.fn(), recover: vi.fn(), openTab: vi.fn() }));
 const revisionMocks = vi.hoisted(() => ({
   subscribe: vi.fn(),
   ready: vi.fn(),
@@ -18,6 +19,14 @@ const revisionMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@services/shared/runtime', () => ({ send: runtimeMocks.send }));
+vi.mock('@services/conversations/client/repo', () => ({
+  listOrphanMessageGroups: recoveryMocks.list,
+  recoverOrphanConversation: recoveryMocks.recover,
+}));
+vi.mock('@services/shared/webext', () => ({
+  downloadBlobFile: vi.fn(),
+  openOrFocusExtensionAppTab: recoveryMocks.openTab,
+}));
 vi.mock('@services/shared/storage', () => ({
   storageGet: storageMocks.get,
   storageSet: storageMocks.set,
@@ -63,6 +72,7 @@ vi.mock('@i18n', async (importOriginal) => ({
 }));
 
 import { useSettingsSceneController } from '@viewmodels/settings/useSettingsSceneController';
+import { decodeConversationLoc } from '@services/shared/conversation-loc';
 
 type Snapshot = ReturnType<typeof useSettingsSceneController>;
 type SettingsSection = Parameters<typeof useSettingsSceneController>[0]['activeSection'];
@@ -217,6 +227,9 @@ beforeEach(() => {
   revisionMocks.retry.mockReset();
   insightSourceMocks.get.mockReset();
   insightSourceMocks.get.mockResolvedValue(source([chat(1)], [[1, 2]]));
+  recoveryMocks.list.mockResolvedValue([]);
+  recoveryMocks.recover.mockReset();
+  recoveryMocks.openTab.mockResolvedValue(null);
 
   setupDom();
 });
@@ -230,6 +243,47 @@ afterEach(async () => {
   }
   root = null;
   cleanupDom();
+});
+
+describe('Settings controller backup recovery navigation', () => {
+  it('keeps reviewed links and other groups accessible after navigating away and returning', async () => {
+    const orphan = { conversationId: 1730, originalConversationId: 1730, messageCount: 10, recovered: false };
+    const imported = { conversationId: 2200, originalConversationId: 1731, messageCount: 75, recovered: true };
+    recoveryMocks.list.mockResolvedValueOnce([orphan, imported]).mockResolvedValue([
+      {
+        ...orphan,
+        recovered: true,
+      },
+      imported,
+    ]);
+    recoveryMocks.recover.mockImplementation(async (id: number) => ({
+      id,
+      source: 'recovered',
+      conversationKey: id === 1730 ? 'orphan-1730' : 'orphan-1731',
+    }));
+
+    await renderController('backup');
+    expect(latestSnapshot?.orphanMessageGroups).toEqual([orphan, imported]);
+
+    await act(async () => {
+      await latestSnapshot!.handleReviewOrphanConversation(1730);
+    });
+    expect(latestSnapshot?.orphanMessageGroups).toEqual([{ ...orphan, recovered: true }, imported]);
+    expect(recoveryMocks.openTab).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await latestSnapshot!.handleReviewOrphanConversation(2200);
+    });
+    const secondRoute = recoveryMocks.openTab.mock.calls[1]?.[0]?.route as string;
+    const loc = new URLSearchParams(secondRoute.split('?')[1]).get('loc');
+    expect(decodeConversationLoc(loc)).toEqual({ source: 'recovered', conversationKey: 'orphan-1731' });
+    expect(latestSnapshot?.orphanMessageGroups).toHaveLength(2);
+
+    await rerenderController('general');
+    await rerenderController('backup');
+    expect(latestSnapshot?.orphanMessageGroups).toEqual([{ ...orphan, recovered: true }, imported]);
+    expect(recoveryMocks.list).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('Settings controller Insight revision lifecycle', () => {

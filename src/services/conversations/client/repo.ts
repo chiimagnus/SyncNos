@@ -69,7 +69,12 @@ export async function findConversationBySourceAndKey(
   return unwrap(res);
 }
 
-export type OrphanMessageGroup = { conversationId: number; messageCount: number };
+export type OrphanMessageGroup = {
+  conversationId: number;
+  originalConversationId: number;
+  messageCount: number;
+  recovered: boolean;
+};
 
 export async function listOrphanMessageGroups(): Promise<OrphanMessageGroup[]> {
   const res = await send<ApiResponse<OrphanMessageGroup[]>>(CORE_MESSAGE_TYPES.LIST_ORPHAN_MESSAGE_GROUPS, {});

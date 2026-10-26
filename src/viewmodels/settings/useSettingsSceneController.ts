@@ -7,10 +7,6 @@ import {
   type OrphanMessageGroup,
 } from '@services/conversations/client/repo';
 import { buildConversationRouteFromLoc, encodeConversationLoc } from '@services/shared/conversation-loc';
-import {
-  RECOVERED_CONVERSATION_SOURCE,
-  recoveredConversationKey,
-} from '@services/conversations/domain/orphaned-messages';
 import { LAST_BACKUP_EXPORT_AT_STORAGE_KEY } from '@services/sync/backup/backup-utils';
 import { importBackupZipMerge, type ImportProgress, type ImportStats } from '@services/sync/backup/import';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
@@ -2022,12 +2018,11 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       await runTask(
         async () => {
           const recovered = await recoverOrphanConversation(conversationId);
-          setOrphanMessageGroups((groups) => groups.filter((group) => group.conversationId !== conversationId));
+          setOrphanMessageGroups((groups) =>
+            groups.map((group) => (group.conversationId === conversationId ? { ...group, recovered: true } : group)),
+          );
           const route = buildConversationRouteFromLoc(
-            encodeConversationLoc({
-              source: RECOVERED_CONVERSATION_SOURCE,
-              conversationKey: recoveredConversationKey(recovered.id),
-            }),
+            encodeConversationLoc({ source: recovered.source, conversationKey: recovered.conversationKey }),
           );
           await openOrFocusExtensionAppTab({ route });
         },
