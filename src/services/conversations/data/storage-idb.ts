@@ -1419,18 +1419,15 @@ export async function syncConversationMessages(
   const result = await runTrackedTransaction(
     {
       db,
-      stores: activityAtProvided ? ['messages', 'conversations'] : ['messages'],
+      stores: ['messages', 'conversations'],
       revisionScopes: activityAtProvided ? ['messages', 'conversations'] : ['messages'],
     },
     async ({ stores, markChanged }) => {
-      let activityConversation: any = null;
+      let activityConversation: any = await reqToPromise(stores.conversations.get(conversationId as any));
+      if (!activityConversation) throw new Error('conversation not found');
       let semanticContentChanged = options?.conversationContentChanged === true;
-      if (activityAtProvided) {
-        activityConversation = await reqToPromise(stores.conversations.get(conversationId as any));
-        if (!activityConversation) throw new Error('conversation not found');
-      }
       const commitActivity = async () => {
-        if (!activityConversation || !semanticContentChanged) return;
+        if (!activityAtProvided || !semanticContentChanged) return;
         const current = normalizeStoredActivityTimestamp(activityConversation.lastActivityAt);
         if (activityAt <= current) return;
         activityConversation = { ...activityConversation, lastActivityAt: activityAt };

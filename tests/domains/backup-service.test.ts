@@ -521,6 +521,153 @@ describe('backup service', () => {
     ).toHaveLength(1);
   });
 
+  it('refuses to export a backup that would silently omit unlinked messages', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const db = await openDb();
+    const transaction = db.transaction(['conversations', 'messages'], 'readwrite');
+    const done = new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+    const conversationId = await reqToPromise<number>(
+      transaction.objectStore('conversations').add({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: 'backup-integrity',
+        title: 'Backup integrity',
+        lastActivityAt: 1,
+      }) as any,
+    );
+    await reqToPromise(
+      transaction.objectStore('messages').add({
+        conversationId,
+        messageKey: 'attached',
+        role: 'user',
+        contentMarkdown: 'included',
+        sequence: 0,
+      }),
+    );
+    await reqToPromise(
+      transaction.objectStore('messages').add({
+        conversationId: 999_999,
+        messageKey: 'unlinked',
+        role: 'assistant',
+        contentMarkdown: 'must not be silently omitted',
+        sequence: 0,
+      }),
+    );
+    await done;
+
+    await expect(exportBackupZip()).rejects.toThrow(/1 message.*no exportable conversation/);
+    expect(chromeMock.__store.last_backup_export_at).toBeUndefined();
+
+    const verify = db.transaction('messages', 'readonly');
+    const verifyDone = new Promise<void>((resolve, reject) => {
+      verify.oncomplete = () => resolve();
+      verify.onerror = () => reject(verify.error);
+      verify.onabort = () => reject(verify.error);
+    });
+    expect(await reqToPromise(verify.objectStore('messages').count())).toBe(2);
+    await verifyDone;
+  });
+
+  it.each([
+    ['messages', false, 'conversation disappeared before restoring messages'],
+    ['assets', true, 'conversation disappeared before restoring assets'],
+  ])(
+    'does not recreate orphan %s after a concurrent conversation deletion',
+    async (_kind, withAsset, expectedError) => {
+      const entries = emptyBackupZipEntries();
+      const encoder = new TextEncoder();
+      const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
+      const filePath = 'sources/chatgpt/restore-race.json';
+      manifest.counts.conversations = 1;
+      manifest.counts.messages = 1;
+      if (withAsset) manifest.counts.image_cache = 1;
+      manifest.sources = [{ source: 'chatgpt', conversationCount: 1, files: [filePath] }];
+      entries.set('manifest.json', encoder.encode(JSON.stringify(manifest)));
+      entries.set(
+        filePath,
+        encoder.encode(
+          JSON.stringify({
+            schemaVersion: 1,
+            conversation: {
+              sourceType: 'chat',
+              source: 'chatgpt',
+              conversationKey: 'restore-race',
+              title: 'Restore race',
+              lastActivityAt: 1,
+            },
+            messages: [{ messageKey: 'm1', role: 'user', contentMarkdown: 'preserve', sequence: 0 }],
+            syncMapping: null,
+          }),
+        ),
+      );
+      if (withAsset) {
+        const blobPath = 'assets/image-cache/blobs/1.png';
+        entries.set(
+          'assets/image-cache/index.json',
+          encoder.encode(
+            JSON.stringify({
+              schemaVersion: 1,
+              assets: [
+                {
+                  assetId: 1,
+                  uniqueKey: 'chatgpt||restore-race',
+                  url: 'https://example.com/recovery.png',
+                  contentType: 'image/png',
+                  byteSize: 3,
+                  blobPath,
+                },
+              ],
+            }),
+          ),
+        );
+        entries.set(blobPath, Uint8Array.from([1, 2, 3]));
+      }
+
+      const db = await openDb();
+      let deletionDone: Promise<void> | null = null;
+      await expect(
+        importBackupZipMerge(entries, (progress) => {
+          if (progress.stage !== 'Conversations' || progress.done !== 1 || deletionDone) return;
+          const deletion = db.transaction('conversations', 'readwrite');
+          deletionDone = new Promise<void>((resolve, reject) => {
+            deletion.oncomplete = () => resolve();
+            deletion.onerror = () => reject(deletion.error);
+            deletion.onabort = () => reject(deletion.error);
+          });
+          const cursorRequest = deletion.objectStore('conversations').openCursor();
+          cursorRequest.onsuccess = () => {
+            const cursor = cursorRequest.result;
+            if (!cursor) return;
+            cursor.delete();
+            cursor.continue();
+          };
+        }),
+      ).rejects.toThrow(expectedError);
+      expect(deletionDone).not.toBeNull();
+      await deletionDone;
+
+      const check = db.transaction(['conversations', 'messages', 'image_cache'], 'readonly');
+      const checkDone = new Promise<void>((resolve, reject) => {
+        check.oncomplete = () => resolve();
+        check.onerror = () => reject(check.error);
+        check.onabort = () => reject(check.error);
+      });
+      expect(await reqToPromise(check.objectStore('conversations').count())).toBe(0);
+      expect(await reqToPromise(check.objectStore('messages').count())).toBe(0);
+      expect(await reqToPromise(check.objectStore('image_cache').count())).toBe(0);
+      await checkDone;
+    },
+  );
+
   it('exportBackupZip emits manifest + bundles and filters storage.local', async () => {
     const chromeMock = mockChromeStorage({
       notion_oauth_client_id: 'client_id',

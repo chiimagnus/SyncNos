@@ -361,36 +361,50 @@ describe('data revision storage', () => {
   });
 
   it('advances the messages revision only for actual message row mutations', async () => {
-    const { syncConversationMessages } = await import('@services/conversations/data/storage-idb');
+    const { syncConversationMessages, upsertConversation } = await import('@services/conversations/data/storage-idb');
+    const conversation = await upsertConversation({
+      sourceType: 'chat',
+      source: 'test',
+      conversationKey: 'message-revision',
+      lastActivityAt: 1,
+    });
+    const id = Number(conversation.id);
     const message = { messageKey: 'm1', role: 'user', contentMarkdown: 'stable', sequence: 1 };
 
-    await syncConversationMessages(42, [{ ...message, updatedAt: 10 }]);
+    await syncConversationMessages(id, [{ ...message, updatedAt: 10 }]);
     expect(await readDataRevision('messages')).toBe(1);
 
-    await syncConversationMessages(42, [{ ...message }]);
+    await syncConversationMessages(id, [{ ...message }]);
     expect(await readDataRevision('messages')).toBe(1);
 
-    await syncConversationMessages(42, [{ ...message, updatedAt: 11 }]);
+    await syncConversationMessages(id, [{ ...message, updatedAt: 11 }]);
     expect(await readDataRevision('messages')).toBe(1);
 
-    await syncConversationMessages(42, [{ ...message, contentMarkdown: 'changed', updatedAt: 11 }]);
+    await syncConversationMessages(id, [{ ...message, contentMarkdown: 'changed', updatedAt: 11 }]);
     expect(await readDataRevision('messages')).toBe(2);
 
-    await syncConversationMessages(42, []);
+    await syncConversationMessages(id, []);
     expect(await readDataRevision('messages')).toBe(3);
-    await syncConversationMessages(42, []);
+    await syncConversationMessages(id, []);
     expect(await readDataRevision('messages')).toBe(3);
   });
 
   it('does not bump messages revision for a snapshot whose protective merge resolves to the existing durable row', async () => {
-    const { syncConversationMessages } = await import('@services/conversations/data/storage-idb');
-    await syncConversationMessages(43, [
+    const { syncConversationMessages, upsertConversation } = await import('@services/conversations/data/storage-idb');
+    const conversation = await upsertConversation({
+      sourceType: 'chat',
+      source: 'test',
+      conversationKey: 'protective-merge-revision',
+      lastActivityAt: 1,
+    });
+    const id = Number(conversation.id);
+    await syncConversationMessages(id, [
       { messageKey: 'm1', role: 'assistant', contentMarkdown: 'rich', sequence: 0, updatedAt: 10 },
     ]);
     expect(await readDataRevision('messages')).toBe(1);
 
     await syncConversationMessages(
-      43,
+      id,
       [
         {
           messageKey: 'm1',

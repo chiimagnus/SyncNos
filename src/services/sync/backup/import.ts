@@ -794,7 +794,7 @@ export async function importBackupZipMerge(
     progress.stage = 'Assets';
     report();
     await runTrackedTransaction(
-      { db, stores: ['image_cache'], revisionScopes: ['image_cache'] },
+      { db, stores: ['image_cache', 'conversations'], revisionScopes: ['image_cache'] },
       async ({ stores: s, markChanged }) => {
         const idx = s.image_cache.index('by_conversationId_url');
         const now = Date.now();
@@ -806,6 +806,9 @@ export async function importBackupZipMerge(
           if (!uniqueKey) continue;
           const localConversationId = uniqueToLocalId.get(uniqueKey);
           if (!localConversationId) continue;
+          if (!(await reqToPromise(s.conversations.get(localConversationId)))) {
+            throw new Error('Backup import aborted: conversation disappeared before restoring assets');
+          }
 
           const safeUrl = asset?.url ? String(asset.url).trim() : '';
           if (!safeUrl) continue;
@@ -882,7 +885,7 @@ export async function importBackupZipMerge(
     report();
     const stageNow = Date.now();
     await runTrackedTransaction(
-      { db, stores: ['messages'], revisionScopes: ['messages'] },
+      { db, stores: ['messages', 'conversations'], revisionScopes: ['messages'] },
       async ({ stores: s, markChanged }) => {
         const idx = s.messages.index('by_conversationId_messageKey');
 
@@ -891,6 +894,9 @@ export async function importBackupZipMerge(
           if (!localConversationId) {
             stats.messagesSkipped += Array.isArray(list) ? list.length : 0;
             continue;
+          }
+          if (list.length && !(await reqToPromise(s.conversations.get(localConversationId)))) {
+            throw new Error('Backup import aborted: conversation disappeared before restoring messages');
           }
           const remap = assetIdRemapByUniqueKey.get(uk) || new Map<number, number>();
           const fallbacks = fallbackUrlByOldIdByUniqueKey.get(uk) || new Map<number, string>();

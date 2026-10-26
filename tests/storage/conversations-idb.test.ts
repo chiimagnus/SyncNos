@@ -1119,6 +1119,40 @@ describe('conversations storage-idb', () => {
     ).rejects.toThrow('conversation not found');
   });
 
+  it('never creates orphan messages when a conversation is missing, even without activity metadata', async () => {
+    const message = { messageKey: 'm1', role: 'user', contentMarkdown: 'orphan', sequence: 0, updatedAt: 1 };
+    const options: Array<Parameters<typeof syncConversationMessages>[2]> = [
+      undefined,
+      { mode: 'incremental', diff: { added: ['m1'] } },
+      { mode: 'append', diff: { added: ['m1'] } },
+    ];
+    const revisionBefore = await readDataRevision('messages');
+    for (const option of options) {
+      await expect(syncConversationMessages(999_999, [message], option)).rejects.toThrow('conversation not found');
+    }
+    expect(await getMessagesByConversationId(999_999)).toEqual([]);
+    expect(await readDataRevision('messages')).toBe(revisionBefore);
+  });
+
+  it('keeps messages linked when deletion races with a message write', async () => {
+    const conversation = await upsertConversation({
+      sourceType: 'chat',
+      source: 'test',
+      conversationKey: 'concurrent-delete-and-write',
+      lastActivityAt: 1,
+    });
+    const id = Number(conversation.id);
+    const [deletion, writing] = await Promise.allSettled([
+      deleteConversationsByIds([id]),
+      syncConversationMessages(id, [{ messageKey: 'm1', role: 'user', contentMarkdown: 'racing write', sequence: 0 }]),
+    ]);
+
+    expect(deletion.status).toBe('fulfilled');
+    if (writing.status === 'rejected') expect(String(writing.reason)).toContain('conversation not found');
+    expect(await getConversationById(id)).toBeNull();
+    expect(await getMessagesByConversationId(id)).toEqual([]);
+  });
+
   it('keeps semantically equivalent message rows revision-stable regardless of incoming timestamps', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',

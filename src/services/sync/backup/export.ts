@@ -213,13 +213,34 @@ export async function exportBackupZip(
   const allImageCache = Array.isArray(imageCache) ? imageCache : [];
   const allArticleComments = Array.isArray(articleComments) ? articleComments : [];
 
+  const exportableConversationIds = new Set<number>();
+  for (const conversation of allConversations) {
+    const id = Number(conversation?.id);
+    if (
+      !Number.isSafeInteger(id) ||
+      id <= 0 ||
+      !String(conversation?.source || '').trim() ||
+      !String(conversation?.conversationKey || '').trim()
+    ) {
+      throw new Error('Backup export blocked: a conversation has no exportable identity');
+    }
+    exportableConversationIds.add(id);
+  }
+
   const messagesByConversationId = new Map<number, AnyRecord[]>();
+  let unlinkedMessages = 0;
   for (const m of allMessages) {
-    const cid = Number(m && m.conversationId);
-    if (!Number.isFinite(cid) || cid <= 0) continue;
+    const cid = Number(m?.conversationId);
+    if (!Number.isSafeInteger(cid) || !exportableConversationIds.has(cid)) {
+      unlinkedMessages += 1;
+      continue;
+    }
     const list = messagesByConversationId.get(cid) || [];
     list.push(m);
     messagesByConversationId.set(cid, list);
+  }
+  if (unlinkedMessages > 0) {
+    throw new Error(`Backup export blocked: ${unlinkedMessages} message records have no exportable conversation`);
   }
 
   const mappingByUniqueKey = new Map<string, AnyRecord>();
