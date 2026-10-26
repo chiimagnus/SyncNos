@@ -186,6 +186,9 @@ export function mergeConversationRecord(existing: UnknownRecord, incoming: Unkno
   else delete next.notionPageId;
 
   next.lastActivityAt = Math.max(validTimestamp(a.lastActivityAt) ?? 0, validTimestamp(b.lastActivityAt) ?? 0);
+  if (next.source === 'recovered' && /^orphan-[1-9]\d*$/.test(next.conversationKey)) {
+    next.originalConversationId = Number(next.conversationKey.slice('orphan-'.length));
+  }
   delete next.lastCapturedAt;
 
   return next;

@@ -521,6 +521,243 @@ describe('backup service', () => {
     ).toHaveLength(1);
   });
 
+  it('preserves two orphan groups totaling 85 messages in one full backup', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const db = await openDb();
+    const transaction = db.transaction('messages', 'readwrite');
+    const done = new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+    for (const [conversationId, count] of [
+      [1730, 10],
+      [1731, 75],
+    ] as const) {
+      for (let sequence = 0; sequence < count; sequence += 1) {
+        await reqToPromise(
+          transaction.objectStore('messages').add({
+            conversationId,
+            messageKey: `m-${conversationId}-${sequence}`,
+            role: 'user',
+            contentMarkdown: `stored message ${sequence}`,
+            sequence,
+            updatedAt: 1_788_765_000_000 + sequence,
+          }),
+        );
+      }
+    }
+    await done;
+
+    const exported = await exportBackupZip();
+    const entries = await extractZipEntries(exported.blob);
+    const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
+    const group = manifest.sources.find((item: any) => item.source === 'recovered');
+    expect(manifest.counts).toMatchObject({ conversations: 2, messages: 85 });
+    expect(group.conversationCount).toBe(2);
+    const recoveredBundles = group.files.map((path: string) =>
+      JSON.parse(new TextDecoder().decode(entries.get(path)!)),
+    );
+    expect(recoveredBundles.map((bundle: any) => bundle.messages.length)).toEqual([10, 75]);
+    expect(recoveredBundles.map((bundle: any) => bundle.conversation.originalConversationId)).toEqual([1730, 1731]);
+
+    closeDbForTests();
+    await deleteDb('webclipper');
+    const result = await importBackupZipMerge(entries);
+    expect(result.conversationsAdded).toBe(2);
+    expect(result.messagesAdded).toBe(85);
+    const importedDb = await openDb();
+    const imported = importedDb.transaction('conversations', 'readonly');
+    const conversations = await reqToPromise<any[]>(imported.objectStore('conversations').getAll());
+    const counts = await Promise.all(
+      conversations.map(async (row) => (await getMessagesByConversationId(row.id)).length),
+    );
+    expect(counts.sort((a, b) => a - b)).toEqual([10, 75]);
+  });
+
+  it('exports and restores every orphan message as a reviewable recovered conversation without changing the source', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const db = await openDb();
+    const transaction = db.transaction(['conversations', 'messages'], 'readwrite');
+    const done = new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+    const conversationId = await reqToPromise<number>(
+      transaction.objectStore('conversations').add({
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: 'backup-integrity',
+        title: 'Backup integrity',
+        lastActivityAt: 1,
+      }) as any,
+    );
+    await reqToPromise(
+      transaction.objectStore('messages').add({
+        conversationId,
+        messageKey: 'attached',
+        role: 'user',
+        contentMarkdown: 'included',
+        sequence: 0,
+      }),
+    );
+    await reqToPromise(
+      transaction.objectStore('messages').add({
+        conversationId: 999_999,
+        messageKey: 'unlinked',
+        role: 'assistant',
+        contentMarkdown: 'must not be silently omitted',
+        sequence: 0,
+      }),
+    );
+    await done;
+
+    const exported = await exportBackupZip();
+    expect(exported.counts).toMatchObject({ conversations: 2, messages: 2 });
+    const entries = await extractZipEntries(exported.blob);
+    const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
+    const recovered = manifest.sources.find((source: any) => source.source === 'recovered');
+    expect(recovered?.files).toHaveLength(1);
+    const recoveredBundle = JSON.parse(new TextDecoder().decode(entries.get(recovered.files[0])!));
+    expect(recoveredBundle.conversation).toMatchObject({
+      originalConversationId: 999_999,
+      source: 'recovered',
+      conversationKey: 'orphan-999999',
+    });
+    expect(recoveredBundle.messages).toEqual([
+      expect.objectContaining({ messageKey: 'unlinked', contentMarkdown: 'must not be silently omitted' }),
+    ]);
+
+    const verify = db.transaction(['messages', 'conversations'], 'readonly');
+    const verifyDone = new Promise<void>((resolve, reject) => {
+      verify.oncomplete = () => resolve();
+      verify.onerror = () => reject(verify.error);
+      verify.onabort = () => reject(verify.error);
+    });
+    expect(await reqToPromise(verify.objectStore('messages').count())).toBe(2);
+    expect(await reqToPromise(verify.objectStore('conversations').count())).toBe(1);
+    await verifyDone;
+
+    closeDbForTests();
+    await deleteDb('webclipper');
+    const first = await importBackupZipMerge(entries);
+    expect(first.conversationsAdded).toBe(2);
+    expect(first.messagesAdded).toBe(2);
+    const restored = await openDb();
+    const lookup = restored.transaction('conversations', 'readonly');
+    const restoredConversations = await reqToPromise<any[]>(lookup.objectStore('conversations').getAll());
+    const restoredRecovered = restoredConversations.find((row) => row.source === 'recovered');
+    expect(restoredRecovered).toMatchObject({ originalConversationId: 999_999 });
+    expect((await getMessagesByConversationId(restoredRecovered.id)).map((row) => row.messageKey)).toEqual([
+      'unlinked',
+    ]);
+    const second = await importBackupZipMerge(entries);
+    expect(second.conversationsAdded).toBe(0);
+    expect(second.messagesAdded).toBe(0);
+  });
+
+  it.each([
+    ['messages', false, 'conversation disappeared before restoring messages'],
+    ['assets', true, 'conversation disappeared before restoring assets'],
+  ])(
+    'does not recreate orphan %s after a concurrent conversation deletion',
+    async (_kind, withAsset, expectedError) => {
+      const entries = emptyBackupZipEntries();
+      const encoder = new TextEncoder();
+      const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
+      const filePath = 'sources/chatgpt/restore-race.json';
+      manifest.counts.conversations = 1;
+      manifest.counts.messages = 1;
+      if (withAsset) manifest.counts.image_cache = 1;
+      manifest.sources = [{ source: 'chatgpt', conversationCount: 1, files: [filePath] }];
+      entries.set('manifest.json', encoder.encode(JSON.stringify(manifest)));
+      entries.set(
+        filePath,
+        encoder.encode(
+          JSON.stringify({
+            schemaVersion: 1,
+            conversation: {
+              sourceType: 'chat',
+              source: 'chatgpt',
+              conversationKey: 'restore-race',
+              title: 'Restore race',
+              lastActivityAt: 1,
+            },
+            messages: [{ messageKey: 'm1', role: 'user', contentMarkdown: 'preserve', sequence: 0 }],
+            syncMapping: null,
+          }),
+        ),
+      );
+      if (withAsset) {
+        const blobPath = 'assets/image-cache/blobs/1.png';
+        entries.set(
+          'assets/image-cache/index.json',
+          encoder.encode(
+            JSON.stringify({
+              schemaVersion: 1,
+              assets: [
+                {
+                  assetId: 1,
+                  uniqueKey: 'chatgpt||restore-race',
+                  url: 'https://example.com/recovery.png',
+                  contentType: 'image/png',
+                  byteSize: 3,
+                  blobPath,
+                },
+              ],
+            }),
+          ),
+        );
+        entries.set(blobPath, Uint8Array.from([1, 2, 3]));
+      }
+
+      const db = await openDb();
+      let deletionDone: Promise<void> | null = null;
+      await expect(
+        importBackupZipMerge(entries, (progress) => {
+          if (progress.stage !== 'Conversations' || progress.done !== 1 || deletionDone) return;
+          const deletion = db.transaction('conversations', 'readwrite');
+          deletionDone = new Promise<void>((resolve, reject) => {
+            deletion.oncomplete = () => resolve();
+            deletion.onerror = () => reject(deletion.error);
+            deletion.onabort = () => reject(deletion.error);
+          });
+          const cursorRequest = deletion.objectStore('conversations').openCursor();
+          cursorRequest.onsuccess = () => {
+            const cursor = cursorRequest.result;
+            if (!cursor) return;
+            cursor.delete();
+            cursor.continue();
+          };
+        }),
+      ).rejects.toThrow(expectedError);
+      expect(deletionDone).not.toBeNull();
+      await deletionDone;
+
+      const check = db.transaction(['conversations', 'messages', 'image_cache'], 'readonly');
+      const checkDone = new Promise<void>((resolve, reject) => {
+        check.oncomplete = () => resolve();
+        check.onerror = () => reject(check.error);
+        check.onabort = () => reject(check.error);
+      });
+      expect(await reqToPromise(check.objectStore('conversations').count())).toBe(0);
+      expect(await reqToPromise(check.objectStore('messages').count())).toBe(0);
+      expect(await reqToPromise(check.objectStore('image_cache').count())).toBe(0);
+      await checkDone;
+    },
+  );
+
   it('exportBackupZip emits manifest + bundles and filters storage.local', async () => {
     const chromeMock = mockChromeStorage({
       notion_oauth_client_id: 'client_id',

@@ -23,6 +23,7 @@
 
 - IndexedDB 业务层使用统一 connection lifecycle。
 - 受 revision 跟踪的业务变更与 revision 必须同 transaction 提交；wake 只提示重读，durable revision + canonical reread 才是事实。
+- 消息写入与所属会话的存在性检查必须在同一事务内完成，不能产生孤立消息。
 - 读取失败时保留 last-good；只有成功读取到的空值才是 authoritative empty。
 
 ## Backup
@@ -31,7 +32,9 @@
 - 普通 Backup 可包含本地内容、可恢复 mapping、图片缓存、评论和非敏感设置，不包含认证凭据。
 - 用户显式选择 **包含私密数据（用于迁移）** 时，Full Backup 才包含可迁移凭据。该选项默认关闭，ZIP 不额外加密。
 - 临时 OAuth / Device Flow 状态、设备运行状态和浏览器 Profile 特定身份不迁移。
-- 导出如果会静默丢数据必须失败，不能生成“成功但不完整”的 Backup。
+- Backup 必须包含全部有效消息。消息所属会话已丢失时，按原 conversation ID 导出为独立的 recovered 会话，保留原编号，不猜测原始标题、来源和链接；导入按 recovered 稳定键合并并重新映射本地 ID。
+- 备份设置按原 conversation ID 列出孤立消息与已恢复的会话；首次查看才补建恢复会话，后续可反复查看，条目不会因恢复而消失。原消息内容、顺序和 ID 不变。普通消息写入仍不得产生新的孤立消息。
+- 遇到无法安全归组或序列化的记录必须明确报错，不得丢弃原始数据或只修改 manifest 计数。
 
 ## 恢复与失败
 

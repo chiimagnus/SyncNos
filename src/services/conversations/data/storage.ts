@@ -29,6 +29,14 @@ export function findConversationBySourceAndKey(
   return idb.findConversationBySourceAndKey(source, conversationKey);
 }
 
+export function listOrphanMessageGroups(): Promise<idb.OrphanMessageGroup[]> {
+  return idb.listOrphanMessageGroups();
+}
+
+export function recoverOrphanConversation(conversationId: number): Promise<Conversation> {
+  return idb.recoverOrphanConversation(conversationId);
+}
+
 export function getConversationById(conversationId: number): Promise<Conversation | null> {
   return idb.getConversationById(conversationId);
 }

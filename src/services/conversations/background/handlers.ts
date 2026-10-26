@@ -9,6 +9,8 @@ import {
   getConversationDetail,
   getConversationTailWindowBySourceAndKey,
   mergeConversationsByIds,
+  listOrphanMessageGroups,
+  recoverOrphanConversation,
   searchConversations,
   syncConversationMessages,
   updateConversationUrlById,
@@ -155,6 +157,18 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     if (!conversationKey) return invalidArgument('conversationKey', 'invalid conversationKey', msg?.conversationKey);
     const target = await findConversationBySourceAndKey(source, conversationKey);
     return router.ok(target);
+  });
+
+  router.register(CORE_MESSAGE_TYPES.LIST_ORPHAN_MESSAGE_GROUPS, async () => {
+    return router.ok(await listOrphanMessageGroups());
+  });
+
+  router.register(CORE_MESSAGE_TYPES.RECOVER_ORPHAN_CONVERSATION, async (msg) => {
+    const id = Number(msg?.conversationId);
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      return invalidArgument('conversationId', 'invalid conversationId', msg?.conversationId);
+    }
+    return router.ok(await recoverOrphanConversation(id));
   });
 
   router.register(CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_ID, async (msg) => {

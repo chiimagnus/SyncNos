@@ -8,6 +8,10 @@ import {
   reusableImageCacheByteSize,
 } from '@services/conversations/data/image-cache-record';
 import { buildCanonicalWebArticleIdentity, WEB_ARTICLE_SOURCE } from '@services/conversations/domain/article-identity';
+import {
+  RECOVERED_CONVERSATION_SOURCE,
+  recoveredConversationRecord,
+} from '@services/conversations/domain/orphaned-messages';
 import { canonicalChatIdentityFromUrl, canonicalChatUrlFromUrl } from '@services/conversations/domain/chat-identity';
 import { normalizeNotionId } from '@services/shared/notion-id';
 import { canonicalizeArticleUrl, normalizeHttpUrl } from '@services/url-cleaning/http-url';
@@ -1419,18 +1423,15 @@ export async function syncConversationMessages(
   const result = await runTrackedTransaction(
     {
       db,
-      stores: activityAtProvided ? ['messages', 'conversations'] : ['messages'],
+      stores: ['messages', 'conversations'],
       revisionScopes: activityAtProvided ? ['messages', 'conversations'] : ['messages'],
     },
     async ({ stores, markChanged }) => {
-      let activityConversation: any = null;
+      let activityConversation: any = await reqToPromise(stores.conversations.get(conversationId as any));
+      if (!activityConversation) throw new Error('conversation not found');
       let semanticContentChanged = options?.conversationContentChanged === true;
-      if (activityAtProvided) {
-        activityConversation = await reqToPromise(stores.conversations.get(conversationId as any));
-        if (!activityConversation) throw new Error('conversation not found');
-      }
       const commitActivity = async () => {
-        if (!activityConversation || !semanticContentChanged) return;
+        if (!activityAtProvided || !semanticContentChanged) return;
         const current = normalizeStoredActivityTimestamp(activityConversation.lastActivityAt);
         if (activityAt <= current) return;
         activityConversation = { ...activityConversation, lastActivityAt: activityAt };
@@ -2425,6 +2426,81 @@ export async function deleteConversationsByIds(conversationIds: any[]): Promise<
 
   if (outcome.conversationChanged) invalidateConversationListStatsCache();
   return outcome.result;
+}
+
+export type OrphanMessageGroup = {
+  conversationId: number;
+  originalConversationId: number;
+  messageCount: number;
+  recovered: boolean;
+};
+
+export async function listOrphanMessageGroups(): Promise<OrphanMessageGroup[]> {
+  const db = await openDb();
+  const { t, stores } = tx(db, ['conversations', 'messages'], 'readonly');
+  const conversationIds = new Set<number>((await reqToPromise(stores.conversations.getAllKeys())).map(Number));
+  const recoveredRows = (await reqToPromise(
+    stores.conversations
+      .index('by_source_conversationKey')
+      .getAll(
+        IDBKeyRange.bound([RECOVERED_CONVERSATION_SOURCE, 'orphan-'], [RECOVERED_CONVERSATION_SOURCE, 'orphan-\uffff']),
+      ),
+  )) as any[];
+  const recoveredOriginalIds = new Map<number, number>();
+  for (const row of recoveredRows) {
+    const conversationId = Number(row.id);
+    const originalConversationId = Number(/^orphan-([1-9]\d*)$/.exec(String(row.conversationKey || ''))?.[1]);
+    if (Number.isSafeInteger(conversationId) && conversationId > 0 && Number.isSafeInteger(originalConversationId)) {
+      recoveredOriginalIds.set(conversationId, originalConversationId);
+    }
+  }
+
+  const groups = new Map<number, number>();
+  await new Promise<void>((resolve, reject) => {
+    const request = stores.messages.index('by_conversationId_sequence').openKeyCursor();
+    request.onerror = () => reject(request.error || new Error('message index scan failed'));
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) return resolve();
+      const id = Number((cursor.key as [number, number])[0]);
+      if (Number.isSafeInteger(id) && id > 0 && (!conversationIds.has(id) || recoveredOriginalIds.has(id))) {
+        groups.set(id, (groups.get(id) || 0) + 1);
+      }
+      cursor.continue();
+    };
+  });
+  await txDone(t);
+  return Array.from(groups, ([conversationId, messageCount]) => ({
+    conversationId,
+    originalConversationId: recoveredOriginalIds.get(conversationId) ?? conversationId,
+    messageCount,
+    recovered: recoveredOriginalIds.has(conversationId),
+  })).sort((a, b) => a.originalConversationId - b.originalConversationId);
+}
+
+export async function recoverOrphanConversation(conversationId: number): Promise<Conversation> {
+  const id = Number(conversationId);
+  if (!Number.isSafeInteger(id) || id <= 0) throw new Error('invalid orphan conversation id');
+  const db = await openDb();
+  const outcome = await runTrackedTransaction(
+    { db, stores: ['conversations', 'messages'], revisionScopes: ['conversations'] },
+    async ({ stores, markChanged }) => {
+      const existing: any = await reqToPromise(stores.conversations.get(id));
+      if (existing) return { conversation: existing, changed: false };
+      const messages = (await reqToPromise(
+        stores.messages
+          .index('by_conversationId_sequence')
+          .getAll(IDBKeyRange.bound([id, -Infinity] as any, [id, Infinity] as any)),
+      )) as any[];
+      if (!messages.length) throw new Error('no orphan messages for conversation');
+      const conversation = normalizeConversationListRecord({ ...recoveredConversationRecord(id, messages), id });
+      await reqToPromise(stores.conversations.add(conversation));
+      markChanged('conversations');
+      return { conversation, changed: true };
+    },
+  );
+  if (outcome.changed) invalidateConversationListStatsCache();
+  return outcome.conversation as Conversation;
 }
 
 export async function getConversationById(conversationId: number): Promise<Conversation | null> {

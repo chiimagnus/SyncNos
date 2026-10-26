@@ -4,6 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, createElement, createRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
+import { decodeConversationLoc } from '@services/shared/conversation-loc';
+import { conversationJumpLinkClassName } from '@ui/settings/ui';
+
+const backupNavigationMocks = vi.hoisted(() => ({ open: vi.fn() }));
+vi.mock('@viewmodels/conversations/conversations-context', () => ({
+  useConversationsApp: () => ({ openConversationInListScopeByLoc: backupNavigationMocks.open }),
+}));
 
 import {
   DEFAULT_SETTINGS_SECTION_KEY,
@@ -845,8 +853,19 @@ describe('inpage anti-hotlink advanced editor', () => {
 describe('backup feedback', () => {
   let root: ReactDOM.Root | null = null;
 
+  function BackupLocationProbe() {
+    const location = useLocation();
+    return createElement('output', { 'data-testid': 'backup-route' }, `${location.pathname}${location.search}`);
+  }
+
+  function currentRoute() {
+    return document.querySelector('[data-testid="backup-route"]')?.textContent || '';
+  }
+
   beforeEach(() => {
     setupDom();
+    backupNavigationMocks.open.mockReset();
+    backupNavigationMocks.open.mockResolvedValue(undefined);
     root = ReactDOM.createRoot(document.getElementById('root')!);
   });
 
@@ -875,7 +894,14 @@ describe('backup feedback', () => {
     };
 
     act(() => {
-      root!.render(createElement(BackupSection, { ...baseProps, ...props }));
+      root!.render(
+        createElement(
+          MemoryRouter,
+          { initialEntries: ['/settings?section=backup'] },
+          createElement(BackupSection, { ...baseProps, ...props }),
+          createElement(BackupLocationProbe),
+        ),
+      );
     });
   }
 
@@ -893,6 +919,111 @@ describe('backup feedback', () => {
 
     act(() => checkbox!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
     expect(onChangeIncludeSensitiveData).toHaveBeenCalledWith(true);
+  });
+
+  it('matches Insight title-link layout and opens recovered conversations without a right-hand action button', () => {
+    const onRecoverOrphanConversation = vi.fn();
+    renderBackup({
+      orphanMessageGroups: [
+        { conversationId: 1730, originalConversationId: 1730, messageCount: 10, recovered: false },
+        { conversationId: 2200, originalConversationId: 1731, messageCount: 75, recovered: true },
+      ],
+      onRecoverOrphanConversation,
+    });
+
+    const pending = document.querySelector('button[aria-label="Restore and view #1730"]') as HTMLButtonElement | null;
+    const recovered = document.querySelector('a[aria-label="View #1731"]') as HTMLAnchorElement | null;
+    expect(pending).toBeTruthy();
+    expect(recovered).toBeTruthy();
+    expect(pending?.className).toBe(conversationJumpLinkClassName);
+    expect(recovered?.className).toBe(conversationJumpLinkClassName);
+    expect(pending?.querySelector('svg')).toBeNull();
+    expect(recovered?.querySelector('svg')).toBeNull();
+    expect(document.body.textContent).toContain('#1730');
+    expect(document.body.textContent).toContain('10 messages');
+    expect(document.body.textContent).toContain('Not yet recovered');
+    expect(document.body.textContent).toContain('#1731');
+    expect(document.body.textContent).toContain('75 messages');
+    expect(document.body.textContent).toContain('Recovered');
+    expect(document.querySelector('button[aria-label="View #1731"]')).toBeNull();
+
+    const url = new URL(recovered!.href);
+    const encoded = new URLSearchParams(url.search).get('loc');
+    expect(decodeConversationLoc(encoded)).toEqual({ source: 'recovered', conversationKey: 'orphan-1731' });
+    expect(currentRoute()).toBe('/settings?section=backup');
+
+    act(() => recovered!.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true })));
+    expect(backupNavigationMocks.open).toHaveBeenCalledWith({ source: 'recovered', conversationKey: 'orphan-1731' });
+    expect(currentRoute()).toBe(`/?loc=${encoded}`);
+    expect(onRecoverOrphanConversation).not.toHaveBeenCalled();
+  });
+
+  it('recovers a pending conversation before navigating, and stays in settings if recovery fails', async () => {
+    const onRecoverOrphanConversation = vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce({
+      id: 1730,
+      source: 'recovered',
+      conversationKey: 'orphan-1730',
+    });
+    renderBackup({
+      orphanMessageGroups: [{ conversationId: 1730, originalConversationId: 1730, messageCount: 10, recovered: false }],
+      onRecoverOrphanConversation,
+    });
+    const pending = document.querySelector('button[aria-label="Restore and view #1730"]') as HTMLButtonElement;
+
+    await act(async () => {
+      pending.click();
+      await flushReactScheduler();
+    });
+    expect(currentRoute()).toBe('/settings?section=backup');
+    expect(backupNavigationMocks.open).not.toHaveBeenCalled();
+
+    await act(async () => {
+      pending.click();
+      await flushReactScheduler();
+    });
+    expect(onRecoverOrphanConversation).toHaveBeenCalledTimes(2);
+    expect(backupNavigationMocks.open).toHaveBeenCalledWith({ source: 'recovered', conversationKey: 'orphan-1730' });
+    expect(decodeConversationLoc(new URLSearchParams(currentRoute().split('?')[1]).get('loc'))).toEqual({
+      source: 'recovered',
+      conversationKey: 'orphan-1730',
+    });
+  });
+
+  it('does not mutate local selection on modifier-click or while pending recovery is disabled', () => {
+    const onRecoverOrphanConversation = vi.fn();
+    renderBackup({
+      busy: true,
+      orphanMessageGroups: [
+        { conversationId: 1730, originalConversationId: 1730, messageCount: 10, recovered: false },
+        { conversationId: 2200, originalConversationId: 1731, messageCount: 75, recovered: true },
+      ],
+      onRecoverOrphanConversation,
+    });
+    const pending = document.querySelector('button[aria-label="Restore and view #1730"]') as HTMLButtonElement;
+    const recovered = document.querySelector('a[aria-label="View #1731"]') as HTMLAnchorElement;
+    expect(pending.disabled).toBe(true);
+    act(() => pending.click());
+    expect(onRecoverOrphanConversation).not.toHaveBeenCalled();
+
+    act(() =>
+      recovered.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true })),
+    );
+    expect(currentRoute()).toBe('/settings?section=backup');
+    expect(backupNavigationMocks.open).not.toHaveBeenCalled();
+  });
+
+  it('shows localized backup errors with the exact technical details visibly attached', () => {
+    renderBackup({
+      exportStatus: 'Error: The backup counts do not match its contents.',
+      importStatus: 'Error: The backup operation failed.',
+      exportErrorDetail: 'Backup count mismatch: messages',
+      importErrorDetail: 'Missing entry: manifest.json',
+    });
+    const alerts = document.querySelectorAll('[role="alert"]');
+    expect(alerts).toHaveLength(2);
+    expect(alerts[0].textContent).toContain('Backup count mismatch: messages');
+    expect(alerts[1].textContent).toContain('Missing entry: manifest.json');
+    expect(document.body.textContent).toContain('Details:');
   });
 
   it('hides empty feedback and shows completed backup feedback', () => {
