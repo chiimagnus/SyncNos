@@ -24,6 +24,8 @@ import {
   deleteConversationsByIds,
   getConversationById,
   getConversationTailWindowBySourceAndKey,
+  listOrphanMessageGroups,
+  recoverOrphanConversation,
   getConversationListBootstrap,
   getMessagesByConversationId,
   getSyncMappingByConversation,
@@ -1132,6 +1134,39 @@ describe('conversations storage-idb', () => {
     }
     expect(await getMessagesByConversationId(999_999)).toEqual([]);
     expect(await readDataRevision('messages')).toBe(revisionBefore);
+  });
+
+  it('lists unlinked messages and restores their original conversation ids only on review', async () => {
+    const db = await openDb();
+    const id = 317;
+    const transaction = db.transaction('messages', 'readwrite');
+    await reqToPromise(
+      transaction.objectStore('messages').add({
+        conversationId: id,
+        messageKey: 'm1',
+        role: 'user',
+        contentMarkdown: 'original content',
+        sequence: 0,
+        updatedAt: 100,
+      }),
+    );
+    await txDone(transaction);
+
+    expect(await listOrphanMessageGroups()).toEqual([{ conversationId: id, messageCount: 1 }]);
+    expect(await getConversationById(id)).toBeNull();
+    expect(await recoverOrphanConversation(id)).toMatchObject({
+      id,
+      source: 'recovered',
+      conversationKey: 'orphan-317',
+      originalConversationId: id,
+    });
+    expect(await listOrphanMessageGroups()).toEqual([]);
+    expect(await recoverOrphanConversation(id)).toMatchObject({ id });
+    expect(await getMessagesByConversationId(id)).toEqual([
+      expect.objectContaining({ id: 1, messageKey: 'm1', contentMarkdown: 'original content' }),
+    ]);
+    expect(await getConversationById(id)).toMatchObject({ id, source: 'recovered' });
+    await expect(recoverOrphanConversation(318)).rejects.toThrow('no orphan messages');
   });
 
   it('keeps messages linked when deletion races with a message write', async () => {

@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { exportBackupZip } from '@services/sync/backup/export';
+import {
+  listOrphanMessageGroups,
+  recoverOrphanConversation,
+  type OrphanMessageGroup,
+} from '@services/conversations/client/repo';
+import { buildConversationRouteFromLoc, encodeConversationLoc } from '@services/shared/conversation-loc';
+import {
+  RECOVERED_CONVERSATION_SOURCE,
+  recoveredConversationKey,
+} from '@services/conversations/domain/orphaned-messages';
 import { LAST_BACKUP_EXPORT_AT_STORAGE_KEY } from '@services/sync/backup/backup-utils';
 import { importBackupZipMerge, type ImportProgress, type ImportStats } from '@services/sync/backup/import';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
@@ -101,6 +111,13 @@ function isPopupUi() {
   } catch (_e) {
     return false;
   }
+}
+
+function formatBackupFailureMessage(message: string) {
+  if (message.startsWith('Backup count mismatch:')) return t('backupCountMismatch');
+  if (message.includes('a conversation has no exportable identity')) return t('backupInvalidConversation');
+  if (message.includes('invalid conversationId for message')) return t('backupInvalidMessage');
+  return t('backupOperationFailed');
 }
 
 function toErrorMessage(error: unknown, fallback: string) {
@@ -316,6 +333,10 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   // Backup
   const [exportStatus, setExportStatus] = useState<string>('');
   const [importStatus, setImportStatus] = useState<string>('');
+  const [exportErrorDetail, setExportErrorDetail] = useState('');
+  const [importErrorDetail, setImportErrorDetail] = useState('');
+  const [orphanMessageGroups, setOrphanMessageGroups] = useState<OrphanMessageGroup[]>([]);
+  const [orphanLoadError, setOrphanLoadError] = useState('');
   const [importStats, setImportStats] = useState<ImportStats | null>(null);
   const [lastBackupExportAt, setLastBackupExportAt] = useState<number>(0);
   const [includeSensitiveBackupData, setIncludeSensitiveBackupData] = useState(false);
@@ -1978,10 +1999,49 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setInsightStats(buildInsightStats(data, rangeWindow));
   }, [activeSection, insightRange]);
 
+  useEffect(() => {
+    if (activeSection !== 'backup') return;
+    let disposed = false;
+    void listOrphanMessageGroups()
+      .then((groups) => {
+        if (disposed) return;
+        setOrphanMessageGroups(groups);
+        setOrphanLoadError('');
+      })
+      .catch((err) => {
+        if (disposed) return;
+        setOrphanLoadError(toErrorMessage(err, t('backupOrphanedLoadFailed')));
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [activeSection]);
+
+  const handleReviewOrphanConversation = useCallback(
+    async (conversationId: number) => {
+      await runTask(
+        async () => {
+          const recovered = await recoverOrphanConversation(conversationId);
+          setOrphanMessageGroups((groups) => groups.filter((group) => group.conversationId !== conversationId));
+          const route = buildConversationRouteFromLoc(
+            encodeConversationLoc({
+              source: RECOVERED_CONVERSATION_SOURCE,
+              conversationKey: recoveredConversationKey(recovered.id),
+            }),
+          );
+          await openOrFocusExtensionAppTab({ route });
+        },
+        { fallbackMessage: t('backupOrphanedLoadFailed') },
+      );
+    },
+    [runTask],
+  );
+
   const handleBackupExport = useCallback(async () => {
     if (busy) return;
 
     setExportStatus(t('backupExporting'));
+    setExportErrorDetail('');
     await runTask(
       async () => {
         // Show coarse-grained progress. Export uses `zipSync()` (CSP-safe on Firefox),
@@ -2023,9 +2083,12 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         setLastBackupExportAt(Date.parse(result.exportedAt) || Date.now());
       },
       {
-        fallbackMessage: 'export failed',
+        fallbackMessage: t('backupOperationFailed'),
         onError: (message) => {
-          setExportStatus(`${t('statusError')}: ${message}`);
+          setExportErrorDetail(message);
+          const description = formatBackupFailureMessage(message);
+          setError(null);
+          setExportStatus(`${t('statusError')}: ${description}`);
         },
       },
     );
@@ -2036,6 +2099,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       if (busy) return;
 
       setImportStats(null);
+      setImportErrorDetail('');
       setImportStatus(`${t('backupImportingFile')}: ${file.name}`);
 
       await runTask(
@@ -2050,9 +2114,12 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
           setImportStatus(t('backupImported'));
         },
         {
-          fallbackMessage: 'import failed',
+          fallbackMessage: t('backupOperationFailed'),
           onError: (message) => {
-            setImportStatus(`${t('statusError')}: ${message}`);
+            setImportErrorDetail(message);
+            const description = formatBackupFailureMessage(message);
+            setError(null);
+            setImportStatus(`${t('statusError')}: ${description}`);
           },
         },
       );
@@ -2233,6 +2300,11 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
     exportStatus,
     importStatus,
+    exportErrorDetail,
+    importErrorDetail,
+    orphanMessageGroups,
+    orphanLoadError,
+    handleReviewOrphanConversation,
     importStats,
     lastBackupExportAt,
     includeSensitiveBackupData,

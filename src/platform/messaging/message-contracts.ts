@@ -13,6 +13,8 @@ export const CORE_MESSAGE_TYPES = {
   SEARCH_CONVERSATIONS: 'searchConversations',
   GET_CONVERSATION_TAIL_WINDOW_BY_SOURCE_AND_KEY: 'getConversationTailWindowBySourceAndKey',
   DELETE_CONVERSATIONS: 'deleteConversations',
+  LIST_ORPHAN_MESSAGE_GROUPS: 'listOrphanMessageGroups',
+  RECOVER_ORPHAN_CONVERSATION: 'recoverOrphanConversation',
 } as const;
 
 export const DATA_REVISION_MESSAGE_TYPES = {

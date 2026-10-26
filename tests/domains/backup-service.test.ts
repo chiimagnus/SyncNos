@@ -521,7 +521,66 @@ describe('backup service', () => {
     ).toHaveLength(1);
   });
 
-  it('refuses to export a backup that would silently omit unlinked messages', async () => {
+  it('preserves two orphan groups totaling 85 messages in one full backup', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const db = await openDb();
+    const transaction = db.transaction('messages', 'readwrite');
+    const done = new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+    for (const [conversationId, count] of [
+      [1730, 10],
+      [1731, 75],
+    ] as const) {
+      for (let sequence = 0; sequence < count; sequence += 1) {
+        await reqToPromise(
+          transaction.objectStore('messages').add({
+            conversationId,
+            messageKey: `m-${conversationId}-${sequence}`,
+            role: 'user',
+            contentMarkdown: `stored message ${sequence}`,
+            sequence,
+            updatedAt: 1_788_765_000_000 + sequence,
+          }),
+        );
+      }
+    }
+    await done;
+
+    const exported = await exportBackupZip();
+    const entries = await extractZipEntries(exported.blob);
+    const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
+    const group = manifest.sources.find((item: any) => item.source === 'recovered');
+    expect(manifest.counts).toMatchObject({ conversations: 2, messages: 85 });
+    expect(group.conversationCount).toBe(2);
+    const recoveredBundles = group.files.map((path: string) =>
+      JSON.parse(new TextDecoder().decode(entries.get(path)!)),
+    );
+    expect(recoveredBundles.map((bundle: any) => bundle.messages.length)).toEqual([10, 75]);
+    expect(recoveredBundles.map((bundle: any) => bundle.conversation.originalConversationId)).toEqual([1730, 1731]);
+
+    closeDbForTests();
+    await deleteDb('webclipper');
+    const result = await importBackupZipMerge(entries);
+    expect(result.conversationsAdded).toBe(2);
+    expect(result.messagesAdded).toBe(85);
+    const importedDb = await openDb();
+    const imported = importedDb.transaction('conversations', 'readonly');
+    const conversations = await reqToPromise<any[]>(imported.objectStore('conversations').getAll());
+    const counts = await Promise.all(
+      conversations.map(async (row) => (await getMessagesByConversationId(row.id)).length),
+    );
+    expect(counts.sort((a, b) => a - b)).toEqual([10, 75]);
+  });
+
+  it('exports and restores every orphan message as a reviewable recovered conversation without changing the source', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
@@ -564,17 +623,48 @@ describe('backup service', () => {
     );
     await done;
 
-    await expect(exportBackupZip()).rejects.toThrow(/1 message.*no exportable conversation/);
-    expect(chromeMock.__store.last_backup_export_at).toBeUndefined();
+    const exported = await exportBackupZip();
+    expect(exported.counts).toMatchObject({ conversations: 2, messages: 2 });
+    const entries = await extractZipEntries(exported.blob);
+    const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
+    const recovered = manifest.sources.find((source: any) => source.source === 'recovered');
+    expect(recovered?.files).toHaveLength(1);
+    const recoveredBundle = JSON.parse(new TextDecoder().decode(entries.get(recovered.files[0])!));
+    expect(recoveredBundle.conversation).toMatchObject({
+      originalConversationId: 999_999,
+      source: 'recovered',
+      conversationKey: 'orphan-999999',
+    });
+    expect(recoveredBundle.messages).toEqual([
+      expect.objectContaining({ messageKey: 'unlinked', contentMarkdown: 'must not be silently omitted' }),
+    ]);
 
-    const verify = db.transaction('messages', 'readonly');
+    const verify = db.transaction(['messages', 'conversations'], 'readonly');
     const verifyDone = new Promise<void>((resolve, reject) => {
       verify.oncomplete = () => resolve();
       verify.onerror = () => reject(verify.error);
       verify.onabort = () => reject(verify.error);
     });
     expect(await reqToPromise(verify.objectStore('messages').count())).toBe(2);
+    expect(await reqToPromise(verify.objectStore('conversations').count())).toBe(1);
     await verifyDone;
+
+    closeDbForTests();
+    await deleteDb('webclipper');
+    const first = await importBackupZipMerge(entries);
+    expect(first.conversationsAdded).toBe(2);
+    expect(first.messagesAdded).toBe(2);
+    const restored = await openDb();
+    const lookup = restored.transaction('conversations', 'readonly');
+    const restoredConversations = await reqToPromise<any[]>(lookup.objectStore('conversations').getAll());
+    const restoredRecovered = restoredConversations.find((row) => row.source === 'recovered');
+    expect(restoredRecovered).toMatchObject({ originalConversationId: 999_999 });
+    expect((await getMessagesByConversationId(restoredRecovered.id)).map((row) => row.messageKey)).toEqual([
+      'unlinked',
+    ]);
+    const second = await importBackupZipMerge(entries);
+    expect(second.conversationsAdded).toBe(0);
+    expect(second.messagesAdded).toBe(0);
   });
 
   it.each([

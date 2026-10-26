@@ -8,6 +8,7 @@ import {
   uniqueConversationKey,
 } from '@services/sync/backup/backup-utils';
 import { buildConversationBasename } from '@services/conversations/domain/file-naming';
+import { recoveredConversationRecord } from '@services/conversations/domain/orphaned-messages';
 import { reqToPromise, tx, txDone } from '@services/sync/backup/idb';
 import { createZipBlob } from '@services/sync/backup/zip-utils';
 import { DB_NAME, DB_VERSION, openDb } from '@platform/idb/schema';
@@ -228,19 +229,20 @@ export async function exportBackupZip(
   }
 
   const messagesByConversationId = new Map<number, AnyRecord[]>();
-  let unlinkedMessages = 0;
   for (const m of allMessages) {
     const cid = Number(m?.conversationId);
-    if (!Number.isSafeInteger(cid) || !exportableConversationIds.has(cid)) {
-      unlinkedMessages += 1;
-      continue;
+    if (!Number.isSafeInteger(cid) || cid <= 0) {
+      throw new Error(`Backup export blocked: invalid conversationId for message ${String(m?.id ?? '?')}`);
     }
     const list = messagesByConversationId.get(cid) || [];
     list.push(m);
     messagesByConversationId.set(cid, list);
   }
-  if (unlinkedMessages > 0) {
-    throw new Error(`Backup export blocked: ${unlinkedMessages} message records have no exportable conversation`);
+
+  const exportConversations = allConversations.slice();
+  for (const [cid, orphanMessages] of messagesByConversationId) {
+    if (exportableConversationIds.has(cid)) continue;
+    exportConversations.push({ ...recoveredConversationRecord(cid, orphanMessages), id: cid });
   }
 
   const mappingByUniqueKey = new Map<string, AnyRecord>();
@@ -253,7 +255,7 @@ export async function exportBackupZip(
   }
 
   const sources = new Map<string, AnyRecord[]>();
-  for (const c of allConversations) {
+  for (const c of exportConversations) {
     if (!c || typeof c !== 'object') continue;
     const source = c.source ? String(c.source) : '';
     if (!source) continue;
@@ -281,7 +283,7 @@ export async function exportBackupZip(
   const usedPathsBySource = new Map<string, Set<string>>();
 
   const uniqueKeyByConversationId = new Map<number, string>();
-  for (const c of allConversations) {
+  for (const c of exportConversations) {
     const cid = Number(c && c.id);
     if (!Number.isFinite(cid) || cid <= 0) continue;
     const uk = uniqueConversationKey(c);
@@ -444,7 +446,7 @@ export async function exportBackupZip(
     exportedAt,
     db: { name: DB_NAME, version: DB_VERSION },
     counts: {
-      conversations: allConversations.length,
+      conversations: exportConversations.length,
       messages: allMessages.length,
       sync_mappings: allMappings.length,
       image_cache: imageCacheAssets.length,

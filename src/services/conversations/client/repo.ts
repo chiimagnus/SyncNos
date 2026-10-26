@@ -69,6 +69,20 @@ export async function findConversationBySourceAndKey(
   return unwrap(res);
 }
 
+export type OrphanMessageGroup = { conversationId: number; messageCount: number };
+
+export async function listOrphanMessageGroups(): Promise<OrphanMessageGroup[]> {
+  const res = await send<ApiResponse<OrphanMessageGroup[]>>(CORE_MESSAGE_TYPES.LIST_ORPHAN_MESSAGE_GROUPS, {});
+  return unwrap(res);
+}
+
+export async function recoverOrphanConversation(conversationId: number): Promise<Conversation> {
+  const res = await send<ApiResponse<Conversation>>(CORE_MESSAGE_TYPES.RECOVER_ORPHAN_CONVERSATION, {
+    conversationId,
+  });
+  return unwrap(res);
+}
+
 export async function getConversationById(conversationId: number): Promise<Conversation | null> {
   const id = Number(conversationId);
   const res = await send<ApiResponse<Conversation | null>>(CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_ID, {

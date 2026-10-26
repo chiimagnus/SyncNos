@@ -895,6 +895,40 @@ describe('backup feedback', () => {
     expect(onChangeIncludeSensitiveData).toHaveBeenCalledWith(true);
   });
 
+  it('shows orphaned conversations with original ids and exposes the review action', () => {
+    const onReviewOrphanConversation = vi.fn();
+    renderBackup({
+      orphanMessageGroups: [
+        { conversationId: 1730, messageCount: 10 },
+        { conversationId: 1731, messageCount: 75 },
+      ],
+      onReviewOrphanConversation,
+    });
+
+    expect(document.body.textContent).toContain('#1730 · 10 messages');
+    expect(document.body.textContent).toContain('#1731 · 75 messages');
+    const buttons = Array.from(document.querySelectorAll('button')).filter(
+      (button) => button.textContent === 'Restore and view',
+    );
+    expect(buttons).toHaveLength(2);
+    act(() => buttons[1].dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
+    expect(onReviewOrphanConversation).toHaveBeenCalledWith(1731);
+  });
+
+  it('shows localized backup errors with the exact technical details visibly attached', () => {
+    renderBackup({
+      exportStatus: 'Error: The backup counts do not match its contents.',
+      importStatus: 'Error: The backup operation failed.',
+      exportErrorDetail: 'Backup count mismatch: messages',
+      importErrorDetail: 'Missing entry: manifest.json',
+    });
+    const alerts = document.querySelectorAll('[role="alert"]');
+    expect(alerts).toHaveLength(2);
+    expect(alerts[0].textContent).toContain('Backup count mismatch: messages');
+    expect(alerts[1].textContent).toContain('Missing entry: manifest.json');
+    expect(document.body.textContent).toContain('Details:');
+  });
+
   it('hides empty feedback and shows completed backup feedback', () => {
     renderBackup();
     expect(document.body.textContent || '').not.toContain('Idle');

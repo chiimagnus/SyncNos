@@ -37,6 +37,11 @@ export function BackupSection(props: {
   busy: boolean;
   exportStatus: string;
   importStatus: string;
+  exportErrorDetail?: string;
+  importErrorDetail?: string;
+  orphanMessageGroups?: { conversationId: number; messageCount: number }[];
+  orphanLoadError?: string;
+  onReviewOrphanConversation?: (conversationId: number) => void;
   importStats: any;
   lastBackupExportAt: number;
   includeSensitiveData: boolean;
@@ -52,6 +57,11 @@ export function BackupSection(props: {
     busy,
     exportStatus,
     importStatus,
+    exportErrorDetail,
+    importErrorDetail,
+    orphanMessageGroups = [],
+    orphanLoadError,
+    onReviewOrphanConversation,
     importStats,
     lastBackupExportAt,
     includeSensitiveData,
@@ -114,8 +124,16 @@ export function BackupSection(props: {
         />
       </div>
       {exportStatus ? (
-        <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+        <div
+          role={exportErrorDetail ? 'alert' : undefined}
+          className={`tw-mt-2 tw-text-xs tw-font-semibold ${exportErrorDetail ? 'tw-text-[var(--error)]' : 'tw-text-[var(--text-secondary)]'}`}
+        >
           {exportStatus}
+          {exportErrorDetail ? (
+            <div className="tw-mt-1 tw-break-words tw-font-normal">
+              {t('backupTechnicalDetail')} {exportErrorDetail}
+            </div>
+          ) : null}
         </div>
       ) : null}
       {lastBackupExportAt ? (
@@ -124,8 +142,42 @@ export function BackupSection(props: {
         </div>
       ) : null}
       {importStatus ? (
-        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+        <div
+          role={importErrorDetail ? 'alert' : undefined}
+          className={`tw-mt-1.5 tw-text-xs tw-font-semibold ${importErrorDetail ? 'tw-text-[var(--error)]' : 'tw-text-[var(--text-secondary)]'}`}
+        >
           {importStatus}
+          {importErrorDetail ? (
+            <div className="tw-mt-1 tw-break-words tw-font-normal">
+              {t('backupTechnicalDetail')} {importErrorDetail}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      {orphanMessageGroups.length || orphanLoadError ? (
+        <div className="tw-mt-4 tw-border-t tw-border-[var(--border)] tw-pt-3">
+          <h3 className="tw-m-0 tw-text-sm tw-font-bold tw-text-[var(--text-primary)]">{t('backupOrphanedHeading')}</h3>
+          <p className="tw-mt-1 tw-text-xs tw-text-[var(--text-secondary)]">{t('backupOrphanedHint')}</p>
+          {orphanLoadError ? (
+            <p role="alert" className="tw-mt-1 tw-break-words tw-text-xs tw-text-[var(--error)]">
+              {t('backupOrphanedLoadFailed')} {orphanLoadError}
+            </p>
+          ) : null}
+          {orphanMessageGroups.map((group) => (
+            <div key={group.conversationId} className="tw-mt-2 tw-flex tw-items-center tw-justify-between tw-gap-2">
+              <span className="tw-text-xs tw-text-[var(--text-primary)]">
+                #{group.conversationId} · {group.messageCount} {t('backupOrphanedCount')}
+              </span>
+              <button
+                type="button"
+                className={buttonClassName}
+                disabled={busy}
+                onClick={() => onReviewOrphanConversation?.(group.conversationId)}
+              >
+                {t('backupOrphanedReview')}
+              </button>
+            </div>
+          ))}
         </div>
       ) : null}
       <div className="tw-mt-2.5">
