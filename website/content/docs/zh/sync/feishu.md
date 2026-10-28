@@ -23,7 +23,8 @@ drive:drive
 
 ## 2. 选择连接方式
 
-- **Proxy**：部署仓库提供的 [OAuth Worker](https://github.com/chiimagnus/SyncNos/tree/main/cloudflare-workers/syncnos-feishu-oauth)，填写 Proxy URL，Client Secret 留空。
+- **Proxy**：部署仓库提供的
+  [OAuth Worker](https://github.com/chiimagnus/SyncNos/tree/main/cloudflare-workers/syncnos-feishu-oauth)，填写 Proxy URL，Client Secret 留空。
 - **Direct**：填写 Client Secret，Proxy URL 留空。
 
 ## 3. 连接 SyncNos

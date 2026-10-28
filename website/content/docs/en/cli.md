@@ -24,4 +24,5 @@ Keep that browser profile running while the agent uses it.
 - [English Skill](https://github.com/chiimagnus/SyncNos/tree/main/skills/syncnos)
 - [中文 Skill](https://github.com/chiimagnus/SyncNos/tree/main/skills/syncnos-zh)
 
-Install the chosen Skill in your AI agent's Skills directory. Treat the local `syncnos` CLI as the command and connection source of truth.
+Install the chosen Skill in your AI agent's Skills directory. Treat the local `syncnos` CLI
+as the command and connection source of truth.

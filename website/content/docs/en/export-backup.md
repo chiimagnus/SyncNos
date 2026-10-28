@@ -9,15 +9,18 @@ description: Export readable files or create a Backup that SyncNos can restore l
 
 ## Export
 
-Select items in the local library and export a Markdown or JSON ZIP. Available local images are included; missing images do not block text export.
+Select items in the local library and export a Markdown or JSON ZIP. Available local images
+are included; missing images do not block text export.
 
 ## Backup
 
 Open **Settings → Backup** to create a recovery package.
 
-A normal Backup contains recoverable local content and settings but excludes authentication credentials.
+A normal Backup contains recoverable local content and settings but excludes authentication
+credentials.
 
-When moving to another device or browser profile, enable **Include private data (for migration)**. This adds portable sign-in credentials to the Backup; the option is off by default.
+When moving to another device or browser profile, enable **Include private data (for migration)**.
+This adds portable sign-in credentials to the Backup; the option is off by default.
 
 A Full Backup is not additionally encrypted by SyncNos. Protect it like a password file.
 

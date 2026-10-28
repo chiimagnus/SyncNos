@@ -6,47 +6,88 @@ This policy covers SyncNos WebClipper on supported Chromium, Firefox-family, and
 
 ## Local-first design
 
-SyncNos saves captured content to browser-local storage before any optional sync or export. External providers and exported files are derived copies.
+SyncNos saves captured content to browser-local storage before any optional sync or export.
+External providers and exported files are derived copies.
 
-Depending on the feature you use, SyncNos may read page data needed for capture, including AI conversation messages, article text and metadata, supported video-page metadata and already-loaded transcripts, image URLs, and text selections used for article comments.
+Depending on the feature you use, SyncNos may read page data needed for capture, including AI
+conversation messages, article text and metadata, supported video-page metadata and already-loaded
+transcripts, image URLs, and text selections used for article comments.
 
-Supported non-virtualized AI sites can auto-save when AI auto-save is enabled. ChatGPT and Google AI Studio require manual capture. Article and Video capture are manually initiated.
+Supported non-virtualized AI sites can auto-save when AI auto-save is enabled. ChatGPT and
+Google AI Studio require manual capture. Article and Video capture are manually initiated.
 
 ## Local data, exports, and backups
 
-Durable captured content is stored in browser IndexedDB. Extension local storage holds settings, OAuth/auth state, provider configuration, queues/jobs, and other small state.
+Durable captured content is stored in browser IndexedDB. Extension local storage holds settings,
+OAuth/auth state, provider configuration, queues/jobs, and other small state.
 
-Selected Markdown/JSON exports are assembled locally from the selected items. Referenced local image-cache assets are included when available. If selected ChatGPT content still references an uncached conversation image, export may temporarily resolve and download that image through the current signed-in ChatGPT session so it can be attached to the export; this does not add the image to the permanent local cache. If the image cannot be retrieved, the text still exports and the image is represented as unavailable. Exports do not include sync mappings, article comments, settings, or provider credentials.
+Selected Markdown/JSON exports are assembled locally from the selected items. Referenced local
+image-cache assets are included when available. If selected ChatGPT content still references
+an uncached conversation image, export may temporarily resolve and download that image through
+the current signed-in ChatGPT session so it can be attached to the export; this does not add
+the image to the permanent local cache. If the image cannot be retrieved, the text still exports
+and the image is represented as unavailable. Exports do not include sync mappings, article
+comments, settings, or provider credentials.
 
-Backup ZIP is a separate recovery package. By default it may contain captured content, recoverable sync mappings, cached images, article comments, and non-sensitive settings, while authentication secrets are excluded. In **Settings → Backup**, the optional **Include private data (for migration)** checkbox creates a Full Backup that also contains portable long-lived credentials such as Notion/Feishu OAuth tokens, a user-configured Feishu client secret, the Obsidian API key, connected GitHub auth tokens, and the Reader TTS AI API key. This option is off by default and is not persisted. SyncNos does not add encryption to the Backup ZIP, so a Full Backup must be protected like a password file. Transient OAuth/Device Flow state and machine/profile-specific CLI identity or opt-in state are always excluded.
+Backup ZIP is a separate recovery package. By default it may contain captured content, recoverable
+sync mappings, cached images, article comments, and non-sensitive settings, while authentication
+secrets are excluded. In **Settings → Backup**, the optional
+**Include private data (for migration)** checkbox creates a Full Backup that also contains
+portable long-lived credentials such as Notion/Feishu OAuth tokens, a user-configured Feishu
+client secret, the Obsidian API key, connected GitHub auth tokens, and the Reader TTS AI API
+key. This option is off by default and is not persisted. SyncNos does not add encryption to
+the Backup ZIP, so a Full Backup must be protected like a password file. Transient OAuth/Device
+Flow state and machine/profile-specific CLI identity or opt-in state are always excluded.
 
 See [storage, backup, and recovery](docs/storage.md) for the recovery contract.
 
 ## Local CLI and Native Messaging
 
-Local CLI Integration is opt-in per browser profile. On supported non-Safari builds, SyncNos requests the optional `nativeMessaging` permission only when you enable this integration.
+Local CLI Integration is opt-in per browser profile. On supported non-Safari builds, SyncNos
+requests the optional `nativeMessaging` permission only when you enable this integration.
 
-The Extension connects to the local `app.syncnos.cli` Native Messaging host, which communicates with `syncnos` over same-user local IPC: Unix domain sockets on macOS/Linux and a local named pipe on Windows. The host does not expose a remote SyncNos network service or maintain a second SyncNos database.
+The Extension connects to the local `app.syncnos.cli` Native Messaging host, which communicates
+with `syncnos` over same-user local IPC: Unix domain sockets on macOS/Linux and a local named
+pipe on Windows. The host does not expose a remote SyncNos network service or maintain a second
+SyncNos database.
 
-`syncnos install` checks a finite set of known browser locations and writes current-user Native Messaging registrations. It does not crawl the disk or inspect browser profile databases. CLI responses exclude provider secrets and the Reader TTS AI API key; local file import/export uses paths explicitly supplied by the user.
+`syncnos install` checks a finite set of known browser locations and writes current-user Native
+Messaging registrations. It does not crawl the disk or inspect browser profile databases. CLI
+responses exclude provider secrets and the Reader TTS AI API key; local file import/export
+uses paths explicitly supplied by the user.
 
 ## External network destinations
 
-External sync is optional. Each provider can be synchronized manually and may also be configured for auto-sync.
+External sync is optional. Each provider can be synchronized manually and may also be configured
+for auto-sync.
 
 ### ChatGPT Advanced capture
 
-When you enable ChatGPT Advanced capture and manually save a signed-in conversation, SyncNos retrieves its history in pages through ChatGPT's non-public backend. This does not enable automatic capture or background polling. Messages from completed pages may remain saved if a later request fails. Unfinished replies, uncertain branches, or unfamiliar content structures are saved conservatively rather than used to replace existing history; unsafe identity or page responses stop the capture.
+When you enable ChatGPT Advanced capture and manually save a signed-in conversation, SyncNos
+retrieves its history in pages through ChatGPT's non-public backend. This does not enable
+automatic capture or background polling. Messages from completed pages may remain saved if a
+later request fails. Unfinished replies, uncertain branches, or unfamiliar content structures
+are saved conservatively rather than used to replace existing history; unsafe identity or page
+responses stop the capture.
 
-Conversation text and durable image identity are saved independently from image downloads. Automatic local image caching follows the general AI image-cache setting and runs after the conversation save; when it is disabled, an uncached ChatGPT image may be resolved on demand for display, export, or provider sync. A failed image resolution/cache attempt does not turn successfully persisted text into a failed or incomplete capture. Ordinary tool screenshots and visual execution artifacts are not stored as conversation images.
+Conversation text and durable image identity are saved independently from image downloads.
+Automatic local image caching follows the general AI image-cache setting and runs after the
+conversation save; when it is disabled, an uncached ChatGPT image may be resolved on demand
+for display, export, or provider sync. A failed image resolution/cache attempt does not turn
+successfully persisted text into a failed or incomplete capture. Ordinary tool screenshots and
+visual execution artifacts are not stored as conversation images.
 
-ChatGPT session cookies and access tokens are used only at runtime. SyncNos does not persist those authentication values, transient signed image download URLs, or raw backend responses in captured messages, browser local storage, or Backup ZIP files.
+ChatGPT session cookies and access tokens are used only at runtime. SyncNos does not persist
+those authentication values, transient signed image download URLs, or raw backend responses
+in captured messages, browser local storage, or Backup ZIP files.
 
 ### Notion
 
-Notion sync sends selected local content to the Notion API over HTTPS. When needed, referenced images may also be fetched and uploaded to Notion.
+Notion sync sends selected local content to the Notion API over HTTPS. When needed, referenced
+images may also be fetched and uploaded to Notion.
 
-Notion OAuth uses a token-exchange proxy so the official client secret is not embedded in the Extension. The proxy receives OAuth exchange data, not captured conversation/article/video content.
+Notion OAuth uses a token-exchange proxy so the official client secret is not embedded in the
+Extension. The proxy receives OAuth exchange data, not captured conversation/article/video content.
 
 ### Feishu (Lark)
 
@@ -54,41 +95,66 @@ Feishu sync sends selected local content to Feishu APIs over HTTPS.
 
 Feishu OAuth supports two modes:
 
-- **Proxy:** the configured Worker receives the authorization code or refresh token and performs the token exchange/refresh with Feishu. It does not receive captured content. The Worker platform may expose ordinary request/network metadata used for best-effort rate limiting.
-- **Direct:** for a user-managed Feishu app, the Extension stores the configured client secret locally and sends OAuth token requests directly to Feishu.
+- **Proxy:** the configured Worker receives the authorization code or refresh token and performs
+  the token exchange/refresh with Feishu. It does not receive captured content. The Worker
+  platform may expose ordinary request/network metadata used for best-effort rate limiting.
+- **Direct:** for a user-managed Feishu app, the Extension stores the configured client secret
+  locally and sends OAuth token requests directly to Feishu.
 
 ### Obsidian
 
-Obsidian sync uses the Local REST API plugin on the same computer. The current integration accepts a local HTTP endpoint (default `http://127.0.0.1:27123`) and sends the configured API key in the authorization header. This path does not require a SyncNos cloud service.
+Obsidian sync uses the Local REST API plugin on the same computer. The current integration
+accepts a local HTTP endpoint (default `http://127.0.0.1:27123`) and sends the configured API
+key in the authorization header. This path does not require a SyncNos cloud service.
 
 ### GitHub
 
-GitHub sync uses GitHub App Device Flow and sends authorization, repository, Git, Markdown, and managed asset requests directly to GitHub over HTTPS. SyncNos does not embed a GitHub Client Secret or App private key.
+GitHub sync uses GitHub App Device Flow and sends authorization, repository, Git, Markdown,
+and managed asset requests directly to GitHub over HTTPS. SyncNos does not embed a GitHub
+Client Secret or App private key.
 
-GitHub access/refresh tokens and pending Device Flow credentials remain in extension-local storage. Connected GitHub tokens are excluded from ordinary Backup ZIP files but can be included when the user explicitly creates a Full Backup for migration; pending Device Flow credentials are always excluded. SyncNos **Disconnect** clears the Extension's local GitHub auth state; revoking authorization or uninstalling the GitHub App is a separate action on GitHub.
+GitHub access/refresh tokens and pending Device Flow credentials remain in extension-local
+storage. Connected GitHub tokens are excluded from ordinary Backup ZIP files but can be included
+when the user explicitly creates a Full Backup for migration; pending Device Flow credentials
+are always excluded. SyncNos **Disconnect** clears the Extension's local GitHub auth state;
+revoking authorization or uninstalling the GitHub App is a separate action on GitHub.
 
 ### Image hosts
 
-When image caching or anti-hotlink handling is used, SyncNos may request original/CDN image URLs. Supported browsers may temporarily adjust headers such as `Referer` for configured anti-hotlink rules. Image download failure does not block saving captured text.
+When image caching or anti-hotlink handling is used, SyncNos may request original/CDN image
+URLs. Supported browsers may temporarily adjust headers such as `Referer` for configured
+anti-hotlink rules. Image download failure does not block saving captured text.
 
 Third-party services process data under their own privacy policies once data is sent to them.
 
 ## Credentials and permissions
 
-OAuth tokens and locally configured secrets are stored in extension-local storage. They are excluded from ordinary Backup ZIP files and are included only when the user explicitly enables the Full Backup migration option described above.
+OAuth tokens and locally configured secrets are stored in extension-local storage. They are
+excluded from ordinary Backup ZIP files and are included only when the user explicitly enables
+the Full Backup migration option described above.
 
-The manifest source of truth is `wxt.config.ts`. Current builds request permissions for local storage, context menus, tab/navigation handling, packaged script injection, scheduled work, and anti-hotlink request handling. Browser-specific builds may differ where platform APIs differ.
+The manifest source of truth is `wxt.config.ts`. Current builds request permissions for local
+storage, context menus, tab/navigation handling, packaged script injection, scheduled work,
+and anti-hotlink request handling. Browser-specific builds may differ where platform APIs differ.
 
-Non-Safari builds declare `nativeMessaging` as optional. Disabling Local CLI Integration removes that permission when the browser exposes the removal API; permission revocation also disables the stored integration state.
+Non-Safari builds declare `nativeMessaging` as optional. Disabling Local CLI Integration removes
+that permission when the browser exposes the removal API; permission revocation also disables
+the stored integration state.
 
-SyncNos declares `http://*/*` and `https://*/*` host access so it can capture user-requested pages and contact configured sync/OAuth/image endpoints. Broad host access does not mean page content is uploaded by default.
+SyncNos declares `http://*/*` and `https://*/*` host access so it can capture user-requested
+pages and contact configured sync/OAuth/image endpoints. Broad host access does not mean page
+content is uploaded by default.
 
 ## Remote code and data sharing
 
-Executable Extension code is packaged with SyncNos; the Extension does not download and execute remote code.
+Executable Extension code is packaged with SyncNos; the Extension does not download and execute
+remote code.
 
-We do not sell your data. Data is sent to third parties only when required by a feature you configure or invoke, such as a sync provider, OAuth exchange service, image host, or your local Obsidian service.
+We do not sell your data. Data is sent to third parties only when required by a feature you
+configure or invoke, such as a sync provider, OAuth exchange service, image host, or your local
+Obsidian service.
 
 ## Contact
 
-Questions about this policy can be filed through [GitHub Issues](https://github.com/chiimagnus/SyncNos/issues).
+Questions about this policy can be filed through
+[GitHub Issues](https://github.com/chiimagnus/SyncNos/issues).

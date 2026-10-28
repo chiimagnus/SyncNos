@@ -13,4 +13,5 @@ You can see:
 - Longest chats and items with more comments
 - Daily capture trends
 
-Ranges include all time, today, the last 7 days, and the last 30 days. Top items can be opened directly.
+Ranges include all time, today, the last 7 days, and the last 30 days. Top items can be opened
+directly.

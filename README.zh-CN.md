@@ -27,7 +27,8 @@
 
 ## 能做什么
 
-- 保存 ChatGPT、Claude、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、z.ai 和 Grok 对话
+- 保存 ChatGPT、Claude、Gemini、Google AI Studio、DeepSeek、Kimi、豆包、元宝、Poe、Notion AI、
+  z.ai 和 Grok 对话
 - 保存网页正文、内容图片，以及 YouTube / Bilibili 字幕与页面信息
 - 在本地库搜索、阅读、划线、评论、朗读和查看数据概览
 - 在支持的 AI 输入框中用 `$` 搜索并插入本地内容
@@ -46,7 +47,8 @@ syncnos install
 syncnos doctor
 ```
 
-然后在目标浏览器 Profile 中开启 **设置 → CLI & AI SKILL → 本地 CLI 集成 → SyncNos CLI**。完整说明见 [CLI & AI SKILL](https://chiimagnus.github.io/SyncNos/docs/cli/)。
+然后在目标浏览器 Profile 中开启 **设置 → CLI & AI SKILL → 本地 CLI 集成 → SyncNos CLI**。
+完整说明见 [CLI & AI SKILL](https://chiimagnus.github.io/SyncNos/docs/cli/)。
 
 ## 演示与预览
 

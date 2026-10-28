@@ -15,9 +15,11 @@ If an empty repository is not initialized yet, use **Initialize repository** fir
 
 ## Sync and disconnect
 
-Once connected, run manual sync or enable auto-sync. SyncNos writes Markdown and attachments to the selected repository and branch.
+Once connected, run manual sync or enable auto-sync. SyncNos writes Markdown and attachments
+to the selected repository and branch.
 
-**Disconnect** removes only the SyncNos connection. Revoke GitHub authorization or uninstall the App from GitHub itself.
+**Disconnect** removes only the SyncNos connection. Revoke GitHub authorization or uninstall
+the App from GitHub itself.
 
 ## Troubleshoot
 

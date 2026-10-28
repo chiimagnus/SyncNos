@@ -1,6 +1,7 @@
 # Documentation Ownership
 
-本页只回答三件事：长期事实由哪份文档拥有、什么变化会触发更新、谁会消费它。`.github/features/**` 是实施/审计历史，不是长期产品文档。
+本页只回答三件事：长期事实由哪份文档拥有、什么变化会触发更新、谁会消费它。
+`.github/features/**` 是实施/审计历史，不是长期产品文档。
 
 ## Source baseline
 
@@ -9,7 +10,8 @@
 | Commit hash | `da8563456dcc0d7b419099e229f69c075078d624` |
 | Reconciled at | `2026-10-03` |
 
-这是 2026-10-03 的文档核对基线，不代表后续功能状态。版本号、权限、schema、默认路径及 browser target 以当前源码、配置和测试为准。
+这是 2026-10-03 的文档核对基线，不代表后续功能状态。
+版本号、权限、schema、默认路径及 browser target 以当前源码、配置和测试为准。
 
 ## Long-term owners
 
@@ -34,6 +36,9 @@
 ## Rules
 
 - 同一受众的同一长期事实只保留一个详细 owner；其它页面只导航或保留必要 guardrail。
-- Runtime 结构、storage key、schema、默认目录和 browser path 由源码/配置/测试回答，不镜像进长期文档。
-- README 只做入口；用户操作归 `website/content/docs/**`，恢复归 `storage.md`，数据流归 `PRIVACY.md`，验证责任归 `CONTRIBUTING.md`。
-- 用户文档按用户任务组织，只保留必要步骤、结果、限制和排障；维护者文档只保留长期不变量、失败语义、ownership 和验证入口。新页面是最后选项。
+- Runtime 结构、storage key、schema、默认目录和 browser path 由源码/配置/测试回答，
+  不镜像进长期文档。
+- README 只做入口；用户操作归 `website/content/docs/**`，恢复归 `storage.md`，
+  数据流归 `PRIVACY.md`，验证责任归 `CONTRIBUTING.md`。
+- 用户文档按用户任务组织，只保留必要步骤、结果、限制和排障；维护者文档只保留长期不变量、
+  失败语义、ownership 和验证入口。新页面是最后选项。

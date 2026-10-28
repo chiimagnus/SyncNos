@@ -14,12 +14,14 @@ Enable auto-sync only if you want it. SyncNos can access only the Notion content
 
 ## Managed content
 
-SyncNos creates or reuses its managed content database under the Parent Page. Normal use does not require editing its fields or sections manually.
+SyncNos creates or reuses its managed content database under the Parent Page. Normal use does
+not require editing its fields or sections manually.
 
 Changing the Parent Page sends future syncs to the new target.
 
 ## Disconnect and troubleshoot
 
-**Disconnect** removes the current SyncNos connection. To revoke authorization completely, also remove SyncNos from Notion's connection settings.
+**Disconnect** removes the current SyncNos connection. To revoke authorization completely,
+also remove SyncNos from Notion's connection settings.
 
 Sync failures do not affect local content. Fix the connection and retry.

@@ -6,8 +6,10 @@ description: 采集、同步或连接遇到问题时，从这里开始。
 ## 采集不完整
 
 - AI 对话缺少历史：先手动保存一次；自动保存不会主动滚动页面补齐旧消息。
-- 自动保存未触发：先在[支持平台列表](/docs/capture-ai-chats/)确认该平台支持自动保存，再检查 **设置 → 通用 → 自动保存**。
-- ChatGPT 高级采集失败：确认已登录且当前不是分享页或临时聊天，再重试。中途保存的内容会保留；关闭高级采集只能改用页面采集，不保证补齐全部历史。
+- 自动保存未触发：先在[支持平台列表](/docs/capture-ai-chats/)确认该平台支持自动保存，
+  再检查 **设置 → 通用 → 自动保存**。
+- ChatGPT 高级采集失败：确认已登录且当前不是分享页或临时聊天，再重试。中途保存的内容会保留；
+  关闭高级采集只能改用页面采集，不保证补齐全部历史。
 - 图片缺失：正文通常已经保存，可稍后用 **缓存图片** 重试。
 
 ## 快捷键没有生效
@@ -16,7 +18,8 @@ description: 采集、同步或连接遇到问题时，从这里开始。
 
 ## 同步失败
 
-本地内容不会丢失。检查对应目标的连接或权限后重试：[Notion](/docs/sync/notion/)、[Obsidian](/docs/sync/obsidian/)、[飞书](/docs/sync/feishu/)、[GitHub](/docs/sync/github/)。
+本地内容不会丢失。检查对应目标的连接或权限后重试：[Notion](/docs/sync/notion/)、
+[Obsidian](/docs/sync/obsidian/)、[飞书](/docs/sync/feishu/)、[GitHub](/docs/sync/github/)。
 
 ## 不连接外部服务还能用吗？
 
@@ -24,7 +27,8 @@ description: 采集、同步或连接遇到问题时，从这里开始。
 
 ## 支持哪些浏览器？
 
-Chrome / Chromium 系、Edge 和 Firefox 有商店版本；Safari（macOS / iOS）可从源码用 Xcode 构建。见[安装](/docs/install/)。
+Chrome / Chromium 系、Edge 和 Firefox 有商店版本；Safari（macOS / iOS）可从源码用 Xcode 构建。
+见[安装](/docs/install/)。
 
 ## 内容会自动上传吗？
 

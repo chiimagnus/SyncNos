@@ -9,7 +9,8 @@ description: Save subtitles and available metadata from YouTube and Bilibili wit
 2. Choose **Save video** in the popup.
 3. Open the video item in the [local library](/docs/en/library/).
 
-When subtitles are available, SyncNos keeps the transcript and timing. Videos can still be saved without subtitles. Descriptions and chapters are also kept when the page provides them.
+When subtitles are available, SyncNos keeps the transcript and timing. Videos can still be
+saved without subtitles. Descriptions and chapters are also kept when the page provides them.
 
 SyncNos does not download the audio or video file itself.
 

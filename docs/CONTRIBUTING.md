@@ -4,8 +4,10 @@
 
 ## 开始之前
 
-1. 先搜索现有 [Issues](https://github.com/chiimagnus/SyncNos/issues) 和 [Pull Requests](https://github.com/chiimagnus/SyncNos/pulls)。
-2. 修改代码前阅读 [`AGENTS.md`](../AGENTS.md)；改 UI 时同时阅读 [`src/ui/AGENTS.md`](../src/ui/AGENTS.md)。
+1. 先搜索现有 [Issues](https://github.com/chiimagnus/SyncNos/issues) 和
+   [Pull Requests](https://github.com/chiimagnus/SyncNos/pulls)。
+2. 修改代码前阅读 [`AGENTS.md`](../AGENTS.md)；
+   改 UI 时同时阅读 [`src/ui/AGENTS.md`](../src/ui/AGENTS.md)。
 3. 非平凡行为、权限、存储/迁移、发布流程或新集成先在 Issue 说明范围；明显小修和文档修正可直接提 PR。
 4. 保持补丁聚焦，不混入无关重构和兼容层。
 
@@ -18,14 +20,18 @@ npm ci
 npm run dev
 ```
 
-`dev*` 会先运行 `npm run cli:link`，因此开发中的 `syncnos` 直接使用当前 `cli/`。其它目标和命令以 [`package.json`](../package.json) 为准。
+`dev*` 会先运行 `npm run cli:link`，因此开发中的 `syncnos` 直接使用当前 `cli/`。
+其它目标和命令以 [`package.json`](../package.json) 为准。
 
-Safari/Xcode 集成使用 `npm run setup:safari:xcode`。排障见 [`troubleshooting.md`](troubleshooting.md)。
+Safari/Xcode 集成使用 `npm run setup:safari:xcode`。
+排障见 [`troubleshooting.md`](troubleshooting.md)。
 
 ## Git 提交
 
-- 一个提交只包含一项可独立理解、验证和回退的逻辑改动，以及相应的测试和必要文档；每完成并验证一项就提交，不把多项功能攒成一次大提交。
-- 只暂存该项相关文件，并检查 `git diff --cached`；中文标题概括结果，正文说明改动、原因和实际验证。`git commit` 不代表获得 `git push` 授权。
+- 一个提交只包含一项可独立理解、验证和回退的逻辑改动，以及相应的测试和必要文档；
+  每完成并验证一项就提交，不把多项功能攒成一次大提交。
+- 只暂存该项相关文件，并检查 `git diff --cached`；中文标题概括结果，正文说明改动、原因和实际验证。
+  `git commit` 不代表获得 `git push` 授权。
 
 ## Pull Request
 
@@ -48,21 +54,32 @@ Safari/Xcode 集成使用 `npm run setup:safari:xcode`。排障见 [`troubleshoo
 | CLI / installer / Native Messaging | `npm run gate` + `npm run cli:check`，并在受影响 OS 做真实 discovery/read-back |
 | 浏览器、站点或视觉行为 | 手动走通受影响的真实路径，并记录用户可观察结果；AI 对话按 [`ai-chat-testing.md`](ai-chat-testing.md) 执行统一回归 |
 
-`npm run gate` 比 `gate:ci` 多构建 Chromium production artifact 并执行 `check:dist`。Zen / Safari 有改动时再运行 `npm run check:zen` / `npm run check:safari`。模拟平台测试不能冒充真实平台 E2E。
+`npm run gate` 比 `gate:ci` 多构建 Chromium production artifact 并执行 `check:dist`。
+Zen / Safari 有改动时再运行 `npm run check:zen` / `npm run check:safari`。
+模拟平台测试不能冒充真实平台 E2E。
 
-`check:dist` 约束解压后的完整目录体积、manifest 声明的 content script JS 总体积和 Popup 启动 JS/CSS，并拒绝冗余 KaTeX TTF/WOFF。具体预算以 [`check-dist.mjs`](../.github/scripts/webclipper/check-dist.mjs) 为准；超标时先查实际依赖和资源，不以放宽预算代替优化。
+`check:dist` 约束解压后的完整目录体积、manifest 声明的 content script JS 总体积和 Popup 启动
+JS/CSS，并拒绝冗余 KaTeX TTF/WOFF。
+具体预算以 [`check-dist.mjs`](../.github/scripts/webclipper/check-dist.mjs) 为准；
+超标时先查实际依赖和资源，不以放宽预算代替优化。
 
-修改 Markdown、公式或字体构建时，按 [`markdown-rendering.md`](markdown-rendering.md) 核对共享渲染与实际显示。尽可能覆盖受影响功能的适用环境、输入、失败/恢复、时序与极端组合；未执行项说明原因、影响及补验，不把组件预览或构建通过写成真实扩展 E2E。
+修改 Markdown、公式或字体构建时，按 [`markdown-rendering.md`](markdown-rendering.md)
+核对共享渲染与实际显示。尽可能覆盖受影响功能的适用环境、输入、失败/恢复、时序与极端组合；
+未执行项说明原因、影响及补验，不把组件预览或构建通过写成真实扩展 E2E。
 
 ## 数据、权限与隐私
 
-修改 IndexedDB、Backup、sync mapping、OAuth、图片缓存、权限、Native Messaging 或迁移时，必须说明失败后如何保持数据可恢复，以及是否新增本地到外部的数据流。
+修改 IndexedDB、Backup、sync mapping、OAuth、图片缓存、权限、Native Messaging 或迁移时，
+必须说明失败后如何保持数据可恢复，以及是否新增本地到外部的数据流。
 
-长期数据契约见 [`storage.md`](storage.md)，用户数据流见 [`../PRIVACY.md`](../PRIVACY.md)。不要提交真实凭据、私人用户内容、浏览器 Profile、Backup 或 session 材料。
+长期数据契约见 [`storage.md`](storage.md)，用户数据流见 [`../PRIVACY.md`](../PRIVACY.md)。
+不要提交真实凭据、私人用户内容、浏览器 Profile、Backup 或 session 材料。
 
 ## 发布与文档
 
-Release 契约见 [`release.md`](release.md)。长期文档归属和更新触发见 [`GENERATION.md`](GENERATION.md)；`.github/features/**` 只保存实施/审计历史。
+Release 契约见 [`release.md`](release.md)。
+长期文档归属和更新触发见 [`GENERATION.md`](GENERATION.md)；
+`.github/features/**` 只保存实施/审计历史。
 
 ## 许可证
 

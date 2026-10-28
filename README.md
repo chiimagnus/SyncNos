@@ -27,7 +27,8 @@ Content is saved in the browser first, then optionally synced to Notion, Obsidia
 
 ## What SyncNos does
 
-- Save chats from ChatGPT, Claude, Gemini, Google AI Studio, DeepSeek, Kimi, Doubao, Yuanbao, Poe, Notion AI, z.ai, and Grok
+- Save chats from ChatGPT, Claude, Gemini, Google AI Studio, DeepSeek, Kimi, Doubao, Yuanbao,
+  Poe, Notion AI, z.ai, and Grok
 - Save readable web articles, content images, and YouTube / Bilibili subtitles and page metadata
 - Search, read, highlight, comment, narrate, and view insights from the local library
 - Use `$` in supported AI editors to search and insert local content
@@ -46,7 +47,8 @@ syncnos install
 syncnos doctor
 ```
 
-Then enable **Settings → CLI & AI SKILL → Local CLI Integration → SyncNos CLI** in the target browser profile. See [CLI & AI SKILL](https://chiimagnus.github.io/SyncNos/docs/en/cli/).
+Then enable **Settings → CLI & AI SKILL → Local CLI Integration → SyncNos CLI** in the target
+browser profile. See [CLI & AI SKILL](https://chiimagnus.github.io/SyncNos/docs/en/cli/).
 
 ## Demo & screenshots
 
@@ -67,11 +69,13 @@ Then enable **Settings → CLI & AI SKILL → Local CLI Integration → SyncNos 
 
 ## Support
 
-SyncNos is maintained by one person. If you would like to sponsor it, feel free to leave a note about why you use SyncNos or what you hope it will solve.
+SyncNos is maintained by one person. If you would like to sponsor it, feel free to leave a
+note about why you use SyncNos or what you hope it will solve.
 
 <img src="public/icons/buymeacoffee1.jpg" alt="Chii Magnus tip jar QR" width="180" />
 
 ## Acknowledgements
 
 - Thanks to the [linux.do](https://linux.do/t/topic/1635410) community 💛
-- Thanks to [Obsidian Web Clipper](https://github.com/obsidianmd/obsidian-clipper) for the inspiration
+- Thanks to [Obsidian Web Clipper](https://github.com/obsidianmd/obsidian-clipper) for the
+  inspiration

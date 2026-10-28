@@ -5,7 +5,8 @@ description: Configure a Feishu app and sync SyncNos content to Feishu cloud doc
 
 ## 1. Create a Feishu app
 
-Create an **Enterprise self-built app** in the Feishu Open Platform, note the **App ID**, and configure this redirect URL:
+Create an **Enterprise self-built app** in the Feishu Open Platform, note the **App ID**, and
+configure this redirect URL:
 
 ```text
 https://chiimagnus.github.io/SyncNos/syncnos-oauth/callback/
@@ -23,7 +24,8 @@ Re-authorize SyncNos after changing permissions.
 
 ## 2. Choose a connection method
 
-- **Proxy**: deploy the repository [OAuth Worker](https://github.com/chiimagnus/SyncNos/tree/main/cloudflare-workers/syncnos-feishu-oauth), enter its Proxy URL, and leave Client Secret empty.
+- **Proxy**: deploy the repository
+  [OAuth Worker](https://github.com/chiimagnus/SyncNos/tree/main/cloudflare-workers/syncnos-feishu-oauth), enter its Proxy URL, and leave Client Secret empty.
 - **Direct**: enter the Client Secret and leave Proxy URL empty.
 
 ## 3. Connect SyncNos
