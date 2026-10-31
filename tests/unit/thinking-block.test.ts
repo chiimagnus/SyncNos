@@ -34,6 +34,17 @@ describe('AI thinking capture', () => {
     expect(splitThinkingMarkdown('> [!NOTE]- Thinking\n> no separator')).toBeNull();
   });
 
+  it('does not split long ordinary messages into lines', () => {
+    const split = vi.spyOn(String.prototype, 'split');
+    try {
+      const result = splitThinkingMarkdown('Ordinary answer\n'.repeat(10000));
+      expect(result).toBeNull();
+      expect(split).not.toHaveBeenCalled();
+    } finally {
+      split.mockRestore();
+    }
+  });
+
   const snapshot = {
     conversation: { source: 'chatgpt' },
     messages: [

@@ -12,6 +12,7 @@ export function composeThinkingMarkdown(thinking: string, answer: string): strin
 }
 
 export function splitThinkingMarkdown(markdown: string): { thinking: string; answer: string } | null {
+  if (!markdown.startsWith(THINKING_HEADER)) return null;
   const lines = markdown.split(/\r?\n/);
   if (lines[0] !== THINKING_HEADER || lines[1] !== '>') return null;
   const thinkingLines: string[] = [];
