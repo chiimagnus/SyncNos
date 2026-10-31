@@ -125,7 +125,9 @@ describe('ChatOutlinePanel', () => {
     expect(firstEntryLabel?.getAttribute('style')).toContain('-webkit-line-clamp: 2');
     expect(firstEntryLabel?.getAttribute('style')).toContain('line-height: 1.35');
     expect(firstEntryLabel?.getAttribute('style')).toContain('overflow-wrap: anywhere');
-    expect(firstEntry?.className).toContain('tw-min-h-[50px]');
+    expect(firstEntry?.className).not.toContain('tw-min-h-[50px]');
+    expect(firstEntry?.className).not.toMatch(/tw-h-\[\d+px\]/);
+    expect(firstEntry?.className).toContain('tw-shrink-0');
     expect(firstEntry?.classList.contains('webclipper-btn')).toBe(true);
     expect(firstEntry?.classList.contains('webclipper-btn--menu-item')).toBe(true);
     expect(firstEntry?.classList.contains('webclipper-btn--tone-muted')).toBe(true);
@@ -176,6 +178,51 @@ describe('ChatOutlinePanel', () => {
     expect(document.querySelector('[data-reader-rail-panel="chat-outline"]')).toBeNull();
   });
 
+  it.each([1, 7, 8, 12, 101, 500])('preserves all %i ordered navigation marks without sampling', (count) => {
+    const list = makeEntries(count);
+    act(() => {
+      root!.render(createElement(ChatOutlinePanel, { entries: list, activeIndex: count, onPickEntry: vi.fn() }));
+    });
+    const nav = document.querySelector('[data-chat-outline-trigger-bars]') as HTMLElement;
+    const marks = [...nav.querySelectorAll('[data-chat-outline-trigger-bar]')];
+    expect(marks).toHaveLength(count);
+    expect(marks[0]?.getAttribute('data-chat-outline-trigger-bar')).toBe('u-1');
+    expect(marks.at(-1)?.getAttribute('data-chat-outline-trigger-bar')).toBe(`u-${count}`);
+    expect(
+      nav.querySelector('[data-chat-outline-trigger-active=true]')?.getAttribute('data-chat-outline-trigger-bar'),
+    ).toBe(`u-${count}`);
+  });
+
+  it('keeps the active mark visible inside an overflowing rail without scrolling the conversation', () => {
+    const manyEntries = makeEntries(500);
+    const props = { entries: manyEntries, onPickEntry: vi.fn() };
+    act(() => {
+      root!.render(createElement(ChatOutlinePanel, props));
+    });
+    const nav = document.querySelector('[data-chat-outline-trigger-bars]') as HTMLElement;
+    Object.defineProperty(nav, 'scrollHeight', { configurable: true, value: 1100 });
+    Object.defineProperty(nav, 'clientHeight', { configurable: true, value: 760 });
+    nav.getBoundingClientRect = vi.fn(() => ({ top: 100, bottom: 860 }) as DOMRect);
+    const lastButton = nav.querySelector('[data-chat-outline-trigger-bar="u-500"]')?.parentElement as HTMLElement;
+    lastButton.getBoundingClientRect = vi.fn(() => ({ top: 900, bottom: 902 }) as DOMRect);
+    const parent = document.getElementById('root')!;
+    parent.scrollTop = 42;
+
+    act(() => {
+      root!.render(createElement(ChatOutlinePanel, { ...props, activeIndex: 500 }));
+    });
+    expect(nav.scrollTop).toBe(42);
+    expect(parent.scrollTop).toBe(42);
+
+    const firstButton = nav.querySelector('[data-chat-outline-trigger-bar="u-1"]')?.parentElement as HTMLElement;
+    firstButton.getBoundingClientRect = vi.fn(() => ({ top: 80, bottom: 82 }) as DOMRect);
+    act(() => {
+      root!.render(createElement(ChatOutlinePanel, { ...props, activeIndex: 1 }));
+    });
+    expect(nav.scrollTop).toBe(22);
+    expect(parent.scrollTop).toBe(42);
+  });
+
   it('keeps the trigger visible for large chat outlines while preserving the active marker', () => {
     const manyEntries = makeEntries(50);
     act(() => {
@@ -191,7 +238,13 @@ describe('ChatOutlinePanel', () => {
     expect(barsRoot?.className).toContain('tw-gap-2');
     expect(barsRoot?.className).toContain('tw-py-1');
     expect(barsRoot?.className).toContain('tw-pr-1');
-    expect(bars).toHaveLength(7);
+    expect(bars).toHaveLength(50);
+    expect(barsRoot?.style.height).toBe('500px');
+    expect(barsRoot?.className).toContain('tw-max-h-[calc(100vh-10rem)]');
+    expect(barsRoot?.style.rowGap).toBe('0px');
+    expect(barsRoot?.className).toContain('tw-overflow-y-auto');
+    expect(bars[0]?.getAttribute('data-chat-outline-trigger-bar')).toBe('u-1');
+    expect(bars.at(-1)?.getAttribute('data-chat-outline-trigger-bar')).toBe('u-50');
     expect(bars.every((bar) => (bar as HTMLElement).className.includes('tw-h-[2px]'))).toBe(true);
     expect(bars.every((bar) => (bar as HTMLElement).className.includes('tw-rounded-[var(--radius-inline)]'))).toBe(
       true,
@@ -208,6 +261,7 @@ describe('ChatOutlinePanel', () => {
       `${readerOutlineLevelToMinimapWidth(2)}px`,
     );
     expect(wrap?.querySelector('[data-chat-outline-trigger-bar="u-37"]')).toBeTruthy();
+    expect(wrap?.querySelectorAll('[data-chat-outline-trigger-bar]')).toHaveLength(manyEntries.length);
     expect(
       wrap?.querySelector('[data-chat-outline-trigger-active="true"]')?.getAttribute('data-chat-outline-trigger-bar'),
     ).toBe('u-37');
