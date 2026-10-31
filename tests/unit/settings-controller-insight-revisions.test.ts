@@ -72,6 +72,7 @@ vi.mock('@i18n', async (importOriginal) => ({
 }));
 
 import { useSettingsSceneController } from '@viewmodels/settings/useSettingsSceneController';
+import { AI_CHAT_INCLUDE_THINKING_STORAGE_KEY } from '@services/shared/thinking-block';
 
 type Snapshot = ReturnType<typeof useSettingsSceneController>;
 type SettingsSection = Parameters<typeof useSettingsSceneController>[0]['activeSection'];
@@ -242,6 +243,66 @@ afterEach(async () => {
   }
   root = null;
   cleanupDom();
+});
+
+describe('Settings controller AI thinking preference', () => {
+  it('does not overwrite a newer storage change with a stale settings refresh', async () => {
+    const staleRead = deferred<Record<string, unknown>>();
+    const send = runtimeMocks.send.getMockImplementation()!;
+    runtimeMocks.send.mockImplementation((type: string, ...args: unknown[]) =>
+      type === 'notionGetConfig' || type === 'feishuGetAuthConfig' ? Promise.resolve(ok({})) : send(type, ...args),
+    );
+    let onStorageChanged: ((changes: Record<string, unknown>, areaName: string) => void) | null = null;
+    storageMocks.get.mockImplementation((keys: string[]) =>
+      keys.includes(AI_CHAT_INCLUDE_THINKING_STORAGE_KEY)
+        ? staleRead.promise
+        : Promise.resolve(Object.fromEntries(keys.map((key) => [key, undefined]))),
+    );
+    storageMocks.onChanged.mockImplementation((listener) => {
+      onStorageChanged = listener;
+      return () => {};
+    });
+
+    await renderController('general');
+    expect(storageMocks.get).toHaveBeenCalledWith(expect.arrayContaining([AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]));
+    expect(onStorageChanged).not.toBeNull();
+    expect(latestSnapshot?.aiChatIncludeThinkingEnabled).toBe(true);
+
+    act(() => onStorageChanged?.({ [AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]: { newValue: false } }, 'local'));
+    expect(latestSnapshot?.aiChatIncludeThinkingEnabled).toBe(false);
+
+    await act(async () => {
+      staleRead.resolve({ [AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]: true });
+      await staleRead.promise;
+      for (let index = 0; index < 12; index += 1) await Promise.resolve();
+    });
+    expect(latestSnapshot?.aiChatIncludeThinkingEnabled).toBe(false);
+  });
+
+  it('keeps the latest observed preference when a local write finishes after another change', async () => {
+    const deferredWrite = deferred<void>();
+    let onStorageChanged: ((changes: Record<string, unknown>, areaName: string) => void) | null = null;
+    storageMocks.onChanged.mockImplementation((listener) => {
+      onStorageChanged = listener;
+      return () => {};
+    });
+    storageMocks.set.mockReturnValue(deferredWrite.promise);
+
+    await renderController('general');
+    let saving: Promise<void> = Promise.resolve();
+    await act(async () => {
+      saving = latestSnapshot!.onToggleAiChatIncludeThinkingEnabled(false);
+      for (let index = 0; index < 8; index += 1) await Promise.resolve();
+    });
+    expect(storageMocks.set).toHaveBeenCalledWith({ [AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]: false });
+
+    act(() => onStorageChanged?.({ [AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]: { newValue: true } }, 'local'));
+    await act(async () => {
+      deferredWrite.resolve();
+      await saving;
+    });
+    expect(latestSnapshot?.aiChatIncludeThinkingEnabled).toBe(true);
+  });
 });
 
 describe('Settings controller backup recovery navigation', () => {

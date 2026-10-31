@@ -354,6 +354,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const aiChatAutoSaveObservationRevisionRef = useRef(0);
   const [chatgptApiCaptureEnabled, setChatgptApiCaptureEnabled] = useState<boolean>(false);
   const [aiChatIncludeThinkingEnabled, setAiChatIncludeThinkingEnabled] = useState(true);
+  const aiChatIncludeThinkingObservationRevisionRef = useRef(0);
   const [aiChatCacheImagesEnabled, setAiChatCacheImagesEnabled] = useState<boolean>(false);
   const [webArticleCacheImagesEnabled, setWebArticleCacheImagesEnabled] = useState<boolean>(false);
   const [antiHotlinkAdvancedOpen, setAntiHotlinkAdvancedOpen] = useState<boolean>(false);
@@ -702,6 +703,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     const feishuAuthObservationAtStart = feishuAuthObservationRevisionRef.current;
     const inpageDisplayObservationAtStart = inpageDisplayObservationRevisionRef.current;
     const aiChatAutoSaveObservationAtStart = aiChatAutoSaveObservationRevisionRef.current;
+    const aiChatIncludeThinkingObservationAtStart = aiChatIncludeThinkingObservationRevisionRef.current;
     const aiChatDollarMentionObservationAtStart = aiChatDollarMentionObservationRevisionRef.current;
     const [
       ,
@@ -800,7 +802,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       setAiChatAutoSaveEnabled(local?.ai_chat_auto_save_enabled !== false);
     }
     setChatgptApiCaptureEnabled(local?.[CHATGPT_API_CAPTURE_ENABLED_STORAGE_KEY] === true);
-    setAiChatIncludeThinkingEnabled(local?.[AI_CHAT_INCLUDE_THINKING_STORAGE_KEY] !== false);
+    if (aiChatIncludeThinkingObservationRevisionRef.current === aiChatIncludeThinkingObservationAtStart) {
+      setAiChatIncludeThinkingEnabled(local?.[AI_CHAT_INCLUDE_THINKING_STORAGE_KEY] !== false);
+    }
     setAiChatCacheImagesEnabled(local?.ai_chat_cache_images_enabled === true);
     setWebArticleCacheImagesEnabled(local?.web_article_cache_images_enabled === true);
     setAntiHotlinkRules(Array.isArray(antiHotlinkRulesDraft) ? antiHotlinkRulesDraft : []);
@@ -907,6 +911,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         setChatgptApiCaptureEnabled(changes[CHATGPT_API_CAPTURE_ENABLED_STORAGE_KEY]?.newValue === true);
       }
       if (Object.prototype.hasOwnProperty.call(changes, AI_CHAT_INCLUDE_THINKING_STORAGE_KEY)) {
+        aiChatIncludeThinkingObservationRevisionRef.current += 1;
         setAiChatIncludeThinkingEnabled(changes[AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]?.newValue !== false);
       }
       if (Object.prototype.hasOwnProperty.call(changes, 'ai_chat_dollar_mention_enabled')) {
@@ -1764,7 +1769,10 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const onToggleAiChatIncludeThinkingEnabled = useCallback(
     async (next: boolean) => {
       await runTask(async () => {
+        const revision = aiChatIncludeThinkingObservationRevisionRef.current;
         await storageSet({ [AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]: next });
+        if (aiChatIncludeThinkingObservationRevisionRef.current !== revision) return;
+        aiChatIncludeThinkingObservationRevisionRef.current += 1;
         setAiChatIncludeThinkingEnabled(next);
       });
     },
