@@ -654,7 +654,7 @@ export function ConversationDetailPane({
               data-detail-outline-anchor="true"
             >
               <div
-                className="tw-pointer-events-auto tw-absolute tw-right-0 tw-top-0"
+                className="tw-pointer-events-auto tw-absolute tw-right-[-12px] md:tw-right-[-16px] tw-top-0"
                 data-chat-outline-root={outlineScrollRoot ? 'route-scroll' : 'viewport'}
               >
                 <ChatOutlinePanel
