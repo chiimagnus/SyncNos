@@ -1,7 +1,7 @@
 import { CHATGPT_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { scriptingExecuteScript } from '@platform/webext/scripting';
 import { fetchChatgptPageInMainWorld } from '@services/integrations/chatgpt/api-main-fetch';
-import { parseChatgptDurableConversationRoute } from '@services/shared/chatgpt-route';
+import { isCanonicalChatgptOrigin, parseChatgptDurableConversationRoute } from '@services/shared/chatgpt-route';
 
 type AnyRouter = {
   ok: (data: unknown) => any;
@@ -13,13 +13,20 @@ export function registerChatgptApiHandlers(router: AnyRouter): void {
   router.register(CHATGPT_MESSAGE_TYPES.FETCH_API_PAGE, async (msg, sender) => {
     const conversationId = String(msg?.conversationId || '').trim();
     const tabId = Number(sender?.tab?.id);
-    const senderRoute = parseChatgptDurableConversationRoute(sender?.url);
+    let documentOrigin = '';
+    try {
+      documentOrigin = new URL(String(sender?.url || '')).origin;
+    } catch (_error) {
+      // A request must originate from a real ChatGPT document.
+    }
     const tabRoute = parseChatgptDurableConversationRoute(sender?.tab?.url);
     if (
       !conversationId ||
       !Number.isSafeInteger(tabId) ||
       tabId < 0 ||
-      senderRoute?.conversationId !== conversationId ||
+      !isCanonicalChatgptOrigin(documentOrigin) ||
+      (sender?.origin != null && !isCanonicalChatgptOrigin(sender.origin)) ||
+      (sender?.frameId != null && sender.frameId !== 0) ||
       tabRoute?.conversationId !== conversationId
     ) {
       return router.err('chatgpt_api_navigation_changed');
