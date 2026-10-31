@@ -12,12 +12,10 @@ description: Connect Notion and sync SyncNos content under a page you choose.
 
 Enable auto-sync only if you want it. SyncNos can access only the Notion content you authorize.
 
-## Managed content
+## Sync location
 
-SyncNos creates or reuses its managed content database under the Parent Page. Normal use does
-not require editing its fields or sections manually.
-
-Changing the Parent Page sends future syncs to the new target.
+SyncNos organizes content under the selected page automatically. You do not need to create or
+edit a database yourself. Changing the destination page sends future syncs to the new location.
 
 ## Disconnect and troubleshoot
 
