@@ -35,6 +35,27 @@ describe('ChatMessageBubble', () => {
     expect(ordinary).not.toContain('<details');
   });
 
+  it('matches the assistant reply typography and surface for expanded thinking in every reading profile', () => {
+    for (const readingProfile of ['medium', 'notion', 'book']) {
+      const html = renderToStaticMarkup(
+        createElement(ChatMessageBubble, {
+          role: 'assistant',
+          readingProfile,
+          markdown: composeThinkingMarkdown('**Thought**\n\nA paragraph.', '**Answer**\n\nAnother paragraph.'),
+        }),
+      );
+      const details = html.match(/<details class="([^"]+)">/);
+      expect(details?.[1]).toBe('tw-mb-3');
+      expect(html).not.toContain('tw-border-t');
+      expect(html).not.toContain('tw-bg-[var(--bg-sunken)]');
+      const markdownClasses = [...html.matchAll(/<div class="([^"]+)"/g)].map((match) => match[1]);
+      expect(markdownClasses).toHaveLength(2);
+      expect(markdownClasses[0]).toBe(markdownClasses[1]);
+      expect(html.indexOf('<summary')).toBeLessThan(html.indexOf('<strong>Thought</strong>'));
+      expect(html.indexOf('<strong>Thought</strong>')).toBeLessThan(html.indexOf('<strong>Answer</strong>'));
+    }
+  });
+
   it('supports thinking-only and long multi-paragraph reasoning without an empty answer panel', () => {
     const html = renderToStaticMarkup(
       createElement(ChatMessageBubble, {

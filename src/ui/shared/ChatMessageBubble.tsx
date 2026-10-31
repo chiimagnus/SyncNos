@@ -134,18 +134,18 @@ export function ChatMessageBubble({
         </header>
       ) : null}
       {thinking ? (
-        <details className="tw-mb-3 tw-rounded-[var(--radius-inline)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)]">
-          <summary className="tw-cursor-pointer tw-px-3 tw-py-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--focus-ring)]">
+        <details className="tw-mb-3">
+          <summary
+            className={`${headerLeftClass} tw-mb-1.5 tw-cursor-pointer tw-select-none focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--focus-ring)]`}
+          >
             {t('aiChatThinkingSummary')}
           </summary>
-          <div className="tw-border-t tw-border-[var(--border)] tw-px-3 tw-py-2">
-            <MarkdownContent
-              markdown={thinking.thinking}
-              syncnosAssetSrcById={syncnosAssetSrcById}
-              chatgptFileSrcById={chatgptFileSrcById}
-              className={[mdClass, mdRoleOverrides].filter(Boolean).join(' ')}
-            />
-          </div>
+          <MarkdownContent
+            markdown={thinking.thinking}
+            syncnosAssetSrcById={syncnosAssetSrcById}
+            chatgptFileSrcById={chatgptFileSrcById}
+            className={[mdClass, mdRoleOverrides].filter(Boolean).join(' ')}
+          />
         </details>
       ) : null}
       {thinking?.answer === '' ? null : (
