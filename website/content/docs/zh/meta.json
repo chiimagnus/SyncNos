@@ -4,10 +4,13 @@
     { "title": "开始使用", "pages": ["index", "install"] },
     { "title": "采集方式", "pages": ["capture", "capture-ai-chats", "capture-articles", "capture-videos"] },
     {
-      "title": "功能",
-      "pages": ["features", "library", "shortcuts", "comments", "reader", "dollar-mention", "insights", "export-backup"]
+      "title": "使用与整理",
+      "pages": ["features", "library", "comments", "reader", "dollar-mention", "insights", "shortcuts"]
     },
-    { "title": "同步", "pages": ["sync/index", "sync/notion", "sync/obsidian", "sync/feishu", "sync/github"] },
+    {
+      "title": "同步与导出",
+      "pages": ["sync/index", "sync/notion", "sync/obsidian", "sync/feishu", "sync/github", "export-backup"]
+    },
     { "title": "高级与帮助", "pages": ["cli", "privacy", "faq"] }
   ]
 }
