@@ -394,6 +394,21 @@ describe('reader mode regression', () => {
     expect(document.querySelector('[data-reader-header-toolbar="true"]')).toBeFalsy();
   });
 
+  it('positions the chat outline rail slightly closer to the right edge', async () => {
+    currentState.detail = {
+      conversationId: 11,
+      messages: [{ id: 101, messageKey: 'u-101', sequence: 0, role: 'user', contentMarkdown: 'Test question' }],
+    } as any;
+
+    renderRoot(root!);
+    await flushDom();
+
+    const outlineRoot = document.querySelector('[data-chat-outline-root]');
+    expect(outlineRoot?.classList.contains('tw-right-[-12px]')).toBe(true);
+    expect(outlineRoot?.classList.contains('md:tw-right-[-16px]')).toBe(true);
+    expect(outlineRoot?.querySelector('[data-chat-outline-trigger-bars]')).toBeTruthy();
+  });
+
   it('hides the outline minimap when article detail has no headings', async () => {
     currentState.selectedConversation = {
       id: 21,
