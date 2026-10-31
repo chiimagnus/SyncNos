@@ -146,6 +146,18 @@ export function ChatMessageBubble({
             chatgptFileSrcById={chatgptFileSrcById}
             className={[mdClass, mdRoleOverrides].filter(Boolean).join(' ')}
           />
+          <button
+            type="button"
+            className={`${headerLeftClass} tw-mt-2 tw-block tw-cursor-pointer tw-select-none tw-border-0 tw-bg-transparent tw-p-0 tw-text-left hover:tw-underline focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--focus-ring)]`}
+            onClick={(event) => {
+              const details = event.currentTarget.closest('details');
+              if (!details) return;
+              details.open = false;
+              details.querySelector('summary')?.focus();
+            }}
+          >
+            {t('aiChatThinkingCollapse')}
+          </button>
         </details>
       ) : null}
       {thinking?.answer === '' ? null : (

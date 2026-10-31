@@ -27,12 +27,17 @@ describe('ChatMessageBubble', () => {
     expect(html).toContain('Thinking</summary>');
     expect(html).toContain('<strong>Plan</strong>');
     expect(html).toContain('<strong>answer</strong>');
+    expect(html).toContain('Collapse thinking</button>');
+    expect(html.indexOf('<strong>Plan</strong>')).toBeLessThan(html.indexOf('Collapse thinking</button>'));
+    expect(html.indexOf('Collapse thinking</button>')).toBeLessThan(html.indexOf('</details>'));
     expect(html).not.toContain('[!NOTE]-');
 
     const user = renderToStaticMarkup(createElement(ChatMessageBubble, { role: 'user', markdown }));
     expect(user).not.toContain('<details');
+    expect(user).not.toContain('Collapse thinking');
     const ordinary = renderToStaticMarkup(createElement(ChatMessageBubble, { role: 'assistant', markdown: 'Final' }));
     expect(ordinary).not.toContain('<details');
+    expect(ordinary).not.toContain('Collapse thinking');
   });
 
   it('matches the assistant reply typography and surface for expanded thinking in every reading profile', () => {

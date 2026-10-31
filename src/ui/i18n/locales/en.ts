@@ -94,6 +94,7 @@ export const en = {
   aiChatThinkingIncludeHint:
     'Supports visible ChatGPT and DeepSeek thinking. On by default; turning it off omits thinking from future saves. Switching the setting does not rewrite saved chats. Thinking is collapsed by default.',
   aiChatThinkingSummary: 'Thinking',
+  aiChatThinkingCollapse: 'Collapse thinking',
   chatgptApiCaptureAdvancedHeading: 'ChatGPT Advanced capture',
   chatgptApiCaptureAdvancedLabel: 'Use the ChatGPT API for the current conversation',
   chatgptApiCaptureAdvancedHint:

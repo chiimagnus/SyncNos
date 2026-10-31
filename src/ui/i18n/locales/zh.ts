@@ -95,6 +95,7 @@ export const zh: { [K in TranslationKey]: string } = {
   aiChatThinkingIncludeLabel: '采集时保存思考过程',
   aiChatThinkingIncludeHint: '支持 ChatGPT 和 DeepSeek 的可见思考内容。默认开启；关闭后，后续保存会省略思考。切换开关不会改写历史记录，插件内默认折叠。',
   aiChatThinkingSummary: '思考过程',
+  aiChatThinkingCollapse: '收起思考过程',
   chatgptApiCaptureAdvancedHeading: 'ChatGPT 高级采集',
   chatgptApiCaptureAdvancedLabel: '使用 ChatGPT API 采集当前会话',
   chatgptApiCaptureAdvancedHint: '默认关闭；仅手动保存 ChatGPT 时使用当前登录 Session，失败不会在同一次保存中回退 DOM。',
