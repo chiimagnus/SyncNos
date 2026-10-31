@@ -16,10 +16,7 @@ Sync is optional; SyncNos works without any external service.
 
 Each destination supports manual sync and optional auto-sync. Local content stays in SyncNos.
 
-Synced AI chats use one heading per message, including its number, role, and first sentence;
-no AI-generated summaries are used. On the next sync, Obsidian regenerates its managed note
-and GitHub updates the Markdown, while Notion uses the new headings only for newly appended
-messages. Review any manual edits to synced notes before syncing.
+If you edited notes in a destination, preserve those changes before syncing again.
 
 Use [Export & backup](/docs/en/export-backup/) when you only need files or recovery.
 

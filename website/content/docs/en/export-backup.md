@@ -12,10 +12,7 @@ description: Export readable files or create a Backup that SyncNos can restore l
 Select items in the local library and export a Markdown or JSON ZIP. Available local images
 are included; missing images do not block text export.
 
-In Markdown exports, each AI chat message gets its own heading with its number,
-role, and the first sentence of its text, making it easier to navigate the document.
-No AI-generated summaries are involved, and message bodies remain intact.
-JSON exports and Backups retain their data-oriented formats.
+When exporting AI chats as Markdown, use message headings to find content quickly.
 
 ## Backup
 
