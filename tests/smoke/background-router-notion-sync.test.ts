@@ -6,6 +6,7 @@ import { createNotionSyncOrchestrator } from '@services/sync/notion/notion-sync-
 import { conversationKinds } from '@services/protocols/conversation-kinds.ts';
 import { SYNC_JOB_STORAGE_KEYS } from '@services/sync/sync-job-store';
 import { notionFetch } from '@services/sync/notion/notion-api.ts';
+import { messagesToBlocks as renderNotionMessageBlocks } from '@services/sync/notion/notion-sync-service.ts';
 
 function mockChromeStorage({ parentPageId = 'parent_page' } = {}) {
   const store: Record<string, unknown> = {
@@ -509,6 +510,7 @@ describe('background-router notion sync', () => {
     const jobStore = createInMemoryJobStore();
 
     let blocksFromCount = 0;
+    const headingFlags: Array<boolean | undefined> = [];
     const router = createRouter({
       chromeMock,
       notionServices: {
@@ -540,9 +542,10 @@ describe('background-router notion sync', () => {
             calls.push({ op: 'append', blocks: _blocks });
             return notionAppendResult(_blocks);
           },
-          messagesToBlocks: (messages: any[]) => {
+          messagesToBlocks: (messages: any[], options?: { chatHeadings?: boolean }) => {
+            headingFlags.push(options?.chatHeadings);
             blocksFromCount = messages.length;
-            return [{ kind: 'blocks', count: messages.length }];
+            return renderNotionMessageBlocks(messages, options);
           },
           isPageUsableForDatabase: () => true,
         },
@@ -553,6 +556,15 @@ describe('background-router notion sync', () => {
     const job = await startNotionSync(router, jobStore, [1]);
     expect(job.perConversation[0].mode).toBe('appended');
     expect(blocksFromCount).toBe(1);
+    expect(headingFlags).toEqual([true]);
+    const appendedHeadings = calls.flatMap((c) =>
+      c.op === 'append'
+        ? c.blocks
+            .filter((block: any) => block.type === 'heading_3')
+            .map((block: any) => block.heading_3.rich_text[0].text.content)
+        : [],
+    );
+    expect(appendedHeadings).toEqual(['03 · Assistant — yo']);
     expect(calls.some((c) => c.op === 'append')).toBe(true);
   });
 
@@ -1080,6 +1092,7 @@ describe('background-router notion sync', () => {
     const jobStore = createInMemoryJobStore();
 
     let blocksFromCount = 0;
+    const headingFlags: Array<boolean | undefined> = [];
     const router = createRouter({
       chromeMock,
       notionServices: {
@@ -1120,9 +1133,10 @@ describe('background-router notion sync', () => {
             calls.push({ op: 'append', blocks: _blocks });
             return notionAppendResult(_blocks);
           },
-          messagesToBlocks: (messages: any[]) => {
+          messagesToBlocks: (messages: any[], options?: { chatHeadings?: boolean }) => {
+            headingFlags.push(options?.chatHeadings);
             blocksFromCount = messages.length;
-            return [{ kind: 'blocks', count: messages.length }];
+            return renderNotionMessageBlocks(messages, options);
           },
           isPageUsableForDatabase: () => true,
         },
@@ -1133,6 +1147,15 @@ describe('background-router notion sync', () => {
     const job = await startNotionSync(router, jobStore, [1]);
     expect(job.perConversation[0].mode).toBe('appended');
     expect(blocksFromCount).toBe(1);
+    expect(headingFlags).toEqual([true]);
+    const appendedHeadings = calls.flatMap((c) =>
+      c.op === 'append'
+        ? c.blocks
+            .filter((block: any) => block.type === 'heading_3')
+            .map((block: any) => block.heading_3.rich_text[0].text.content)
+        : [],
+    );
+    expect(appendedHeadings).toEqual(['03 · Assistant — yo']);
     expect(calls.some((c) => c.op === 'append')).toBe(true);
   });
 

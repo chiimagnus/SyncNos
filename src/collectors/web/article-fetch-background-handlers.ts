@@ -9,7 +9,7 @@ import {
 type AnyRouter = {
   ok: (data: unknown) => any;
   err: (message: string, extra?: unknown) => any;
-  register: (type: string, handler: (msg: any) => Promise<any> | any) => void;
+  register: (type: string, handler: (msg: any, sender?: any) => Promise<any> | any) => void;
 };
 
 type WebArticleHandlersDeps = {
@@ -28,10 +28,15 @@ function fireAndForget(task: void | Promise<void>) {
   Promise.resolve(task).catch(() => {});
 }
 
+function articleTabId(msg: any, sender: any): number | undefined {
+  const sourceTabId = sender?.tab?.id;
+  return Number.isSafeInteger(sourceTabId) && sourceTabId > 0 ? sourceTabId : msg?.tabId;
+}
+
 export function registerWebArticleHandlers(router: AnyRouter, deps: WebArticleHandlersDeps) {
-  router.register(ARTICLE_MESSAGE_TYPES.FETCH_ACTIVE_TAB, async (msg) => {
+  router.register(ARTICLE_MESSAGE_TYPES.FETCH_ACTIVE_TAB, async (msg, sender) => {
     try {
-      const data = await fetchActiveTabArticle({ tabId: msg?.tabId });
+      const data = await fetchActiveTabArticle({ tabId: articleTabId(msg, sender) });
 
       fireAndForget(
         deps.onConversationChanged(
@@ -46,9 +51,9 @@ export function registerWebArticleHandlers(router: AnyRouter, deps: WebArticleHa
     }
   });
 
-  router.register(ARTICLE_MESSAGE_TYPES.RESOLVE_OR_CAPTURE_ACTIVE_TAB, async (msg) => {
+  router.register(ARTICLE_MESSAGE_TYPES.RESOLVE_OR_CAPTURE_ACTIVE_TAB, async (msg, sender) => {
     try {
-      const data = await resolveOrCaptureActiveTabArticle({ tabId: msg?.tabId });
+      const data = await resolveOrCaptureActiveTabArticle({ tabId: articleTabId(msg, sender) });
 
       if (data.isNew) {
         fireAndForget(

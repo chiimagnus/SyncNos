@@ -31,8 +31,31 @@ describe('remote-markdown-writer', () => {
     expect(md).toContain('last_activity_at: "2026-09-08T02:00:00.000Z"');
     expect(md).toContain('syncnos:');
     expect(md).toContain('# Conversations');
-    expect(md).toContain('## 1 assistant');
+    expect(md).toContain('## 02 · Assistant — hi');
     expect(md).toContain('hi');
+  });
+
+  it('uses stable message sequences and excludes saved reasoning from Obsidian/GitHub headings', async () => {
+    const w = await loadWriter();
+    const content = [
+      '> [!NOTE]- Thinking',
+      '>',
+      '> 这是不应该成为标题的思考。',
+      '',
+      '最终回答：整理如下。继续讨论。',
+    ].join('\n');
+    const md = w.buildFullNoteMarkdown({
+      conversation: { sourceType: 'chat', source: 'chatgpt', title: 'Example' },
+      messages: [
+        { messageKey: 'm1', sequence: 0, role: 'user', contentMarkdown: '你觉得呢？还有建议吗？' },
+        { messageKey: 'm2', sequence: 14, role: 'assistant', contentMarkdown: content },
+      ],
+    });
+    expect(md).toContain('## 01 · You — 你觉得呢？');
+    expect(md).toContain('## 15 · Assistant — 最终回答：整理如下。');
+    expect(md).toContain('> 这是不应该成为标题的思考。');
+    expect(md).toContain(content);
+    expect(md).not.toContain('## 15 · Assistant — 这是不应该成为标题');
   });
 
   it('builds article markdown with Article/Comments sections and quote+bullets', async () => {

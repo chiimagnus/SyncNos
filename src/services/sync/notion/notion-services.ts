@@ -53,7 +53,7 @@ type NotionSyncService = {
     input: { pageId: string; properties: Record<string, unknown> },
   ) => Promise<any>;
   appendChildren: (accessToken: string, pageId: string, blocks: any[]) => Promise<{ results: any[]; count: number }>;
-  messagesToBlocks: (messages: any[]) => any[];
+  messagesToBlocks: (messages: any[], options?: { chatHeadings?: boolean }) => any[];
   isPageUsableForDatabase: (page: any, databaseId: string) => boolean;
   upgradeImageBlocksToFileUploads: (accessToken: string, blocks: any[], conversationId: number) => Promise<any[]>;
 };

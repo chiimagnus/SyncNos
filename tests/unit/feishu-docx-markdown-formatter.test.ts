@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { formatConversationMarkdownForFeishuDocxSync } from '@services/sync/feishu/docx/feishu-docx-markdown';
 
 describe('feishu docx markdown formatter', () => {
-  it('uses H1 for role labels (content/user/assistant) to improve Feishu render prominence', async () => {
+  it('uses H1 for numbered message headings while preserving Feishu render prominence', async () => {
     const out = await formatConversationMarkdownForFeishuDocxSync(
       {
         id: 1,
@@ -23,12 +23,10 @@ describe('feishu docx markdown formatter', () => {
     );
 
     expect(out).toContain('- Last Activity: 2026-09-08T01:02:03.000Z');
-    expect(out).toContain('\n# content\n');
-    expect(out).toContain('\n# You\n');
-    expect(out).toContain('\n# assistant\n');
-    expect(out).not.toContain('\n## content\n');
-    expect(out).not.toContain('\n## You\n');
-    expect(out).not.toContain('\n## assistant\n');
+    expect(out).toContain('\n# 01 · content — a\n');
+    expect(out).toContain('\n# 02 · You — b\n');
+    expect(out).toContain('\n# 03 · Assistant — c\n');
+    expect(out).not.toContain('\n## 02 · You');
   });
 
   it('uses normalized Markdown for historical ChatGPT assistant rich components', async () => {
@@ -54,7 +52,7 @@ describe('feishu docx markdown formatter', () => {
         ],
       } as any,
     );
-    expect(markdown).toContain('# assistant\n');
+    expect(markdown).toContain('# 01 · Assistant — 步骤正文\n');
     expect(markdown).toContain('---');
     expect(markdown).toContain('**步骤正文**');
     expect(markdown).not.toContain('<divider');

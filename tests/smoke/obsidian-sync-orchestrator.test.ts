@@ -762,7 +762,7 @@ describe('obsidian-sync-orchestrator', () => {
     expect(syncRes.results[0].appended).toBe(2);
     expect(syncRes.results[0].ok).toBe(true);
     expect(putBody).toContain('# Conversations');
-    expect(putBody).toContain('## 1 assistant');
+    expect(putBody).toContain('## 02 · Assistant — a');
 
     const status = await orch.getSyncStatus();
     expect(status.job?.status).toBe('done');
@@ -1066,7 +1066,7 @@ describe('obsidian-sync-orchestrator', () => {
     expect(syncRes.results[0].mode).toBe('full_rebuild');
     expect(patchCount).toBe(0);
     expect(putBody).toContain('# Conversations');
-    expect(putBody).toContain('## 1 assistant');
+    expect(putBody).toContain('## 02 · Assistant — a');
   });
 
   it.each([

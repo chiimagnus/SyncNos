@@ -89,8 +89,29 @@ export function registerUiMessageHandlers(router: AnyRouter, options: UiMessageH
     return router.ok(relayed.data);
   });
 
-  router.register(UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE, async () => {
-    const activeTab = await getActiveTabRaw();
+  router.register(UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE, async (msg: any) => {
+    const expectedUrl = msg?.url;
+    let targetTab;
+    if (expectedUrl === undefined) {
+      targetTab = await getActiveTabRaw();
+    } else {
+      let url: URL;
+      try {
+        if (typeof expectedUrl !== 'string' || /\s/u.test(expectedUrl)) throw new Error('invalid URL');
+        url = new URL(expectedUrl);
+        if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error('invalid URL');
+      } catch {
+        return router.err('capture URL must be HTTP(S) without credentials', { code: 'INVALID_ARGUMENT' });
+      }
+      const tabs = await tabsQuery({ url: ['http://*/*', 'https://*/*'] });
+      const matches = tabs.filter((tab) => tab.url === url.href && Number.isSafeInteger(tab.id) && Number(tab.id) > 0);
+      if (!matches.length)
+        return router.err('capture URL is not open in the browser', { code: 'CAPTURE_TARGET_NOT_FOUND' });
+      if (matches.length !== 1)
+        return router.err('capture URL matches multiple open tabs', { code: 'CAPTURE_TARGET_AMBIGUOUS' });
+      targetTab = { kind: 'tab' as const, tab: { ...matches[0], id: Number(matches[0].id) } };
+    }
+    const activeTab = targetTab;
     if (activeTab.kind !== 'tab') {
       await ensureFallbackLocaleReady();
       const state = unsupportedState(
@@ -102,7 +123,11 @@ export function registerUiMessageHandlers(router: AnyRouter, options: UiMessageH
       });
     }
 
-    const relayed = await relayToActiveTab(activeTab.tab.id, CURRENT_PAGE_MESSAGE_TYPES.CAPTURE);
+    const relayed = await relayToActiveTab(
+      activeTab.tab.id,
+      CURRENT_PAGE_MESSAGE_TYPES.CAPTURE,
+      expectedUrl === undefined ? undefined : { expectedUrl: new URL(expectedUrl).href },
+    );
     if (!relayed.ok) {
       if (relayed.message) {
         return router.err(relayed.message, {
@@ -135,7 +160,7 @@ function unsupportedState(reason: string) {
 }
 
 async function getActiveTabRaw() {
-  const tabs = await tabsQuery({ active: true, currentWindow: true });
+  const tabs = await tabsQuery({ active: true, lastFocusedWindow: true });
   const tab = Array.isArray(tabs) && tabs.length ? tabs[0] : null;
   const tabId = Number(tab?.id);
 
@@ -173,7 +198,10 @@ async function relayToActiveTab(tabId: number, type: string, payload?: Record<st
     const message = String(apiResponse.error?.message || '').trim();
     const extra = apiResponse.error?.extra as { code?: unknown; status?: unknown } | null | undefined;
     const code =
-      typeof extra?.code === 'string' && /^chatgpt_api_[a-z0-9_]+$/.test(extra.code) ? extra.code : 'CAPTURE_FAILED';
+      typeof extra?.code === 'string' &&
+      (extra.code === 'CAPTURE_TARGET_CHANGED' || /^chatgpt_api_[a-z0-9_]+$/.test(extra.code))
+        ? extra.code
+        : 'CAPTURE_FAILED';
     const status = Number(extra?.status);
     return {
       ok: false as const,

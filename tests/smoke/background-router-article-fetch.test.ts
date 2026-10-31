@@ -35,6 +35,29 @@ describe('background-router article fetch', () => {
     expect(articleFetchMocks.fetchActiveTabArticle).toHaveBeenCalledWith({ tabId: 42 });
   });
 
+  it('uses the originating content-script tab for article capture instead of the active browser tab', async () => {
+    articleFetchMocks.fetchActiveTabArticle.mockResolvedValue({ conversationId: 200, title: 'Synthetic page' });
+    const router = createTestBackgroundRouter();
+    const sender = { tab: { id: 401, url: 'http://127.0.0.1:38941/index.html' }, frameId: 0 };
+    const response = await router.dispatch({ type: 'fetchActiveTabArticle' }, sender);
+    expect(response).toMatchObject({ ok: true, data: { conversationId: 200 } });
+    expect(articleFetchMocks.fetchActiveTabArticle).toHaveBeenCalledWith({ tabId: 401 });
+  });
+
+  it('does not let content-script payload override its browser-owned sender tab', async () => {
+    articleFetchMocks.fetchActiveTabArticle.mockResolvedValue({ conversationId: 200 });
+    const router = createTestBackgroundRouter();
+    await router.dispatch({ type: 'fetchActiveTabArticle', tabId: 999 }, { tab: { id: 401 } });
+    expect(articleFetchMocks.fetchActiveTabArticle).toHaveBeenCalledWith({ tabId: 401 });
+  });
+
+  it('binds resolve-or-capture requests to the sender tab as well', async () => {
+    articleFetchMocks.resolveOrCaptureActiveTabArticle.mockResolvedValue({ isNew: false, conversationId: 200 });
+    const router = createTestBackgroundRouter();
+    await router.dispatch({ type: 'resolveOrCaptureActiveTabArticle', tabId: 999 }, { tab: { id: 401 } });
+    expect(articleFetchMocks.resolveOrCaptureActiveTabArticle).toHaveBeenCalledWith({ tabId: 401 });
+  });
+
   it('returns integration errors as router errors', async () => {
     articleFetchMocks.fetchActiveTabArticle.mockRejectedValue(new Error('extract failed'));
 

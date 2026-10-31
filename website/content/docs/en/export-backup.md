@@ -12,6 +12,8 @@ description: Export readable files or create a Backup that SyncNos can restore l
 Select items in the local library and export a Markdown or JSON ZIP. Available local images
 are included; missing images do not block text export.
 
+When exporting AI chats as Markdown, use message headings to find content quickly.
+
 ## Backup
 
 Open **Settings → Backup** to create a recovery package.

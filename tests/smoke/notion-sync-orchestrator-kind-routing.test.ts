@@ -47,6 +47,7 @@ describe('notion-sync-orchestrator kind routing', () => {
     const createCalls: any[] = [];
     const updateCalls: any[] = [];
     const upgradeConversationIds: number[] = [];
+    const messageHeadingFlags: Array<boolean | undefined> = [];
 
     // @ts-expect-error test global
     globalThis.chrome = mockChromeStorage();
@@ -158,13 +159,16 @@ describe('notion-sync-orchestrator kind routing', () => {
           : [];
         return { ok: true, results };
       },
-      messagesToBlocks: (_messages: any[]) => [
-        {
-          object: 'block',
-          type: 'image',
-          image: { type: 'external', external: { url: 'syncnos-asset://42' } },
-        },
-      ],
+      messagesToBlocks: (_messages: any[], options?: { chatHeadings?: boolean }) => {
+        messageHeadingFlags.push(options?.chatHeadings);
+        return [
+          {
+            object: 'block',
+            type: 'image',
+            image: { type: 'external', external: { url: 'syncnos-asset://42' } },
+          },
+        ];
+      },
       upgradeImageBlocksToFileUploads: async (_token: string, blocks: any[], conversationId: number) => {
         upgradeConversationIds.push(conversationId);
         return blocks;
@@ -200,6 +204,7 @@ describe('notion-sync-orchestrator kind routing', () => {
     expect(getSyncMappingByConversation).toHaveBeenCalledTimes(2);
 
     expect(upgradeConversationIds.sort((a, b) => a - b)).toEqual([1, 2]);
+    expect(messageHeadingFlags.sort()).toEqual([true, undefined].sort());
 
     // Update properties only happen on subsequent syncs; keep coverage minimal here.
     expect(updateCalls.length).toBe(0);

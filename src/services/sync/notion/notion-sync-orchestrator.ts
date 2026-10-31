@@ -147,14 +147,18 @@ async function buildBlocksForSync({
   accessToken,
   messagesList,
   conversationId,
+  chatHeadings = false,
 }: {
   notionSyncService: NotionServices['syncService'];
   accessToken: string;
   messagesList: any[];
   conversationId: number;
+  chatHeadings?: boolean;
 }) {
   const warnings: any[] = [];
-  let blocks = notionSyncService.messagesToBlocks(messagesList);
+  let blocks = chatHeadings
+    ? notionSyncService.messagesToBlocks(messagesList, { chatHeadings: true })
+    : notionSyncService.messagesToBlocks(messagesList);
   blocks = await maybeUpgradeBlocksWithNotionFileUploads({
     notionSyncService,
     accessToken,
@@ -289,6 +293,7 @@ async function buildNonArticleBlocksForSync({
     accessToken,
     messagesList: projectedMessages,
     conversationId,
+    chatHeadings: kindId === 'chat',
   });
   if (kindId !== 'video') return built;
   return {

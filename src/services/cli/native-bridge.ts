@@ -814,7 +814,13 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
     }
 
     if (method === 'capture.current-page') {
-      const result = await router.dispatch({ type: UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE }, null);
+      const result = await router.dispatch(
+        {
+          type: UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE,
+          ...(Object.prototype.hasOwnProperty.call(params, 'url') ? { url: params.url } : null),
+        },
+        null,
+      );
       postBackgroundResult(result, toCliCaptureResult);
       return;
     }

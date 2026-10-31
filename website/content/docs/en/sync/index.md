@@ -16,6 +16,8 @@ Sync is optional; SyncNos works without any external service.
 
 Each destination supports manual sync and optional auto-sync. Local content stays in SyncNos.
 
+If you edited notes in a destination, preserve those changes before syncing again.
+
 Use [Export & backup](/docs/en/export-backup/) when you only need files or recovery.
 
 A sync failure does not delete local content. Fix the connection or permission and retry.

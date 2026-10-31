@@ -17,7 +17,14 @@ export function registerCurrentPageCaptureContentHandlers(
   const listener = (msg: any, _sender: any, sendResponse: (value: ApiResponse<any>) => void) => {
     const isStateQuery = msg?.type === CURRENT_PAGE_MESSAGE_TYPES.GET_CAPTURE_STATE;
     if (!isStateQuery && msg?.type !== CURRENT_PAGE_MESSAGE_TYPES.CAPTURE) return undefined;
-    const run: () => Promise<unknown> = isStateQuery ? service.getCurrentPageCaptureState : service.captureCurrentPage;
+    const run: () => Promise<unknown> = isStateQuery
+      ? service.getCurrentPageCaptureState
+      : () => {
+          if (msg?.payload?.expectedUrl !== undefined && globalThis.location?.href !== msg.payload.expectedUrl) {
+            throw Object.assign(new Error('Capture target changed'), { code: 'CAPTURE_TARGET_CHANGED' });
+          }
+          return service.captureCurrentPage();
+        };
 
     options.localeReady
       .catch(() => undefined)
@@ -26,7 +33,10 @@ export function registerCurrentPageCaptureContentHandlers(
       .catch((error) => {
         const code = (error as any)?.code;
         const status = Number((error as any)?.status);
-        const safeCode = typeof code === 'string' && /^chatgpt_api_[a-z0-9_]+$/.test(code) ? code : '';
+        const safeCode =
+          typeof code === 'string' && (code === 'CAPTURE_TARGET_CHANGED' || /^chatgpt_api_[a-z0-9_]+$/.test(code))
+            ? code
+            : '';
         sendResponse(
           err(
             (error as any)?.message ?? error,

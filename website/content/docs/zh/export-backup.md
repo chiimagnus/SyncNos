@@ -12,6 +12,8 @@ description: 导出可读文件，或创建以后可以恢复到 SyncNos 的 Bac
 从本地库选择内容后，可以导出 Markdown 或 JSON ZIP。可用的本地图片会一起导出；
 图片暂时无法取得时，正文仍会正常导出。
 
+导出 AI 对话为 Markdown 后，可以通过消息标题快速查找内容。
+
 ## Backup
 
 打开 **设置 → Backup** 创建恢复包。

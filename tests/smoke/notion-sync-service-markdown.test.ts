@@ -106,6 +106,32 @@ describe('notion sync markdown', () => {
     expect(heading?.heading_3?.rich_text?.[0]?.text?.content).toBe('Alice');
   });
 
+  it('renders chat message headings with stable source sequences without changing body blocks', () => {
+    const blocks = messagesToBlocks(
+      [
+        { sequence: 0, role: 'user', contentMarkdown: '请解释一下！还有吗？' },
+        { sequence: 9, role: 'assistant', contentMarkdown: '> [!NOTE]- Thinking\n>\n> 中间推理\n\n最终答案。' },
+      ],
+      { chatHeadings: true },
+    );
+    const headings = blocks.filter((block: any) => block.type === 'heading_3');
+    expect(headings.map((block: any) => block.heading_3.rich_text[0].text.content)).toEqual([
+      '01 · You — 请解释一下！',
+      '10 · Assistant — 最终答案。',
+    ]);
+    expect(headings.map((block: any) => block.heading_3.color)).toEqual(['green', 'blue_background']);
+    expect(blocks.some((block: any) => block.type === 'paragraph')).toBe(true);
+  });
+
+  it('keeps article and video role headings unchanged', () => {
+    expect(
+      messagesToBlocks([{ role: 'article', contentMarkdown: 'body' }])[0].heading_3.rich_text[0].text.content,
+    ).toBe('article');
+    expect(
+      messagesToBlocks([{ role: 'transcript', contentMarkdown: 'body' }])[0].heading_3.rich_text[0].text.content,
+    ).toBe('transcript');
+  });
+
   it('converts fenced code through messagesToBlocks', () => {
     const blocks = messagesToBlocks([{ role: 'assistant', contentMarkdown: '```js\nconsole.log(1)\n```' }]);
     expect(blocks.some((b: any) => b?.type === 'code')).toBe(true);
