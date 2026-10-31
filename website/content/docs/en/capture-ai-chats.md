@@ -20,8 +20,12 @@ On supported platforms, enable **Settings → General → Auto-save** to save ne
 To retrieve older history, run a manual capture.
 
 Long chats may not be captured in full, but an incomplete capture will not overwrite
-previously saved history. Keep long Grok conversations in the foreground when saving.
+previously saved history. Keep long Grok conversations in the foreground and wait
+for the reply to finish before capturing.
 Some Notion AI attachment details may be unavailable.
+
+Control image caching under **Settings → General → Auto-save AI chat images locally**.
+Disabling it does not prevent text from being saved.
 
 ## ChatGPT Advanced capture
 
