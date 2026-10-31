@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 import { ChatMessageBubble } from '../../src/ui/shared/ChatMessageBubble';
+import { composeThinkingMarkdown } from '@services/shared/thinking-block';
 
 function extractRootSectionClass(html: string) {
   const match = html.match(/^<section class="([^"]+)">/);
@@ -17,6 +18,60 @@ function extractMarkdownClass(html: string) {
 }
 
 describe('ChatMessageBubble', () => {
+  it('renders captured thinking as a keyboard-accessible native disclosure before the final answer', () => {
+    const markdown = composeThinkingMarkdown('**Plan**\n\nEvaluate $x^2$.', 'Final **answer**.');
+    const html = renderToStaticMarkup(createElement(ChatMessageBubble, { role: 'assistant', markdown }));
+    expect(html).toContain('<details');
+    expect(html).toContain('<summary');
+    expect(html).not.toContain('<details open=');
+    expect(html).toContain('Thinking</summary>');
+    expect(html).not.toContain('<strong>Plan</strong>');
+    expect(html).toContain('<strong>answer</strong>');
+    expect(html).not.toContain('Collapse thinking</button>');
+    expect(html).not.toContain('[!NOTE]-');
+
+    const user = renderToStaticMarkup(createElement(ChatMessageBubble, { role: 'user', markdown }));
+    expect(user).not.toContain('<details');
+    expect(user).not.toContain('Collapse thinking');
+    const ordinary = renderToStaticMarkup(createElement(ChatMessageBubble, { role: 'assistant', markdown: 'Final' }));
+    expect(ordinary).not.toContain('<details');
+    expect(ordinary).not.toContain('Collapse thinking');
+  });
+
+  it('does not render thinking content before expansion in any reading profile', () => {
+    for (const readingProfile of ['medium', 'notion', 'book']) {
+      const html = renderToStaticMarkup(
+        createElement(ChatMessageBubble, {
+          role: 'assistant',
+          readingProfile,
+          markdown: composeThinkingMarkdown('**Thought**\n\nA paragraph.', '**Answer**\n\nAnother paragraph.'),
+        }),
+      );
+      const details = html.match(/<details class="([^"]+)">/);
+      expect(details?.[1]).toBe('tw-mb-3');
+      expect(html).not.toContain('tw-border-t');
+      expect(html).not.toContain('tw-bg-[var(--bg-sunken)]');
+      const markdownClasses = [...html.matchAll(/<div class="([^"]+)"/g)].map((match) => match[1]);
+      expect(markdownClasses).toHaveLength(1);
+      expect(html).not.toContain('<strong>Thought</strong>');
+      expect(html).not.toContain('Collapse thinking');
+      expect(html).toContain('<strong>Answer</strong>');
+    }
+  });
+
+  it('supports thinking-only and long multi-paragraph reasoning without an empty answer panel', () => {
+    const html = renderToStaticMarkup(
+      createElement(ChatMessageBubble, {
+        role: 'assistant',
+        markdown: composeThinkingMarkdown('analysis\n\n```ts\nconst x = 1;\n```', ''),
+      }),
+    );
+    expect(html).toContain('<details');
+    expect(html).not.toContain('analysis');
+    expect(html).not.toContain('<pre>');
+    expect(html).not.toContain('Collapse thinking');
+    expect(html).not.toContain('[!NOTE]-');
+  });
   it('renders user messages with green-tinted bubbles without card background conflicts', () => {
     const html = renderToStaticMarkup(createElement(ChatMessageBubble, { role: 'user', markdown: 'hi' }));
     const cls = extractRootSectionClass(html);

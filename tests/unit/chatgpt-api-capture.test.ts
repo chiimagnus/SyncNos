@@ -4,6 +4,7 @@ import MarkdownIt from 'markdown-it';
 import { captureCurrentChatgptConversationViaApi } from '@services/integrations/chatgpt/api-capture';
 import { buildChatgptApiSnapshot } from '@services/integrations/chatgpt/api-snapshot';
 import { buildChatgptGeneratedImageMessageKey } from '@services/shared/chatgpt-image-identity';
+import { composeThinkingMarkdown, splitThinkingMarkdown } from '@services/shared/thinking-block';
 import {
   CHATGPT_API_CAPTURE_ENABLED_STORAGE_KEY,
   readChatgptApiCaptureEnabled,
@@ -679,9 +680,10 @@ describe('ChatGPT API snapshot', () => {
 
     const result = build(data);
     expect(result.snapshot.messages[1]).toMatchObject({ messageKey: 'assistant-final', role: 'assistant' });
-    expect(result.snapshot.messages[1].contentMarkdown).toBe(
-      '**Plan**\n\nInspect first.\n\nReasoning recap.\n\nProgress update.\n\nFinal answer.',
-    );
+    expect(splitThinkingMarkdown(result.snapshot.messages[1].contentMarkdown)).toEqual({
+      thinking: '**Plan**\n\nInspect first.\n\nReasoning recap.\n\nProgress update.',
+      answer: 'Final answer.',
+    });
   });
 
   it('keeps stable visible output when reasoning schema drifts', () => {
@@ -717,7 +719,7 @@ describe('ChatGPT API snapshot', () => {
     const chunkResult = build(unsupportedChunk);
     expect(chunkResult.snapshot.messages.at(-1)).toMatchObject({
       messageKey: 'assistant-final',
-      contentMarkdown: '**Plan**\n\nanswer',
+      contentMarkdown: composeThinkingMarkdown('**Plan**', 'answer'),
     });
     expect(chunkResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
 
@@ -765,7 +767,7 @@ describe('ChatGPT API snapshot', () => {
     const commentaryResult = build(commentaryImage);
     expect(commentaryResult.snapshot.messages.at(-1)).toMatchObject({
       messageKey: 'assistant-1',
-      contentMarkdown: 'progress\n\nanswer',
+      contentMarkdown: composeThinkingMarkdown('progress', 'answer'),
     });
     expect(commentaryResult.snapshot.captureMeta.reasons).toEqual(['chatgpt_api_schema_drift_partial']);
 
@@ -829,7 +831,11 @@ describe('ChatGPT API snapshot', () => {
     const result = build(data);
     expect(result.snapshot.messages).toEqual([
       expect.objectContaining({ messageKey: 'user-1', role: 'user', contentMarkdown: 'q' }),
-      expect.objectContaining({ messageKey: 'assistant-1', role: 'assistant', contentMarkdown: 'Working\n\nanswer' }),
+      expect.objectContaining({
+        messageKey: 'assistant-1',
+        role: 'assistant',
+        contentMarkdown: composeThinkingMarkdown('Working', 'answer'),
+      }),
     ]);
   });
 
@@ -926,7 +932,10 @@ describe('ChatGPT API snapshot', () => {
       expect.objectContaining({
         messageKey: 'chatgpt-turn:turn-aux-only',
         role: 'assistant',
-        contentMarkdown: '**visible progress**\n\nreasoning without a final message\n\ntool progress',
+        contentMarkdown: composeThinkingMarkdown(
+          '**visible progress**\n\nreasoning without a final message\n\ntool progress',
+          '',
+        ),
       }),
       expect.objectContaining({ messageKey: 'user-2', role: 'user', contentMarkdown: 'second' }),
       expect.objectContaining({ messageKey: 'assistant-2', role: 'assistant', contentMarkdown: 'answer' }),
@@ -954,7 +963,9 @@ describe('ChatGPT API snapshot', () => {
       'user-2',
       'assistant-2',
     ]);
-    expect(result.snapshot.messages[1].contentMarkdown).toBe('visible progress without a turn id');
+    expect(result.snapshot.messages[1].contentMarkdown).toBe(
+      composeThinkingMarkdown('visible progress without a turn id', ''),
+    );
     expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
   });
 
@@ -983,7 +994,10 @@ describe('ChatGPT API snapshot', () => {
       expect.objectContaining({
         messageKey: 'chatgpt-turn:user-1',
         role: 'assistant',
-        contentMarkdown: '**Plan**\n\nstill-working history from backend\n\ncompleted progress',
+        contentMarkdown: composeThinkingMarkdown(
+          '**Plan**\n\nstill-working history from backend\n\ncompleted progress',
+          '',
+        ),
       }),
     ]);
     expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
@@ -1003,7 +1017,7 @@ describe('ChatGPT API snapshot', () => {
     const result = build(data);
     expect(result.snapshot.messages.at(-1)).toMatchObject({
       messageKey: 'chatgpt-turn:user-1',
-      contentMarkdown: 'still generating',
+      contentMarkdown: composeThinkingMarkdown('still generating', ''),
     });
     expect(result.snapshot.captureMeta).toMatchObject({
       completeness: 'partial',
@@ -1038,7 +1052,7 @@ describe('ChatGPT API snapshot', () => {
       expect.objectContaining({
         messageKey: 'chatgpt-turn:turn-a',
         role: 'assistant',
-        contentMarkdown: '**done**\n\ncompleted execution-only turn\n\ncompleted progress',
+        contentMarkdown: composeThinkingMarkdown('**done**\n\ncompleted execution-only turn\n\ncompleted progress', ''),
       }),
     ]);
     expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
@@ -1104,7 +1118,7 @@ describe('ChatGPT API snapshot', () => {
       expect.objectContaining({
         messageKey: 'chatgpt-turn:turn-a',
         role: 'assistant',
-        contentMarkdown: 'unfinished',
+        contentMarkdown: composeThinkingMarkdown('unfinished', ''),
       }),
     ]);
     expect(auxiliaryResult.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
@@ -1172,7 +1186,10 @@ describe('ChatGPT API snapshot', () => {
     expect(result.snapshot.messages.at(-1)).toMatchObject({
       messageKey: imageKey,
       role: 'assistant',
-      contentMarkdown: 'Generated the image.\n\nDone.\n\n![generated image](chatgpt-file://file_generated_1)',
+      contentMarkdown: composeThinkingMarkdown(
+        'Generated the image.',
+        'Done.\n\n![generated image](chatgpt-file://file_generated_1)',
+      ),
     });
 
     const missingImage = pagedFrom([
@@ -1307,7 +1324,7 @@ describe('ChatGPT API snapshot', () => {
       expect.objectContaining({
         messageKey: 'chatgpt-turn:turn-image',
         role: 'assistant',
-        contentMarkdown: 'working\n\n**Plan**\n\nGenerate image.',
+        contentMarkdown: composeThinkingMarkdown('working\n\n**Plan**\n\nGenerate image.', ''),
       }),
       expect.objectContaining({ messageKey: 'user-2', role: 'user', contentMarkdown: 'continue' }),
       expect.objectContaining({ messageKey: 'assistant-2', role: 'assistant', contentMarkdown: 'done' }),
@@ -1343,7 +1360,7 @@ describe('ChatGPT API snapshot', () => {
       expect.objectContaining({
         messageKey: 'chatgpt-turn:turn-image',
         role: 'assistant',
-        contentMarkdown: 'working',
+        contentMarkdown: composeThinkingMarkdown('working', ''),
       }),
     ]);
     expect(unfinishedResult.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
@@ -1389,7 +1406,7 @@ describe('ChatGPT API snapshot', () => {
       expect.objectContaining({
         messageKey: 'chatgpt-turn:turn-other',
         role: 'assistant',
-        contentMarkdown: 'belongs elsewhere',
+        contentMarkdown: composeThinkingMarkdown('belongs elsewhere', ''),
       }),
     ]);
     expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
@@ -1486,7 +1503,10 @@ describe('ChatGPT API snapshot', () => {
       expect.objectContaining({
         messageKey: 'chatgpt-turn:turn-image',
         role: 'assistant',
-        contentMarkdown: 'backend recap not rendered as a DOM message for the image-only turn',
+        contentMarkdown: composeThinkingMarkdown(
+          'backend recap not rendered as a DOM message for the image-only turn',
+          '',
+        ),
       }),
     ]);
     expect(JSON.stringify(result.snapshot)).not.toContain('legacy.invalid');
@@ -2216,7 +2236,7 @@ describe('ChatGPT paged API transport', () => {
     expect(result.snapshot.messages[1]).toMatchObject({
       messageKey: 'chatgpt-turn:turn-a',
       role: 'assistant',
-      contentMarkdown: 'Working',
+      contentMarkdown: composeThinkingMarkdown('Working', ''),
     });
   });
 

@@ -24,6 +24,7 @@ import {
 } from '@services/protocols/message-contracts';
 import { conversationKinds } from '@services/protocols/conversation-kinds';
 import { MARKDOWN_READING_PROFILE_STORAGE_KEY } from '@services/protocols/markdown-reading-profile-storage';
+import { AI_CHAT_INCLUDE_THINKING_STORAGE_KEY } from '@services/shared/thinking-block';
 import { send } from '@services/shared/runtime';
 import { storageGet, storageOnChanged, storageSet } from '@services/shared/storage';
 import { downloadBlobFile, openOrFocusExtensionAppTab } from '@services/shared/webext';
@@ -352,6 +353,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [aiChatAutoSaveEnabled, setAiChatAutoSaveEnabled] = useState<boolean>(true);
   const aiChatAutoSaveObservationRevisionRef = useRef(0);
   const [chatgptApiCaptureEnabled, setChatgptApiCaptureEnabled] = useState<boolean>(false);
+  const [aiChatIncludeThinkingEnabled, setAiChatIncludeThinkingEnabled] = useState(true);
+  const aiChatIncludeThinkingObservationRevisionRef = useRef(0);
   const [aiChatCacheImagesEnabled, setAiChatCacheImagesEnabled] = useState<boolean>(false);
   const [webArticleCacheImagesEnabled, setWebArticleCacheImagesEnabled] = useState<boolean>(false);
   const [antiHotlinkAdvancedOpen, setAntiHotlinkAdvancedOpen] = useState<boolean>(false);
@@ -700,6 +703,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     const feishuAuthObservationAtStart = feishuAuthObservationRevisionRef.current;
     const inpageDisplayObservationAtStart = inpageDisplayObservationRevisionRef.current;
     const aiChatAutoSaveObservationAtStart = aiChatAutoSaveObservationRevisionRef.current;
+    const aiChatIncludeThinkingObservationAtStart = aiChatIncludeThinkingObservationRevisionRef.current;
     const aiChatDollarMentionObservationAtStart = aiChatDollarMentionObservationRevisionRef.current;
     const [
       ,
@@ -730,6 +734,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY,
         'ai_chat_auto_save_enabled',
         CHATGPT_API_CAPTURE_ENABLED_STORAGE_KEY,
+        AI_CHAT_INCLUDE_THINKING_STORAGE_KEY,
         'ai_chat_cache_images_enabled',
         'web_article_cache_images_enabled',
         'ai_chat_dollar_mention_enabled',
@@ -797,6 +802,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       setAiChatAutoSaveEnabled(local?.ai_chat_auto_save_enabled !== false);
     }
     setChatgptApiCaptureEnabled(local?.[CHATGPT_API_CAPTURE_ENABLED_STORAGE_KEY] === true);
+    if (aiChatIncludeThinkingObservationRevisionRef.current === aiChatIncludeThinkingObservationAtStart) {
+      setAiChatIncludeThinkingEnabled(local?.[AI_CHAT_INCLUDE_THINKING_STORAGE_KEY] !== false);
+    }
     setAiChatCacheImagesEnabled(local?.ai_chat_cache_images_enabled === true);
     setWebArticleCacheImagesEnabled(local?.web_article_cache_images_enabled === true);
     setAntiHotlinkRules(Array.isArray(antiHotlinkRulesDraft) ? antiHotlinkRulesDraft : []);
@@ -901,6 +909,10 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       }
       if (Object.prototype.hasOwnProperty.call(changes, CHATGPT_API_CAPTURE_ENABLED_STORAGE_KEY)) {
         setChatgptApiCaptureEnabled(changes[CHATGPT_API_CAPTURE_ENABLED_STORAGE_KEY]?.newValue === true);
+      }
+      if (Object.prototype.hasOwnProperty.call(changes, AI_CHAT_INCLUDE_THINKING_STORAGE_KEY)) {
+        aiChatIncludeThinkingObservationRevisionRef.current += 1;
+        setAiChatIncludeThinkingEnabled(changes[AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]?.newValue !== false);
       }
       if (Object.prototype.hasOwnProperty.call(changes, 'ai_chat_dollar_mention_enabled')) {
         aiChatDollarMentionObservationRevisionRef.current += 1;
@@ -1754,6 +1766,19 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     [runTask],
   );
 
+  const onToggleAiChatIncludeThinkingEnabled = useCallback(
+    async (next: boolean) => {
+      await runTask(async () => {
+        const revision = aiChatIncludeThinkingObservationRevisionRef.current;
+        await storageSet({ [AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]: next });
+        if (aiChatIncludeThinkingObservationRevisionRef.current !== revision) return;
+        aiChatIncludeThinkingObservationRevisionRef.current += 1;
+        setAiChatIncludeThinkingEnabled(next);
+      });
+    },
+    [runTask],
+  );
+
   const onToggleAiChatCacheImagesEnabled = useCallback(
     async (next: boolean) => {
       await runTask(async () => {
@@ -2320,6 +2345,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onToggleAiChatAutoSaveEnabled,
     chatgptApiCaptureEnabled,
     onToggleChatgptApiCaptureEnabled,
+    aiChatIncludeThinkingEnabled,
+    onToggleAiChatIncludeThinkingEnabled,
     aiChatCacheImagesEnabled,
     onToggleAiChatCacheImagesEnabled,
     webArticleCacheImagesEnabled,

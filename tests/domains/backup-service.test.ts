@@ -6,6 +6,7 @@ import { FEISHU_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { exportBackupZip } from '@services/sync/backup/export';
 import { importBackupZipMerge } from '@services/sync/backup/import';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
+import { AI_CHAT_INCLUDE_THINKING_STORAGE_KEY } from '@services/shared/thinking-block';
 import { closeDbForTests, openDb } from '../../src/platform/idb/schema';
 import {
   getConversationById,
@@ -405,6 +406,20 @@ describe('backup service', () => {
 
     expect(stats.settingsApplied).toBe(1);
     expect(chromeMock.__store.chatgpt_api_capture_enabled).toBe(true);
+    expect(chromeMock.__runtimeMessages).toHaveLength(0);
+  });
+
+  it('restores the portable AI thinking capture preference', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const stats = await importBackupZipMerge(emptyBackupZipEntries({ [AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]: false }));
+
+    expect(stats.settingsApplied).toBe(1);
+    expect(chromeMock.__store[AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]).toBe(false);
     expect(chromeMock.__runtimeMessages).toHaveLength(0);
   });
 

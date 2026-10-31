@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
 import { ChatDetailView } from '@ui/conversations/views/ChatDetailView';
+import { composeThinkingMarkdown } from '@services/shared/thinking-block';
 
 function renderConversation(source: string, markdown: string, role = 'assistant') {
   return renderToStaticMarkup(
@@ -18,6 +19,15 @@ function renderConversation(source: string, markdown: string, role = 'assistant'
 }
 
 describe('ChatDetailView ChatGPT rich content', () => {
+  it('preserves the structured thinking disclosure through rich-content normalization', () => {
+    const markdown = composeThinkingMarkdown('**Planning**\n\nInspect code', 'Final answer');
+    const html = renderConversation('chatgpt', markdown);
+    expect(html).toContain('<details');
+    expect(html).toContain('Thinking</summary>');
+    expect(html).not.toContain('<strong>Planning</strong>');
+    expect(html).toContain('Final answer');
+    expect(html).not.toContain('[!NOTE]- Thinking');
+  });
   it('renders old ChatGPT layout markup as Markdown without changing stored data', () => {
     const saved = [
       '## 方法',

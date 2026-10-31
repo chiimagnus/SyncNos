@@ -1,4 +1,5 @@
 import { structuredRichUiMarkdown } from '@services/integrations/chatgpt/rich-ui-data';
+import { composeThinkingMarkdown } from '@services/shared/thinking-block';
 import { normalizeDilMarkdown } from '@services/shared/dil-markdown';
 import {
   buildChatgptFileCacheKey,
@@ -689,7 +690,7 @@ export function buildChatgptApiSnapshot(input: {
     messages.push({
       messageKey: key,
       role: 'assistant',
-      contentMarkdown: markdown,
+      contentMarkdown: composeThinkingMarkdown(markdown, ''),
       sequence: messages.length,
       updatedAt: capturedAt,
     });
@@ -765,12 +766,14 @@ export function buildChatgptApiSnapshot(input: {
         if (hasUnsupportedAttachmentMetadata(message, finalImages, markSchemaDrift)) markSchemaDrift();
         pendingImages.push(...finalImages);
 
-        const markdown = appendBlocks([
-          ...pendingAuxiliary.map((item) => item.markdown),
-          renderTextParts(message, markSchemaDrift, true),
-          renderImageBlocks(pendingImages),
-          renderNonImageAttachments(message, markSchemaDrift),
-        ]);
+        const markdown = composeThinkingMarkdown(
+          appendBlocks(pendingAuxiliary.map((item) => item.markdown)),
+          appendBlocks([
+            renderTextParts(message, markSchemaDrift, true),
+            renderImageBlocks(pendingImages),
+            renderNonImageAttachments(message, markSchemaDrift),
+          ]),
+        );
         let imageOwnerKey = buildChatgptGeneratedImageMessageKey(pendingImages.map((image) => image.fileId));
         if (pendingImages.length && !imageOwnerKey) {
           markSchemaDrift();

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { createContentController } from '@services/bootstrap/content-controller.ts';
 import { createCurrentPageCaptureService } from '@services/bootstrap/current-page-capture.ts';
+import { AI_CHAT_INCLUDE_THINKING_STORAGE_KEY, composeThinkingMarkdown } from '@services/shared/thinking-block';
 
 vi.mock('@services/integrations/chatgpt/api-capture-settings', () => ({
   readChatgptApiCaptureEnabled: vi.fn(async () => false),
@@ -133,6 +134,7 @@ function createHarness(options?: {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   const g = globalThis as any;
   delete g.window;
   delete g.document;
@@ -308,6 +310,42 @@ describe('content-controller inpage combo', () => {
     expect(harness.sendCalls.some((c) => c.type === 'syncConversationMessages')).toBe(true);
     expect(harness.tipCalls.some((c) => String(c.text) === 'Saved')).toBe(true);
     expect((await harness.getCaptureState()).activity).toMatchObject({ phase: 'settled', kind: 'success' });
+  });
+
+  it('filters thinking from actual auto-save persistence while retaining the final answer', async () => {
+    setupDom();
+    vi.stubGlobal('chrome', {
+      runtime: { lastError: null },
+      storage: {
+        local: {
+          get: (_keys: string[], callback: (value: Record<string, boolean>) => void) =>
+            callback({ [AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]: false }),
+        },
+      },
+    });
+    const thinking = composeThinkingMarkdown('Work in progress', 'Completed answer');
+    const snapshot = {
+      conversation: { source: 'gemini', conversationKey: 'autosave-thinking' },
+      messages: [
+        { messageKey: 'user', role: 'user', sequence: 0, contentMarkdown: 'Question' },
+        { messageKey: 'assistant', role: 'assistant', sequence: 1, contentMarkdown: thinking },
+      ],
+    };
+    const harness = createHarness({
+      captureImpl: () => snapshot,
+      incrementalImpl: (value) => ({ changed: true, snapshot: value }),
+      sendImpl: async (type: string) => {
+        if (type === 'upsertConversation') return { ok: true, data: { id: 22, __isNew: true } };
+        if (type === 'syncConversationMessages') return { ok: true, data: { inserted: 1 } };
+        return { ok: true, data: {} };
+      },
+    });
+
+    await harness.runTick();
+
+    const stored = harness.sendCalls.find(({ type }) => type === 'syncConversationMessages')?.payload?.messages;
+    expect(stored?.[1]?.contentMarkdown).toBe('Completed answer');
+    expect(snapshot.messages[1].contentMarkdown).toBe(thinking);
   });
 
   it('skips auto-save when chatgpt deep research message is still a placeholder', async () => {

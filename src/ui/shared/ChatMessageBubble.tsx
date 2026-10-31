@@ -1,7 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { MarkdownContent } from '@ui/shared/MarkdownContent';
 import { getMarkdownReadingProfilePreset } from '@ui/shared/markdown-reading-profile-presets';
+import { splitThinkingMarkdown } from '@services/shared/thinking-block';
+import { t } from '@i18n';
 
 type BubbleRole = 'user' | 'assistant';
 
@@ -39,6 +41,11 @@ export function ChatMessageBubble({
   className,
 }: ChatMessageBubbleProps) {
   const bubbleRole = normalizeRole(role);
+  const thinking = useMemo(
+    () => (bubbleRole === 'assistant' ? splitThinkingMarkdown(markdown) : null),
+    [bubbleRole, markdown],
+  );
+  const [thinkingOpen, setThinkingOpen] = useState(false);
   const readingProfilePreset = useMemo(() => getMarkdownReadingProfilePreset(readingProfile), [readingProfile]);
   const bubbleBase = 'tw-min-w-0 tw-border tw-rounded-[var(--radius-inline)] tw-p-3 tw-shadow-none';
 
@@ -117,8 +124,14 @@ export function ChatMessageBubble({
     '[&_a:focus-visible]:tw-outline [&_a:focus-visible]:tw-outline-2 [&_a:focus-visible]:tw-outline-offset-2 [&_a:focus-visible]:tw-outline-[var(--focus-ring)]',
   ].join(' ');
 
-  const mdClass = [mdStructureClass, readingProfilePreset.typographyClassName, className].filter(Boolean).join(' ');
-  const mdRoleOverrides = String(readingProfilePreset.roleOverrides?.[bubbleRole] || '');
+  const markdownClassName = [
+    mdStructureClass,
+    readingProfilePreset.typographyClassName,
+    className,
+    readingProfilePreset.roleOverrides?.[bubbleRole],
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <section
@@ -130,12 +143,44 @@ export function ChatMessageBubble({
           <div className={headerRightClass}>{headerRight}</div>
         </header>
       ) : null}
-      <MarkdownContent
-        markdown={markdown}
-        syncnosAssetSrcById={syncnosAssetSrcById}
-        chatgptFileSrcById={chatgptFileSrcById}
-        className={[mdClass, mdRoleOverrides].filter(Boolean).join(' ')}
-      />
+      {thinking ? (
+        <details className="tw-mb-3" onToggle={(event) => setThinkingOpen(event.currentTarget.open)}>
+          <summary
+            className={`${headerLeftClass} tw-mb-1.5 tw-cursor-pointer tw-select-none focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--focus-ring)]`}
+          >
+            {t('aiChatThinkingSummary')}
+          </summary>
+          {thinkingOpen ? (
+            <>
+              <MarkdownContent
+                markdown={thinking.thinking}
+                syncnosAssetSrcById={syncnosAssetSrcById}
+                chatgptFileSrcById={chatgptFileSrcById}
+                className={markdownClassName}
+              />
+              <button
+                type="button"
+                className={`${headerLeftClass} tw-mt-2 tw-block tw-cursor-pointer tw-select-none tw-border-0 tw-bg-transparent tw-p-0 tw-text-left hover:tw-underline focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--focus-ring)]`}
+                onClick={(event) => {
+                  const details = event.currentTarget.parentElement as HTMLDetailsElement;
+                  details.open = false;
+                  details.querySelector('summary')?.focus();
+                }}
+              >
+                {t('aiChatThinkingCollapse')}
+              </button>
+            </>
+          ) : null}
+        </details>
+      ) : null}
+      {thinking?.answer === '' ? null : (
+        <MarkdownContent
+          markdown={thinking ? thinking.answer : markdown}
+          syncnosAssetSrcById={syncnosAssetSrcById}
+          chatgptFileSrcById={chatgptFileSrcById}
+          className={markdownClassName}
+        />
+      )}
     </section>
   );
 }

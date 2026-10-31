@@ -574,6 +574,8 @@ describe('inpage anti-hotlink advanced editor', () => {
       onToggleAiChatAutoSaveEnabled: () => {},
       chatgptApiCaptureEnabled: false,
       onToggleChatgptApiCaptureEnabled: () => {},
+      aiChatIncludeThinkingEnabled: true,
+      onToggleAiChatIncludeThinkingEnabled: () => {},
       aiChatCacheImagesEnabled: true,
       onToggleAiChatCacheImagesEnabled: () => {},
       webArticleCacheImagesEnabled: true,
@@ -643,6 +645,18 @@ describe('inpage anti-hotlink advanced editor', () => {
     expect(
       section?.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/dollar-mention/"]')?.textContent,
     ).toContain('Help docs');
+  });
+
+  it('keeps the AI thinking capture preference in General settings', () => {
+    const onToggleAiChatIncludeThinkingEnabled = vi.fn();
+    renderInpage({ onToggleAiChatIncludeThinkingEnabled });
+
+    const section = document.querySelector('section[aria-label="AI thinking"]');
+    const toggle = section?.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+    expect(toggle?.checked).toBe(true);
+    expect(section?.textContent).toContain('future saves');
+    act(() => toggle!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
+    expect(onToggleAiChatIncludeThinkingEnabled).toHaveBeenCalledWith(false);
   });
 
   it('keeps ChatGPT Advanced capture in General settings', () => {
