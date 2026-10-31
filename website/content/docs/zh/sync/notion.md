@@ -12,11 +12,10 @@ description: 连接 Notion，并把 SyncNos 内容同步到你选择的页面下
 
 需要时再开启自动同步。SyncNos 只能访问你授权给它的内容。
 
-## SyncNos 管理的内容
+## 同步位置
 
-SyncNos 会在 Parent Page 下创建或使用自己的内容数据库。正常使用不需要手工修改数据库字段或 section。
-
-更换 Parent Page 后，后续同步会写入新目标。
+SyncNos 会在选定页面下自动整理内容，不需要手动创建或修改数据库。
+更换目标页面后，后续同步会写入新的位置。
 
 ## 断开与排障
 
