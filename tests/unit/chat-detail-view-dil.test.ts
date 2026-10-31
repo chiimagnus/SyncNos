@@ -23,7 +23,8 @@ describe('ChatDetailView ChatGPT rich content', () => {
     const markdown = composeThinkingMarkdown('**Planning**\n\nInspect code', 'Final answer');
     const html = renderConversation('chatgpt', markdown);
     expect(html).toContain('<details');
-    expect(html).toContain('<strong>Planning</strong>');
+    expect(html).toContain('Thinking</summary>');
+    expect(html).not.toContain('<strong>Planning</strong>');
     expect(html).toContain('Final answer');
     expect(html).not.toContain('[!NOTE]- Thinking');
   });

@@ -25,11 +25,9 @@ describe('ChatMessageBubble', () => {
     expect(html).toContain('<summary');
     expect(html).not.toContain('<details open=');
     expect(html).toContain('Thinking</summary>');
-    expect(html).toContain('<strong>Plan</strong>');
+    expect(html).not.toContain('<strong>Plan</strong>');
     expect(html).toContain('<strong>answer</strong>');
-    expect(html).toContain('Collapse thinking</button>');
-    expect(html.indexOf('<strong>Plan</strong>')).toBeLessThan(html.indexOf('Collapse thinking</button>'));
-    expect(html.indexOf('Collapse thinking</button>')).toBeLessThan(html.indexOf('</details>'));
+    expect(html).not.toContain('Collapse thinking</button>');
     expect(html).not.toContain('[!NOTE]-');
 
     const user = renderToStaticMarkup(createElement(ChatMessageBubble, { role: 'user', markdown }));
@@ -40,7 +38,7 @@ describe('ChatMessageBubble', () => {
     expect(ordinary).not.toContain('Collapse thinking');
   });
 
-  it('matches the assistant reply typography and surface for expanded thinking in every reading profile', () => {
+  it('does not render thinking content before expansion in any reading profile', () => {
     for (const readingProfile of ['medium', 'notion', 'book']) {
       const html = renderToStaticMarkup(
         createElement(ChatMessageBubble, {
@@ -54,10 +52,10 @@ describe('ChatMessageBubble', () => {
       expect(html).not.toContain('tw-border-t');
       expect(html).not.toContain('tw-bg-[var(--bg-sunken)]');
       const markdownClasses = [...html.matchAll(/<div class="([^"]+)"/g)].map((match) => match[1]);
-      expect(markdownClasses).toHaveLength(2);
-      expect(markdownClasses[0]).toBe(markdownClasses[1]);
-      expect(html.indexOf('<summary')).toBeLessThan(html.indexOf('<strong>Thought</strong>'));
-      expect(html.indexOf('<strong>Thought</strong>')).toBeLessThan(html.indexOf('<strong>Answer</strong>'));
+      expect(markdownClasses).toHaveLength(1);
+      expect(html).not.toContain('<strong>Thought</strong>');
+      expect(html).not.toContain('Collapse thinking');
+      expect(html).toContain('<strong>Answer</strong>');
     }
   });
 
@@ -69,8 +67,9 @@ describe('ChatMessageBubble', () => {
       }),
     );
     expect(html).toContain('<details');
-    expect(html).toContain('analysis');
-    expect(html).toContain('<pre>');
+    expect(html).not.toContain('analysis');
+    expect(html).not.toContain('<pre>');
+    expect(html).not.toContain('Collapse thinking');
     expect(html).not.toContain('[!NOTE]-');
   });
   it('renders user messages with green-tinted bubbles without card background conflicts', () => {
