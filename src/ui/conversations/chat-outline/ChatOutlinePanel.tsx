@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties } from 'react';
+import { useLayoutEffect, useRef, type CSSProperties } from 'react';
 
 import type { ChatOutlineEntry } from '@ui/conversations/chat-outline/outline-entries';
 import { readerOutlineLevelToMinimapWidth } from '@services/protocols/reader-outline';
@@ -19,7 +19,6 @@ export type ChatOutlinePanelProps = {
 };
 
 const OUTLINE_LABEL = 'Outline';
-const TRIGGER_MAX_BARS = 7;
 const PANEL_LIST_CLASS = 'tw-flex tw-max-h-[60vh] tw-flex-col tw-gap-1 tw-overflow-auto';
 const TRIGGER_ACTIVE_BAR_WIDTH = readerOutlineLevelToMinimapWidth(OUTLINE_STRIP_BAR_LEVEL_1);
 const TRIGGER_INACTIVE_BAR_WIDTH = readerOutlineLevelToMinimapWidth(OUTLINE_STRIP_BAR_LEVEL_2);
@@ -36,7 +35,7 @@ const PANEL_ENTRY_LABEL_STYLE: CSSProperties = {
 function toItemClass(active: boolean): string {
   return [
     buttonMenuItemClassName(),
-    'tw-min-h-[50px] tw-shrink-0 tw-items-start tw-text-xs',
+    'tw-shrink-0 tw-items-start tw-text-xs',
     active ? '' : 'webclipper-btn--tone-muted',
   ]
     .filter(Boolean)
@@ -48,34 +47,32 @@ function toLabel(entry: ChatOutlineEntry): string {
   return text ? `${entry.index}. ${text}` : `${entry.index}.`;
 }
 
-function pickTriggerEntries(entries: ChatOutlineEntry[], activeIndex: number | null): ChatOutlineEntry[] {
-  if (entries.length <= TRIGGER_MAX_BARS) return entries;
-
-  const activeEntry = entries.find((entry) => entry.index === activeIndex) || null;
-  const sampleCount = activeEntry ? TRIGGER_MAX_BARS - 1 : TRIGGER_MAX_BARS;
-  const picked = new Map<string, ChatOutlineEntry>();
-
-  for (let slot = 0; slot < sampleCount; slot += 1) {
-    const position = sampleCount <= 1 ? 0 : Math.round((slot * (entries.length - 1)) / (sampleCount - 1));
-    const entry = entries[position];
-    if (entry) picked.set(entry.messageKey, entry);
-  }
-
-  if (activeEntry) picked.set(activeEntry.messageKey, activeEntry);
-
-  return Array.from(picked.values())
-    .sort((left, right) => left.index - right.index)
-    .slice(0, TRIGGER_MAX_BARS);
-}
-
 export function ChatOutlinePanel({ entries, activeIndex = null, onPickEntry }: ChatOutlinePanelProps) {
-  const triggerEntries = useMemo(() => pickTriggerEntries(entries, activeIndex), [activeIndex, entries]);
+  const stripRef = useRef<HTMLElement | null>(null);
+
+  useLayoutEffect(() => {
+    const strip = stripRef.current;
+    if (!strip || strip.scrollHeight <= strip.clientHeight) return;
+    const activeBar = strip.querySelector('[data-chat-outline-trigger-active="true"]');
+    const activeButton = activeBar?.parentElement;
+    if (!activeButton) return;
+    const stripRect = strip.getBoundingClientRect();
+    const buttonRect = activeButton.getBoundingClientRect();
+    if (buttonRect.top < stripRect.top) strip.scrollTop += buttonRect.top - stripRect.top;
+    else if (buttonRect.bottom > stripRect.bottom) strip.scrollTop += buttonRect.bottom - stripRect.bottom;
+  }, [activeIndex, entries]);
 
   if (!entries.length) return null;
 
   const trigger = (
-    <nav className={OUTLINE_STRIP_CLASS} aria-label={OUTLINE_LABEL} data-chat-outline-trigger-bars={entries.length}>
-      {triggerEntries.map((entry) => {
+    <nav
+      ref={stripRef}
+      className={`${OUTLINE_STRIP_CLASS} tw-max-h-[calc(100vh-10rem)] tw-justify-between tw-overflow-y-auto`}
+      style={{ height: `${entries.length * 10}px`, rowGap: 0 }}
+      aria-label={OUTLINE_LABEL}
+      data-chat-outline-trigger-bars={entries.length}
+    >
+      {entries.map((entry) => {
         const isActive = activeIndex === entry.index;
         const label = toLabel(entry);
         return (
