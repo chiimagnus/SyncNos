@@ -1,4 +1,5 @@
 import type { ArticleCommentDto } from '@services/comments/domain/comment-dto';
+import { escapeMarkdownHeading, formatChatMessageHeading } from '@services/conversations/domain/chat-message-heading';
 import { normalizeCommentThreadGraph } from '@services/comments/domain/comment-thread-graph';
 import { normalizeStandaloneImageCaptionLines } from '@services/sync/shared/markdown-image-normalizer';
 import { degradeMarkdownImagesToLinks } from '@services/shared/markdown-image-references';
@@ -94,25 +95,15 @@ function buildFrontmatterBlock(frontmatter: unknown) {
   return `${lines.join('\n')}\n\n`;
 }
 
-function normalizeRole(role: unknown) {
-  const normalized = safeString(role).toLowerCase();
-  if (!normalized) return 'assistant';
-  return normalized;
-}
-
-function buildMessageChunk(message: any) {
-  const m = message || {};
-  const seq = Number.isFinite(Number(m.sequence)) ? Number(m.sequence) : 0;
-  const role = normalizeRole(m.role);
-  const roleLabel = role === 'user' ? safeString(m.authorName) || DEFAULT_COMMENT_AUTHOR : role;
-  const body = safeString(m.contentMarkdown);
-  const header = `## ${seq} ${roleLabel}`.trim();
+function buildMessageChunk(message: any, index: number) {
+  const body = safeString(message?.contentMarkdown);
+  const header = `## ${escapeMarkdownHeading(formatChatMessageHeading(message, index))}`;
   return `${header}\n\n${body}\n\n`;
 }
 
 function buildMessagesMarkdown(messages: any[]) {
   const list = Array.isArray(messages) ? messages : [];
-  return list.map((m) => buildMessageChunk(m)).join('');
+  return list.map((message, index) => buildMessageChunk(message, index)).join('');
 }
 
 function toArticleBodyMessages(messages: unknown[]): any[] {

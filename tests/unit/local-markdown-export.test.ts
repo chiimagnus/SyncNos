@@ -134,6 +134,36 @@ describe('local markdown export', () => {
     expect(markdown).not.toContain('![malformed](syncnos-asset://nope)');
   });
 
+  it('exports all chat messages into a readable, numbered Markdown transcript with original bodies', async () => {
+    mocks.createZipBlob.mockImplementation((entries: any[]) => mocks.realCreateZipBlob!(entries));
+    const c = { ...conversation(1, 'Chat'), source: 'chatgpt', sourceType: 'chat', conversationKey: 'conversation-1' };
+    mocks.getConversationDetail.mockResolvedValue({
+      conversationId: 1,
+      messages: [
+        { messageKey: 'u0', sequence: 0, role: 'user', contentMarkdown: '你觉得呢？请解释原因。' },
+        {
+          messageKey: 'a1',
+          sequence: 1,
+          role: 'assistant',
+          contentMarkdown: '这是我的结论。\n\n- 保留列表\n- 保留原文',
+        },
+      ],
+    });
+    mocks.getImageCacheAssetsByIds.mockResolvedValue(new Map());
+
+    const result = await buildConversationsMarkdownZipExport({ conversations: [c] });
+    const markdown = String(capturedFiles().find((file) => file.name.endsWith('.md'))?.data || '');
+    const archive = await extractZipEntries(result.zipBlob);
+    const archiveMarkdown = [...archive.entries()].find(([name]) => name.endsWith('.md'))?.[1];
+    expect(archiveMarkdown).toBeTruthy();
+    expect(new TextDecoder().decode(archiveMarkdown)).toBe(markdown);
+    expect(markdown).toContain('## 01 · You — 你觉得呢？');
+    expect(markdown).toContain('## 02 · Assistant — 这是我的结论。');
+    expect(markdown).toContain('你觉得呢？请解释原因。');
+    expect(markdown).toContain('- 保留列表\n- 保留原文');
+    expect(markdown.match(/^## \d+ · /gm)).toHaveLength(2);
+  });
+
   it('exports existing ChatGPT rich-layout messages as proper Markdown without altering user input', async () => {
     const c = {
       ...conversation(1, 'Chat'),

@@ -3,6 +3,32 @@ import { describe, expect, it } from 'vitest';
 import { formatConversationMarkdownForExternalOutput } from '../../src/services/conversations/external-markdown';
 
 describe('formatConversationMarkdownForExternalOutput', () => {
+  it('copies a complete chat with numbered role and first-sentence headings without changing the transcript', async () => {
+    const thinking = ['> [!NOTE]- Thinking', '>', '> 不应放进标题。', '', '**结论：**可以实现。补充说明。'].join('\n');
+    const markdown = await formatConversationMarkdownForExternalOutput(
+      { id: 1, sourceType: 'chat', source: 'chatgpt', conversationKey: 'chat-1', title: '对话记录' } as any,
+      {
+        conversationId: 1,
+        messages: [
+          {
+            id: 1,
+            conversationId: 1,
+            messageKey: 'u0',
+            sequence: 0,
+            role: 'user',
+            contentMarkdown: '什么是日报？请举例。',
+          },
+          { id: 2, conversationId: 1, messageKey: 'a1', sequence: 1, role: 'assistant', contentMarkdown: thinking },
+        ],
+      },
+    );
+    expect(markdown).toContain('## 01 · You — 什么是日报？');
+    expect(markdown).toContain('## 02 · Assistant — 结论：可以实现。');
+    expect(markdown).toContain('什么是日报？请举例。');
+    expect(markdown).toContain('> [!NOTE]- Thinking');
+    expect(markdown).toContain('**结论：**可以实现。');
+    expect(markdown.split(/^## /m)).toHaveLength(3);
+  });
   it('inherits the semantic Video document projection and still sanitizes internal image targets', async () => {
     const markdown = await formatConversationMarkdownForExternalOutput(
       {

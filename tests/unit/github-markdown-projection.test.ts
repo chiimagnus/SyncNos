@@ -88,6 +88,20 @@ describe('github markdown projection', () => {
     expect(projection.projectionFingerprint).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  it('projects numbered chat headings without modifying frontmatter or the original message bodies', async () => {
+    const projection = await buildGithubMarkdownProjection({
+      conversation: conversation(),
+      messages: [
+        { sequence: 0, messageKey: 'u0', role: 'user', contentMarkdown: '请解释 Markdown！后续。' },
+        { sequence: 1, messageKey: 'a1', role: 'assistant', contentMarkdown: '可以使用标题。\n\n- 列表项' },
+      ],
+    });
+    expect(projection.markdownText).toContain('## 01 · You — 请解释 Markdown！');
+    expect(projection.markdownText).toContain('## 02 · Assistant — 可以使用标题。');
+    expect(projection.markdownText).toContain('- 列表项');
+    expect(projection.markdownText).toContain('syncnos:');
+  });
+
   it('changes Video Markdown and content hash when semantic Video content changes', async () => {
     const current = conversation({
       sourceType: 'video',

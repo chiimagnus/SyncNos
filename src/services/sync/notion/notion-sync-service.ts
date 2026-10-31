@@ -1,3 +1,4 @@
+import { formatChatMessageHeading } from '@services/conversations/domain/chat-message-heading';
 import { notionFetch } from '@services/sync/notion/notion-api.ts';
 import { upgradeImageBlocksToFileUploads } from '@services/sync/notion/notion-image-upload-upgrader.ts';
 import { markdownToNotionBlocks } from '@services/sync/notion/notion-markdown-blocks.ts';
@@ -37,12 +38,18 @@ function headingBlock(label: string, color: string) {
   };
 }
 
-function messagesToBlocks(messages: any[]) {
+function messagesToBlocks(messages: any[], options: { chatHeadings?: boolean } = {}) {
   const out = [];
-  for (const m of messages) {
+  for (const [index, m] of messages.entries()) {
     const role = m.role || 'assistant';
     const authorName = m.authorName && String(m.authorName).trim() ? String(m.authorName).trim() : 'You';
-    const label = role === 'user' ? authorName : role === 'assistant' ? 'Assistant' : role;
+    const label = options.chatHeadings
+      ? formatChatMessageHeading(m, index)
+      : role === 'user'
+        ? authorName
+        : role === 'assistant'
+          ? 'Assistant'
+          : role;
     out.push(headingBlock(label, role === 'user' ? 'green' : 'blue_background'));
     const markdown = String(m.contentMarkdown || '');
     if (!markdown.trim()) continue;

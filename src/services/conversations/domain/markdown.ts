@@ -1,4 +1,5 @@
 import type { Conversation, ConversationMessage } from '@services/conversations/domain/models';
+import { escapeMarkdownHeading, formatChatMessageHeading } from '@services/conversations/domain/chat-message-heading';
 import { formatVideoChaptersMarkdown } from '@services/conversations/domain/video-content';
 import { normalizeDilMarkdown } from '@services/shared/dil-markdown';
 
@@ -145,10 +146,10 @@ function formatChatMarkdown(
   const messageHeadingLevel = clampHeadingLevel(options.chatMessageHeadingLevel, 2);
   const messageHeading = headingPrefix(messageHeadingLevel);
   const isChatgpt = String(c.source || c.listSourceKey || '').toLowerCase() === 'chatgpt';
-  for (const m of messages || []) {
+  for (const [index, m] of (messages || []).entries()) {
     const role = (m as any).role || 'assistant';
-    const authorName = role === 'user' && isNonEmptyString((m as any).authorName) ? String((m as any).authorName) : '';
-    lines.push(`${messageHeading} ${role === 'user' ? authorName || 'You' : role}`);
+    const heading = escapeMarkdownHeading(formatChatMessageHeading(m, index));
+    lines.push(`${messageHeading} ${heading}`);
     lines.push('');
     const raw = String((m as any).contentMarkdown || '');
     lines.push(isChatgpt && role === 'assistant' ? normalizeDilMarkdown(raw) : raw);
