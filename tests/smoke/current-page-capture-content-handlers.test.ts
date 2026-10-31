@@ -53,6 +53,7 @@ async function dispatch(listener: any, message: any) {
 }
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
   // @ts-expect-error test global cleanup
   delete globalThis.chrome;
@@ -71,6 +72,30 @@ describe('current-page-capture content handlers', () => {
     expect(result).toEqual({ ok: true, data: { kind: 'chat', title: 'Saved' }, error: null });
     expect(captureCurrentPage).toHaveBeenCalledOnce();
     expect(captureCurrentPage).toHaveBeenCalledWith();
+  });
+
+  it('rechecks the explicitly selected page URL before starting capture', async () => {
+    const runtime = setupListener();
+    const captureCurrentPage = vi.fn(async () => ({ kind: 'article', title: 'Saved' }));
+    registerCurrentPageCaptureContentHandlers({ getCurrentPageCaptureState: vi.fn(), captureCurrentPage } as any, {
+      localeReady: Promise.resolve(),
+    });
+    vi.stubGlobal('location', { href: 'https://example.com/changed' });
+    expect(
+      await dispatch(runtime.getListener(), {
+        type: 'captureCurrentPage',
+        payload: { expectedUrl: 'https://example.com/original' },
+      }),
+    ).toMatchObject({ ok: false, error: { extra: { code: 'CAPTURE_TARGET_CHANGED' } } });
+    expect(captureCurrentPage).not.toHaveBeenCalled();
+    vi.stubGlobal('location', { href: 'https://example.com/original' });
+    expect(
+      await dispatch(runtime.getListener(), {
+        type: 'captureCurrentPage',
+        payload: { expectedUrl: 'https://example.com/original' },
+      }),
+    ).toMatchObject({ ok: true, data: { kind: 'article', title: 'Saved' } });
+    expect(captureCurrentPage).toHaveBeenCalledOnce();
   });
 
   it('passes the video metadata result unchanged', async () => {

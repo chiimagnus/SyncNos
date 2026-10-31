@@ -101,7 +101,7 @@ async function resolveTargetTab(tabId?: number) {
     return tab;
   }
 
-  const tabs = await tabsQuery({ active: true, currentWindow: true });
+  const tabs = await tabsQuery({ active: true, lastFocusedWindow: true });
   const tab = Array.isArray(tabs) && tabs.length ? tabs[0] : null;
   if (!tab || !Number.isFinite(Number(tab.id))) throw toError('active tab not found');
   return tab;

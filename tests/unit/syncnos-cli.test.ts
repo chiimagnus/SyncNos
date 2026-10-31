@@ -771,7 +771,16 @@ describe('syncnos CLI instance selection', () => {
         subtitleStatus: 'empty',
       });
 
+      const explicitUrl = 'https://example.com/test?page=1';
+      const targetCapture = await run(['capture', '--url', explicitUrl], runtimeRoot, homeDir);
+      expect(targetCapture.exitCode).toBe(0);
+      expect(instance.requests.at(-1)).toEqual({ method: 'capture.current-page', params: { url: explicitUrl } });
       const beforeInvalid = instance.requests.length;
+      for (const invalid of ['file:///tmp/test', 'not-a-url', 'https://user:password@example.com/path']) {
+        const invalidUrl = await run(['capture', '--url', invalid], runtimeRoot, homeDir);
+        expect(invalidUrl.exitCode).toBe(2);
+        expect(invalidUrl.json.error.code).toBe('usage_error');
+      }
       const videoSpecific = await run(['capture', 'video'], runtimeRoot, homeDir);
       expect(videoSpecific.exitCode).toBe(2);
       expect(videoSpecific.json.error.code).toBe('usage_error');

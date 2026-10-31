@@ -4,7 +4,7 @@ import { realpathSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 import process from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL, URL } from 'node:url';
 
 import { discoverInstalledBrowsers, listBrowserTargets } from './browser-targets.mjs';
 import { contract } from './contract.mjs';
@@ -72,6 +72,7 @@ function parseArgs(argv) {
     noWait: false,
     timeout: null,
     output: null,
+    url: null,
     force: false,
     browser: null,
     extensionId: null,
@@ -188,6 +189,11 @@ function parseArgs(argv) {
     if (token === '--output') {
       options.output = readValue(token);
       options.provided.add('output');
+      continue;
+    }
+    if (token === '--url') {
+      options.url = readValue(token);
+      options.provided.add('url');
       continue;
     }
     if (token === '--force') {
@@ -625,7 +631,7 @@ function usage(platform = process.platform) {
     '  conversation merge --keep <conversation-id> --remove <conversation-id>',
     '  conversation delete <conversation-id> [...]',
     '  conversation backfill-images <conversation-id>',
-    '  capture',
+    '  capture [--url <open-page-url>]',
     '  comments list <conversation-id>',
     '  comments add <conversation-id> --text <text>',
     '  comments reply <conversation-id> <parent-id> --text <text>',
@@ -975,11 +981,28 @@ export async function runCli(
     }
 
     if (options.command === 'capture') {
-      assertAllowedOptions(options, new Set(['instance', 'human']));
+      assertAllowedOptions(options, new Set(['instance', 'human', 'url']));
       if (options.positionals.length)
         throw codedError('usage_error', 'capture does not accept positional arguments', EXIT.usage);
+      let url;
+      if (options.url != null) {
+        try {
+          const parsed = new URL(options.url);
+          if (
+            !['http:', 'https:'].includes(parsed.protocol) ||
+            parsed.username ||
+            parsed.password ||
+            /\s/u.test(options.url)
+          ) {
+            throw new Error('invalid capture URL');
+          }
+          url = parsed.href;
+        } catch {
+          throw codedError('usage_error', '--url must be an HTTP(S) URL without embedded credentials', EXIT.usage);
+        }
+      }
       const { selected } = await selectedInstance(options, context);
-      const result = await requestSelected(selected, 'capture.current-page');
+      const result = await requestSelected(selected, 'capture.current-page', url == null ? {} : { url });
       writeResult(stdout, envelopeOk(result), options.human);
       return EXIT.success;
     }

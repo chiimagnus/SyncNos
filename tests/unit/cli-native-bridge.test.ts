@@ -504,6 +504,26 @@ describe('CLI Native Messaging bridge', () => {
     harness.controller.stop();
   });
 
+  it('passes an explicit capture URL through the public RPC to the canonical background handler', async () => {
+    const router = { dispatch: vi.fn(async () => ({ ok: true, data: { kind: 'article', conversationId: 42 } })) };
+    const harness = createHarness(undefined, router as any);
+    await waitForPosted(harness, 1);
+    harness.fakePort.emitMessage({
+      kind: 'rpc-request',
+      protocolVersion: 1,
+      requestId: 'capture-url',
+      method: 'capture.current-page',
+      params: { url: 'https://example.com/target' },
+    });
+    await waitForPosted(harness, 2);
+    expect(router.dispatch).toHaveBeenCalledWith(
+      { type: UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE, url: 'https://example.com/target' },
+      null,
+    );
+    expect(harness.fakePort.posted[1]).toMatchObject({ ok: true, data: { kind: 'article', conversationId: 42 } });
+    harness.controller.stop();
+  });
+
   it('resolves comment conversation identity without exposing locator input and reuses existing comment handlers', async () => {
     const router = {
       dispatch: vi.fn(async (message: any) => {
