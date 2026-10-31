@@ -18,6 +18,7 @@ import {
   type CurrentPageCaptureActivity,
 } from '@services/bootstrap/current-page-capture';
 import { buildCaptureSuccessTipMessage } from '@services/shared/capture-tip';
+import { AI_CHAT_INCLUDE_THINKING_STORAGE_KEY, composeThinkingMarkdown } from '@services/shared/thinking-block';
 
 function deferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -366,6 +367,33 @@ describe('current page capture integrity routing', () => {
     await expect(harness.service.captureCurrentPage()).resolves.toMatchObject({ kind: 'chat' });
     expect(chatgptApiMocks.capture).toHaveBeenCalledTimes(1);
     expect(harness.capture).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])('applies the thinking preference to manual ChatGPT saves (enabled=%s)', async (enabled) => {
+    vi.stubGlobal('chrome', {
+      runtime: { lastError: null },
+      storage: {
+        local: {
+          get: (_keys: string[], callback: (value: Record<string, boolean>) => void) =>
+            callback({ [AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]: enabled }),
+        },
+      },
+    });
+    const thought = composeThinkingMarkdown('Visible thinking', 'Final answer');
+    const snapshot = chatSnapshot();
+    snapshot.messages.push({
+      messageKey: 'assistant',
+      role: 'assistant',
+      contentMarkdown: thought,
+      sequence: 1,
+    });
+    const harness = createHarness({ collectorId: 'chatgpt', snapshot });
+
+    await harness.service.captureCurrentPage();
+
+    const stored = harness.calls.find(({ type }) => type === 'syncConversationMessages')?.payload?.messages;
+    expect(stored[1].contentMarkdown).toBe(enabled ? thought : 'Final answer');
+    expect(snapshot.messages[1].contentMarkdown).toBe(thought);
   });
 
   it('keeps the existing DOM manual path when Advanced API is disabled', async () => {

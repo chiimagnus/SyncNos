@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import normalizeApi from '@services/shared/normalize.ts';
 import { createCollectorEnv } from '../../src/collectors/collector-env.ts';
 import { createDeepseekCollectorDef } from '../../src/collectors/deepseek/deepseek-collector.ts';
+import { splitThinkingMarkdown } from '@services/shared/thinking-block';
 
 function setupDeepseekDom(messages: string, url = 'https://chat.deepseek.com/a/chat/s/abc123') {
   const dom = new JSDOM(
@@ -135,7 +136,7 @@ describe('deepseek-collector', () => {
     );
   });
 
-  it('captures current semantic virtual-list items with stable keys and final assistant markdown only', async () => {
+  it('captures semantic virtual-list items with stable keys and separately preserved thinking', async () => {
     const dom = setupDeepseekDom(
       item('1', user('你好')) +
         item(
@@ -176,7 +177,27 @@ describe('deepseek-collector', () => {
     expect(markdown).toContain('| 语法元素 | 说明 |');
     expect(markdown).toContain('```python');
     expect(markdown).not.toContain('复制');
-    expect(markdown).not.toContain('内部思考');
+    expect(splitThinkingMarkdown(markdown)?.thinking).toBe('内部思考不应进入最终正文');
+    expect(splitThinkingMarkdown(markdown)?.answer).toContain('# 主标题');
+  });
+
+  it('extracts visible DeepSeek thinking as a separate rich Markdown block', async () => {
+    const dom = setupDeepseekDom(
+      item('1', user('Question')) +
+        item(
+          '2',
+          assistant(
+            '<p>Answer</p>',
+            '<p>**ignored source syntax**</p><p>Step <strong>one</strong></p><button>Copy</button>',
+          ),
+        ),
+    );
+    const snapshot = (await capturePrepared(createDef(dom))) as any;
+    expect(splitThinkingMarkdown(snapshot.messages[1].contentMarkdown)).toEqual({
+      thinking: '**ignored source syntax**\n\nStep **one**',
+      answer: 'Answer',
+    });
+    expect(snapshot.messages[1].contentMarkdown).not.toContain('Copy');
   });
 
   it('uses the active DeepSeek history title without the brand suffix', async () => {

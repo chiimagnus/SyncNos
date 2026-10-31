@@ -1,5 +1,6 @@
 import { t } from '@i18n';
 import { hydrateChatgptDeepResearchSnapshot } from '@collectors/chatgpt/chatgpt-deep-research-hydrator';
+import { applyThinkingCapturePreference } from '@services/shared/thinking-block';
 import { resolveActiveOrInpageCollector, type CollectorRegistryLike } from '@collectors/registry';
 import { DISCOURSE_OP_NOT_FOUND_ERROR, isDiscourseOpNotFoundErrorMessage } from '@collectors/web/article-fetch-errors';
 import { ARTICLE_MESSAGE_TYPES, CORE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
@@ -261,7 +262,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
           }
         : snapshot;
 
-    const integrity = resolveCaptureIntegrity(collectorId, safeSnapshot);
+    const integrity = resolveCaptureIntegrity(collectorId, await applyThinkingCapturePreference(safeSnapshot));
     if (!integrity.ok) return null;
     const normalizedSnapshot = integrity.snapshot;
     const activityAt = Date.now();

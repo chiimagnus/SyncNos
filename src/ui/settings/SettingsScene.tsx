@@ -176,6 +176,8 @@ export function SettingsScene(props: SettingsSceneProps) {
     onToggleAiChatAutoSaveEnabled,
     chatgptApiCaptureEnabled,
     onToggleChatgptApiCaptureEnabled,
+    aiChatIncludeThinkingEnabled,
+    onToggleAiChatIncludeThinkingEnabled,
     aiChatCacheImagesEnabled,
     onToggleAiChatCacheImagesEnabled,
     webArticleCacheImagesEnabled,
@@ -482,6 +484,10 @@ export function SettingsScene(props: SettingsSceneProps) {
           chatgptApiCaptureEnabled={chatgptApiCaptureEnabled}
           onToggleChatgptApiCaptureEnabled={(next) => {
             void onToggleChatgptApiCaptureEnabled(next);
+          }}
+          aiChatIncludeThinkingEnabled={aiChatIncludeThinkingEnabled}
+          onToggleAiChatIncludeThinkingEnabled={(next) => {
+            void onToggleAiChatIncludeThinkingEnabled(next);
           }}
           aiChatCacheImagesEnabled={aiChatCacheImagesEnabled}
           onToggleAiChatCacheImagesEnabled={(next) => {

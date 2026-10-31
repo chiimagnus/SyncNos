@@ -12,6 +12,7 @@ import {
   chatgptFileIdFromEstuaryUrl,
 } from '@services/shared/chatgpt-image-identity';
 import { isCanonicalChatgptHostname, parseChatgptDurableConversationRoute } from '@services/shared/chatgpt-route';
+import { composeThinkingMarkdown } from '@services/shared/thinking-block';
 import {
   addPreparedReason,
   createPreparedAccumulator,
@@ -640,7 +641,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       baseMarkdown = input.iframeUrl ? `Deep Research (iframe): ${input.iframeUrl}` : 'Deep Research (iframe)';
     } else if (input.role === 'assistant' && input.cotOuterHtml) {
       const cot = extractCotContentFromHtml(input.cotOuterHtml);
-      baseMarkdown = joinContentBlocks([cot.markdown || cot.text, baseMarkdown]);
+      baseMarkdown = composeThinkingMarkdown(cot.markdown || cot.text, baseMarkdown);
     }
     if (!baseMarkdown.trim() && !input.imageUrls.length) return null;
     return {

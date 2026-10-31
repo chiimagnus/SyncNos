@@ -59,6 +59,8 @@ export function InpageSection(props: {
   onToggleAiChatAutoSaveEnabled: (next: boolean) => void;
   chatgptApiCaptureEnabled: boolean;
   onToggleChatgptApiCaptureEnabled: (next: boolean) => void;
+  aiChatIncludeThinkingEnabled: boolean;
+  onToggleAiChatIncludeThinkingEnabled: (next: boolean) => void;
   aiChatCacheImagesEnabled: boolean;
   onToggleAiChatCacheImagesEnabled: (next: boolean) => void;
   webArticleCacheImagesEnabled: boolean;
@@ -88,6 +90,8 @@ export function InpageSection(props: {
     onToggleAiChatAutoSaveEnabled,
     chatgptApiCaptureEnabled,
     onToggleChatgptApiCaptureEnabled,
+    aiChatIncludeThinkingEnabled,
+    onToggleAiChatIncludeThinkingEnabled,
     aiChatCacheImagesEnabled,
     onToggleAiChatCacheImagesEnabled,
     webArticleCacheImagesEnabled,
@@ -209,6 +213,25 @@ export function InpageSection(props: {
         </label>
         <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
           {t('chatgptApiCaptureAdvancedHint')}
+        </div>
+      </section>
+
+      <section className={cardClassName} aria-label={t('aiChatThinkingHeading')}>
+        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
+          {t('aiChatThinkingHeading')}
+        </h2>
+        <label className="tw-mt-2.5 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
+          <input
+            type="checkbox"
+            checked={aiChatIncludeThinkingEnabled}
+            disabled={busy}
+            onChange={(event) => onToggleAiChatIncludeThinkingEnabled(event.target.checked)}
+            className={checkboxClassName}
+          />
+          {t('aiChatThinkingIncludeLabel')}
+        </label>
+        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+          {t('aiChatThinkingIncludeHint')}
         </div>
       </section>
 

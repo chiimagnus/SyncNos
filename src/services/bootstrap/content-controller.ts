@@ -5,6 +5,7 @@ import { resolveCaptureIntegrity } from '@services/shared/capture-integrity';
 import { storageGet, storageOnChanged } from '@services/shared/storage';
 import { CORE_MESSAGE_TYPES, UI_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { reconcileAutoSaveBackfill } from '@services/conversations/content/autosave-backfill-reconciler';
+import { applyThinkingCapturePreference } from '@services/shared/thinking-block';
 import {
   fingerprintHash,
   makeAutoSaveConversationStateKey,
@@ -95,6 +96,7 @@ export function createContentController(deps: Deps) {
   ) {
     if (!snapshot || !snapshot.conversation) return null;
     const activityAt = Date.now();
+    const savedSnapshot = await applyThinkingCapturePreference(snapshot);
 
     const conversationRes = await send(CORE_MESSAGE_TYPES.UPSERT_CONVERSATION, {
       payload: { ...snapshot.conversation, lastActivityAt: 0 },
@@ -108,7 +110,7 @@ export function createContentController(deps: Deps) {
     if (typeof isNew !== 'boolean') throw new Error('invalid upsertConversation response');
     const messagesRes = await send(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, {
       conversationId: conversation.id,
-      messages: snapshot.messages || [],
+      messages: savedSnapshot.messages || [],
       mode: options?.mode || 'snapshot',
       diff: options?.diff || null,
       conversationSourceType: snapshot?.conversation?.sourceType || 'chat',

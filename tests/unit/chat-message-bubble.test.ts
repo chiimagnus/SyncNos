@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 import { ChatMessageBubble } from '../../src/ui/shared/ChatMessageBubble';
+import { composeThinkingMarkdown } from '@services/shared/thinking-block';
 
 function extractRootSectionClass(html: string) {
   const match = html.match(/^<section class="([^"]+)">/);
@@ -17,6 +18,35 @@ function extractMarkdownClass(html: string) {
 }
 
 describe('ChatMessageBubble', () => {
+  it('renders captured thinking as a keyboard-accessible native disclosure before the final answer', () => {
+    const markdown = composeThinkingMarkdown('**Plan**\n\nEvaluate $x^2$.', 'Final **answer**.');
+    const html = renderToStaticMarkup(createElement(ChatMessageBubble, { role: 'assistant', markdown }));
+    expect(html).toContain('<details');
+    expect(html).toContain('<summary');
+    expect(html).not.toContain('<details open=');
+    expect(html).toContain('Thinking</summary>');
+    expect(html).toContain('<strong>Plan</strong>');
+    expect(html).toContain('<strong>answer</strong>');
+    expect(html).not.toContain('[!NOTE]-');
+
+    const user = renderToStaticMarkup(createElement(ChatMessageBubble, { role: 'user', markdown }));
+    expect(user).not.toContain('<details');
+    const ordinary = renderToStaticMarkup(createElement(ChatMessageBubble, { role: 'assistant', markdown: 'Final' }));
+    expect(ordinary).not.toContain('<details');
+  });
+
+  it('supports thinking-only and long multi-paragraph reasoning without an empty answer panel', () => {
+    const html = renderToStaticMarkup(
+      createElement(ChatMessageBubble, {
+        role: 'assistant',
+        markdown: composeThinkingMarkdown('analysis\n\n```ts\nconst x = 1;\n```', ''),
+      }),
+    );
+    expect(html).toContain('<details');
+    expect(html).toContain('analysis');
+    expect(html).toContain('<pre>');
+    expect(html).not.toContain('[!NOTE]-');
+  });
   it('renders user messages with green-tinted bubbles without card background conflicts', () => {
     const html = renderToStaticMarkup(createElement(ChatMessageBubble, { role: 'user', markdown: 'hi' }));
     const cls = extractRootSectionClass(html);

@@ -69,8 +69,10 @@ Grok 目前**不支持自动保存**：长对话的初始化和后台渲染可�
 
 ## Markdown 与附件
 
-- provider 先克隆正确的正文 DOM，再删除该站点的 thinking/control/UI 节点；
-  之后才调用通用 Markdown / formula helper。
+- provider 先识别正文与用户可见的思考内容，并清理 control/UI 节点；
+  未识别的内部 thinking/tool 内容不得混入最终正文。当前 ChatGPT DOM / Advanced API、DeepSeek
+  会把明确识别的思考内容保存为独立 Markdown callout，和正式回答分开；其他 provider 仍按原有
+  过滤规则处理，不推断未显示的私有思维链。
 - 通用 DOM→Markdown 转换只负责传入正文的 HTML 语义，不负责识别“哪个节点才是正文”。
   保存后的显示规则另见 [`Markdown 与公式渲染`](markdown-rendering.md)，
   不在 collector 中修补展示问题。
@@ -87,6 +89,15 @@ Grok 目前**不支持自动保存**：长对话的初始化和后台渲染可�
   分隔线、引用与可用链接转换为可阅读形式，不执行原始组件，不改写行内代码或代码块（含缩进代码）。
 - Rich UI 的卡片、图表、地图和表格尽量转成可读 Markdown；无法解析的数据保留原文。
   内嵌 PNG 进入本地图片缓存，不受远程下载开关控制；非图片附件只保存文件名和类型，不下载二进制内容。
+
+## AI 思考过程
+
+通用设置 `ai_chat_include_thinking_v1` 默认开启。关闭后，手动与自动保存的**新内容**在
+持久化前剔除可识别的思考 callout，正式回答保持不变；已有剪藏不会被追溯修改。
+开启时使用可移植的 Markdown `> [!NOTE]- Thinking` 格式，插件内以原生 `details` 默认折叠，
+展开后继续由共享 Markdown 渲染组件显示。仅含思考、无最终答复的进行中 DeepSeek 消息仍
+按原有完整性规则处理，不得将其误判为完成。导出到其它 Markdown 工具时保留原文，
+Obsidian 可原生折叠 callout。
 
 ## ChatGPT 手动采集
 

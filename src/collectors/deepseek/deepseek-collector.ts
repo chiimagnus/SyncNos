@@ -1,4 +1,5 @@
 import type { CollectorDefinition } from '@collectors/collector-contract.ts';
+import { composeThinkingMarkdown } from '@services/shared/thinking-block';
 import type { CollectorEnv } from '@collectors/collector-env.ts';
 import { DEEPSEEK_MESSAGE_ID_ATTRIBUTE } from '@collectors/deepseek/deepseek-message-identity';
 import {
@@ -147,7 +148,10 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
       const source = [img.currentSrc, img.getAttribute('src')].find((url) => /^blob:/i.test(String(url || '')));
       if (source && !blobUrls.includes(source)) blobUrls.push(source);
     }
-    const baseMarkdown = role === 'assistant' ? extractAssistantMarkdown(item) || text : text;
+    const answerMarkdown = role === 'assistant' ? extractAssistantMarkdown(item) || text : text;
+    const thinkingNode = role === 'assistant' ? item.querySelector('.ds-think-content') : null;
+    const thinkingMarkdown = thinkingNode ? String(deepseekMarkdown.extractAssistantMarkdown(thinkingNode) || '') : '';
+    const baseMarkdown = composeThinkingMarkdown(thinkingMarkdown, answerMarkdown);
     return {
       text,
       imageUrls,

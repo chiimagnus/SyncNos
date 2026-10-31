@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { MarkdownContent } from '@ui/shared/MarkdownContent';
 import { getMarkdownReadingProfilePreset } from '@ui/shared/markdown-reading-profile-presets';
+import { splitThinkingMarkdown } from '@services/shared/thinking-block';
+import { t } from '@i18n';
 
 type BubbleRole = 'user' | 'assistant';
 
@@ -39,6 +41,7 @@ export function ChatMessageBubble({
   className,
 }: ChatMessageBubbleProps) {
   const bubbleRole = normalizeRole(role);
+  const thinking = bubbleRole === 'assistant' ? splitThinkingMarkdown(markdown) : null;
   const readingProfilePreset = useMemo(() => getMarkdownReadingProfilePreset(readingProfile), [readingProfile]);
   const bubbleBase = 'tw-min-w-0 tw-border tw-rounded-[var(--radius-inline)] tw-p-3 tw-shadow-none';
 
@@ -130,12 +133,29 @@ export function ChatMessageBubble({
           <div className={headerRightClass}>{headerRight}</div>
         </header>
       ) : null}
-      <MarkdownContent
-        markdown={markdown}
-        syncnosAssetSrcById={syncnosAssetSrcById}
-        chatgptFileSrcById={chatgptFileSrcById}
-        className={[mdClass, mdRoleOverrides].filter(Boolean).join(' ')}
-      />
+      {thinking ? (
+        <details className="tw-mb-3 tw-rounded-[var(--radius-inline)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)]">
+          <summary className="tw-cursor-pointer tw-px-3 tw-py-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-[var(--focus-ring)]">
+            {t('aiChatThinkingSummary')}
+          </summary>
+          <div className="tw-border-t tw-border-[var(--border)] tw-px-3 tw-py-2">
+            <MarkdownContent
+              markdown={thinking.thinking}
+              syncnosAssetSrcById={syncnosAssetSrcById}
+              chatgptFileSrcById={chatgptFileSrcById}
+              className={[mdClass, mdRoleOverrides].filter(Boolean).join(' ')}
+            />
+          </div>
+        </details>
+      ) : null}
+      {thinking?.answer === '' ? null : (
+        <MarkdownContent
+          markdown={thinking ? thinking.answer : markdown}
+          syncnosAssetSrcById={syncnosAssetSrcById}
+          chatgptFileSrcById={chatgptFileSrcById}
+          className={[mdClass, mdRoleOverrides].filter(Boolean).join(' ')}
+        />
+      )}
     </section>
   );
 }

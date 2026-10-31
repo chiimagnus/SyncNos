@@ -89,6 +89,11 @@ export const en = {
   videoTranscriptTipNoSubtitles: 'No subtitles. Video info saved.',
   videoTranscriptTipSubtitlesOff: 'Subtitles off. Video info saved.',
   videoTranscriptTipSubtitlesUnavailable: 'Subtitle fetch failed. Video info saved.',
+  aiChatThinkingHeading: 'AI thinking',
+  aiChatThinkingIncludeLabel: 'Include thinking when capturing chats',
+  aiChatThinkingIncludeHint:
+    'Supports visible ChatGPT and DeepSeek thinking. On by default; turning it off omits thinking from future saves. Switching the setting does not rewrite saved chats. Thinking is collapsed by default.',
+  aiChatThinkingSummary: 'Thinking',
   chatgptApiCaptureAdvancedHeading: 'ChatGPT Advanced capture',
   chatgptApiCaptureAdvancedLabel: 'Use the ChatGPT API for the current conversation',
   chatgptApiCaptureAdvancedHint:
