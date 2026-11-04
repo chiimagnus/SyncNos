@@ -6,6 +6,7 @@ schema、索引、storage key 和默认路径以源码与测试为准。
 ## 本地真源
 
 - AI 对话、文章和 Video 先保存到浏览器本地；Provider 与导出文件都是派生结果。
+- 本地 JSON/Markdown ZIP 仅清理文件名（含附件路径），不修改内容中的原始标题；附件引用必须与 ZIP 路径一致。
 - 同一个真实 AI 会话始终复用同一条本地 conversation。
   采集 key 格式或瞬时 URL / host 变化只做原地身份迁移，保留消息、图片缓存和同步映射；
   持久 URL 只保留稳定会话地址。

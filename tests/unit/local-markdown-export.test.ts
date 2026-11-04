@@ -93,6 +93,29 @@ describe('local markdown export', () => {
     expect(mocks.getConversationDetail).not.toHaveBeenCalled();
   });
 
+  it('uses safe archive and attachment names while retaining the original Markdown heading', async () => {
+    mocks.createZipBlob.mockImplementation((entries: any[]) => mocks.realCreateZipBlob!(entries));
+    const originalTitle = '有限元进度总结' + String.fromCodePoint(0x4e7c4);
+    const c = conversation(1, originalTitle);
+    mocks.getConversationDetail.mockResolvedValue({
+      conversationId: 1,
+      messages: [{ messageKey: 'article_body', contentMarkdown: '![image](syncnos-asset://11)' }],
+    });
+    mocks.getImageCacheAssetsByIds.mockResolvedValue(new Map([[11, asset(11, 1)]]));
+
+    const result = await buildConversationsMarkdownZipExport({ conversations: [c] });
+    const entries = await extractZipEntries(result.zipBlob);
+    const names = [...entries.keys()];
+    const markdownName = names.find((name) => name.endsWith('.md'))!;
+    const attachmentName = names.find((name) => name.startsWith('attachments/'))!;
+    const markdown = new TextDecoder().decode(entries.get(markdownName));
+
+    expect(markdownName).toBe(buildConversationBasename(c) + '.md');
+    expect(names.every((name) => !name.includes(String.fromCodePoint(0x4e7c4)))).toBe(true);
+    expect(markdown).toContain('# ' + originalTitle);
+    expect(markdown).toContain(attachmentName);
+  });
+
   it('uses one scoped batch read and safely degrades unavailable internal images', async () => {
     const c = conversation(1, 'One');
     const source = [
