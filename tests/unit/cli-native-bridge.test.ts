@@ -269,6 +269,15 @@ describe('CLI Native Messaging bridge', () => {
             };
           case CORE_MESSAGE_TYPES.GET_CONVERSATION_LIST_PAGE:
             return { ok: true, data: { items: [{ id: 9 }], cursor: null, hasMore: false }, error: null };
+          case CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_SOURCE_AND_KEY:
+            return {
+              ok: true,
+              data:
+                message.conversationKey === 'missing'
+                  ? null
+                  : { id: 10, source: message.source, conversationKey: message.conversationKey },
+              error: null,
+            };
           case CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_ID:
             return {
               ok: true,
@@ -334,6 +343,29 @@ describe('CLI Native Messaging bridge', () => {
       },
       null,
     );
+
+    const found = await emit('find-1', 'conversation.find', { source: 'notionai', conversationKey: 'thread-10' });
+    expect(found).toMatchObject({
+      ok: true,
+      data: { id: 10, source: 'notionai', conversationKey: 'thread-10' },
+    });
+    expect(router.dispatch).toHaveBeenCalledWith(
+      {
+        type: CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_SOURCE_AND_KEY,
+        source: 'notionai',
+        conversationKey: 'thread-10',
+      },
+      null,
+    );
+    const notFound = await emit('find-missing', 'conversation.find', {
+      source: 'notionai',
+      conversationKey: 'missing',
+    });
+    expect(notFound).toMatchObject({ ok: false, error: { code: 'not_found' } });
+    const beforeInvalid = router.dispatch.mock.calls.length;
+    const invalid = await emit('find-invalid', 'conversation.find', { source: '', conversationKey: 'x' });
+    expect(invalid).toMatchObject({ ok: false, error: { code: 'invalid_argument' } });
+    expect(router.dispatch).toHaveBeenCalledTimes(beforeInvalid);
 
     const get = await emit('get-1', 'conversation.get', { conversationId: 10 });
     expect(get).toEqual({

@@ -29,6 +29,7 @@ import { clearPreferredInstance, readUserConfig, setPreferredInstance } from './
 
 const EXIT = Object.freeze({ success: 0, usage: 2, instance: 3, transport: 4, business: 5 });
 const DEFAULT_PING_TIMEOUT_MS = 750;
+const SYNCNOS_LINK_BASE = 'https://chiimagnus.github.io/SyncNos/';
 
 function envelopeOk(data) {
   return { ok: true, data, error: null };
@@ -249,6 +250,91 @@ export function parseConversationCursorToken(value) {
     throw codedError('usage_error', 'cursor must contain a finite timestamp and positive integer id', EXIT.usage);
   }
   return { lastActivityAt, id };
+}
+
+function parseConversationReference(value) {
+  const raw = String(value || '').trim();
+  if (!raw.includes('://')) return { conversationId: parsePositiveInteger(raw, 'conversation id'), messageKey: null };
+
+  const invalid = () => codedError('usage_error', 'Expected a conversation id or valid SyncNos link', EXIT.usage);
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw invalid();
+  }
+  if (
+    /\p{Cc}/u.test(raw) ||
+    url.origin !== 'https://chiimagnus.github.io' ||
+    url.pathname !== '/SyncNos/' ||
+    url.search ||
+    url.username ||
+    url.password ||
+    !url.hash.startsWith('#/open?')
+  )
+    throw invalid();
+
+  const fragmentQuery = url.hash.slice('#/open?'.length);
+  const params = new URLSearchParams(fragmentQuery);
+  if (params.toString() !== fragmentQuery) throw invalid();
+  const locs = params.getAll('loc');
+  const messages = params.getAll('message');
+  if (
+    locs.length !== 1 ||
+    locs[0].length > 4096 ||
+    !/^[A-Za-z0-9_-]+$/.test(locs[0]) ||
+    messages.length > 1 ||
+    [...params.keys()].some((key) => key !== 'loc' && key !== 'message')
+  )
+    throw invalid();
+
+  const bytes = Buffer.from(locs[0], 'base64url');
+  const decoded = bytes.toString('utf8');
+  if (bytes.toString('base64url') !== locs[0] || Buffer.from(decoded).toString('base64url') !== locs[0])
+    throw invalid();
+  const delimiter = decoded.indexOf('||');
+  if (delimiter <= 0) throw invalid();
+  const source = decoded.slice(0, delimiter).trim().toLowerCase();
+  const conversationKey = decoded.slice(delimiter + 2).trim();
+  if (!source || !conversationKey || decoded !== `${source}||${conversationKey}` || /\p{Cc}/u.test(decoded))
+    throw invalid();
+  const messageKey = messages[0] ?? null;
+  if (messageKey !== null && (!messageKey || messageKey.length > 512 || /\p{Cc}/u.test(messageKey))) throw invalid();
+  return { source, conversationKey, messageKey };
+}
+
+function selectedMessageKey(reference, override) {
+  const messageKey = override || reference.messageKey || null;
+  if (reference.messageKey && override && reference.messageKey !== override)
+    throw codedError('usage_error', '--message-key conflicts with the link', EXIT.usage);
+  if (messageKey && (messageKey.length > 512 || /\p{Cc}/u.test(messageKey)))
+    throw codedError('usage_error', '--message-key is invalid', EXIT.usage);
+  return messageKey;
+}
+
+function verifyConversationReference(reference, detail) {
+  if (
+    'source' in reference &&
+    (detail?.conversation?.source !== reference.source ||
+      detail?.conversation?.conversationKey !== reference.conversationKey)
+  )
+    throw codedError('not_found', 'Conversation identity changed', EXIT.business);
+}
+
+async function resolveConversationId(selected, reference) {
+  if ('conversationId' in reference) return reference.conversationId;
+  const target = await requestSelected(selected, 'conversation.find', {
+    source: reference.source,
+    conversationKey: reference.conversationKey,
+  });
+  if (
+    !Number.isSafeInteger(target?.id) ||
+    target.id <= 0 ||
+    target.source !== reference.source ||
+    target.conversationKey !== reference.conversationKey
+  )
+    throw codedError('not_found', 'Conversation not found', EXIT.business);
+  return target.id;
 }
 
 function formatConversationCursorToken(cursor) {
@@ -631,7 +717,7 @@ function usage(platform = process.platform) {
     '  status [--instance <id>]',
     '  revision [--instance <id>]',
     '  list [--source <key>] [--site <key>] [--limit <n>] [--cursor <lastActivityAt>,<id>]',
-    '  get <conversation-id>',
+    '  get <conversation-id|SyncNos-URL> [--message-key <key>]',
     '  search <query> [--source <key>] [--site <key>] [--after <iso>] [--before <iso>] [--limit <n>]',
     '  stats',
     '  conversation update-url <conversation-id> <url> [--merge-existing]',
@@ -645,8 +731,8 @@ function usage(platform = process.platform) {
     '  comments delete <comment-id>',
     '  mention search [query...] [--limit <n>]',
     '  mention build <conversation-id>',
-    '  open <conversation-id> [--target source|notion|obsidian|feishu|github] [--launch]',
-    '  link <conversation-id> [--message-key <key>]   Create a clickable SyncNos-local citation',
+    '  open <conversation-id|SyncNos-URL> [--target source|notion|obsidian|feishu|github] [--launch]',
+    '  link <conversation-id|SyncNos-URL> [--message-key <key>]   Create a clickable SyncNos-local citation',
     '  capabilities',
     '  notion auth status|start|disconnect',
     '  notion pages list',
@@ -887,27 +973,36 @@ export async function runCli(
     }
 
     if (options.command === 'get') {
-      assertAllowedOptions(options, new Set(['instance', 'human']));
-      if (options.positionals.length !== 1) {
-        throw codedError('usage_error', 'get requires exactly one conversation id', EXIT.usage);
-      }
-      const conversationId = parsePositiveInteger(options.positionals[0], 'conversation id');
+      assertAllowedOptions(options, new Set(['instance', 'human', 'messageKey']));
+      if (options.positionals.length !== 1)
+        throw codedError('usage_error', 'get requires exactly one conversation id or SyncNos URL', EXIT.usage);
+      const reference = parseConversationReference(options.positionals[0]);
+      const messageKey = selectedMessageKey(reference, options.messageKey);
       const { selected } = await selectedInstance(options, context);
+      const conversationId = await resolveConversationId(selected, reference);
       const detail = await requestSelected(selected, 'conversation.get', { conversationId });
-      writeResult(stdout, envelopeOk(detail), options.human);
+      verifyConversationReference(reference, detail);
+      if (messageKey) {
+        const targetMessage = detail?.messages?.find((item) => item?.messageKey === messageKey);
+        if (!targetMessage)
+          throw codedError('message_not_found', 'Message key does not belong to this conversation', EXIT.business);
+        writeResult(stdout, envelopeOk({ ...detail, targetMessage }), options.human);
+      } else {
+        writeResult(stdout, envelopeOk(detail), options.human);
+      }
       return EXIT.success;
     }
 
     if (options.command === 'link') {
       assertAllowedOptions(options, new Set(['instance', 'human', 'messageKey']));
       if (options.positionals.length !== 1)
-        throw codedError('usage_error', 'link requires exactly one conversation id', EXIT.usage);
-      const conversationId = parsePositiveInteger(options.positionals[0], 'conversation id');
-      const messageKey = options.messageKey;
-      if (messageKey && (messageKey.length > 512 || /\p{Cc}/u.test(messageKey)))
-        throw codedError('usage_error', '--message-key is invalid', EXIT.usage);
+        throw codedError('usage_error', 'link requires exactly one conversation id or SyncNos URL', EXIT.usage);
+      const reference = parseConversationReference(options.positionals[0]);
+      const messageKey = selectedMessageKey(reference, options.messageKey);
       const { selected } = await selectedInstance(options, context);
+      const conversationId = await resolveConversationId(selected, reference);
       const detail = await requestSelected(selected, 'conversation.get', { conversationId });
+      verifyConversationReference(reference, detail);
       const source = String(detail?.conversation?.source || '')
         .trim()
         .toLowerCase();
@@ -925,7 +1020,7 @@ export async function runCli(
         throw codedError('link_unavailable', 'Conversation identity is too long for a link', EXIT.business);
       const params = new URLSearchParams({ loc });
       if (messageKey) params.set('message', messageKey);
-      const url = `https://chiimagnus.github.io/SyncNos/#/open?${params}`;
+      const url = `${SYNCNOS_LINK_BASE}#/open?${params}`;
       writeResult(
         stdout,
         envelopeOk({ url, source, conversationKey, ...(messageKey ? { messageKey } : null) }),
@@ -1130,14 +1225,15 @@ export async function runCli(
     if (options.command === 'open') {
       assertAllowedOptions(options, new Set(['instance', 'human', 'target', 'launch']));
       if (options.positionals.length !== 1) {
-        throw codedError('usage_error', 'open requires exactly one conversation id', EXIT.usage);
+        throw codedError('usage_error', 'open requires exactly one conversation id or SyncNos URL', EXIT.usage);
       }
-      const conversationId = parsePositiveInteger(options.positionals[0], 'conversation id');
+      const reference = parseConversationReference(options.positionals[0]);
       const target = options.target == null ? null : parseOpenTarget(options.target);
       if (options.launch && !target) {
         throw codedError('usage_error', 'open --launch requires --target', EXIT.usage);
       }
       const { selected } = await selectedInstance(options, context);
+      const conversationId = await resolveConversationId(selected, reference);
       const result = await requestSelected(selected, options.launch ? 'open.launch' : 'open.resolve', {
         conversationId,
         ...(target ? { target } : null),

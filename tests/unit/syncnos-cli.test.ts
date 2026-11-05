@@ -177,6 +177,179 @@ describe('syncnos CLI local evidence links', () => {
       await instance.stop();
     }
   });
+
+  it('gets, links, and opens a saved message by URL using an exact identity lookup, not pagination', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    const source = 'web';
+    const conversationKey = 'article:https://example.com/标题?q=你好';
+    const messageKey = 'comment_你好_1';
+    const loc = Buffer.from(`${source}||${conversationKey}`, 'utf8').toString('base64url');
+    const url = `https://chiimagnus.github.io/SyncNos/#/open?${new URLSearchParams({ loc, message: messageKey })}`;
+    const messages = [
+      { messageKey: 'before', role: 'user', contentMarkdown: '前文' },
+      { messageKey, role: 'user', contentMarkdown: '我的观点' },
+      { messageKey: 'after', role: 'assistant', contentMarkdown: '后文' },
+    ];
+    const instance = await startFakeInstance(runtimeRoot, 'helium-main', 'chromium', {
+      onRequest(request) {
+        if (request.method === 'conversation.find') {
+          if (request.params.source !== source || request.params.conversationKey !== conversationKey) return null;
+          return { data: { id: 509, source, conversationKey, title: '我的剪藏' } };
+        }
+        if (request.method === 'conversation.get') {
+          return { data: { conversation: { id: 509, source, conversationKey, title: '我的剪藏' }, messages } };
+        }
+        if (request.method === 'open.resolve' || request.method === 'open.launch') {
+          return { data: { conversationId: request.params.conversationId, target: request.params.target ?? null } };
+        }
+        return null;
+      },
+    });
+    try {
+      const get = await run(['get', url], runtimeRoot, homeDir);
+      expect(get.exitCode).toBe(0);
+      expect(get.json?.data).toEqual({
+        conversation: { id: 509, source, conversationKey, title: '我的剪藏' },
+        messages,
+        targetMessage: messages[1],
+      });
+      expect(instance.requests.filter((r) => r.method !== 'system.ping')).toEqual([
+        { method: 'conversation.find', params: { source, conversationKey } },
+        { method: 'conversation.get', params: { conversationId: 509 } },
+      ]);
+
+      const numericMessage = await run(['get', '509', '--message-key', messageKey], runtimeRoot, homeDir);
+      expect(numericMessage.json?.data?.targetMessage).toEqual(messages[1]);
+      const canonical = await run(['link', url], runtimeRoot, homeDir);
+      expect(canonical.exitCode).toBe(0);
+      expect(canonical.json?.data?.url).toBe(url);
+      const byId = await run(['link', '509', '--message-key', messageKey], runtimeRoot, homeDir);
+      expect(byId.json?.data?.url).toBe(url);
+      const open = await run(['open', url, '--target', 'notion'], runtimeRoot, homeDir);
+      expect(open.json?.data).toEqual({ conversationId: 509, target: 'notion' });
+      const launch = await run(['open', url, '--target', 'source', '--launch'], runtimeRoot, homeDir);
+      expect(launch.json?.data).toEqual({ conversationId: 509, target: 'source' });
+      expect(instance.requests.filter((r) => r.method === 'conversation.list')).toHaveLength(0);
+      expect(instance.requests.filter((r) => r.method === 'conversation.find')).toHaveLength(4);
+      expect(instance.requests.at(-1)).toEqual({
+        method: 'open.launch',
+        params: { conversationId: 509, target: 'source' },
+      });
+    } finally {
+      await instance.stop();
+    }
+  });
+
+  it('rejects invalid links and conflicting message keys before contacting the extension', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    const loc = Buffer.from('notionai||notionai_t_123', 'utf8').toString('base64url');
+    const good = `https://chiimagnus.github.io/SyncNos/#/open?loc=${loc}&message=user_123`;
+    const bad = [
+      good.replace('https:', 'http:'),
+      good.replace('chiimagnus.github.io', 'malicious.example'),
+      good.replace('/SyncNos/', '/syncnos/'),
+      good.replace('message=user_123', 'message='),
+      good.replace('message=user_123', 'message=user_123&message=other'),
+      good.replace(`loc=${loc}`, `loc=${loc}&loc=${loc}`),
+      good.replace('message=user_123', 'extra=1'),
+      good.replace(`loc=${loc}&`, ''),
+      good.replace(`loc=${loc}`, 'loc=_w'),
+      good.replace(`loc=${loc}`, `loc=${Buffer.from('WRONG||key').toString('base64url')}`),
+      good.replace('message=user_123', `message=${'x'.repeat(513)}`),
+      good.replace('message=user_123', 'message=user%0A123'),
+      good.replace('#/open?', '#/settings?'),
+      good.replace('https://', 'https://user:pass@'),
+      good + '#ignored',
+      'https://example.org/not-a-syncnos-link',
+      'ftp://chiimagnus.github.io/SyncNos/',
+    ];
+    const instance = await startFakeInstance(runtimeRoot, 'helium-main', 'chromium');
+    try {
+      for (const target of bad) {
+        const before = instance.requests.length;
+        const result = await run(['get', target], runtimeRoot, homeDir);
+        expect(result.exitCode, target).toBe(2);
+        expect(result.json?.error?.code, target).toBe('usage_error');
+        expect(instance.requests.length, target).toBe(before);
+      }
+      for (const command of ['get', 'link']) {
+        const before = instance.requests.length;
+        const result = await run([command, good, '--message-key', 'different'], runtimeRoot, homeDir);
+        expect(result.json?.error?.code).toBe('usage_error');
+        expect(instance.requests.length).toBe(before);
+      }
+    } finally {
+      await instance.stop();
+    }
+  });
+
+  it('rejects a stale identity after an IndexedDB lookup without returning the wrong conversation', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    const loc = Buffer.from('chatgpt||original', 'utf8').toString('base64url');
+    const url = `https://chiimagnus.github.io/SyncNos/#/open?loc=${loc}`;
+    const instance = await startFakeInstance(runtimeRoot, 'helium-main', 'chromium', {
+      onRequest(request) {
+        if (request.method === 'conversation.find') {
+          return { data: { id: 5, source: 'chatgpt', conversationKey: 'original' } };
+        }
+        if (request.method === 'conversation.get') {
+          return { data: { conversation: { id: 5, source: 'chatgpt', conversationKey: 'replaced' }, messages: [] } };
+        }
+        return null;
+      },
+    });
+    try {
+      for (const command of ['get', 'link']) {
+        const result = await run([command, url], runtimeRoot, homeDir);
+        expect(result.exitCode).toBe(5);
+        expect(result.json?.error?.code).toBe('not_found');
+      }
+    } finally {
+      await instance.stop();
+    }
+  });
+
+  it('fails closed on a missing conversation or message', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    const loc = Buffer.from('chatgpt||conversation-1', 'utf8').toString('base64url');
+    const url = `https://chiimagnus.github.io/SyncNos/#/open?loc=${loc}&message=deleted-message`;
+    const instance = await startFakeInstance(runtimeRoot, 'helium-main', 'chromium', {
+      onRequest(request) {
+        if (request.method === 'conversation.find') {
+          if (request.params.conversationKey === 'conversation-1') {
+            return { data: { id: 42, source: 'chatgpt', conversationKey: 'conversation-1' } };
+          }
+          return { errorCode: 'not_found', errorMessage: 'Conversation not found' };
+        }
+        if (request.method === 'conversation.get') {
+          return {
+            data: {
+              conversation: { id: 42, source: 'chatgpt', conversationKey: 'conversation-1' },
+              messages: [{ messageKey: 'another-message', contentMarkdown: 'intact' }],
+            },
+          };
+        }
+        return null;
+      },
+    });
+    try {
+      for (const command of ['get', 'link']) {
+        const result = await run([command, url], runtimeRoot, homeDir);
+        expect(result.exitCode).toBe(5);
+        expect(result.json?.error?.code).toBe('message_not_found');
+      }
+      const missingLoc = Buffer.from('chatgpt||missing', 'utf8').toString('base64url');
+      const missingUrl = `https://chiimagnus.github.io/SyncNos/#/open?loc=${missingLoc}`;
+      for (const command of ['get', 'open', 'link']) {
+        const result = await run([command, missingUrl], runtimeRoot, homeDir);
+        expect(result.exitCode).toBe(5);
+        expect(result.json?.error?.code).toBe('not_found');
+      }
+      expect(instance.requests.filter((x) => x.method === 'conversation.list')).toHaveLength(0);
+    } finally {
+      await instance.stop();
+    }
+  });
 });
 
 describe('syncnos CLI instance selection', () => {

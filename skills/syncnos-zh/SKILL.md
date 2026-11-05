@@ -27,4 +27,5 @@ description: "使用 syncnos CLI 采集、查找、管理、同步、导出或�
 - 修改设置前先运行 `settings schema`，只操作 public key。
 - Provider 认证/配置只走 CLI 暴露接口，不直接读取底层凭据。
 - 用户要求“同步并确认完成”时保留默认等待语义；仅在明确需要异步时使用 `--no-wait`。`sync_wait_timeout` 不等于远端任务已取消。
-- `open` 默认解析原站或同步目标，只有用户要求实际打开时才加 `--launch`；引用本地保存内容使用 `link`。
+- `get`、`open`、`link` 均可接收数字 ID 或 SyncNos 链接；消息链接交给 `get` 时随完整会话返回 `targetMessage`。
+  `open` 仍解析原站或同步目标（实际打开才加 `--launch`），`link` 生成本地引用。

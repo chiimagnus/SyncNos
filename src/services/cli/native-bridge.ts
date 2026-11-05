@@ -568,6 +568,25 @@ export function startCliNativeBridge(router: Router, deps: BridgeDeps = DEFAULT_
       return;
     }
 
+    if (method === 'conversation.find') {
+      const source = typeof params.source === 'string' ? params.source.trim() : '';
+      const conversationKey = typeof params.conversationKey === 'string' ? params.conversationKey.trim() : '';
+      if (!source || !conversationKey || source.length > 4096 || conversationKey.length > 4096) {
+        safePost(currentPort, response(requestId, false, null, 'invalid_argument', 'Invalid conversation identity'));
+        return;
+      }
+      const result = await router.dispatch(
+        { type: CORE_MESSAGE_TYPES.FIND_CONVERSATION_BY_SOURCE_AND_KEY, source, conversationKey },
+        null,
+      );
+      if (result?.ok === true && !result.data) {
+        safePost(currentPort, response(requestId, false, null, 'not_found', 'Conversation not found'));
+        return;
+      }
+      postBackgroundResult(result);
+      return;
+    }
+
     if (method === 'conversation.get') {
       const conversationId = Number(params.conversationId);
       const conversationResult = await router.dispatch(
