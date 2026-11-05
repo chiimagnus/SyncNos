@@ -25,8 +25,3 @@ syncnos doctor
 - [English Skill](https://github.com/chiimagnus/SyncNos/tree/main/skills/syncnos)
 
 安装到 AI Agent 的 Skills 目录即可。命令和连接诊断以本机 `syncnos` CLI 为准。
-
-## 3. 引用已保存的消息
-
-`syncnos link <会话ID> --message-key <消息Key>` 生成可点击的 SyncNos 链接，打开本地记录并定位消息。
-在安装了支持该功能的 SyncNos 扩展、且保存了对应内容的浏览器中使用。
