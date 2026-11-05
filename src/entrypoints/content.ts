@@ -27,6 +27,8 @@ import {
   isInpageCommentsPanelOpen,
 } from '@ui/inpage/inpage-comments-panel-shadow.ts';
 import { createRuntimeClient } from '@platform/runtime/client.ts';
+import { isSyncnosLinkPage, parseSyncnosLink } from '@services/shared/conversation-loc';
+import { UI_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 
 export default defineContentScript({
   // Inpage visibility is controlled at runtime by canonical `inpage_display_mode`.
@@ -36,6 +38,20 @@ export default defineContentScript({
     const restoreInpageComments = isInpageCommentsPanelOpen();
     const lifecycleToken = await ensureContentScriptLifecycleToken();
     const lifecycle = startContentScriptLifecycle(document, lifecycleToken);
+
+    // The public URL contains only a locator; the private conversation stays in the extension.
+    if (isSyncnosLinkPage(location.href)) {
+      const runtime = createRuntimeClient();
+      runtime.onInvalidated(lifecycle.dispose);
+      const openLink = () => {
+        if (!parseSyncnosLink(location.href)) return;
+        void runtime.send(UI_MESSAGE_TYPES.OPEN_SYNCNOS_LINK, { url: location.href }).catch(() => {});
+      };
+      window.addEventListener('hashchange', openLink);
+      lifecycle.addCleanup(() => window.removeEventListener('hashchange', openLink));
+      openLink();
+      if (parseSyncnosLink(location.href)) return;
+    }
 
     lifecycle.addCleanup(cleanupInpageCommentsPanel);
     lifecycle.addCleanup(inpageTipApi.cleanup);

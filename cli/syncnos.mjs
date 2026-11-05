@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
+import { Buffer } from 'node:buffer';
 import { realpathSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 import process from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { fileURLToPath, pathToFileURL, URL } from 'node:url';
+import { fileURLToPath, pathToFileURL, URL, URLSearchParams } from 'node:url';
 
 import { discoverInstalledBrowsers, listBrowserTargets } from './browser-targets.mjs';
 import { contract } from './contract.mjs';
@@ -68,6 +69,7 @@ function parseArgs(argv) {
     to: null,
     provider: null,
     target: null,
+    messageKey: null,
     launch: false,
     noWait: false,
     timeout: null,
@@ -169,6 +171,11 @@ function parseArgs(argv) {
     if (token === '--target') {
       options.target = readValue(token);
       options.provided.add('target');
+      continue;
+    }
+    if (token === '--message-key') {
+      options.messageKey = readValue(token);
+      options.provided.add('messageKey');
       continue;
     }
     if (token === '--launch') {
@@ -639,6 +646,7 @@ function usage(platform = process.platform) {
     '  mention search [query...] [--limit <n>]',
     '  mention build <conversation-id>',
     '  open <conversation-id> [--target source|notion|obsidian|feishu|github] [--launch]',
+    '  link <conversation-id> [--message-key <key>]   Create a clickable SyncNos-local citation',
     '  capabilities',
     '  notion auth status|start|disconnect',
     '  notion pages list',
@@ -887,6 +895,42 @@ export async function runCli(
       const { selected } = await selectedInstance(options, context);
       const detail = await requestSelected(selected, 'conversation.get', { conversationId });
       writeResult(stdout, envelopeOk(detail), options.human);
+      return EXIT.success;
+    }
+
+    if (options.command === 'link') {
+      assertAllowedOptions(options, new Set(['instance', 'human', 'messageKey']));
+      if (options.positionals.length !== 1)
+        throw codedError('usage_error', 'link requires exactly one conversation id', EXIT.usage);
+      const conversationId = parsePositiveInteger(options.positionals[0], 'conversation id');
+      const messageKey = options.messageKey;
+      if (messageKey && (messageKey.length > 512 || /\p{Cc}/u.test(messageKey)))
+        throw codedError('usage_error', '--message-key is invalid', EXIT.usage);
+      const { selected } = await selectedInstance(options, context);
+      const detail = await requestSelected(selected, 'conversation.get', { conversationId });
+      const source = String(detail?.conversation?.source || '')
+        .trim()
+        .toLowerCase();
+      const conversationKey = String(detail?.conversation?.conversationKey || '').trim();
+      if (!source || !conversationKey)
+        throw codedError(
+          'conversation_identity_unavailable',
+          'Conversation has no stable source identity',
+          EXIT.business,
+        );
+      if (messageKey && !detail?.messages?.some((item) => item?.messageKey === messageKey))
+        throw codedError('message_not_found', 'Message key does not belong to this conversation', EXIT.business);
+      const loc = Buffer.from(`${source}||${conversationKey}`, 'utf8').toString('base64url');
+      if (loc.length > 4096)
+        throw codedError('link_unavailable', 'Conversation identity is too long for a link', EXIT.business);
+      const params = new URLSearchParams({ loc });
+      if (messageKey) params.set('message', messageKey);
+      const url = `https://chiimagnus.github.io/SyncNos/#/open?${params}`;
+      writeResult(
+        stdout,
+        envelopeOk({ url, source, conversationKey, ...(messageKey ? { messageKey } : null) }),
+        options.human,
+      );
       return EXIT.success;
     }
 

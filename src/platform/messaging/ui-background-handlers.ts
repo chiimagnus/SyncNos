@@ -1,4 +1,6 @@
 import { t } from '@i18n';
+import { isSyncnosLinkPage, parseSyncnosLink } from '@services/shared/conversation-loc';
+import { openOrFocusExtensionAppTab } from '@platform/webext/extension-app';
 import { tabsQuery } from '@platform/webext/tabs';
 import { sendToContentScript } from '@platform/messaging/content-script-recovery';
 import {
@@ -19,6 +21,31 @@ type UiMessageHandlersOptions = {
 
 export function registerUiMessageHandlers(router: AnyRouter, options: UiMessageHandlersOptions) {
   const ensureLocaleReady = options.ensureLocaleReady;
+  router.register(UI_MESSAGE_TYPES.OPEN_SYNCNOS_LINK, async (msg: any, sender: any) => {
+    const link = parseSyncnosLink(msg?.url);
+    let source: URL;
+    let tab: URL;
+    try {
+      source = new URL(String(sender?.url || ''));
+      tab = new URL(String(sender?.tab?.url || ''));
+    } catch {
+      return router.err('Untrusted SyncNos link', { code: 'INVALID_ARGUMENT' });
+    }
+    if (
+      !link ||
+      !Number.isSafeInteger(sender?.tab?.id) ||
+      sender.tab.id <= 0 ||
+      [source, tab].some((url) => !isSyncnosLinkPage(url.href))
+    ) {
+      return router.err('Untrusted or invalid SyncNos link', { code: 'INVALID_ARGUMENT' });
+    }
+    try {
+      const tab = await openOrFocusExtensionAppTab({ route: link.route });
+      return tab ? router.ok({ opened: true }) : router.err('SyncNos tab is unavailable', { code: 'OPEN_FAILED' });
+    } catch {
+      return router.err('Failed to open SyncNos tab', { code: 'OPEN_FAILED' });
+    }
+  });
   const ensureFallbackLocaleReady = async () => {
     await ensureLocaleReady().catch(() => undefined);
   };

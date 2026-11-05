@@ -26,3 +26,8 @@ Keep that browser profile running while the agent uses it.
 
 Install the chosen Skill in your AI agent's Skills directory. Treat the local `syncnos` CLI
 as the command and connection source of truth.
+
+## 3. Link to a saved message
+
+Use `syncnos link <conversation-id> --message-key <messageKey>` to create a clickable SyncNos link to the locally saved message.
+Open it in a browser with a compatible SyncNos extension and a copy of the saved conversation.

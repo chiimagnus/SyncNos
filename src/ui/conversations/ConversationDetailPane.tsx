@@ -24,6 +24,7 @@ import { countConversationMessageImages } from '@services/conversations/domain/i
 import { countConversationMessageTextUnits } from '@services/conversations/domain/text-count';
 import { formatVideoTimecode } from '@services/conversations/domain/video-content';
 import { conversationKinds } from '@services/protocols/conversation-kinds';
+import { findLinkedMessageIndex } from '@services/shared/conversation-loc';
 import type { CommentLocatorSurfaceRoots } from '@ui/comments';
 
 function findRouteScrollRoot(messagesRoot: Element | null): Element | null {
@@ -87,6 +88,24 @@ export function ConversationDetailPane({
   const expandSidebarLabel = t('expandSidebar');
   const commentsSidebarLabel = t(commentsSidebarOpen ? 'closeCommentsSidebar' : 'openCommentsSidebar');
   const messagesRootRef = useRef<HTMLDivElement | null>(null);
+  const lastDeepLinkScrollRef = useRef('');
+  const [linkHash, setLinkHash] = useState(() => globalThis.window?.location?.hash || '');
+  useEffect(() => {
+    const onHashChange = () => setLinkHash(globalThis.window?.location?.hash || '');
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+  useEffect(() => {
+    if (!selected || !detail?.messages || Number(detail.conversationId) !== Number(selected.id)) return;
+    const messageIndex = findLinkedMessageIndex(linkHash, selected, detail.messages);
+    if (messageIndex < 0) return;
+    const element = messagesRootRef.current?.children.item(messageIndex) as HTMLElement | null;
+    if (!element) return;
+    const identity = `${selected.id}:${linkHash}`;
+    if (lastDeepLinkScrollRef.current === identity) return;
+    lastDeepLinkScrollRef.current = identity;
+    element.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'nearest' });
+  }, [linkHash, detail?.messages, detail?.conversationId, selected]);
   const userMessageElByIdRef = useRef<Map<number, HTMLDivElement>>(new Map());
   const userMessageRefSetterByIdRef = useRef<Map<number, (node: HTMLDivElement | null) => void>>(new Map());
   const optimisticActiveClearTimerRef = useRef<number | null>(null);

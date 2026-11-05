@@ -137,6 +137,48 @@ async function roots() {
   };
 }
 
+describe('syncnos CLI local evidence links', () => {
+  it('returns a verified message-level SyncNos link instead of an original-site URL', async () => {
+    const { runtimeRoot, homeDir } = await roots();
+    const instance = await startFakeInstance(runtimeRoot, 'helium-main', 'chromium', {
+      onRequest(request) {
+        if (request.method !== 'conversation.get') return null;
+        return {
+          data: {
+            conversation: {
+              source: 'chatgpt',
+              conversationKey: 'original-conversation-id',
+              url: 'https://chatgpt.com/c/original-conversation-id',
+            },
+            messages: [{ messageKey: 'user-message-1' }, { messageKey: 'assistant-message-2' }],
+          },
+        };
+      },
+    });
+    try {
+      const reply = await run(['link', '2253', '--message-key', 'user-message-1'], runtimeRoot, homeDir);
+      expect(reply.exitCode).toBe(0);
+      expect(reply.json?.data?.url).toMatch(/^https:\/\/chiimagnus\.github\.io\/SyncNos\/#\/open\?/);
+      expect(reply.json?.data?.url).toContain('message=user-message-1');
+      expect(reply.json?.data?.url).not.toContain('chatgpt.com');
+      expect(
+        instance.requests.some(
+          (request) => request.method === 'conversation.get' && request.params?.conversationId === 2253,
+        ),
+      ).toBe(true);
+      const conversationLink = await run(['link', '2253'], runtimeRoot, homeDir);
+      expect(conversationLink.exitCode).toBe(0);
+      expect(conversationLink.json?.data?.url).not.toContain('&message=');
+      const missing = await run(['link', '2253', '--message-key', 'not-in-conversation'], runtimeRoot, homeDir);
+      expect(missing.json?.error?.code).toBe('message_not_found');
+      const unknownFlag = await run(['link', '2253', '--target', 'notion'], runtimeRoot, homeDir);
+      expect(unknownFlag.json?.error?.code).toBe('usage_error');
+    } finally {
+      await instance.stop();
+    }
+  });
+});
+
 describe('syncnos CLI instance selection', () => {
   it('auto-selects the only online instance and reads revisions through its endpoint', async () => {
     const { runtimeRoot, homeDir } = await roots();
