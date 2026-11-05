@@ -33,7 +33,7 @@ import {
 } from '@services/shared/markdown-image-references';
 import { formatSyncnosAssetUrl, isSyncnosAssetUrl, parseSyncnosAssetId } from '@services/shared/syncnos-asset-uri';
 import { hasValidArticleCommentContent } from '@services/comments/domain/comment-content';
-import { normalizeArticleCommentLocator } from '@services/comments/domain/comment-locator';
+import { parseArticleCommentDto } from '@services/comments/domain/comment-dto';
 import {
   buildArticleCommentArchiveBaseKey,
   buildArticleCommentArchiveFingerprint,
@@ -558,72 +558,37 @@ export async function importBackupZipMerge(
           const id = Number(conversationId);
           activityByConversationId.set(id, Math.max(activityByConversationId.get(id) || 0, timestamp));
         };
-        const index = store.index('by_canonicalUrl_createdAt');
         const existingByFingerprint = new Map<string, AnyRecord>();
         const existingByImportIdentity = new Map<string, AnyRecord>();
         const existingBaseKeysById = new Map<number, Map<string, string>>();
-        const existingRows: AnyRecord[] = [];
+        const existingRows: { row: AnyRecord; comment: NonNullable<ReturnType<typeof parseArticleCommentDto>> }[] = [];
 
-        for (const canonicalUrl of canonicalUrls) {
-          const range = globalThis.IDBKeyRange?.bound
-            ? globalThis.IDBKeyRange.bound([canonicalUrl, -Infinity] as any, [canonicalUrl, Infinity] as any)
-            : null;
-          const rows = range ? (await reqToPromise<any[]>(index.getAll(range) as any)) || [] : [];
-          for (const row of rows) {
-            const id = Number(row?.id);
-            const quoteText = String(row?.quoteText || '');
-            const commentText = safeString(row?.commentText);
-            const parentId = Number(row?.parentId);
-            if (
-              !Number.isSafeInteger(id) ||
-              id <= 0 ||
-              !hasValidArticleCommentContent({
-                parentId: Number.isSafeInteger(parentId) && parentId > 0 ? parentId : null,
-                quoteText,
-                commentText,
-                locator: normalizeArticleCommentLocator(row?.locator),
-                importSource: safeString(row?.importSource),
-                importKey: safeString(row?.importKey),
-              })
-            )
-              continue;
-            const uniqueKeys = new Set<string>(uniqueKeysByLocalConversationId.get(Number(row?.conversationId)) ?? []);
-            uniqueKeys.add('');
-            const baseKeys = new Map<string, string>();
-            for (const uniqueKey of uniqueKeys) {
-              baseKeys.set(
-                uniqueKey,
-                buildArticleCommentArchiveBaseKey({
-                  uniqueKey,
-                  canonicalUrl,
-                  createdAt: Number(row?.createdAt) || 0,
-                  quoteText,
-                  commentText,
-                }),
-              );
-            }
-            existingBaseKeysById.set(id, baseKeys);
-            const importedMergeKey = buildImportedArticleCommentMergeKey({
-              canonicalUrl,
-              importSource: row?.importSource,
-              importKey: row?.importKey,
-              isRoot: !(Number.isSafeInteger(parentId) && parentId > 0),
-            });
-            if (importedMergeKey && !existingByImportIdentity.has(importedMergeKey)) {
-              existingByImportIdentity.set(importedMergeKey, row);
-            }
-            existingRows.push(row);
+        // A backup uses canonical DTO values, but legacy IndexedDB indexes may still contain raw URLs or timestamps.
+        for (const row of (await reqToPromise<AnyRecord[]>(store.getAll() as any)) || []) {
+          const comment = parseArticleCommentDto(row);
+          if (!comment || !canonicalUrls.has(comment.canonicalUrl)) continue;
+          const uniqueKeys = new Set<string>(uniqueKeysByLocalConversationId.get(Number(comment.conversationId)) ?? []);
+          uniqueKeys.add('');
+          const baseKeys = new Map<string, string>();
+          for (const uniqueKey of uniqueKeys) {
+            baseKeys.set(uniqueKey, buildArticleCommentArchiveBaseKey({ ...comment, uniqueKey }));
           }
+          existingBaseKeysById.set(comment.id, baseKeys);
+          const importedMergeKey = buildImportedArticleCommentMergeKey({
+            canonicalUrl: comment.canonicalUrl,
+            importSource: comment.importSource,
+            importKey: comment.importKey,
+            isRoot: comment.parentId == null,
+          });
+          if (importedMergeKey && !existingByImportIdentity.has(importedMergeKey)) {
+            existingByImportIdentity.set(importedMergeKey, row);
+          }
+          existingRows.push({ row, comment });
         }
-        for (const row of existingRows) {
-          if (safeString(row.importSource) && safeString(row.importKey)) continue;
-          const id = Number(row.id);
-          const baseKeys = existingBaseKeysById.get(id) ?? new Map<string, string>();
-          const parentId = Number(row.parentId);
-          const parentBaseKeys =
-            Number.isSafeInteger(parentId) && parentId > 0
-              ? (existingBaseKeysById.get(parentId) ?? new Map<string, string>())
-              : null;
+        for (const { row, comment } of existingRows) {
+          if (comment.importSource && comment.importKey) continue;
+          const baseKeys = existingBaseKeysById.get(comment.id) ?? new Map<string, string>();
+          const parentBaseKeys = comment.parentId == null ? null : existingBaseKeysById.get(comment.parentId);
           for (const [uniqueKey, baseKey] of baseKeys) {
             const parentBaseKey = parentBaseKeys?.get(uniqueKey) ?? '';
             const fingerprint = buildArticleCommentArchiveFingerprint(baseKey, parentBaseKey);
@@ -636,6 +601,7 @@ export async function importBackupZipMerge(
           parentId: number | null;
           conversationId: number | null;
           fingerprint: string;
+          legacyFingerprint?: string;
           isRoot: boolean;
         }): Promise<{ id: number; created: boolean; changed: boolean; incomingContentWins: boolean }> => {
           const item = input.item;
@@ -647,7 +613,9 @@ export async function importBackupZipMerge(
           });
           const existing = importedMergeKey
             ? (existingByImportIdentity.get(importedMergeKey) ?? null)
-            : (existingByFingerprint.get(input.fingerprint) ?? null);
+            : (existingByFingerprint.get(input.fingerprint) ??
+              (input.legacyFingerprint ? existingByFingerprint.get(input.legacyFingerprint) : null) ??
+              null);
           const incomingUpdatedAt = Number(item.updatedAt) || 0;
 
           if (existing?.id) {
@@ -742,6 +710,7 @@ export async function importBackupZipMerge(
             parentId,
             conversationId: mappedConversationId,
             fingerprint: primaryFingerprint,
+            legacyFingerprint: splitCompositeRoot ? item.fingerprint : undefined,
             isRoot: item.parentCommentId == null,
           });
           incomingIdToLocalId.set(item.commentId, primary.id);

@@ -260,6 +260,248 @@ afterEach(async () => {
 });
 
 describe('backup service', () => {
+  it('matches historical comments by canonical identity even when IndexedDB stores legacy URL, timestamps, and line endings', async () => {
+    const canonicalUrl = 'https://mp.weixin.qq.com/s/legacy-comment';
+    const legacyUrl = `${canonicalUrl}#old-fragment`;
+    const conversationKey = `article:${canonicalUrl}`;
+    const uniqueKey = `web||${conversationKey}`;
+    const locator = {
+      v: 1,
+      env: 'app',
+      quote: { type: 'TextQuoteSelector', exact: 'quoted\nline' },
+      position: { type: 'TextPositionSelector', start: 0, end: 11 },
+    };
+    const db = await openDb();
+    const seed = db.transaction(['conversations', 'article_comments'], 'readwrite');
+    const conversationId = await reqToPromise<number>(
+      seed.objectStore('conversations').add({
+        sourceType: 'article',
+        source: 'web',
+        conversationKey,
+        title: 'Historical comments',
+        url: canonicalUrl,
+        lastActivityAt: 200,
+      }) as IDBRequest<number>,
+    );
+    const comments = seed.objectStore('article_comments');
+    const rootId = await reqToPromise<number>(
+      comments.add({
+        parentId: null,
+        conversationId,
+        canonicalUrl: legacyUrl,
+        authorName: 'Reader',
+        quoteText: 'quoted\r\nline',
+        commentText: '',
+        locator,
+        createdAt: '100',
+        updatedAt: '100',
+      }) as IDBRequest<number>,
+    );
+    const replyId = await reqToPromise<number>(
+      comments.add({
+        parentId: rootId,
+        conversationId,
+        canonicalUrl: legacyUrl,
+        authorName: 'Reader',
+        quoteText: '',
+        commentText: 'reply',
+        locator: null,
+        createdAt: '101',
+        updatedAt: '101',
+      }) as IDBRequest<number>,
+    );
+    const legacyRootId = await reqToPromise<number>(
+      comments.add({
+        parentId: null,
+        conversationId,
+        canonicalUrl: legacyUrl,
+        authorName: 'Reader',
+        quoteText: 'unanchored quote',
+        commentText: 'legacy note',
+        locator: null,
+        createdAt: '102',
+        updatedAt: '102',
+      }) as IDBRequest<number>,
+    );
+    await new Promise<void>((resolve, reject) => {
+      seed.oncomplete = () => resolve();
+      seed.onerror = () => reject(seed.error);
+      seed.onabort = () => reject(seed.error);
+    });
+
+    const entries = emptyBackupZipEntries();
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+    const manifest = JSON.parse(decoder.decode(entries.get('manifest.json')!));
+    const path = 'sources/web/legacy-comment.json';
+    manifest.counts.conversations = 1;
+    manifest.counts.article_comments = 3;
+    manifest.sources = [{ source: 'web', conversationCount: 1, files: [path] }];
+    entries.set('manifest.json', encoder.encode(JSON.stringify(manifest)));
+    entries.set(
+      path,
+      encoder.encode(
+        JSON.stringify({
+          schemaVersion: 1,
+          conversation: {
+            sourceType: 'article',
+            source: 'web',
+            conversationKey,
+            title: 'Historical comments',
+            url: canonicalUrl,
+            lastActivityAt: 200,
+          },
+          messages: [],
+          syncMapping: null,
+        }),
+      ),
+    );
+    entries.set(
+      'assets/article-comments/index.json',
+      encoder.encode(
+        JSON.stringify({
+          schemaVersion: 2,
+          comments: [
+            {
+              commentId: 10,
+              parentCommentId: null,
+              uniqueKey,
+              canonicalUrl,
+              authorName: 'Reader',
+              quoteText: 'quoted\nline',
+              commentText: '',
+              locator,
+              createdAt: 100,
+              updatedAt: 100,
+            },
+            {
+              commentId: 11,
+              parentCommentId: 10,
+              uniqueKey,
+              canonicalUrl,
+              authorName: 'Reader',
+              quoteText: '',
+              commentText: 'reply',
+              locator: null,
+              createdAt: 101,
+              updatedAt: 101,
+            },
+            {
+              commentId: 12,
+              parentCommentId: null,
+              uniqueKey,
+              canonicalUrl,
+              authorName: 'Reader',
+              quoteText: 'unanchored quote',
+              commentText: 'legacy note',
+              locator: null,
+              createdAt: 102,
+              updatedAt: 102,
+            },
+          ],
+        }),
+      ),
+    );
+
+    const first = await importBackupZipMerge(entries);
+    expect(first.commentsAdded).toBe(0);
+    const second = await importBackupZipMerge(entries);
+    expect(second).toMatchObject({ commentsAdded: 0, commentsUpdated: 0, commentsSkipped: 3 });
+
+    const read = db.transaction('article_comments', 'readonly');
+    const restored = await reqToPromise<any[]>(read.objectStore('article_comments').getAll());
+    expect(restored).toHaveLength(3);
+    expect(restored.map((row) => row.id).sort((a, b) => a - b)).toEqual(
+      [rootId, replyId, legacyRootId].sort((a, b) => a - b),
+    );
+    expect(restored.every((row) => row.canonicalUrl === canonicalUrl && typeof row.createdAt === 'number')).toBe(true);
+    expect(restored.find((row) => row.id === replyId)?.parentId).toBe(rootId);
+    expect(restored.find((row) => row.id === rootId)?.quoteText).toBe('quoted\nline');
+    const indexed = await reqToPromise<any[]>(
+      read.objectStore('article_comments')
+        .index('by_canonicalUrl_createdAt')
+        .getAll(IDBKeyRange.bound([canonicalUrl, -Infinity], [canonicalUrl, Infinity])),
+    );
+    expect(indexed).toHaveLength(3);
+  });
+
+  it('splits an anchored legacy composite root in place during restore without duplicating it', async () => {
+    const url = 'https://example.com/composite-legacy';
+    const locator = {
+      v: 1,
+      env: 'app',
+      quote: { type: 'TextQuoteSelector', exact: 'anchored quote' },
+      position: { type: 'TextPositionSelector', start: 0, end: 14 },
+    };
+    const db = await openDb();
+    const seed = db.transaction('article_comments', 'readwrite');
+    const rootId = await reqToPromise<number>(
+      seed.objectStore('article_comments').add({
+        parentId: null,
+        conversationId: null,
+        canonicalUrl: url,
+        authorName: 'Reader',
+        quoteText: 'anchored quote',
+        commentText: 'a comment',
+        locator,
+        createdAt: 100,
+        updatedAt: 100,
+      }) as IDBRequest<number>,
+    );
+    await new Promise<void>((resolve, reject) => {
+      seed.oncomplete = () => resolve();
+      seed.onerror = () => reject(seed.error);
+      seed.onabort = () => reject(seed.error);
+    });
+
+    const entries = emptyBackupZipEntries();
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+    const manifest = JSON.parse(decoder.decode(entries.get('manifest.json')!));
+    manifest.counts.article_comments = 1;
+    entries.set('manifest.json', encoder.encode(JSON.stringify(manifest)));
+    entries.set(
+      'assets/article-comments/index.json',
+      encoder.encode(
+        JSON.stringify({
+          schemaVersion: 2,
+          comments: [
+            {
+              commentId: 10,
+              parentCommentId: null,
+              uniqueKey: '',
+              canonicalUrl: url,
+              authorName: 'Reader',
+              quoteText: 'anchored quote',
+              commentText: 'a comment',
+              locator,
+              createdAt: 100,
+              updatedAt: 100,
+            },
+          ],
+        }),
+      ),
+    );
+
+    const first = await importBackupZipMerge(entries);
+    expect(first.commentsAdded).toBe(0);
+    const second = await importBackupZipMerge(entries);
+    expect(second.commentsAdded).toBe(0);
+    const read = db.transaction('article_comments', 'readonly');
+    const restored = await reqToPromise<any[]>(read.objectStore('article_comments').getAll());
+    expect(restored).toHaveLength(2);
+    expect(restored.find((row) => row.id === rootId)).toMatchObject({
+      parentId: null,
+      quoteText: 'anchored quote',
+      commentText: '',
+    });
+    expect(restored.find((row) => row.id !== rootId)).toMatchObject({
+      parentId: rootId,
+      quoteText: '',
+      commentText: 'a comment',
+    });
+  });
+
   it('fails closed instead of exporting a ZIP that silently drops an invalid persisted comment', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
