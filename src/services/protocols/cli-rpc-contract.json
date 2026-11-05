@@ -24,6 +24,7 @@
     "system.ping",
     "revision.get",
     "conversation.list",
+    "conversation.find",
     "conversation.get",
     "conversation.search",
     "conversation.stats",
