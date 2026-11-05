@@ -6,6 +6,7 @@ schema、索引、storage key 和默认路径以源码与测试为准。
 ## 本地真源
 
 - AI 对话、文章和 Video 先保存到浏览器本地；Provider 与导出文件都是派生结果。
+- 本地 JSON/Markdown ZIP 仅清理文件名（含附件路径），不修改内容中的原始标题；附件引用必须与 ZIP 路径一致。
 - 同一个真实 AI 会话始终复用同一条本地 conversation。
   采集 key 格式或瞬时 URL / host 变化只做原地身份迁移，保留消息、图片缓存和同步映射；
   持久 URL 只保留稳定会话地址。
@@ -49,6 +50,7 @@ schema、索引、storage key 和默认路径以源码与测试为准。
 ## 恢复与失败
 
 - 导入是 merge restore；重复导入应保持幂等。敏感凭据只允许从明确声明的 Full Backup 恢复。
+- 评论恢复按规范化的 URL、内容与时间戳匹配已有记录，包括旧版存储形式；不得因为原始索引未命中而重复创建评论，或破坏父子关系。
 - manifest、schema 和 ZIP 路径必须在写入前验证；危险或缺失数据直接拒绝。
 - 已提交的恢复 stage 不因后续 stage 失败而回滚，也不得用恢复时刻改写业务活跃时间。
 - 图片 asset identity 只在 owning conversation 内有效，导入 remap 不得跨 conversation 复用。

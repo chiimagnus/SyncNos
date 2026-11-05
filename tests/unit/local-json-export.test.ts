@@ -1,3 +1,7 @@
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -152,6 +156,42 @@ describe('local JSON v2 export', () => {
     expect(JSON.stringify(entry.value)).not.toMatch(
       /notion|feishu|commentThread|listSource|listSite|conversationId|sequence|updatedAt|"id"/,
     );
+  });
+
+  it('exports a macOS-extractable ZIP while preserving an unsupported codepoint in the JSON title', async () => {
+    const originalTitle = '有限元进度总结' + String.fromCodePoint(0x4e7c4);
+    const c = conversation(1, { title: originalTitle });
+    mocks.getConversationDetail.mockResolvedValue({
+      conversationId: 1,
+      messages: [message('m-1', { contentMarkdown: '![image](syncnos-asset://1)' })],
+    });
+    mocks.getImageCacheAssetsByIds.mockResolvedValue(new Map([[1, asset(1, 1)]]));
+
+    const result = await buildConversationsJsonZipExport({ conversations: [c] });
+    const entries = await extractZipEntries(result.zipBlob);
+    const [item] = await readJsonEntries(result.zipBlob);
+    const attachmentPath = item.value.attachments[0].path;
+
+    expect(item.value.title).toBe(originalTitle);
+    expect(item.name).toBe(buildConversationBasename(c) + '.json');
+    expect(item.name).not.toContain(String.fromCodePoint(0x4e7c4));
+    expect(entries.has(attachmentPath)).toBe(true);
+    expect(item.value.messages[0].content.value).toContain(attachmentPath);
+
+    if (process.platform === 'darwin') {
+      const directory = mkdtempSync(join(tmpdir(), 'syncnos-json-extract-'));
+      try {
+        const zipPath = join(directory, 'export.zip');
+        const destination = join(directory, 'output');
+        mkdirSync(destination);
+        writeFileSync(zipPath, new Uint8Array(await result.zipBlob.arrayBuffer()));
+        execFileSync('/usr/bin/ditto', ['-x', '-k', zipPath, destination]);
+        expect(JSON.parse(readFileSync(join(destination, item.name), 'utf8')).title).toBe(originalTitle);
+        expect(readFileSync(join(destination, attachmentPath))).toEqual(Buffer.from([1]));
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    }
   });
 
   it('uses article_body when present and falls back to the first historical message only when that key is absent', async () => {

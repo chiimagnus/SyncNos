@@ -35,5 +35,16 @@ export function buildConversationBasename(conversation: any): string {
   const ai = sanitizeFilenamePart(aiTagForSource(c.source), 'unknown', 24);
   const title = sanitizeFilenamePart(c.title || 'Untitled', 'Untitled', 80);
   const id = stableConversationId10(c);
-  return `${ai}-${title}-${id}`;
+  // Leave room for attachment suffixes within the 255-byte filesystem filename limit.
+  const encoder = new TextEncoder();
+  const titleBudget = 240 - encoder.encode(`${ai}--${id}`).byteLength;
+  let bytes = 0;
+  let boundedTitle = '';
+  for (const character of title) {
+    const size = encoder.encode(character).byteLength;
+    if (bytes + size > titleBudget) break;
+    boundedTitle += character;
+    bytes += size;
+  }
+  return `${ai}-${boundedTitle.replace(/-+$/, '')}-${id}`;
 }

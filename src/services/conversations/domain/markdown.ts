@@ -53,11 +53,16 @@ export function sanitizeFilenamePart(value: unknown, fallback: string, maxLen: n
   const cleaned = raw
     .replace(/[\\/:*?"<>|]+/g, '-')
     .replace(/\s+/g, '-')
+    .replace(/[\p{Cc}\p{Cs}\p{Cn}]/gu, '')
     .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '')
     .trim();
   const limit = Number.isFinite(Number(maxLen)) ? Math.max(1, Math.floor(Number(maxLen))) : 80;
-  return cleaned.slice(0, limit) || fallback;
+  const truncated = cleaned
+    .slice(0, limit)
+    .replace(/[\uD800-\uDBFF]$/, '')
+    .replace(/-+$/, '');
+  return truncated || fallback;
 }
 
 function formatArticleMarkdown(
