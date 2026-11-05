@@ -5,11 +5,17 @@ vi.mock('../../src/platform/webext/tabs', () => ({
   tabsSendMessage: vi.fn(),
 }));
 
+vi.mock('../../src/platform/webext/extension-app', () => ({
+  openOrFocusExtensionAppTab: vi.fn(),
+}));
+
 vi.mock('../../src/platform/webext/scripting', () => ({
   scriptingExecuteScript: vi.fn(),
 }));
 
 import { UI_MESSAGE_TYPES } from '../../src/platform/messaging/message-contracts';
+import { buildSyncnosLink, parseSyncnosLink } from '../../src/services/shared/conversation-loc';
+import { openOrFocusExtensionAppTab } from '../../src/platform/webext/extension-app';
 import { scriptingExecuteScript } from '../../src/platform/webext/scripting';
 import { tabsQuery, tabsSendMessage } from '../../src/platform/webext/tabs';
 import { registerUiMessageHandlers } from '../../src/platform/messaging/ui-background-handlers';
@@ -51,6 +57,33 @@ afterEach(() => {
 });
 
 describe('UI background handler locale readiness', () => {
+  it('opens only verified SyncNos website links in the extension app', async () => {
+    const { router, handlers } = createRouter();
+    registerUiMessageHandlers(router, { ensureLocaleReady: vi.fn(async () => undefined) });
+    const link = buildSyncnosLink({ source: 'chatgpt', conversationKey: 'conversation-a', messageKey: 'msg-b' });
+    const sender = { url: link, tab: { id: 8, url: link } };
+    vi.mocked(openOrFocusExtensionAppTab).mockResolvedValue({ id: 19 } as any);
+    const open = handlers.get(UI_MESSAGE_TYPES.OPEN_SYNCNOS_LINK)!;
+    await expect(open({ url: link }, sender)).resolves.toMatchObject({ ok: true, data: { opened: true } });
+    await expect(
+      open({ url: link }, { url: link.replace('message=msg-b', 'message=old'), tab: sender.tab }),
+    ).resolves.toMatchObject({ ok: true, data: { opened: true } });
+    expect(openOrFocusExtensionAppTab).toHaveBeenCalledWith({ route: parseSyncnosLink(link)!.route });
+    vi.mocked(openOrFocusExtensionAppTab).mockClear();
+    for (const untrusted of [
+      { url: link, tab: { id: 8, url: 'https://example.com/' } },
+      { url: 'https://evil.test/', tab: { id: 8, url: 'https://evil.test/' } },
+      { url: link },
+      {
+        url: link.replace('/SyncNos/', '/not-syncnos/'),
+        tab: { id: 8, url: link.replace('/SyncNos/', '/not-syncnos/') },
+      },
+    ])
+      await expect(open({ url: link }, untrusted)).resolves.toMatchObject({ ok: false });
+    await expect(open({ url: 'https://example.com/' }, sender)).resolves.toMatchObject({ ok: false });
+    expect(openOrFocusExtensionAppTab).not.toHaveBeenCalled();
+  });
+
   it('registers every UI message synchronously and relays HTTP state without touching locale readiness', async () => {
     const locale = deferred<void>();
     const ensureLocaleReady = vi.fn(() => locale.promise);

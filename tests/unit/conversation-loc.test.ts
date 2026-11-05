@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   buildConversationLoc,
   buildConversationRouteFromLoc,
+  buildSyncnosLink,
+  parseSyncnosLink,
+  findLinkedMessageIndex,
   decodeConversationLoc,
   encodeConversationLoc,
 } from '@services/shared/conversation-loc';
@@ -55,6 +58,44 @@ describe('conversation-loc', () => {
         }),
       ),
     ).toBeNull();
+  });
+
+  it('builds HTTPS links to the local SyncNos app without exposing the extension ID', () => {
+    const url = buildSyncnosLink({ source: 'ChatGPT', conversationKey: 'session-42', messageKey: 'message-2' });
+    expect(url).toMatch(/^https:\/\/chiimagnus\.github\.io\/SyncNos\/#\/open\?/);
+    expect(url).not.toContain('chrome-extension://');
+    expect(url).not.toContain('chatgpt.com');
+    const parsed = parseSyncnosLink(url);
+    expect(parsed?.route).toContain('&message=message-2');
+    expect(
+      findLinkedMessageIndex(`#${parsed?.route}`, { source: 'chatgpt', conversationKey: 'session-42' }, [
+        { messageKey: 'message-1' },
+        { messageKey: 'message-2' },
+      ]),
+    ).toBe(1);
+    expect(
+      findLinkedMessageIndex(`#${parsed?.route}`, { source: 'chatgpt', conversationKey: 'different' }, [
+        { messageKey: 'message-2' },
+      ]),
+    ).toBe(-1);
+  });
+
+  it('rejects malformed, conflicting, and off-origin deep links', () => {
+    const good = buildSyncnosLink({ source: 'chatgpt', conversationKey: 'session-1', messageKey: 'msg' });
+    for (const bad of [
+      good.replace('chiimagnus.github.io', 'attacker.example'),
+      good.replace('https://', 'http://'),
+      good.replace('/SyncNos/', '/syncnos/'),
+      good.replace('message=msg', 'message=msg&message=duplicate'),
+      good.replace('message=msg', 'message='),
+      good + '&extra=true',
+      good.replace('loc=', 'loc=bad&loc='),
+      good.replace('message=msg', `message=${'a'.repeat(513)}`),
+      good.replace('#/open?', '#/settings?'),
+      'not-a-url',
+    ])
+      expect(parseSyncnosLink(bad)).toBeNull();
+    expect(findLinkedMessageIndex('#/wrong', { source: 'chatgpt', conversationKey: 'session-1' }, [])).toBe(-1);
   });
 
   it('builds loc and route helpers', () => {

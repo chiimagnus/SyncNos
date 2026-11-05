@@ -118,6 +118,7 @@ export const COMMENTS_MESSAGE_TYPES = {
 } as const;
 
 export const UI_MESSAGE_TYPES = {
+  OPEN_SYNCNOS_LINK: 'openSyncnosLink',
   OPEN_EXTENSION_POPUP: 'openExtensionPopup',
   OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL: 'openCurrentTabInpageCommentsPanel',
   GET_ACTIVE_TAB_CAPTURE_STATE: 'getActiveTabCaptureState',

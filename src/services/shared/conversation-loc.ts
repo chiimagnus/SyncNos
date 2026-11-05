@@ -76,6 +76,73 @@ export function buildConversationRouteFromLoc(loc: string): string {
   return `/?loc=${encodeURIComponent(String(loc || '').trim())}`;
 }
 
+const SYNCNOS_LINK_ORIGIN = 'https://chiimagnus.github.io';
+const SYNCNOS_LINK_PATH = '/SyncNos/';
+
+export function isSyncnosLinkPage(value: unknown): boolean {
+  try {
+    const url = new URL(String(value));
+    return url.origin === SYNCNOS_LINK_ORIGIN && url.pathname === SYNCNOS_LINK_PATH && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}
+
+export function findLinkedMessageIndex(
+  hash: string,
+  identity: { source: string; conversationKey: string },
+  messages: readonly { messageKey: string }[],
+): number {
+  if (!hash.startsWith('#/')) return -1;
+  const queryStart = hash.indexOf('?');
+  if (queryStart < 0) return -1;
+  const params = new URLSearchParams(hash.slice(queryStart + 1));
+  const messageKey = params.get('message');
+  const target = decodeConversationLoc(params.get('loc'));
+  if (
+    !messageKey ||
+    !target ||
+    target.source !== identity.source ||
+    target.conversationKey !== identity.conversationKey
+  )
+    return -1;
+  return messages.findIndex((message) => message.messageKey === messageKey);
+}
+
+export function buildSyncnosLink(input: { source: string; conversationKey: string; messageKey?: string }): string {
+  const loc = encodeConversationLoc(input);
+  const params = new URLSearchParams({ loc });
+  if (input.messageKey) params.set('message', input.messageKey);
+  return `${SYNCNOS_LINK_ORIGIN}${SYNCNOS_LINK_PATH}#/open?${params}`;
+}
+
+export function parseSyncnosLink(value: unknown): { route: string; messageKey: string | null } | null {
+  if (typeof value !== 'string') return null;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (!isSyncnosLinkPage(url.href) || url.search) return null;
+  if (!url.hash.startsWith('#/open?')) return null;
+  const params = new URLSearchParams(url.hash.slice('#/open?'.length));
+  const locs = params.getAll('loc');
+  const messages = params.getAll('message');
+  if (
+    locs.length !== 1 ||
+    locs[0]!.length > 4096 ||
+    !decodeConversationLoc(locs[0]) ||
+    messages.length > 1 ||
+    [...params.keys()].some((key) => key !== 'loc' && key !== 'message')
+  )
+    return null;
+  const messageKey = messages[0] ?? null;
+  if (messageKey != null && (!messageKey || messageKey.length > 512 || /\p{Cc}/u.test(messageKey))) return null;
+  const route = buildConversationRouteFromLoc(locs[0]!);
+  return { route: messageKey ? `${route}&message=${encodeURIComponent(messageKey)}` : route, messageKey };
+}
+
 const conversationLocApi = {
   encodeConversationLoc,
   decodeConversationLoc,

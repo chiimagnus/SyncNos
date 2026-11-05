@@ -27,4 +27,4 @@ Use `syncnos` as the normal operational entry point. The Extension/IndexedDB rem
 - Run `settings schema` before changing settings and only operate on public keys.
 - Provider auth/config must use CLI-exposed interfaces; do not read underlying credentials directly.
 - When the user asks to sync and confirm completion, keep the default wait semantics. Use `--no-wait` only when asynchronous behavior is explicitly needed. `sync_wait_timeout` does not mean the remote job was cancelled.
-- `open` resolves a target by default; add `--launch` only when the user asked to actually open it.
+- `open` resolves source or sync targets by default; add `--launch` only when opening is requested. Use `link` to cite locally saved content.
