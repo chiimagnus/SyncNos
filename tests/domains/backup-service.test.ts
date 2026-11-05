@@ -418,7 +418,8 @@ describe('backup service', () => {
     expect(restored.find((row) => row.id === replyId)?.parentId).toBe(rootId);
     expect(restored.find((row) => row.id === rootId)?.quoteText).toBe('quoted\nline');
     const indexed = await reqToPromise<any[]>(
-      read.objectStore('article_comments')
+      read
+        .objectStore('article_comments')
         .index('by_canonicalUrl_createdAt')
         .getAll(IDBKeyRange.bound([canonicalUrl, -Infinity], [canonicalUrl, Infinity])),
     );
