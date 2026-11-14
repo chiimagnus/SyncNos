@@ -564,22 +564,25 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
               const response = await send(CORE_MESSAGE_TYPES.GET_CONVERSATION_TAIL_WINDOW_BY_SOURCE_AND_KEY, {
                 source: 'chatgpt',
                 conversationKey: route.conversationId,
-                limit: 1,
+                limit: 16,
                 compact: true,
               });
-              const last = response?.data?.messages?.[0];
-              if (
-                response?.ok &&
-                (last?.role === 'user' || last?.role === 'assistant') &&
-                typeof last.messageKey === 'string' &&
-                !!last.messageKey.trim() &&
-                !last.messageKey.startsWith('fallback_') &&
-                !last.messageKey.startsWith('chatgpt-turn:') &&
-                Number.isSafeInteger(last.sequence) &&
-                last.sequence >= 0
-              ) {
-                savedTailMessageKey = last.messageKey;
-              }
+              const messages = response?.data?.messages;
+              const anchor =
+                response?.ok && Array.isArray(messages)
+                  ? messages.findLast(
+                      (message: any) =>
+                        (message?.role === 'user' || message?.role === 'assistant') &&
+                        typeof message.messageKey === 'string' &&
+                        !!message.messageKey.trim() &&
+                        !message.messageKey.startsWith('fallback_') &&
+                        !message.messageKey.startsWith('chatgpt-turn:') &&
+                        !message.messageKey.startsWith('chatgpt_turn_') &&
+                        Number.isSafeInteger(message.sequence) &&
+                        message.sequence >= 0,
+                    )
+                  : null;
+              if (anchor) savedTailMessageKey = anchor.messageKey;
             } catch (_error) {
               // A missing local optimization hint cannot prevent a safe full DOM sweep.
             }
