@@ -91,7 +91,7 @@ describe('image backfill scheduler', () => {
     expect(backfillMocks.backfillConversationImages).not.toHaveBeenCalled();
   });
 
-  it('flushes due work once, notifies only changed conversations, and does not spin on best-effort failures', async () => {
+  it('keeps only failed conversations queued for delayed retry without repeating successful backfills', async () => {
     const pack = makeInfra();
     const now = pack.infra.now();
     pack.storage[AI_CHAT_IMAGE_CACHE_ENABLED_STORAGE_KEY] = true;
@@ -118,7 +118,11 @@ describe('image backfill scheduler', () => {
     expect(backfillMocks.backfillConversationImages).toHaveBeenNthCalledWith(3, { conversationId: 10 });
     expect(onConversationChanged).toHaveBeenCalledWith(7, 'backfillImages');
     expect(onConversationChanged).not.toHaveBeenCalledWith(8, expect.anything());
-    expect(pack.storage[AI_CHAT_IMAGE_BACKFILL_QUEUE_STORAGE_KEY]).toEqual({ '9': now + 30_000 });
+    expect(pack.storage[AI_CHAT_IMAGE_BACKFILL_QUEUE_STORAGE_KEY]).toEqual({
+      '8': now + 60_000,
+      '9': now + 30_000,
+      '10': now + 60_000,
+    });
     expect(pack.alarm.when).toBe(now + 30_000);
   });
 
@@ -149,6 +153,50 @@ describe('image backfill scheduler', () => {
     await scheduler.enqueueWithKeys(7, ['new-image']);
     await scheduler.flush();
     expect(backfillMocks.backfillConversationImages).toHaveBeenLastCalledWith({ conversationId: 7 });
+  });
+
+  it('retains a failed scoped download in the durable queue and retries after connectivity returns', async () => {
+    const pack = makeInfra();
+    pack.storage[AI_CHAT_IMAGE_CACHE_ENABLED_STORAGE_KEY] = true;
+    let attempts = 0;
+    backfillMocks.backfillConversationImages.mockImplementation(async () => {
+      attempts += 1;
+      return result(attempts === 1 ? { warningFlags: ['chatgpt_images_cache_incomplete'] } : {});
+    });
+    const scheduler = createImageBackfillScheduler({ onConversationChanged: vi.fn() }, pack.infra);
+    await scheduler.enqueueWithKeys(7, ['new-image']);
+    await scheduler.flush();
+    const retryAt = pack.storage[AI_CHAT_IMAGE_BACKFILL_QUEUE_STORAGE_KEY]?.['7'];
+    expect(retryAt).toBeGreaterThan(pack.infra.now());
+    pack.setNow(retryAt);
+    await scheduler.flush();
+    expect(backfillMocks.backfillConversationImages).toHaveBeenNthCalledWith(2, {
+      conversationId: 7,
+      messageKeys: ['new-image'],
+    });
+    expect(pack.storage[AI_CHAT_IMAGE_BACKFILL_QUEUE_STORAGE_KEY]).toEqual({});
+  });
+
+  it('recovers a failed image job after worker restart without losing the durable queue', async () => {
+    const pack = makeInfra();
+    pack.storage[AI_CHAT_IMAGE_CACHE_ENABLED_STORAGE_KEY] = true;
+    backfillMocks.backfillConversationImages
+      .mockResolvedValueOnce(result({ warningFlags: ['chatgpt_images_cache_incomplete'] }))
+      .mockResolvedValue(result());
+    const scheduler = createImageBackfillScheduler({ onConversationChanged: vi.fn() }, pack.infra);
+    await scheduler.enqueueWithKeys(7, ['new-image']);
+    await scheduler.flush();
+    const retryAt = pack.storage[AI_CHAT_IMAGE_BACKFILL_QUEUE_STORAGE_KEY]['7'];
+    const restarted = createImageBackfillScheduler({ onConversationChanged: vi.fn() }, pack.infra);
+    pack.setNow(retryAt);
+    await restarted.flush();
+
+    expect(backfillMocks.backfillConversationImages).toHaveBeenNthCalledWith(1, {
+      conversationId: 7,
+      messageKeys: ['new-image'],
+    });
+    expect(backfillMocks.backfillConversationImages).toHaveBeenNthCalledWith(2, { conversationId: 7 });
+    expect(pack.storage[AI_CHAT_IMAGE_BACKFILL_QUEUE_STORAGE_KEY]).toEqual({});
   });
 
   it('keeps durable work queued without falling back to synchronous downloads when alarms are unavailable', async () => {

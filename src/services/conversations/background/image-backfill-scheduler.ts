@@ -16,6 +16,7 @@ export const AI_CHAT_IMAGE_BACKFILL_QUEUE_STORAGE_KEY = 'ai_chat_image_backfill_
 export const AI_CHAT_IMAGE_BACKFILL_ALARM_NAME = 'syncnos_ai_chat_image_backfill';
 const AI_CHAT_IMAGE_CACHE_ENABLED_STORAGE_KEY = 'ai_chat_cache_images_enabled';
 const AI_CHAT_IMAGE_BACKFILL_QUEUE_MAX_ITEMS = 200;
+const AI_CHAT_IMAGE_BACKFILL_RETRY_DELAY_MS = 60_000;
 
 export type ImageBackfillScheduler = AutoSyncScheduler & {
   enqueueWithKeys: (conversationId: number, messageKeys: string[]) => Promise<void>;
@@ -50,6 +51,7 @@ export function createImageBackfillScheduler(
     isProviderEnabled: async () => true,
     flushWhenAlarmsUnavailable: false,
     syncConversations: async (conversationIds) => {
+      const retryConversationIds: number[] = [];
       for (const conversationId of conversationIds) {
         const pending = pendingKeysByConversation.get(conversationId);
         const messageKeys = pending?.size ? Array.from(pending) : undefined;
@@ -58,7 +60,9 @@ export function createImageBackfillScheduler(
             conversationId,
             ...(messageKeys ? { messageKeys } : null),
           });
-          if (messageKeys && !result.warningFlags.includes('chatgpt_images_cache_incomplete')) {
+          if (result.warningFlags.includes('chatgpt_images_cache_incomplete')) {
+            retryConversationIds.push(conversationId);
+          } else if (messageKeys) {
             for (const key of messageKeys) pending?.delete(key);
             if (!pending?.size) pendingKeysByConversation.delete(conversationId);
           }
@@ -66,9 +70,10 @@ export function createImageBackfillScheduler(
             await deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.backfillImages);
           }
         } catch (_error) {
-          // Best-effort cache failures leave the original remote reference intact for a later save or manual retry.
+          retryConversationIds.push(conversationId);
         }
       }
+      return { retryConversationIds, retryDelayMs: AI_CHAT_IMAGE_BACKFILL_RETRY_DELAY_MS };
     },
   });
   return {

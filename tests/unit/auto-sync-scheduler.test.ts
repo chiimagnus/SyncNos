@@ -212,6 +212,30 @@ describe('auto-sync-scheduler-core', () => {
     expect(infraPack.storage[QUEUE_KEY]).toEqual({ '1': now + 30_000, '2': now + 10_000 });
   });
 
+  it('preserves only failed due ids returned by a partial batch run', async () => {
+    infraPack.storage[ENABLED_KEY] = true;
+    const now = infraPack.infra.now();
+    infraPack.storage[QUEUE_KEY] = { '1': now, '2': now, '3': now + 10_000 };
+    syncConversations.mockResolvedValueOnce({ retryConversationIds: [2], retryDelayMs: 60_000 });
+    const scheduler = createAutoSyncSchedulerCore({
+      queueStorageKey: QUEUE_KEY,
+      enabledStorageKey: ENABLED_KEY,
+      alarmName: ALARM_NAME,
+      debounceMs: 0,
+      maxItems: 200,
+      infra: infraPack.infra,
+      getInstanceId: () => 'partial-batch',
+      isProviderEnabled,
+      syncConversations,
+    });
+
+    await scheduler.flush();
+
+    expect(syncConversations).toHaveBeenCalledWith([1, 2], 'partial-batch');
+    expect(infraPack.storage[QUEUE_KEY]).toEqual({ '2': now + 60_000, '3': now + 10_000 });
+    expect(infraPack.alarm.when).toBe(now + 10_000);
+  });
+
   it('flush processes due items and removes them from queue', async () => {
     infraPack.storage[ENABLED_KEY] = true;
     infraPack.storage[QUEUE_KEY] = { '1': infraPack.infra.now() - 1, '2': infraPack.infra.now() + 10_000 };
