@@ -2072,6 +2072,60 @@ describe('conversations storage-idb', () => {
     expect((await getMessagesByConversationId(id)).map((message) => message.sequence)).toEqual([0, 1]);
   });
 
+  it('appends a verified DOM tail without reading or rewriting thousands of stored messages', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'dom-verified-tail',
+      title: 'Tail-only DOM',
+    });
+    const id = Number(convo.id);
+    const existing = Array.from({ length: 2000 }, (_, index) => ({
+      messageKey: `old-${index}`,
+      role: index % 2 === 0 ? 'user' : 'assistant',
+      contentMarkdown: `historic-${index}`,
+      sequence: index,
+      updatedAt: 1,
+    }));
+    await syncConversationMessages(id, existing);
+    const integrity = resolveCaptureIntegrity('chatgpt', {
+      conversation: { sourceType: 'chat', source: 'chatgpt', conversationKey: 'dom-verified-tail' },
+      messages: [
+        { messageKey: 'old-1999', role: 'assistant', contentMarkdown: 'partial-looking regression', sequence: 0 },
+        { messageKey: 'new-2000', role: 'user', contentMarkdown: 'new question', sequence: 1 },
+        { messageKey: 'new-2001', role: 'assistant', contentMarkdown: 'new answer', sequence: 2 },
+      ],
+      captureMeta: { completeness: 'partial', identityVerified: true, metrics: { stoppedAtKey: true } },
+    });
+    expect(integrity.ok).toBe(true);
+    if (!integrity.ok) return;
+    expect(
+      integrity.snapshot.messages.every((row: any) => row.captureSequencePolicy === 'preserve-existing-tail'),
+    ).toBe(true);
+    const getAll = vi.spyOn(IDBIndex.prototype, 'getAll');
+    try {
+      await syncConversationMessages(id, integrity.snapshot.messages, integrity.persistence);
+      expect(getAll).not.toHaveBeenCalled();
+    } finally {
+      getAll.mockRestore();
+    }
+
+    const stored = await getMessagesByConversationId(id);
+    expect(stored).toHaveLength(2002);
+    expect(stored[1999]).toMatchObject({
+      messageKey: 'old-1999',
+      contentMarkdown: 'historic-1999',
+      sequence: 1999,
+      updatedAt: 1,
+    });
+    expect(stored.at(-2)).toMatchObject({ messageKey: 'new-2000', sequence: 2000 });
+    expect(stored.at(-1)).toMatchObject({ messageKey: 'new-2001', sequence: 2001 });
+
+    const revisionAfterFirstCapture = await readDataRevision('messages');
+    await syncConversationMessages(id, integrity.snapshot.messages, integrity.persistence);
+    expect(await readDataRevision('messages')).toBe(revisionAfterFirstCapture);
+  });
+
   it('reconciles newly discovered virtual partial prefixes before existing anchored rows', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',

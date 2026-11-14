@@ -728,7 +728,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
   async function harvestRenderedInto(
     accumulator: PreparedAccumulator<any>,
     _root: any,
-    _options: any = {},
+    options: { newestFirst?: boolean } = {},
   ): Promise<{ added: number; updated: number }> {
     mergeIdentityAnchors(accumulator.identityGuard, manualAdapter.readIdentity());
     const { descriptors, inputsByKey, unresolvedIdentity } = manualAdapter.readWindow();
@@ -763,7 +763,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         payload: message,
       });
     }
-    return mergePreparedRecords(accumulator, records);
+    return mergePreparedRecords(accumulator, records, options);
   }
 
   async function enrichApiSnapshotWithRenderedGraphics(snapshot: any): Promise<any> {
@@ -826,6 +826,10 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       identityVerified: !!durableConversationKey,
       identityGuard: initialIdentityGuard,
     });
+    const savedTailMessageKey =
+      durableConversationKey && typeof options.savedTailMessageKey === 'string'
+        ? options.savedTailMessageKey.trim()
+        : '';
 
     try {
       const sweep = await runVirtualizedSweep(
@@ -838,17 +842,14 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
           readBoundaryState: manualAdapter.readBoundaryState,
           onTopConfirmed: (target) => {
             const canonicalGuard = manualAdapter.readIdentity();
-            target.identityGuard = {
-              ...canonicalGuard,
-              anchors: canonicalGuard.anchors.slice(),
-            };
+            target.identityGuard = { ...canonicalGuard, anchors: canonicalGuard.anchors.slice() };
             if (!target.conversationKey) {
               target.conversationKey = identityConversationKey(canonicalGuard);
               target.identityVerified = !!target.conversationKey;
             }
             if (!target.conversationKey) addPreparedReason(target, 'unstable_identity');
           },
-          harvest: (target) => harvestRenderedInto(target, null, { allowEditing: true }),
+          harvest: (target) => harvestRenderedInto(target, null, { newestFirst: true }),
         },
         accumulator,
         {
@@ -862,8 +863,14 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
           maxOverlapRecoveries: options.maxOverlapRecoveries,
           sleep: options.sleep,
           now: options.now,
+          startAtBottom: true,
+          ...(savedTailMessageKey ? { stopAtKey: savedTailMessageKey } : null),
         },
       );
+      if (sweep.stoppedAtKey) {
+        const anchorIndex = accumulator.records.findIndex((record) => record.key === savedTailMessageKey);
+        accumulator.records = accumulator.records.slice(anchorIndex);
+      }
       accumulator.completeness = sweep.completeness;
     } finally {
       const restoreResult = scrollRestorer.restore();
@@ -906,7 +913,10 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       prepared.records.map(({ firstSeenIndex: _firstSeenIndex, ...record }) => record),
     );
     const root = getConversationRoot();
-    const finalLive = root ? await harvestRenderedInto(accumulator, root) : { added: 0, updated: 0 };
+    const finalLive =
+      root && prepared.metrics.stoppedAtKey !== true
+        ? await harvestRenderedInto(accumulator, root)
+        : { added: 0, updated: 0 };
     if (accumulator.completeness === 'complete' && (finalLive.added > 0 || finalLive.updated > 0)) {
       accumulator.completeness = 'partial';
       addPreparedReason(accumulator, 'final_live_changed');

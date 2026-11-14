@@ -556,8 +556,40 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         await applyApiCapture(apiCapture);
       } else {
         let preparedCapture: unknown;
+        let savedTailMessageKey = '';
+        if (target.collectorId === 'chatgpt') {
+          const route = parseChatgptDurableConversationRoute(pageUrl);
+          if (route) {
+            try {
+              const response = await send(CORE_MESSAGE_TYPES.GET_CONVERSATION_TAIL_WINDOW_BY_SOURCE_AND_KEY, {
+                source: 'chatgpt',
+                conversationKey: route.conversationId,
+                limit: 1,
+                compact: true,
+              });
+              const last = response?.data?.messages?.[0];
+              if (
+                response?.ok &&
+                (last?.role === 'user' || last?.role === 'assistant') &&
+                typeof last.messageKey === 'string' &&
+                !!last.messageKey.trim() &&
+                !last.messageKey.startsWith('fallback_') &&
+                !last.messageKey.startsWith('chatgpt-turn:') &&
+                Number.isSafeInteger(last.sequence) &&
+                last.sequence >= 0
+              ) {
+                savedTailMessageKey = last.messageKey;
+              }
+            } catch (_error) {
+              // A missing local optimization hint cannot prevent a safe full DOM sweep.
+            }
+          }
+        }
         if (typeof target.collector.prepareManualCapture === 'function') {
-          preparedCapture = await target.collector.prepareManualCapture({ manual: true });
+          preparedCapture = await target.collector.prepareManualCapture({
+            manual: true,
+            ...(savedTailMessageKey ? { savedTailMessageKey } : null),
+          });
         }
         snapshot = await Promise.resolve(target.collector.capture({ manual: true, preparedCapture }));
         if (!snapshot) throw new Error(t('noVisibleConversationFound'));

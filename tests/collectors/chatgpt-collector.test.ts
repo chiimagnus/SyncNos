@@ -175,6 +175,57 @@ function articleTurnDom(options: { firstOrdinal?: number; assistantId?: string; 
   return dom;
 }
 
+function simulatedVirtualHistory(initialTop = 0) {
+  const dom = setupChatgptDom('', 'https://chatgpt.com/c/virtual-dom-incremental');
+  (dom.window as any).scrollTo = vi.fn();
+  const scroller = dom.window.document.createElement('div');
+  scroller.style.overflowY = 'auto';
+  dom.window.document.querySelector('main')!.appendChild(scroller);
+  let top = initialTop;
+  const all = Array.from({ length: 8 }, (_, index) => ({
+    role: index % 2 === 0 ? 'user' : 'assistant',
+    id: `message-${index}`,
+  }));
+  const render = () => {
+    const segment = top >= 150 ? all.slice(6) : top >= 75 ? all.slice(4) : all.slice(0, 4);
+    scroller.innerHTML = segment
+      .map(({ role, id }) => {
+        const ordinal = all.findIndex((node) => node.id === id);
+        return `<article data-turn="${role}" data-turn-id="turn-${ordinal}" data-testid="conversation-turn-${ordinal}">
+          <div data-message-author-role="${role}" data-message-id="${id}">
+            <div class="${role === 'user' ? 'whitespace-pre-wrap' : 'markdown prose'}"><p>${id} content</p></div>
+          </div>
+        </article>`;
+      })
+      .join('');
+    for (const message of Array.from(scroller.querySelectorAll('[data-message-author-role]'))) {
+      (message as any).getBoundingClientRect = () => ({
+        top: 0,
+        bottom: 100,
+        height: 100,
+        left: 0,
+        right: 500,
+        width: 500,
+      });
+    }
+  };
+  Object.defineProperties(scroller, {
+    clientHeight: { value: 100 },
+    scrollHeight: { value: 300 },
+    clientWidth: { value: 100 },
+    scrollWidth: { value: 100 },
+    scrollTop: {
+      get: () => top,
+      set(value: number) {
+        top = Math.min(200, Math.max(0, Number(value) || 0));
+        render();
+      },
+    },
+  });
+  render();
+  return { dom, getTop: () => top };
+}
+
 function currentDef(dom: JSDOM) {
   return createChatgptCollectorDef(
     createCollectorEnv({
@@ -201,6 +252,36 @@ async function capturePrepared(def: any, options: any = {}) {
 }
 
 describe('chatgpt current DOM', () => {
+  it('scans newest-to-oldest only until the last saved message, and restores the original scroll', async () => {
+    const test = simulatedVirtualHistory(0);
+    const def = currentDef(test.dom);
+    const prepared = await prepare(def, { savedTailMessageKey: 'message-5' });
+    expect(prepared.metrics).toMatchObject({ stoppedAtKey: true, reachedBottom: true, reachedTop: false });
+    expect(test.getTop()).toBe(0);
+    expect(prepared.records.map((record: any) => record.key)).toEqual(['message-5', 'message-6', 'message-7']);
+    const snapshot = await def.collector.capture({ manual: true, preparedCapture: prepared });
+    expect(snapshot.messages.map((row: any) => row.messageKey)).toEqual(['message-5', 'message-6', 'message-7']);
+    expect(snapshot.captureMeta.completeness).toBe('partial');
+    const integrity = resolveCaptureIntegrity('chatgpt', snapshot);
+    expect(integrity).toMatchObject({ ok: true, persistence: { mode: 'append' } });
+    expect(
+      integrity.snapshot.messages.every((row: any) => row.captureSequencePolicy === 'preserve-existing-tail'),
+    ).toBe(true);
+    expect(snapshot.captureMeta.metrics.stoppedAtKey).toBe(true);
+  });
+
+  it('falls back to the whole original sweep if the saved message was edited away', async () => {
+    const test = simulatedVirtualHistory(200);
+    const prepared = await prepare(currentDef(test.dom), { savedTailMessageKey: 'removed-original-assistant' });
+    expect(prepared.metrics.stoppedAtKey).toBe(false);
+    expect(prepared.metrics.passes).toBe(1);
+    expect(prepared.records.map((record: any) => record.key)).toEqual(
+      Array.from({ length: 8 }, (_, index) => `message-${index}`),
+    );
+    expect(test.getTop()).toBe(200);
+    expect(prepared.reasons).not.toContain('order_conflict');
+  });
+
   it('captures role-based data-turn-id articles using real message IDs, not transient turn IDs', async () => {
     const dom = articleTurnDom();
     const def = currentDef(dom);

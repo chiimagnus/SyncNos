@@ -139,6 +139,58 @@ afterEach(() => {
 });
 
 describe('current page capture integrity routing', () => {
+  it('passes only the last stored ChatGPT DOM key to the manual sweep', async () => {
+    const prepare = vi.fn(async () => ({ prepared: true }));
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      url: 'https://chatgpt.com/c/conversation-1',
+      snapshot: chatSnapshot({ completeness: 'partial' }),
+      prepare,
+      tailResponse: {
+        conversationId: 7,
+        messages: [{ messageKey: 'last-stored-assistant', role: 'assistant', sequence: 101 }],
+        checkpoint: null,
+        messagesRevision: 3,
+      },
+    });
+    await harness.service.captureCurrentPage();
+    expect(harness.tailReads).toEqual([
+      {
+        type: 'getConversationTailWindowBySourceAndKey',
+        payload: { source: 'chatgpt', conversationKey: 'conversation-1', limit: 1, compact: true },
+      },
+    ]);
+    expect(prepare).toHaveBeenCalledWith({ manual: true, savedTailMessageKey: 'last-stored-assistant' });
+  });
+
+  it('does not use an API provisional turn key as a DOM scroll anchor', async () => {
+    const prepare = vi.fn(async () => ({ prepared: true }));
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      url: 'https://chatgpt.com/c/conversation-1',
+      snapshot: chatSnapshot({ completeness: 'partial' }),
+      prepare,
+      tailResponse: {
+        messages: [{ messageKey: 'chatgpt-turn:api-provisional-turn', role: 'assistant', sequence: 10 }],
+      },
+    });
+    await harness.service.captureCurrentPage();
+    expect(prepare).toHaveBeenCalledWith({ manual: true });
+  });
+
+  it('falls back to the usual manual sweep when no safe local DOM tail exists', async () => {
+    const prepare = vi.fn(async () => ({ prepared: true }));
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      url: 'https://chatgpt.com/c/conversation-1',
+      snapshot: chatSnapshot({ completeness: 'partial' }),
+      prepare,
+      tailResponse: { messages: [{ messageKey: 'untrusted', role: 'user', sequence: null }] },
+    });
+    await harness.service.captureCurrentPage();
+    expect(prepare).toHaveBeenCalledWith({ manual: true });
+  });
+
   it('routes supported Bilibili and YouTube URLs through Video before the web fallback', async () => {
     for (const url of [
       'https://www.bilibili.com/video/BV1FwY4zkEef/',

@@ -445,6 +445,208 @@ describe('virtualized chat single pass', () => {
     expect(result).toMatchObject({ reachedTop: true, reachedBottom: true });
     expect(physicalTop).toBe(0);
     expect(finishPreparedCapture(accumulator).records.map((record) => record.key)).toEqual(['a', 'b', 'c', 'd', 'e']);
+
+    const reverseAccumulator = createPreparedAccumulator<{ text: string }>({
+      source: 'test',
+      conversationKey: 'conversation',
+      identityVerified: true,
+    });
+    const reverse = await runVirtualizedPass(
+      { document: dom.window.document, window: dom.window as any },
+      adapter,
+      reverseAccumulator,
+      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, startAtBottom: true },
+    );
+    expect(reverse).toMatchObject({ reachedTop: true, reachedBottom: true });
+    expect(finishPreparedCapture(reverseAccumulator).records.map((record) => record.key)).toEqual([
+      'a',
+      'b',
+      'c',
+      'd',
+      'e',
+    ]);
+  });
+
+  it('collects an unsaved conversation newest-first without relying on any local key', async () => {
+    const test = harness([
+      { top: 0, keys: ['a', 'b'] },
+      { top: 60, keys: ['b', 'c'] },
+      { top: 120, keys: ['c', 'd'] },
+      { top: 180, keys: ['d', 'e'] },
+    ]);
+    const visited: string[] = [];
+    const harvest = test.adapter.harvest;
+    test.adapter.harvest = async (accumulator) => {
+      visited.push(test.adapter.readDescriptorKeys().at(-1) || '');
+      return harvest(accumulator);
+    };
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, startAtBottom: true },
+    );
+    expect(result).toMatchObject({
+      stoppedAtKey: false,
+      reachedTop: true,
+      reachedBottom: true,
+      completeness: 'complete',
+    });
+    expect(visited.at(0)).toBe('e');
+    expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual([
+      'a',
+      'b',
+      'c',
+      'd',
+      'e',
+    ]);
+  });
+
+  it('rechecks the logical top after older messages load during a newest-first sweep', async () => {
+    const test = harness([
+      { top: 0, keys: ['a', 'b'] },
+      { top: 60, keys: ['b', 'c'] },
+      { top: 120, keys: ['c', 'd'] },
+      { top: 180, keys: ['d', 'e'] },
+    ]);
+    let olderLoaded = false;
+    const originalKeys = test.adapter.readDescriptorKeys;
+    test.adapter.readDescriptorKeys = () =>
+      olderLoaded && test.getTop() === 0 ? ['z', ...originalKeys()] : originalKeys();
+    test.adapter.harvest = async (target) =>
+      mergePreparedRecords(
+        target,
+        test.adapter.readDescriptorKeys().map((key) => ({
+          key,
+          turnKey: key,
+          withinTurn: 0,
+          fingerprint: key,
+          payload: { text: key },
+        })),
+        { newestFirst: true },
+      );
+    (test.adapter as any).readBoundaryState = (boundary: 'top' | 'bottom') =>
+      boundary === 'top' && !olderLoaded ? 'pending' : 'confirmed';
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      {
+        startAtBottom: true,
+        stableSamples: 1,
+        pollMs: 0,
+        overlapRatio: 0.6,
+        sleep: async () => {
+          olderLoaded = true;
+        },
+      },
+    );
+    expect(olderLoaded).toBe(true);
+    expect(result).toMatchObject({ reachedTop: true, reachedBottom: true, completeness: 'complete' });
+    expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual([
+      'z',
+      'a',
+      'b',
+      'c',
+      'd',
+      'e',
+    ]);
+  });
+
+  it('starts from the latest window and stops at the saved tail key without visiting old history', async () => {
+    const test = harness([
+      { top: 0, keys: ['a', 'b'] },
+      { top: 60, keys: ['b', 'c'] },
+      { top: 120, keys: ['c', 'd'] },
+      { top: 180, keys: ['d', 'e'] },
+    ]);
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, stopAtKey: 'b' },
+    );
+    expect(result).toMatchObject({
+      stoppedAtKey: true,
+      reachedBottom: true,
+      reachedTop: false,
+      completeness: 'partial',
+      steps: 3,
+    });
+    expect(result.reasons).not.toContain('top_not_reached');
+    expect(test.getTop()).toBeGreaterThan(0);
+    expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual(['b', 'c', 'd', 'e']);
+  });
+
+  it('stops after two recent windows even when 160 older windows exist', async () => {
+    const windows = Array.from({ length: 160 }, (_, index) => ({
+      top: index * 60,
+      keys: [`m${index}`, `m${index + 1}`],
+    }));
+    const test = harness(windows, { initialScrollHeight: windows.at(-1)!.top + 100 });
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, stopAtKey: 'm158' },
+    );
+    expect(result).toMatchObject({ stoppedAtKey: true, steps: 2, reachedTop: false, reachedBottom: true });
+    expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual([
+      'm158',
+      'm159',
+      'm160',
+    ]);
+  });
+
+  it('does not trust a saved key after an unanchored virtualized gap', async () => {
+    const test = harness([
+      { top: 0, keys: ['old', 'anchor'] },
+      { top: 180, keys: ['new-a', 'new-b'] },
+    ]);
+    test.adapter.harvest = async (target) =>
+      mergePreparedRecords(
+        target,
+        test.adapter.readDescriptorKeys().map((key) => ({
+          key,
+          turnKey: key,
+          withinTurn: 0,
+          fingerprint: key,
+          payload: { text: key },
+        })),
+        { newestFirst: true },
+      );
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, stopAtKey: 'anchor' },
+    );
+    expect(result).toMatchObject({ stoppedAtKey: false, reachedTop: true, completeness: 'partial' });
+    expect(result.reasons).toContain('order_unanchored');
+    expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual([
+      'old',
+      'anchor',
+      'new-a',
+      'new-b',
+    ]);
+  });
+
+  it('does not accept a missing local tail as an incremental boundary', async () => {
+    const test = harness([
+      { top: 0, keys: ['a', 'b'] },
+      { top: 60, keys: ['b', 'c'] },
+      { top: 120, keys: ['c', 'd'] },
+      { top: 180, keys: ['d', 'e'] },
+    ]);
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, stopAtKey: 'retired-message' },
+    );
+    expect(result.stoppedAtKey).toBe(false);
+    expect(result.reachedTop).toBe(true);
+    expect(finishPreparedCapture(test.accumulator).records).toHaveLength(5);
   });
 
   it('survives replacement and node recycling because each window is plain data', async () => {

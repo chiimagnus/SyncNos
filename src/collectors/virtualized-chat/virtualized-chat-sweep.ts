@@ -266,6 +266,7 @@ export function addPreparedReason<T>(accumulator: PreparedAccumulator<T>, reason
 export function mergePreparedRecords<T>(
   accumulator: PreparedAccumulator<T>,
   records: Array<Omit<PreparedMessageRecord<T>, 'firstSeenIndex'>>,
+  options: { newestFirst?: boolean } = {},
 ): { added: number; updated: number } {
   accumulator.samples += 1;
   const incoming = records
@@ -303,15 +304,12 @@ export function mergePreparedRecords<T>(
   const knownIncoming = uniqueIncoming.filter((record) => existingByKey.has(record.key));
   if (!knownIncoming.length) {
     addPreparedReason(accumulator, 'order_unanchored');
-    let added = 0;
-    for (const record of uniqueIncoming) {
-      if (existingByKey.has(record.key)) continue;
-      const prepared = { ...record, firstSeenIndex: accumulator.records.length };
-      accumulator.records.push(prepared);
-      existingByKey.set(record.key, prepared);
-      added += 1;
-    }
-    return { added, updated };
+    const inserted = uniqueIncoming
+      .filter((record) => !existingByKey.has(record.key))
+      .map((record, index) => ({ ...record, firstSeenIndex: accumulator.records.length + index }));
+    if (options.newestFirst) accumulator.records.unshift(...inserted);
+    else accumulator.records.push(...inserted);
+    return { added: inserted.length, updated };
   }
 
   const currentPositions = new Map(accumulator.records.map((record, index) => [record.key, index]));
@@ -462,6 +460,7 @@ export type VirtualizedPassResult = {
   added: number;
   updated: number;
   unresolvedKeys: string[];
+  stoppedAtKey: boolean;
 };
 
 export type VirtualizedPassOptions = {
@@ -475,6 +474,8 @@ export type VirtualizedPassOptions = {
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
   deadline?: number;
+  stopAtKey?: string;
+  startAtBottom?: boolean;
 };
 
 const PASS_DEFAULTS = Object.freeze({
@@ -563,6 +564,8 @@ export async function runVirtualizedPass<T>(
   const root = resolveScrollRoot(runtime, adapter.getScrollSeed());
   let reachedTop = false;
   let reachedBottom = false;
+  let stoppedAtKey = false;
+  const backwards = options.startAtBottom === true || !!options.stopAtKey;
   let steps = 0;
   let maxScrollExtent = 0;
   let previousTop = 0;
@@ -608,7 +611,17 @@ export async function runVirtualizedPass<T>(
   if (!originalIdentity) {
     addReason('missing_identity');
     invalidateAccumulatorIdentity(accumulator);
-    return { reachedTop, reachedBottom, steps, maxScrollExtent, reasons, added, updated, unresolvedKeys: [] };
+    return {
+      reachedTop,
+      reachedBottom,
+      stoppedAtKey,
+      steps,
+      maxScrollExtent,
+      reasons,
+      added,
+      updated,
+      unresolvedKeys: [],
+    };
   }
 
   const validateAfterAwait = (): boolean => {
@@ -757,20 +770,71 @@ export async function runVirtualizedPass<T>(
     return { stable: null, confirmed: false };
   };
 
+  const acquireLogicalBottom = async (): Promise<StableWindow | null> => {
+    let progressDeadline = now() + boundaryTimeoutMs;
+    let lastSignature = '';
+    while (!deadlineExceeded()) {
+      const metrics = readScrollMetrics(runtime, root);
+      writeScrollPosition(runtime, root, metrics.left, metrics.scrollHeight - metrics.clientHeight);
+      const bottom = await waitForLogicalBottom();
+      if (!bottom.stable) return null;
+      if (bottom.confirmed) {
+        reachedBottom = true;
+        return bottom.stable;
+      }
+      const signature = contentFreeWindowSignature(originalIdentity, bottom.stable.metrics, bottom.stable.keys);
+      if (signature !== lastSignature) {
+        lastSignature = signature;
+        progressDeadline = now() + boundaryTimeoutMs;
+      }
+      if (now() > progressDeadline) {
+        addReason('boundary_stalled');
+        return null;
+      }
+      await sleep(Math.max(1, pollMs));
+      if (!validateAfterAwait()) return null;
+    }
+    return null;
+  };
+
   try {
     if (deadlineExceeded()) {
-      return { reachedTop, reachedBottom, steps, maxScrollExtent, reasons, added, updated, unresolvedKeys: [] };
+      return {
+        reachedTop,
+        reachedBottom,
+        stoppedAtKey,
+        steps,
+        maxScrollExtent,
+        reasons,
+        added,
+        updated,
+        unresolvedKeys: [],
+      };
     }
-    let stable = await acquireLogicalTop();
-    if (!stable || !reachedTop)
-      return { reachedTop, reachedBottom, steps, maxScrollExtent, reasons, added, updated, unresolvedKeys: [] };
+    let stable = backwards ? await acquireLogicalBottom() : await acquireLogicalTop();
+    if (!stable || !(backwards ? reachedBottom : reachedTop))
+      return {
+        reachedTop,
+        reachedBottom,
+        stoppedAtKey,
+        steps,
+        maxScrollExtent,
+        reasons,
+        added,
+        updated,
+        unresolvedKeys: [],
+      };
     previousTop = stable.metrics.top;
 
     while (steps < maxSteps) {
       if (deadlineExceeded() || !validateAfterAwait()) break;
       const knownKeys = new Set(accumulator.records.map((record) => record.key));
       const hasOverlap = !knownKeys.size || stable.keys.some((key) => knownKeys.has(key));
-      if (!hasOverlap && overlapRecoveries < maxOverlapRecoveries && stable.metrics.top > previousTop + 1) {
+      if (
+        !hasOverlap &&
+        overlapRecoveries < maxOverlapRecoveries &&
+        (backwards ? stable.metrics.top < previousTop - 1 : stable.metrics.top > previousTop + 1)
+      ) {
         overlapRecoveries += 1;
         const recoveryTop = Math.floor((previousTop + stable.metrics.top) / 2);
         writeScrollPosition(runtime, root, stable.metrics.left, recoveryTop);
@@ -800,7 +864,54 @@ export async function runVirtualizedPass<T>(
       updated += harvested.updated;
       clearResolvedKeys();
       steps += 1;
+      if (
+        options.stopAtKey &&
+        accumulator.records.some((record) => record.key === options.stopAtKey) &&
+        !accumulator.reasons.includes('order_unanchored') &&
+        !accumulator.reasons.includes('order_conflict')
+      ) {
+        stoppedAtKey = true;
+        break;
+      }
       const metrics = readScrollMetrics(runtime, root);
+      if (backwards) {
+        maxScrollExtent = Math.max(maxScrollExtent, metrics.scrollHeight);
+        if (isAtScrollTop(metrics)) {
+          const topState = readBoundaryState('top');
+          if (!topState) break;
+          if (topState === 'confirmed') {
+            try {
+              adapter.onTopConfirmed?.(accumulator);
+              reachedTop = true;
+            } catch (_error) {
+              addReason('pass_failed');
+            }
+            break;
+          }
+          const top = await acquireLogicalTop();
+          if (!top || !reachedTop) break;
+          stable = top;
+          previousTop = stable.metrics.top;
+          // Newly loaded turns at the logical top must be harvested before declaring success.
+          if (steps >= maxSteps) {
+            reachedTop = false;
+            addReason('step_budget_exhausted');
+            break;
+          }
+          continue;
+        }
+        previousTop = metrics.top;
+        const stepSize = Math.max(1, Math.floor(metrics.clientHeight * overlapRatio));
+        const nextTop = Math.max(0, metrics.top - stepSize);
+        if (nextTop >= metrics.top) {
+          addReason('scroll_stalled');
+          break;
+        }
+        writeScrollPosition(runtime, root, metrics.left, nextTop);
+        stable = await stabilize();
+        if (!stable) break;
+        continue;
+      }
       const previousExtent = maxScrollExtent;
       maxScrollExtent = Math.max(maxScrollExtent, metrics.scrollHeight);
       if (isAtScrollBottom(metrics)) {
@@ -842,7 +953,8 @@ export async function runVirtualizedPass<T>(
       stable = await stabilize();
       if (!stable) break;
     }
-    if (steps >= maxSteps && !reachedBottom) addReason('step_budget_exhausted');
+    if (steps >= maxSteps && !(backwards ? stoppedAtKey || reachedTop : reachedBottom))
+      addReason('step_budget_exhausted');
   } catch (_error) {
     addReason('pass_failed');
   }
@@ -850,6 +962,7 @@ export async function runVirtualizedPass<T>(
   return {
     reachedTop,
     reachedBottom,
+    stoppedAtKey,
     steps,
     maxScrollExtent,
     reasons,
@@ -870,6 +983,7 @@ export type VirtualizedSweepResult = {
   maxScrollExtent: number;
   reachedTop: boolean;
   reachedBottom: boolean;
+  stoppedAtKey: boolean;
   reasons: string[];
 };
 
@@ -922,6 +1036,7 @@ export async function runVirtualizedSweep<T>(
   let pass: VirtualizedPassResult = {
     reachedTop: false,
     reachedBottom: false,
+    stoppedAtKey: false,
     steps: 0,
     maxScrollExtent: 0,
     reasons: [],
@@ -940,12 +1055,13 @@ export async function runVirtualizedSweep<T>(
   if (validateSweepIdentity() && now() > deadline) addPreparedReason(accumulator, 'total_deadline_exhausted');
 
   if (pass.unresolvedKeys.length) addPreparedReason(accumulator, 'unresolved_turn');
-  if (!pass.reachedTop) addPreparedReason(accumulator, 'top_not_reached');
+  if (!pass.reachedTop && !pass.stoppedAtKey) addPreparedReason(accumulator, 'top_not_reached');
   if (!pass.reachedBottom) addPreparedReason(accumulator, 'bottom_not_reached');
   const hasBlockingReason = accumulator.reasons.some((reason) => INCOMPLETE_REASONS.has(reason));
   const complete =
     pass.reachedTop &&
     pass.reachedBottom &&
+    !pass.stoppedAtKey &&
     accumulator.identityVerified &&
     !pass.unresolvedKeys.length &&
     !hasBlockingReason;
@@ -956,6 +1072,7 @@ export async function runVirtualizedSweep<T>(
     maxScrollExtent: pass.maxScrollExtent,
     reachedTop: pass.reachedTop,
     reachedBottom: pass.reachedBottom,
+    stoppedAtKey: pass.stoppedAtKey,
   };
   return {
     completeness: accumulator.completeness,
@@ -964,6 +1081,7 @@ export async function runVirtualizedSweep<T>(
     maxScrollExtent: pass.maxScrollExtent,
     reachedTop: pass.reachedTop,
     reachedBottom: pass.reachedBottom,
+    stoppedAtKey: pass.stoppedAtKey,
     reasons: accumulator.reasons.slice(),
   };
 }

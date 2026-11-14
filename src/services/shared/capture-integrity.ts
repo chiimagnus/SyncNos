@@ -164,7 +164,9 @@ export function resolveCaptureIntegrity(collectorId: unknown, snapshot: any): Ca
   const hasUntrustedOrder = (effectiveMeta.reasons || []).some(
     (reason) => reason === 'order_unanchored' || reason === 'order_conflict',
   );
-  const captureSequencePolicy = hasUntrustedOrder ? 'preserve-existing-tail' : 'reconcile-existing-order';
+  const anchoredDomTail = normalizedCollectorId === 'chatgpt' && effectiveMeta.metrics?.stoppedAtKey === true;
+  const captureSequencePolicy =
+    hasUntrustedOrder || anchoredDomTail ? 'preserve-existing-tail' : 'reconcile-existing-order';
   const firstPositions: string[] = [];
   const byKey = new Map<string, any>();
   for (const message of rawMessages) {
