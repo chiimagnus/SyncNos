@@ -232,13 +232,10 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
     const selectedAncestorsTo = (target: string): Set<string> | null => {
       const ancestors = new Set<string>();
       let id = currentNode;
-      for (let i = 0; i <= seenIds.size; i += 1) {
-        if (!seenIds.has(id) || ancestors.has(id)) return null;
+      while (seenIds.has(id) && !ancestors.has(id)) {
         ancestors.add(id);
         if (id === target) return ancestors;
-        const parent = parentById.get(id);
-        if (!parent) return null;
-        id = parent;
+        id = parentById.get(id) || '';
       }
       return null;
     };
