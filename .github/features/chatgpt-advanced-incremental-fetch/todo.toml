@@ -12,10 +12,10 @@ note = "只读真实 API：10 turns 可含 1214 原始节点且 parent_id 大量
 [[tasks]]
 id = "P1-T2"
 title = "建立原子可信校验点与有界本地读取"
-status = "pending"
+status = "completed"
 plan = "plan-p1.md#p1-t2"
-commit = ""
-note = ""
+commit = "0d2b311d7"
+note = "可信完整采集校验点、Thinking 设置一致性、尾窗轻量读取与 Backup 失效；Node22 gate 3266/3266，通过构建。"
 
 [[tasks]]
 id = "P1-T3"
