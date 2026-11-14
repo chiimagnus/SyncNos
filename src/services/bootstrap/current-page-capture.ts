@@ -510,8 +510,15 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         const savedAnchorSequence = trustedTail?.messages.find(
           (message) => message.messageKey === savedAnchorKey,
         )?.sequence;
+        const followingUserSequence =
+          trustedTail?.messages.find(
+            (message) => message.role === 'user' && message.sequence > (savedAnchorSequence ?? Infinity),
+          )?.sequence ?? Infinity;
         const savedAssistantKey = trustedTail?.messages.findLast(
-          (message) => message.role === 'assistant' && message.sequence > (savedAnchorSequence ?? Infinity),
+          (message) =>
+            message.role === 'assistant' &&
+            message.sequence > (savedAnchorSequence ?? Infinity) &&
+            message.sequence < followingUserSequence,
         )?.messageKey;
         const apiCapture = await captureCurrentChatgptConversationViaApi({
           includeThinking,

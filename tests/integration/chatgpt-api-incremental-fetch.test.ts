@@ -307,6 +307,83 @@ describe('ChatGPT Advanced end-to-end incremental fetch', () => {
     expect(
       (await getConversationBySourceConversationKey('chatgpt', conversationKey))?.chatgptApiCheckpoint?.lastUserKey,
     ).toBe('u4');
+
+    const preStreamingTail = await getConversationTailWindowBySourceAndKey('chatgpt', conversationKey, 200, {
+      withRevision: true,
+    });
+    expect(preStreamingTail.conversation?.chatgptApiCheckpoint?.lastUserKey).toBe('u4');
+    expect(preStreamingTail.messages.at(-1)?.messageKey).toBe('a7');
+    expect(preStreamingTail.messages.map((item) => item.sequence)).toEqual(
+      Array.from({ length: 8 }, (_, index) => index),
+    );
+    activeNodes = [
+      node('u4', 'user', 'fresh follow-up'),
+      node('a7', 'assistant', 'fresh answer'),
+      node('u5', 'user', 'prompt while generating', 'a7'),
+      { ...node('a8', 'assistant', 'unfinished response', 'u5'), status: 'in_progress' },
+    ];
+    const beforeStreaming = nonHeadPages;
+    await capture.captureCurrentPage();
+    expect(nonHeadPages - beforeStreaming).toBe(1);
+    expect((await getMessagesByConversationId(id)).map((item) => item.messageKey)).toEqual([
+      'u1',
+      'a1',
+      'u2',
+      'a2',
+      'u3-edited',
+      'a6',
+      'u4',
+      'a7',
+      'u5',
+      'a8',
+    ]);
+    expect(
+      (await getConversationBySourceConversationKey('chatgpt', conversationKey))?.chatgptApiCheckpoint?.lastUserKey,
+    ).toBe('u4');
+
+    activeNodes[3] = node('a8', 'assistant', 'finished response', 'u5');
+    const beforeStreamingFinished = nonHeadPages;
+    await capture.captureCurrentPage();
+    expect(nonHeadPages - beforeStreamingFinished).toBe(1);
+    expect((await getMessagesByConversationId(id)).map((item) => item.messageKey)).toEqual([
+      'u1',
+      'a1',
+      'u2',
+      'a2',
+      'u3-edited',
+      'a6',
+      'u4',
+      'a7',
+      'u5',
+      'a8',
+    ]);
+    expect((await getMessagesByConversationId(id)).at(-1)?.contentMarkdown).toBe('finished response');
+    expect(
+      (await getConversationBySourceConversationKey('chatgpt', conversationKey))?.chatgptApiCheckpoint?.lastUserKey,
+    ).toBe('u5');
+
+    const savedBeforeApiErrors = await getMessagesByConversationId(id);
+    const savedRevision = await readDataRevision('messages');
+    const savedConversation = await getConversationBySourceConversationKey('chatgpt', conversationKey);
+    for (const status of [401, 403, 429, 503]) {
+      const error = Object.assign(new Error('chatgpt_api_page_http'), {
+        code: 'chatgpt_api_page_http',
+        status,
+      });
+      api.requestPage.mockRejectedValueOnce(error);
+      if (status === 503) api.requestPage.mockRejectedValueOnce(error);
+      const beforeCalls = api.requestPage.mock.calls.length;
+      await expect(capture.captureCurrentPage()).rejects.toThrow();
+      expect(api.requestPage.mock.calls.length - beforeCalls).toBe(status === 503 ? 2 : 1);
+      expect(await getMessagesByConversationId(id)).toEqual(savedBeforeApiErrors);
+      expect(await readDataRevision('messages')).toBe(savedRevision);
+      expect((await getConversationBySourceConversationKey('chatgpt', conversationKey))?.chatgptApiCheckpoint).toEqual(
+        savedConversation?.chatgptApiCheckpoint,
+      );
+      expect((await getConversationBySourceConversationKey('chatgpt', conversationKey))?.lastActivityAt).toBe(
+        savedConversation?.lastActivityAt,
+      );
+    }
   });
 
   it('updates an actual 10000-message IndexedDB history without loading the old message list', async () => {
