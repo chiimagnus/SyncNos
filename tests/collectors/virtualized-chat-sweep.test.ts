@@ -696,6 +696,53 @@ describe('virtualized chat single pass', () => {
     expect(finishPreparedCapture(test.accumulator).records.at(-1)?.key).toBe('g');
   });
 
+  it('holds at the top during pending lazy history without re-entering or restarting', async () => {
+    const test = harness(
+      [
+        { top: 0, keys: ['a', 'b'] },
+        { top: 60, keys: ['b', 'c'] },
+        { top: 120, keys: ['c', 'd'] },
+      ],
+      { initialScrollHeight: 300 },
+    );
+    const scrollDescriptor = Object.getOwnPropertyDescriptor(test.root, 'scrollTop')!;
+    let reachedTop = false;
+    let scrollDownAfterTop = 0;
+    Object.defineProperty(test.root, 'scrollTop', {
+      configurable: true,
+      get: scrollDescriptor.get,
+      set(value: number) {
+        if (reachedTop && value > 0) scrollDownAfterTop += 1;
+        scrollDescriptor.set!.call(this, value);
+        if (value === 0) reachedTop = true;
+      },
+    });
+    let clock = 0;
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      {
+        ...test.adapter,
+        readBoundaryState: (boundary) => (boundary === 'top' ? 'pending' : 'confirmed'),
+      },
+      test.accumulator,
+      {
+        startAtBottom: true,
+        holdAtTop: true,
+        stableSamples: 1,
+        pollMs: 5,
+        boundaryTimeoutMs: 30,
+        totalDeadlineMs: 100,
+        now: () => clock,
+        sleep: async (ms) => {
+          clock += Math.max(1, ms);
+        },
+      },
+    );
+    expect(result.reasons).toContain('boundary_stalled');
+    expect(result.completeness).toBe('partial');
+    expect(scrollDownAfterTop).toBe(0);
+  });
+
   it('waits for a provider-confirmed logical top before sweeping downward', async () => {
     const test = harness(
       [
@@ -965,6 +1012,34 @@ describe('virtualized chat single pass', () => {
       },
     );
     expect(result.reasons).toContain('step_timeout');
+  });
+
+  it('exits a pending reverse-top probe promptly when the requested step budget is exhausted', async () => {
+    const test = harness([{ top: 0, keys: ['a'] }]);
+    let waited = 0;
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      {
+        ...test.adapter,
+        readBoundaryState: (boundary) => (boundary === 'top' ? 'pending' : 'confirmed'),
+      },
+      test.accumulator,
+      {
+        startAtBottom: true,
+        holdAtTop: true,
+        maxSteps: 1,
+        stableSamples: 1,
+        pollMs: 0,
+        boundaryTimeoutMs: 30_000,
+        sleep: async () => {
+          waited += 1;
+        },
+      },
+    );
+    expect(result).toMatchObject({ completeness: 'partial', steps: 1, reachedTop: false });
+    expect(result.reasons).toContain('step_budget_exhausted');
+    expect(result.reasons).not.toContain('boundary_stalled');
+    expect(waited).toBeLessThan(5);
   });
 
   it('reports step budget exhaustion without discarding prior stable data', async () => {

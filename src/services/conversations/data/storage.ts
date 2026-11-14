@@ -1,6 +1,7 @@
 import * as idb from '@services/conversations/data/storage-idb';
 import type {
   ChatgptApiCheckpoint,
+  ChatgptDomCoverage,
   Conversation,
   ConversationListCursor,
   ConversationListOpenTarget,
@@ -85,6 +86,7 @@ export function syncConversationMessages(
     activityAt?: number;
     conversationContentChanged?: boolean;
     checkpoint?: ChatgptApiCheckpoint;
+    domCoverage?: ChatgptDomCoverage;
     preserveCheckpointTail?: boolean;
     expectedCheckpoint?: ChatgptApiCheckpoint;
     expectedMessagesRevision?: number;

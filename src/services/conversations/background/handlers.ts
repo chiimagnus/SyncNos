@@ -235,6 +235,7 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
       ...(compact
         ? {
             checkpoint: result.conversation?.chatgptApiCheckpoint ?? null,
+            domCoverage: result.conversation?.chatgptDomCoverage ?? null,
             messagesRevision: result.messagesRevision,
           }
         : null),
@@ -455,6 +456,7 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
       ...(hasActivityAt ? { activityAt: Number(activityAt) } : null),
       ...(conversationContentChanged ? { conversationContentChanged: true } : null),
       ...(msg?.chatgptApiCheckpoint ? { checkpoint: msg.chatgptApiCheckpoint } : null),
+      ...(msg?.chatgptDomCoverage ? { domCoverage: msg.chatgptDomCoverage } : null),
       ...(msg?.trustedChatgptApiPartial === true ? { preserveCheckpointTail: true } : null),
       ...(msg?.verifiedChatgptApiTail === true
         ? {

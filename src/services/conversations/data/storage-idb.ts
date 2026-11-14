@@ -1,4 +1,9 @@
-import type { ChatgptApiCheckpoint, Conversation, ConversationMessage } from '@services/conversations/domain/models';
+import type {
+  ChatgptApiCheckpoint,
+  ChatgptDomCoverage,
+  Conversation,
+  ConversationMessage,
+} from '@services/conversations/domain/models';
 import {
   normalizeCanonicalVideoChapters,
   normalizeCanonicalVideoTranscriptCues,
@@ -1412,6 +1417,7 @@ export async function syncConversationMessages(
     activityAt?: number;
     conversationContentChanged?: boolean;
     checkpoint?: ChatgptApiCheckpoint;
+    domCoverage?: ChatgptDomCoverage;
     preserveCheckpointTail?: boolean;
     expectedCheckpoint?: ChatgptApiCheckpoint | null;
     expectedMessagesRevision?: number;
@@ -1426,6 +1432,15 @@ export async function syncConversationMessages(
   const activityAtProvided = !!options && Object.prototype.hasOwnProperty.call(options, 'activityAt');
   const activityAt = activityAtProvided ? parseRequestedActivityTimestamp(options?.activityAt, false, 'activityAt') : 0;
   const checkpoint = options?.checkpoint;
+  const domCoverage = options?.domCoverage;
+  if (
+    domCoverage &&
+    (!safeString(domCoverage.anchorKey) ||
+      domCoverage.singleSweepSettled !== true ||
+      (domCoverage.anchorOrdinal !== null &&
+        (!Number.isSafeInteger(domCoverage.anchorOrdinal) || domCoverage.anchorOrdinal < 0)))
+  )
+    throw new Error('chatgpt_dom_coverage_invalid');
   if (
     checkpoint &&
     ((mode !== 'snapshot' && mode !== 'incremental') ||
@@ -1462,6 +1477,7 @@ export async function syncConversationMessages(
       let activityConversation: any = await reqToPromise(stores.conversations.get(conversationId as any));
       if (!activityConversation) throw new Error('conversation not found');
       if (checkpoint && activityConversation.source !== 'chatgpt') throw new Error('chatgpt_api_checkpoint_source');
+      if (domCoverage && activityConversation.source !== 'chatgpt') throw new Error('chatgpt_dom_coverage_source');
       if (options?.expectedMessagesRevision !== undefined && activityConversation.source !== 'chatgpt')
         throw new Error('chatgpt_api_storage_conflict');
       if (options?.expectedMessagesRevision !== undefined) {
@@ -1483,6 +1499,8 @@ export async function syncConversationMessages(
       };
       const commitActivity = async () => {
         const next = { ...activityConversation };
+        if (domCoverage) next.chatgptDomCoverage = domCoverage;
+        else if (messagesChanged) delete next.chatgptDomCoverage;
         if (checkpoint) {
           const user: any = await reqToPromise(
             stores.messages.index('by_conversationId_messageKey').get([conversationId, checkpoint.lastUserKey] as any),

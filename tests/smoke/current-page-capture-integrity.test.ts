@@ -182,6 +182,49 @@ describe('current page capture integrity routing', () => {
     expect(prepare).toHaveBeenCalledWith({ manual: true, savedTailMessageKey: 'stable-last-user' });
   });
 
+  it('persists DOM-only verified history without invoking Advanced API Fetch', async () => {
+    const prepare = vi.fn(async () => ({ prepared: true }));
+    const coverage = { anchorKey: 'older-user', anchorOrdinal: 4, singleSweepSettled: true };
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      url: 'https://chatgpt.com/c/conversation-1',
+      snapshot: { ...chatSnapshot({ completeness: 'partial' }), domCoverage: coverage },
+      prepare,
+      tailResponse: {
+        conversationId: 7,
+        messages: [{ messageKey: 'latest-assistant', role: 'assistant', sequence: 11 }],
+        domCoverage: coverage,
+        messagesRevision: 4,
+      },
+    });
+    await harness.service.captureCurrentPage();
+    expect(prepare).toHaveBeenCalledWith({
+      manual: true,
+      savedTailMessageKey: 'latest-assistant',
+      savedDomCoverage: coverage,
+    });
+    const save = harness.calls.find((call) => call.type === 'syncConversationMessages');
+    expect(save?.payload?.chatgptDomCoverage).toEqual(coverage);
+    expect(save?.payload?.mode).toBe('append');
+    expect(chatgptApiMocks.capture).not.toHaveBeenCalled();
+  });
+
+  it('ignores previously persisted DOM coverage without a single-sweep completion proof', async () => {
+    const prepare = vi.fn(async () => ({ prepared: true }));
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      url: 'https://chatgpt.com/c/conversation-1',
+      snapshot: chatSnapshot({ completeness: 'partial' }),
+      prepare,
+      tailResponse: {
+        messages: [{ messageKey: 'saved-last-user', role: 'user', sequence: 27 }],
+        domCoverage: { anchorKey: 'saved-last-user', anchorOrdinal: 4 },
+      },
+    });
+    await harness.service.captureCurrentPage();
+    expect(prepare).toHaveBeenCalledWith({ manual: true, savedTailMessageKey: 'saved-last-user' });
+  });
+
   it('does not use an API provisional turn key as a DOM scroll anchor', async () => {
     const prepare = vi.fn(async () => ({ prepared: true }));
     const harness = createHarness({

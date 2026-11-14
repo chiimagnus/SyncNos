@@ -1012,6 +1012,100 @@ describe('conversations storage-idb', () => {
     expect(finalMessages[1]?.contentMarkdown).toBe('streaming complete');
   });
 
+  it('commits verified DOM history coverage atomically and preserves older saved content', async () => {
+    const conversation = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'dom-history-backfill',
+      title: 'DOM history backfill',
+      lastActivityAt: 5,
+    });
+    const id = Number(conversation.id);
+    const initial = [
+      { messageKey: 'u2', role: 'user', contentMarkdown: 'newest question', sequence: 0, updatedAt: 10 },
+      { messageKey: 'a2', role: 'assistant', contentMarkdown: 'edited saved answer', sequence: 1, updatedAt: 11 },
+    ];
+    const coverage = { anchorKey: 'u2', anchorOrdinal: 2, singleSweepSettled: true };
+    await syncConversationMessages(id, initial, {
+      mode: 'append',
+      diff: { added: ['u2', 'a2'] },
+    });
+    expect(
+      (await getConversationTailWindowBySourceAndKey('chatgpt', 'dom-history-backfill', 2)).conversation
+        ?.chatgptDomCoverage,
+    ).toBeUndefined();
+
+    const incoming = [
+      { messageKey: 'u0', role: 'user', contentMarkdown: 'oldest question', sequence: 0 },
+      { messageKey: 'a0', role: 'assistant', contentMarkdown: 'oldest answer', sequence: 1 },
+      { messageKey: 'u1', role: 'user', contentMarkdown: 'older question', sequence: 2 },
+      { messageKey: 'a1', role: 'assistant', contentMarkdown: 'older answer', sequence: 3 },
+      { messageKey: 'u2', role: 'user', contentMarkdown: 'newest question', sequence: 4 },
+      { messageKey: 'a2', role: 'assistant', contentMarkdown: 'outdated scraped answer', sequence: 5 },
+    ].map((row) => ({
+      ...row,
+      captureSequencePolicy: 'reconcile-existing-order',
+      captureMergePolicy: 'preserve-existing-content',
+    }));
+    await syncConversationMessages(id, incoming, {
+      mode: 'append',
+      diff: { added: incoming.map((row) => row.messageKey) },
+      domCoverage: coverage,
+    });
+    const saved = await getMessagesByConversationId(id);
+    expect(saved.map((row) => [row.messageKey, row.sequence])).toEqual(
+      incoming.map((row, index) => [row.messageKey, index]),
+    );
+    expect(saved.find((row) => row.messageKey === 'a2')?.contentMarkdown).toBe('edited saved answer');
+    expect(saved.find((row) => row.messageKey === 'a2')?.updatedAt).toBe(11);
+    expect((await getConversationById(id))?.chatgptDomCoverage).toEqual(coverage);
+
+    const revisionsBefore = {
+      messages: await readDataRevision('messages'),
+      conversations: await readDataRevision('conversations'),
+    };
+    await syncConversationMessages(id, incoming, {
+      mode: 'append',
+      diff: { added: incoming.map((row) => row.messageKey) },
+      domCoverage: coverage,
+    });
+    expect(await readDataRevision('messages')).toBe(revisionsBefore.messages);
+    expect(await readDataRevision('conversations')).toBe(revisionsBefore.conversations);
+
+    await syncConversationMessages(
+      id,
+      [{ messageKey: 'u3', role: 'user', contentMarkdown: 'changed by another capture', sequence: 6 }],
+      {
+        mode: 'append',
+        diff: { added: ['u3'] },
+      },
+    );
+    expect((await getConversationById(id))?.chatgptDomCoverage).toBeUndefined();
+  });
+
+  it('rejects invalid DOM history status without changing another provider', async () => {
+    const conversation = await upsertConversation({
+      sourceType: 'chat',
+      source: 'claude',
+      conversationKey: 'foreign-dom-coverage',
+      title: 'Foreign capture',
+      lastActivityAt: 5,
+    });
+    await expect(
+      syncConversationMessages(Number(conversation.id), [], {
+        mode: 'append',
+        domCoverage: { anchorKey: 'u1', anchorOrdinal: 0, singleSweepSettled: true },
+      }),
+    ).rejects.toThrow('chatgpt_dom_coverage_source');
+    expect((await getConversationById(Number(conversation.id)))?.chatgptDomCoverage).toBeUndefined();
+    await expect(
+      syncConversationMessages(Number(conversation.id), [], {
+        mode: 'append',
+        domCoverage: { anchorKey: '', anchorOrdinal: -1, singleSweepSettled: true },
+      }),
+    ).rejects.toThrow('chatgpt_dom_coverage_invalid');
+  });
+
   it('advances capture activity only when message semantics actually change', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',

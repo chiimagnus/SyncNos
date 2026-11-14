@@ -1,5 +1,6 @@
 import type { CollectorDefinition } from '@collectors/collector-contract.ts';
 import type { CollectorEnv } from '@collectors/collector-env.ts';
+import type { ChatgptDomCoverage } from '@services/conversations/domain/models';
 import {
   appendImageMarkdown,
   extractImageUrlsFromElement,
@@ -20,6 +21,7 @@ import {
   finishPreparedCapture,
   mergePreparedRecords,
   createPreparedCaptureConsumer,
+  resolveScrollRoot,
   runVirtualizedSweep,
   type PreparedAccumulator,
   type VirtualizedBoundary,
@@ -804,6 +806,16 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     };
   }
 
+  function visibleDomOrdinal(messageKey: string): number | null {
+    if (!messageKey) return null;
+    for (const wrapper of getTurnWrappers(getConversationRoot())) {
+      const role = roleFromWrapper(wrapper);
+      if (stableManualMessageKey(wrapper, role, extractChatgptImageUrlsForRole(wrapper, role)) !== messageKey) continue;
+      return structuralTurnOrdinal(wrapper.closest(CHATGPT_TURN_SELECTOR));
+    }
+    return null;
+  }
+
   // Manual-only dynamic sweep. The provider re-queries after every wait; no turn/message node
   // survives across an await. The original scroll root is restored exactly once in finally.
   async function prepareManualCapture(options: any = {}): Promise<any | null> {
@@ -831,47 +843,104 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         ? options.savedTailMessageKey.trim()
         : '';
 
+    const previousCoverage = options.savedDomCoverage as ChatgptDomCoverage | undefined;
+    const now = typeof options.now === 'function' ? options.now : Date.now;
+    const historyQuietMs = Number.isFinite(options.historyQuietMs)
+      ? Math.max(0, Number(options.historyQuietMs))
+      : 12_000;
+    const observedUserOrdinals = new Map<string, number | null>();
+    let lastTopSignature = '';
+    let topChangedAt = now();
+    let stableTopSamples = 0;
+    const adapter = {
+      getScrollSeed: manualAdapter.readScrollSeed,
+      sampleIdentity,
+      readDescriptorKeys: manualAdapter.readDescriptorKeys,
+      readUnresolvedKeys: manualAdapter.readUnresolvedKeys,
+      ...(historyQuietMs > 0 ? { canProbeTop: () => !hasBoundaryLoadingSignal('top') } : null),
+      readBoundaryState: (boundary: VirtualizedBoundary) => {
+        const state = manualAdapter.readBoundaryState(boundary);
+        if (boundary !== 'top') return state;
+        if (state !== 'confirmed') {
+          lastTopSignature = '';
+          stableTopSamples = 0;
+          return 'pending';
+        }
+        const keys = manualAdapter.readDescriptorKeys();
+        const scrollRoot = resolveScrollRoot(scrollRuntime, manualAdapter.readScrollSeed());
+        const signature = [
+          (scrollRoot as HTMLElement).scrollHeight,
+          keys[0] || '',
+          keys.at(-1) || '',
+          keys.length,
+        ].join('|');
+        if (signature !== lastTopSignature) {
+          lastTopSignature = signature;
+          topChangedAt = now();
+          stableTopSamples = 0;
+        } else {
+          stableTopSamples += 1;
+        }
+        return state === 'confirmed' && stableTopSamples >= 2 && now() - topChangedAt >= historyQuietMs
+          ? 'confirmed'
+          : 'pending';
+      },
+      onTopConfirmed: (target: PreparedAccumulator<any>) => {
+        const canonicalGuard = manualAdapter.readIdentity();
+        target.identityGuard = { ...canonicalGuard, anchors: canonicalGuard.anchors.slice() };
+        if (!target.conversationKey) {
+          target.conversationKey = identityConversationKey(canonicalGuard);
+          target.identityVerified = !!target.conversationKey;
+        }
+        if (!target.conversationKey) addPreparedReason(target, 'unstable_identity');
+      },
+      harvest: (target: PreparedAccumulator<any>) => {
+        for (const wrapper of getTurnWrappers(getConversationRoot())) {
+          if (roleFromWrapper(wrapper) !== 'user') continue;
+          const key = stableManualMessageKey(wrapper, 'user');
+          if (key) observedUserOrdinals.set(key, structuralTurnOrdinal(wrapper.closest(CHATGPT_TURN_SELECTOR)));
+        }
+        return harvestRenderedInto(target, null, { newestFirst: true });
+      },
+    };
+    const mayUseTail = previousCoverage?.singleSweepSettled === true && !!savedTailMessageKey;
+    let settled = false;
     try {
-      const sweep = await runVirtualizedSweep(
-        scrollRuntime,
-        {
-          getScrollSeed: manualAdapter.readScrollSeed,
-          sampleIdentity,
-          readDescriptorKeys: manualAdapter.readDescriptorKeys,
-          readUnresolvedKeys: manualAdapter.readUnresolvedKeys,
-          readBoundaryState: manualAdapter.readBoundaryState,
-          onTopConfirmed: (target) => {
-            const canonicalGuard = manualAdapter.readIdentity();
-            target.identityGuard = { ...canonicalGuard, anchors: canonicalGuard.anchors.slice() };
-            if (!target.conversationKey) {
-              target.conversationKey = identityConversationKey(canonicalGuard);
-              target.identityVerified = !!target.conversationKey;
+      const sweep = await runVirtualizedSweep(scrollRuntime, adapter, accumulator, {
+        totalDeadlineMs: options.totalDeadlineMs,
+        maxSteps: options.maxSteps,
+        stableSamples: options.stableSamples,
+        pollMs: options.pollMs,
+        stepTimeoutMs: options.stepTimeoutMs,
+        boundaryTimeoutMs: options.boundaryTimeoutMs ?? 120_000,
+        overlapRatio: options.overlapRatio,
+        maxOverlapRecoveries: options.maxOverlapRecoveries,
+        sleep: options.sleep,
+        now,
+        startAtBottom: true,
+        holdAtTop: true,
+        topProbeDelayMs: Math.max(1, Math.floor(historyQuietMs / 2)),
+        ...(mayUseTail
+          ? {
+              stopAtKey: savedTailMessageKey,
+              acceptStopAtKey: () => {
+                const previousOrdinal = previousCoverage?.anchorOrdinal;
+                const currentOrdinal =
+                  observedUserOrdinals.get(previousCoverage?.anchorKey || '') ??
+                  visibleDomOrdinal(previousCoverage?.anchorKey || '') ??
+                  visibleDomOrdinal(savedTailMessageKey);
+                return previousOrdinal != null && currentOrdinal != null && currentOrdinal <= previousOrdinal;
+              },
             }
-            if (!target.conversationKey) addPreparedReason(target, 'unstable_identity');
-          },
-          harvest: (target) => harvestRenderedInto(target, null, { newestFirst: true }),
-        },
-        accumulator,
-        {
-          totalDeadlineMs: options.totalDeadlineMs,
-          maxSteps: options.maxSteps,
-          stableSamples: options.stableSamples,
-          pollMs: options.pollMs,
-          stepTimeoutMs: options.stepTimeoutMs,
-          boundaryTimeoutMs: options.boundaryTimeoutMs,
-          overlapRatio: options.overlapRatio,
-          maxOverlapRecoveries: options.maxOverlapRecoveries,
-          sleep: options.sleep,
-          now: options.now,
-          startAtBottom: true,
-          ...(savedTailMessageKey ? { stopAtKey: savedTailMessageKey } : null),
-        },
-      );
+          : null),
+      });
       if (sweep.stoppedAtKey) {
-        const anchorIndex = accumulator.records.findIndex((record) => record.key === savedTailMessageKey);
-        accumulator.records = accumulator.records.slice(anchorIndex);
+        const index = accumulator.records.findIndex((record) => record.key === savedTailMessageKey);
+        accumulator.records = accumulator.records.slice(index);
       }
       accumulator.completeness = sweep.completeness;
+      settled = sweep.stoppedAtKey || (sweep.reachedTop && sweep.reachedBottom && sweep.completeness === 'complete');
+      accumulator.sweepMetrics = { ...accumulator.sweepMetrics, domHistorySettled: settled };
     } finally {
       const restoreResult = scrollRestorer.restore();
       if (!restoreResult.restored) {
@@ -889,7 +958,21 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       accumulator.completeness = 'partial';
       addPreparedReason(accumulator, 'identity_changed');
     }
-    return finishPreparedCapture(accumulator);
+    const priorAnchor = previousCoverage?.anchorKey || '';
+    const lastUser = accumulator.records.findLast(
+      (record) => record.payload?.role === 'user' && !record.key.startsWith('fallback_'),
+    );
+    const anchorKey = lastUser?.key || priorAnchor;
+    const anchorOrdinal =
+      visibleDomOrdinal(anchorKey) ??
+      observedUserOrdinals.get(anchorKey) ??
+      (priorAnchor === anchorKey ? previousCoverage?.anchorOrdinal : null) ??
+      null;
+    const coverage: ChatgptDomCoverage | null =
+      anchorKey && settled && accumulator.identityVerified && !accumulator.reasons.length
+        ? { anchorKey, anchorOrdinal, singleSweepSettled: true }
+        : null;
+    return { ...finishPreparedCapture(accumulator), domCoverage: coverage };
   }
 
   async function capture(options: any): Promise<any | null> {
@@ -924,6 +1007,8 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     const finalPrepared = finishPreparedCapture(accumulator);
     const messages = finalPrepared.records.map((record, index) => ({ ...record.payload, sequence: index }));
     if (!messages.length || !finalPrepared.identityVerified || !finalPrepared.conversationKey) return null;
+    const domCoverage = (prepared as any).domCoverage as ChatgptDomCoverage | null;
+    const coverageChanged = prepared.metrics.stoppedAtKey !== true && (finalLive.added > 0 || finalLive.updated > 0);
     return {
       conversation: {
         sourceType: 'chat',
@@ -934,6 +1019,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         warningFlags: [],
       },
       messages,
+      ...(domCoverage && !coverageChanged ? { domCoverage } : null),
       captureMeta: {
         completeness: 'partial',
         identityVerified: true,

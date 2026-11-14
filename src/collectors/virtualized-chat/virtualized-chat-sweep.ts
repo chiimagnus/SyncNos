@@ -424,6 +424,7 @@ export type VirtualizedPassAdapter<T> = {
   readUnresolvedKeys?: () => string[];
   readPendingKeys?: () => string[];
   readBoundaryState?: (boundary: VirtualizedBoundary) => VirtualizedBoundaryState;
+  canProbeTop?: () => boolean;
   onTopConfirmed?: (accumulator: PreparedAccumulator<T>) => void;
   harvest: (accumulator: PreparedAccumulator<T>) => Promise<{ added: number; updated: number }>;
 };
@@ -450,7 +451,10 @@ export type VirtualizedPassOptions = {
   now?: () => number;
   deadline?: number;
   stopAtKey?: string;
+  acceptStopAtKey?: () => boolean;
   startAtBottom?: boolean;
+  holdAtTop?: boolean;
+  topProbeDelayMs?: number;
 };
 
 const PASS_DEFAULTS = Object.freeze({
@@ -531,6 +535,11 @@ export async function runVirtualizedPass<T>(
   let previousTop = 0;
   let overlapRecoveries = 0;
   let boundaryRecoveries = 0;
+  let topProbeCount = 0;
+  let topProbeAt = 0;
+  let lastObservedTop = '';
+  let topProgressAt = now();
+  const probeDelayMs = boundedInteger(options.topProbeDelayMs, 6_000, 1, 30_000);
   const unresolvedKeys = new Set<string>();
   const result = (keys: string[] = []): VirtualizedPassResult => ({
     reachedTop,
@@ -624,7 +633,8 @@ export async function runVirtualizedPass<T>(
       await sleep(pollMs);
       if (deadlineExceeded() || !validateAfterAwait()) return null;
     }
-    if (latest && !latest.unresolvedKeys.length) addReason('step_timeout');
+    if (latest && !latest.unresolvedKeys.length && !(options.holdAtTop && adapter.canProbeTop?.() === false))
+      addReason('step_timeout');
     return latest;
   };
 
@@ -644,28 +654,41 @@ export async function runVirtualizedPass<T>(
     return stabilize();
   };
 
-  const acquireLogicalTop = async (): Promise<StableWindow | null> => {
+  const acquireLogicalTop = async (previousWindow?: StableWindow): Promise<StableWindow | null> => {
     let lastSignature = '';
     let lastPendingSignature = '';
     let progressDeadline = now() + boundaryTimeoutMs;
+    const waitingSignature = previousWindow
+      ? `${previousWindow.metrics.scrollHeight}|${previousWindow.keys.join('\u001f')}`
+      : '';
     while (!deadlineExceeded()) {
-      writeScrollPosition(runtime, root, 0, 0);
+      if (!options.holdAtTop || !previousWindow) writeScrollPosition(runtime, root, 0, 0);
       const stable = await stabilize();
       if (!stable) return null;
       maxScrollExtent = Math.max(maxScrollExtent, stable.metrics.scrollHeight);
-      const signature = contentFreeWindowSignature(originalIdentity, stable.metrics, stable.keys);
+      const signature = options.holdAtTop
+        ? `${stable.metrics.scrollHeight}|${stable.keys.join('\u001f')}`
+        : contentFreeWindowSignature(originalIdentity, stable.metrics, stable.keys);
+      if (options.holdAtTop && signature !== lastObservedTop) {
+        topProbeCount = 0;
+        lastObservedTop = signature;
+        topProgressAt = now();
+      }
+      if (options.holdAtTop && previousWindow && signature !== waitingSignature) return stable;
       if (signature !== lastSignature) {
         lastSignature = signature;
         progressDeadline = now() + boundaryTimeoutMs;
       }
       if (!isAtScrollTop(stable.metrics)) {
+        if (options.holdAtTop) writeScrollPosition(runtime, root, stable.metrics.left, 0);
         await sleep(Math.max(1, pollMs));
         if (!validateAfterAwait()) return null;
         continue;
       }
       const state = readBoundaryState('top');
       if (!state) return null;
-      if (state === 'confirmed') {
+      const probeRequired = options.holdAtTop && !!adapter.canProbeTop;
+      if (state === 'confirmed' && (!probeRequired || (topProbeCount >= 2 && now() - topProbeAt >= probeDelayMs))) {
         try {
           adapter.onTopConfirmed?.(accumulator);
         } catch (_error) {
@@ -675,7 +698,26 @@ export async function runVirtualizedPass<T>(
         reachedTop = true;
         return stable;
       }
-      if (signature === lastPendingSignature) {
+      if (
+        probeRequired &&
+        topProbeCount < 2 &&
+        now() - Math.max(topProgressAt, topProbeAt) >= probeDelayMs &&
+        adapter.canProbeTop?.()
+      ) {
+        const maxTop = Math.max(0, stable.metrics.scrollHeight - stable.metrics.clientHeight);
+        const reentryTop = Math.min(maxTop, Math.max(1, Math.floor(stable.metrics.clientHeight * overlapRatio)));
+        if (reentryTop > 0) {
+          writeScrollPosition(runtime, root, stable.metrics.left, reentryTop);
+          await sleep(Math.min(250, Math.max(40, pollMs)));
+          if (!validateAfterAwait()) return null;
+          writeScrollPosition(runtime, root, stable.metrics.left, 0);
+          if (!validateAfterAwait()) return null;
+        }
+        topProbeCount += 1;
+        topProbeAt = now();
+        continue;
+      }
+      if (!options.holdAtTop && signature === lastPendingSignature) {
         const maxTop = Math.max(0, stable.metrics.scrollHeight - stable.metrics.clientHeight);
         const reentryTop = Math.min(maxTop, Math.max(1, Math.floor(stable.metrics.clientHeight * overlapRatio)));
         if (reentryTop > 0) {
@@ -686,8 +728,12 @@ export async function runVirtualizedPass<T>(
       }
       lastPendingSignature = signature;
       if (now() > progressDeadline) {
-        addReason('boundary_stalled');
-        return stable;
+        if (options.holdAtTop && adapter.canProbeTop?.() === false) {
+          progressDeadline = now() + boundaryTimeoutMs;
+        } else {
+          addReason('boundary_stalled');
+          return null;
+        }
       }
       await sleep(Math.max(1, pollMs));
       if (!validateAfterAwait()) return null;
@@ -779,6 +825,7 @@ export async function runVirtualizedPass<T>(
       if (
         options.stopAtKey &&
         accumulator.records.some((record) => record.key === options.stopAtKey) &&
+        (!options.acceptStopAtKey || options.acceptStopAtKey()) &&
         !accumulator.reasons.includes('order_unanchored') &&
         !accumulator.reasons.includes('order_conflict')
       ) {
@@ -800,16 +847,15 @@ export async function runVirtualizedPass<T>(
             }
             break;
           }
-          const top = await acquireLogicalTop();
-          if (!top || !reachedTop) break;
-          stable = top;
-          previousTop = stable.metrics.top;
-          // Newly loaded turns at the logical top must be harvested before declaring success.
           if (steps >= maxSteps) {
-            reachedTop = false;
             addReason('step_budget_exhausted');
             break;
           }
+          const top = await acquireLogicalTop(options.holdAtTop ? stable : undefined);
+          if (!top) break;
+          stable = top;
+          previousTop = stable.metrics.top;
+          // Newly loaded turns at the logical top must be harvested before declaring success.
           continue;
         }
         previousTop = metrics.top;

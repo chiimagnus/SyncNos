@@ -226,6 +226,119 @@ function simulatedVirtualHistory(initialTop = 0) {
   return { dom, getTop: () => top };
 }
 
+function simulatedLazyChatgptHistory(
+  totalTurns = 27,
+  initiallyLoaded = 5,
+  autoLoad = true,
+  loadDelayMs = 5,
+  needsTopReentry = false,
+) {
+  const dom = setupChatgptDom('', 'https://chatgpt.com/c/lazy-hydrated-history');
+  (dom.window as any).scrollTo = vi.fn();
+  const scroller = dom.window.document.createElement('div');
+  scroller.style.overflowY = 'auto';
+  scroller.setAttribute('data-app-action-timeline-scroll', '');
+  dom.window.document.querySelector('main')!.appendChild(scroller);
+  let loaded = initiallyLoaded;
+  let top = (loaded - 1) * 100;
+  let topArrivals = 0;
+  let canLoadMore = autoLoad;
+  let clock = 0;
+  let loadAt: number | null = null;
+  let returnedToBottom = 0;
+  let scrollMovesDuringLoad = 0;
+  let visitedTop = false;
+  let topReentryArmed = false;
+
+  const render = () => {
+    const start = totalTurns - loaded;
+    const first = Math.max(0, Math.floor(top / 100) - 1);
+    const last = Math.min(loaded - 1, Math.floor(top / 100) + 1);
+    const turnsHtml = Array.from({ length: last - first + 1 }, (_, offset) => {
+      const ordinal = first + offset;
+      const actual = start + ordinal;
+      return `<div data-turn-key="turn-${actual}">
+        <div data-content-search-turn-key="fallback-turn-${ordinal}">
+          <div data-chatgpt-search-unit-key="fallback-turn-${ordinal}:0:user"
+            data-chatgpt-search-message-ids="user-${actual}" data-message-author-role="user">
+            <div data-user-message-bubble><div class="whitespace-pre-wrap">Question ${actual}</div></div>
+          </div>
+          <div data-chatgpt-search-unit-key="fallback-turn-${ordinal}:1:assistant"
+            data-chatgpt-search-message-ids="assistant-${actual}" data-message-author-role="assistant">
+            <div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary">Answer ${actual}</div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    scroller.innerHTML =
+      loadAt === null
+        ? turnsHtml
+        : '<div data-chatgpt-conversation-selection-target="true"><span role="status"></span></div>' + turnsHtml;
+    for (const element of Array.from(scroller.querySelectorAll('[data-chatgpt-search-unit-key]'))) {
+      (element as any).getBoundingClientRect = () => ({
+        top: 0,
+        bottom: 100,
+        height: 100,
+        left: 0,
+        right: 500,
+        width: 500,
+      });
+    }
+  };
+  Object.defineProperties(scroller, {
+    clientHeight: { value: 100 },
+    scrollHeight: { get: () => loaded * 100 },
+    clientWidth: { value: 100 },
+    scrollWidth: { value: 100 },
+    scrollTop: {
+      get: () => top,
+      set(value: number) {
+        const previousTop = top;
+        top = Math.min((loaded - 1) * 100, Math.max(0, Number(value) || 0));
+        if (loadAt !== null && top !== previousTop && top < (loaded - 1) * 100) scrollMovesDuringLoad += 1;
+        if (top <= 0) {
+          if (canLoadMore && loaded < totalTurns && loadAt === null && (!needsTopReentry || topReentryArmed))
+            loadAt = clock + loadDelayMs;
+          topReentryArmed = false;
+          visitedTop = true;
+        } else if (visitedTop) {
+          if (top >= (loaded - 1) * 100) returnedToBottom += 1;
+          else topReentryArmed = true;
+        }
+        render();
+      },
+    },
+  });
+  render();
+  return {
+    dom,
+    getLoaded: () => loaded,
+    getTopArrivals: () => topArrivals,
+    getBottomReturns: () => returnedToBottom,
+    getMovesDuringLoad: () => scrollMovesDuringLoad,
+    now: () => clock,
+    sleep: async (ms: number) => {
+      clock += Math.max(1, ms);
+      if (loadAt !== null && clock >= loadAt) {
+        const previousLoaded = loaded;
+        loaded = Math.min(totalTurns, loaded + 5);
+        top += (loaded - previousLoaded) * 100;
+        topArrivals += 1;
+        loadAt = null;
+        render();
+      }
+    },
+    enableMoreHistory: () => {
+      canLoadMore = true;
+      const previousLoaded = loaded;
+      loaded = Math.min(totalTurns, loaded + 5);
+      top += (loaded - previousLoaded) * 100;
+      render();
+    },
+    atBottom: () => top >= (loaded - 1) * 100,
+  };
+}
+
 function currentDef(dom: JSDOM) {
   return createChatgptCollectorDef(
     createCollectorEnv({
@@ -242,6 +355,16 @@ async function prepare(def: any, options: any = {}) {
     stableSamples: 1,
     pollMs: 0,
     sleep: async () => {},
+    historyQuietMs: 0,
+    ...(options.savedTailMessageKey
+      ? {
+          savedDomCoverage: {
+            anchorKey: options.savedTailMessageKey,
+            anchorOrdinal: Number(options.savedTailMessageKey.match(/(?:message-|user-|assistant-)(\d+)$/)?.[1] || 0),
+            singleSweepSettled: true,
+          },
+        }
+      : null),
     ...options,
   });
 }
@@ -268,6 +391,155 @@ describe('chatgpt current DOM', () => {
       integrity.snapshot.messages.every((row: any) => row.captureSequencePolicy === 'preserve-existing-tail'),
     ).toBe(true);
     expect(snapshot.captureMeta.metrics.stoppedAtKey).toBe(true);
+  });
+
+  it('harvests delayed lazy batches in one upward sweep without returning to the bottom', async () => {
+    const test = simulatedLazyChatgptHistory(27, 5);
+    const def = currentDef(test.dom);
+    const prepared = await prepare(def, {
+      now: test.now,
+      sleep: test.sleep,
+      pollMs: 1,
+      historyQuietMs: 12,
+    });
+    expect(test.getLoaded()).toBe(27);
+    expect(test.getTopArrivals()).toBeGreaterThan(3);
+    expect(test.getBottomReturns()).toBe(1);
+    expect(test.getMovesDuringLoad()).toBe(0);
+    expect(test.atBottom()).toBe(true);
+    expect(prepared.records).toHaveLength(54);
+    expect(prepared.records.map((record: any) => record.key)).toEqual(
+      Array.from({ length: 27 }, (_, index) => [`user-${index}`, `assistant-${index}`]).flat(),
+    );
+    expect(prepared.domCoverage).toMatchObject({
+      anchorKey: 'user-26',
+      anchorOrdinal: 26,
+    });
+  });
+
+  it('does not certify incomplete history after a single sweep hits its step budget', async () => {
+    const test = simulatedLazyChatgptHistory(27, 5);
+    const prepared = await prepare(currentDef(test.dom), {
+      maxSteps: 2,
+      now: test.now,
+      sleep: test.sleep,
+      pollMs: 1,
+      historyQuietMs: 12,
+    });
+    expect(prepared.domCoverage).toBeNull();
+    expect(prepared.metrics.domHistorySettled).toBe(false);
+    expect(prepared.reasons).toContain('step_budget_exhausted');
+    expect(prepared.records.length).toBeLessThan(54);
+    expect(test.atBottom()).toBe(true);
+  });
+
+  it('triggers an otherwise stalled lazy page with a small top-edge entry, never a bottom restart', async () => {
+    const test = simulatedLazyChatgptHistory(27, 5, true, 5, true);
+    const prepared = await prepare(currentDef(test.dom), {
+      now: test.now,
+      sleep: test.sleep,
+      pollMs: 1,
+      historyQuietMs: 12,
+    });
+    expect(test.getLoaded()).toBe(27);
+    expect(test.getTopArrivals()).toBeGreaterThan(3);
+    expect(test.getBottomReturns()).toBe(1);
+    expect(test.getMovesDuringLoad()).toBe(0);
+    expect(prepared.records).toHaveLength(54);
+    expect(prepared.domCoverage).toMatchObject({ anchorKey: 'user-26', anchorOrdinal: 26 });
+  });
+
+  it('does not move the scroller while older history is still loading, and reports a stalled load as incomplete', async () => {
+    const test = simulatedLazyChatgptHistory(27, 5, true, 2_000);
+    const prepared = await prepare(currentDef(test.dom), {
+      now: test.now,
+      sleep: test.sleep,
+      pollMs: 1,
+      historyQuietMs: 12,
+      boundaryTimeoutMs: 35,
+      totalDeadlineMs: 160,
+    });
+    expect(test.getLoaded()).toBe(5);
+    expect(test.getMovesDuringLoad()).toBe(0);
+    expect(test.getBottomReturns()).toBe(1);
+    expect(prepared.metrics.reachedTop).toBe(false);
+    expect(prepared.reasons).toContain('total_deadline_exhausted');
+    expect(prepared.domCoverage).toBeNull();
+  });
+
+  it('waits for genuinely slow history loading beyond the former 30-second boundary without scrolling', async () => {
+    const test = simulatedLazyChatgptHistory(10, 5, true, 35_000);
+    const prepared = await prepare(currentDef(test.dom), {
+      now: test.now,
+      sleep: test.sleep,
+      pollMs: 500,
+      historyQuietMs: 12,
+      boundaryTimeoutMs: 120_000,
+      totalDeadlineMs: 180_000,
+    });
+    expect(test.getLoaded()).toBe(10);
+    expect(test.getMovesDuringLoad()).toBe(0);
+    expect(test.getBottomReturns()).toBe(1);
+    expect(prepared.records).toHaveLength(20);
+    expect(prepared.domCoverage).toMatchObject({ anchorKey: 'user-9', singleSweepSettled: true });
+  });
+
+  it('terminates an in-flight top-loading wait when the user navigates to another conversation', async () => {
+    const test = simulatedLazyChatgptHistory(27, 5, true, 2_000);
+    let changedRoute = false;
+    const prepared = await prepare(currentDef(test.dom), {
+      now: test.now,
+      sleep: async (ms: number) => {
+        await test.sleep(ms);
+        if (!changedRoute && test.now() > 10) {
+          test.dom.window.history.replaceState({}, '', '/c/unrelated-conversation');
+          changedRoute = true;
+        }
+      },
+      pollMs: 1,
+      historyQuietMs: 12,
+      boundaryTimeoutMs: 35,
+      totalDeadlineMs: 160,
+    });
+    expect(changedRoute).toBe(true);
+    expect(test.getMovesDuringLoad()).toBe(0);
+    expect(prepared.identityVerified).toBe(false);
+    expect(prepared.records).toHaveLength(0);
+    expect(prepared.domCoverage).toBeNull();
+  });
+
+  it('collects a 120-turn simulated history without restarting from the bottom', async () => {
+    const test = simulatedLazyChatgptHistory(120, 5);
+    const prepared = await prepare(currentDef(test.dom), {
+      now: test.now,
+      sleep: test.sleep,
+      pollMs: 1,
+      historyQuietMs: 12,
+    });
+    expect(test.getLoaded()).toBe(120);
+    expect(test.getTopArrivals()).toBeGreaterThanOrEqual(20);
+    expect(test.getBottomReturns()).toBe(1);
+    expect(test.getMovesDuringLoad()).toBe(0);
+    expect(prepared.records).toHaveLength(240);
+    expect(prepared.records.at(0)?.key).toBe('user-0');
+    expect(prepared.records.at(-1)?.key).toBe('assistant-119');
+    expect(prepared.domCoverage).toMatchObject({ anchorKey: 'user-119', anchorOrdinal: 119 });
+  }, 20_000);
+
+  it('ignores a saved tail within the same sweep if its historical ordinal has shifted', async () => {
+    const test = simulatedLazyChatgptHistory(27, 5);
+    const def = currentDef(test.dom);
+    const prepared = await prepare(def, {
+      savedTailMessageKey: 'assistant-26',
+      savedDomCoverage: { anchorKey: 'user-26', anchorOrdinal: 0 },
+      now: test.now,
+      sleep: test.sleep,
+      pollMs: 1,
+      historyQuietMs: 12,
+    });
+    expect(prepared.metrics.stoppedAtKey).toBe(false);
+    expect(prepared.records).toHaveLength(54);
+    expect(prepared.domCoverage).toMatchObject({ anchorKey: 'user-26', anchorOrdinal: 26 });
   });
 
   it('falls back to the whole original sweep if the saved message was edited away', async () => {

@@ -2,7 +2,7 @@ import { t } from '@i18n';
 import { hydrateChatgptDeepResearchSnapshot } from '@collectors/chatgpt/chatgpt-deep-research-hydrator';
 import { AI_CHAT_INCLUDE_THINKING_STORAGE_KEY, applyThinkingCapturePreference } from '@services/shared/thinking-block';
 import { storageGet } from '@services/shared/storage';
-import type { ChatgptApiCheckpoint } from '@services/conversations/domain/models';
+import type { ChatgptApiCheckpoint, ChatgptDomCoverage } from '@services/conversations/domain/models';
 import { resolveActiveOrInpageCollector, type CollectorRegistryLike } from '@collectors/registry';
 import { DISCOURSE_OP_NOT_FOUND_ERROR, isDiscourseOpNotFoundErrorMessage } from '@collectors/web/article-fetch-errors';
 import { ARTICLE_MESSAGE_TYPES, CORE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
@@ -359,6 +359,9 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       ...(integrity.meta?.completeness === 'complete' && options?.checkpoint
         ? { chatgptApiCheckpoint: options.checkpoint }
         : null),
+      ...(collectorId === 'chatgpt' && !options?.expectedChatgptConversationId && normalizedSnapshot.domCoverage
+        ? { chatgptDomCoverage: normalizedSnapshot.domCoverage }
+        : null),
       ...(options?.trustedChatgptApiPartial ? { trustedChatgptApiPartial: true } : null),
       ...(options?.trustedTail || (persistence.mode === 'snapshot' && options?.fullSnapshotGuard)
         ? {
@@ -557,6 +560,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       } else {
         let preparedCapture: unknown;
         let savedTailMessageKey = '';
+        let savedDomCoverage: ChatgptDomCoverage | null = null;
         if (target.collectorId === 'chatgpt') {
           const route = parseChatgptDurableConversationRoute(pageUrl);
           if (route) {
@@ -568,6 +572,15 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
                 compact: true,
               });
               const messages = response?.data?.messages;
+              const coverage = response?.data?.domCoverage;
+              if (
+                response?.ok &&
+                coverage?.singleSweepSettled === true &&
+                typeof coverage.anchorKey === 'string' &&
+                (coverage.anchorOrdinal === null ||
+                  (Number.isSafeInteger(coverage.anchorOrdinal) && coverage.anchorOrdinal >= 0))
+              )
+                savedDomCoverage = coverage;
               const anchor =
                 response?.ok && Array.isArray(messages)
                   ? messages.findLast(
@@ -592,6 +605,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
           preparedCapture = await target.collector.prepareManualCapture({
             manual: true,
             ...(savedTailMessageKey ? { savedTailMessageKey } : null),
+            ...(savedDomCoverage ? { savedDomCoverage } : null),
           });
         }
         snapshot = await Promise.resolve(target.collector.capture({ manual: true, preparedCapture }));
