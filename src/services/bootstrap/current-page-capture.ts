@@ -15,6 +15,12 @@ import { readChatgptApiCaptureEnabled } from '@services/integrations/chatgpt/api
 import { captureCurrentChatgptConversationViaApi } from '@services/integrations/chatgpt/api-capture';
 import { parseChatgptDurableConversationRoute } from '@services/shared/chatgpt-route';
 
+type ChatgptTrustedTailWindow = {
+  checkpoint: ChatgptApiCheckpoint;
+  messagesRevision: number;
+  messages: Array<{ messageKey: string; role: string; sequence: number }>;
+};
+
 type RuntimeClient = {
   send?: (type: string, payload?: Record<string, unknown>) => Promise<any>;
 };
@@ -255,6 +261,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       deferRemoteSync?: boolean;
       includeThinking?: boolean;
       checkpoint?: ChatgptApiCheckpoint | null;
+      trustedTail?: ChatgptTrustedTailWindow;
       trustedChatgptApiPartial?: boolean;
     },
   ) {
@@ -276,6 +283,55 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     );
     if (!integrity.ok) return null;
     const normalizedSnapshot = integrity.snapshot;
+    let persistence: {
+      mode: 'snapshot' | 'append' | 'incremental';
+      diff: { added: string[]; updated: string[]; removed: string[] } | null;
+    } = integrity.persistence;
+    if (options?.trustedTail) {
+      const window = options.trustedTail;
+      const messages = normalizedSnapshot.messages as Array<{
+        messageKey: string;
+        role: string;
+        sequence: number;
+        contentMarkdown: string;
+      }>;
+      const oldAnchor = window.messages.find((item) => item.messageKey === window.checkpoint.lastUserKey);
+      const newAnchor = messages.find((item) => item.messageKey === window.checkpoint.lastUserKey);
+      if (
+        oldAnchor?.role !== 'user' ||
+        newAnchor?.role !== 'user' ||
+        !Number.isFinite(oldAnchor.sequence) ||
+        !Number.isFinite(newAnchor.sequence)
+      )
+        throw new Error('chatgpt_api_storage_conflict');
+
+      const previousTail = window.messages.filter((item) => item.sequence > oldAnchor.sequence);
+      const previousKeys = new Set(previousTail.map((item) => item.messageKey));
+      const previousByKey = new Map(previousTail.map((item) => [item.messageKey, item]));
+      const isPartialTail = integrity.meta?.completeness !== 'complete';
+      let nextProvisionalSequence = Math.max(oldAnchor.sequence, ...previousTail.map((item) => item.sequence)) + 1;
+      const currentTail = messages
+        .filter((item) => item.sequence > newAnchor.sequence)
+        .map((item) => ({
+          ...item,
+          sequence: isPartialTail
+            ? (previousByKey.get(item.messageKey)?.sequence ?? nextProvisionalSequence++)
+            : oldAnchor.sequence + item.sequence - newAnchor.sequence,
+        }));
+      const currentKeys = new Set(currentTail.map((item) => item.messageKey));
+      persistence = {
+        mode: 'incremental',
+        diff: {
+          added: currentTail.filter((item) => !previousKeys.has(item.messageKey)).map((item) => item.messageKey),
+          updated: currentTail.filter((item) => previousKeys.has(item.messageKey)).map((item) => item.messageKey),
+          removed:
+            integrity.meta?.completeness === 'complete'
+              ? previousTail.filter((item) => !currentKeys.has(item.messageKey)).map((item) => item.messageKey)
+              : [],
+        },
+      };
+      normalizedSnapshot.messages = currentTail;
+    }
     const activityAt = Date.now();
     const assertExpectedChatgptRoute = () => {
       const expected = String(options?.expectedChatgptConversationId || '').trim();
@@ -300,16 +356,24 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     const messagesRes = await send(CORE_MESSAGE_TYPES.SYNC_CONVERSATION_MESSAGES, {
       conversationId,
       messages: normalizedSnapshot.messages || [],
-      mode: integrity.persistence.mode,
-      diff: integrity.persistence.diff,
+      mode: persistence.mode,
+      diff: persistence.diff,
       conversationSourceType: normalizedSnapshot?.conversation?.sourceType || 'chat',
       conversationContentChanged: (conversation as any)?.__semanticContentChanged === true,
+      conversationMetadataChanged: (conversation as any)?.__conversationChanged === true,
       activityAt,
       ...(options?.deferRemoteSync ? { deferRemoteSync: true } : null),
       ...(integrity.meta?.completeness === 'complete' && options?.checkpoint
         ? { chatgptApiCheckpoint: options.checkpoint }
         : null),
       ...(options?.trustedChatgptApiPartial ? { trustedChatgptApiPartial: true } : null),
+      ...(options?.trustedTail
+        ? {
+            expectedCheckpoint: options.trustedTail.checkpoint,
+            expectedMessagesRevision: options.trustedTail.messagesRevision,
+            verifiedChatgptApiTail: true,
+          }
+        : null),
     });
     if (!messagesRes?.ok) {
       throw new Error(messagesRes?.error?.message || 'syncConversationMessages failed');
@@ -381,28 +445,83 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       let firstPageIsNew: boolean | null = null;
       let includeThinking: boolean | undefined;
       let checkpoint: ChatgptApiCheckpoint | null = null;
+      let trustedTail: ChatgptTrustedTailWindow | null = null;
+      let capturedVerifiedTail = false;
+      let stageChatgptPage: ((page: { snapshot: any }) => Promise<void>) | undefined;
       if (target.kind === 'chat' && target.useChatgptApi) {
         includeThinking =
           (await storageGet([AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]))?.[AI_CHAT_INCLUDE_THINKING_STORAGE_KEY] !== false;
+        const chatgptRoute = parseChatgptDurableConversationRoute(pageUrl);
+        if (!chatgptRoute) throw new Error('chatgpt_api_navigation_changed');
+        const tailResponse = await send(CORE_MESSAGE_TYPES.GET_CONVERSATION_TAIL_WINDOW_BY_SOURCE_AND_KEY, {
+          source: 'chatgpt',
+          conversationKey: chatgptRoute.conversationId,
+          limit: 200,
+          compact: true,
+        });
+        if (!tailResponse?.ok) throw new Error(tailResponse?.error?.message || 'chatgpt_api_tail_unavailable');
+        const tailData = tailResponse.data;
+        const tailMessages = Array.isArray(tailData?.messages) ? tailData.messages : [];
+        const tailCheckpoint = tailData?.checkpoint as ChatgptApiCheckpoint | null;
+        const orderedTail =
+          tailMessages.length <= 200 &&
+          tailMessages.every(
+            (message: any, index: number) =>
+              typeof message?.messageKey === 'string' &&
+              !!message.messageKey &&
+              Number.isSafeInteger(message.sequence) &&
+              message.sequence >= 0 &&
+              (index === 0 || message.sequence > tailMessages[index - 1].sequence),
+          );
+        if (
+          tailCheckpoint &&
+          typeof tailCheckpoint.lastUserKey === 'string' &&
+          /^[0-9a-f]{64}$/.test(tailCheckpoint.userSignature) &&
+          tailCheckpoint.includeThinking === includeThinking &&
+          Number.isSafeInteger(tailData?.messagesRevision) &&
+          tailData.messagesRevision >= 0 &&
+          orderedTail &&
+          tailMessages.some(
+            (message: any) => message?.messageKey === tailCheckpoint.lastUserKey && message.role === 'user',
+          )
+        ) {
+          trustedTail = {
+            checkpoint: tailCheckpoint,
+            messagesRevision: tailData.messagesRevision,
+            messages: tailMessages,
+          };
+        }
+        stageChatgptPage = async (page) => {
+          const staged = {
+            ...page.snapshot,
+            captureMeta: { ...page.snapshot.captureMeta, completeness: 'partial' },
+          };
+          const savedPage = await saveSnapshot(staged, 'chatgpt', {
+            expectedChatgptConversationId: String(page.snapshot?.conversation?.conversationKey || ''),
+            deferRemoteSync: true,
+            includeThinking,
+            trustedChatgptApiPartial: true,
+          });
+          if (!savedPage) throw new Error('chatgpt_api_no_safe_messages');
+          savedPagedConversationId = savedPage.conversationId;
+          firstPageIsNew ??= savedPage.isNew;
+        };
+        const savedAnchorKey = trustedTail?.checkpoint.lastUserKey;
+        const savedAnchorSequence = trustedTail?.messages.find(
+          (message) => message.messageKey === savedAnchorKey,
+        )?.sequence;
+        const savedAssistantKey = trustedTail?.messages.findLast(
+          (message) => message.role === 'assistant' && message.sequence > (savedAnchorSequence ?? Infinity),
+        )?.messageKey;
         const apiCapture = await captureCurrentChatgptConversationViaApi({
           includeThinking,
-          onPage: async (page) => {
-            const staged = {
-              ...page.snapshot,
-              captureMeta: { ...page.snapshot.captureMeta, completeness: 'partial' },
-            };
-            const savedPage = await saveSnapshot(staged, 'chatgpt', {
-              expectedChatgptConversationId: String(page.snapshot?.conversation?.conversationKey || ''),
-              deferRemoteSync: true,
-              includeThinking,
-              trustedChatgptApiPartial: true,
-            });
-            if (!savedPage) throw new Error('chatgpt_api_no_safe_messages');
-            savedPagedConversationId = savedPage.conversationId;
-            firstPageIsNew ??= savedPage.isNew;
-          },
+          ...(trustedTail
+            ? { trustedCheckpoint: trustedTail.checkpoint, trustedTailLastAssistantKey: savedAssistantKey }
+            : null),
+          onPage: stageChatgptPage,
         });
         snapshot = apiCapture.snapshot;
+        capturedVerifiedTail = apiCapture.verifiedTail === true;
         expectedChatgptConversationId = String(snapshot?.conversation?.conversationKey || '').trim();
         if (typeof target.collector.enrichApiSnapshotWithRenderedGraphics === 'function') {
           snapshot = await target.collector.enrichApiSnapshotWithRenderedGraphics(snapshot);
@@ -441,15 +560,48 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         }
       }
 
-      const saved = await saveSnapshot(snapshot, target.collectorId, {
-        ...(expectedChatgptConversationId ? { expectedChatgptConversationId } : null),
-        ...(includeThinking !== undefined ? { includeThinking } : null),
-        ...(checkpoint ? { checkpoint } : null),
-        ...(expectedChatgptConversationId ? { trustedChatgptApiPartial: true } : null),
-      });
-      if (!saved) {
-        throw new Error(t('noVisibleConversationFound'));
+      const persist = () =>
+        saveSnapshot(snapshot, target.collectorId, {
+          ...(expectedChatgptConversationId ? { expectedChatgptConversationId } : null),
+          ...(includeThinking !== undefined ? { includeThinking } : null),
+          ...(checkpoint ? { checkpoint } : null),
+          ...(capturedVerifiedTail && trustedTail ? { trustedTail } : null),
+          ...(expectedChatgptConversationId ? { trustedChatgptApiPartial: true } : null),
+        });
+      let saved;
+      try {
+        saved = await persist();
+      } catch (error) {
+        if (
+          !capturedVerifiedTail ||
+          !stageChatgptPage ||
+          String((error as Error)?.message || '') !== 'chatgpt_api_storage_conflict'
+        )
+          throw error;
+
+        // Another tab changed the local tail after our bounded read. Refetch the current branch once.
+        const fullCapture = await captureCurrentChatgptConversationViaApi({
+          includeThinking,
+          onPage: stageChatgptPage,
+        });
+        snapshot = fullCapture.snapshot;
+        capturedVerifiedTail = false;
+        checkpoint = null;
+        expectedChatgptConversationId = String(snapshot?.conversation?.conversationKey || '').trim();
+        if (typeof target.collector.enrichApiSnapshotWithRenderedGraphics === 'function') {
+          snapshot = await target.collector.enrichApiSnapshotWithRenderedGraphics(snapshot);
+        }
+        if (snapshot?.captureMeta?.completeness === 'complete') {
+          await fullCapture.verifyCurrent();
+          const currentThinking =
+            (await storageGet([AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]))?.[AI_CHAT_INCLUDE_THINKING_STORAGE_KEY] !==
+            false;
+          if (currentThinking !== includeThinking) throw new Error('chatgpt_api_settings_changed');
+          checkpoint = fullCapture.checkpoint;
+        }
+        saved = await persist();
       }
+      if (!saved) throw new Error(t('noVisibleConversationFound'));
 
       const title = String(snapshot?.conversation?.title || '');
       const isNew = firstPageIsNew ?? saved.isNew;

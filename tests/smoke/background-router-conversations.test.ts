@@ -164,6 +164,7 @@ describe('background-router conversations', () => {
       mode: 'snapshot',
       diff: null,
       checkpoint,
+      reportChanged: true,
     });
     await router.dispatch({
       type: 'syncConversationMessages',
@@ -176,6 +177,7 @@ describe('background-router conversations', () => {
       mode: 'append',
       diff: null,
       preserveCheckpointTail: true,
+      reportChanged: true,
     });
   });
   it.each([
@@ -370,7 +372,7 @@ describe('background-router conversations', () => {
     expect(onConversationChanged).toHaveBeenCalledTimes(1);
     expect(onConversationChanged).toHaveBeenCalledWith(2002, 'syncConversationMessages');
     expect(scheduleImageBackfill).toHaveBeenCalledOnce();
-    expect(scheduleImageBackfill).toHaveBeenCalledWith(2002);
+    expect(scheduleImageBackfill).toHaveBeenCalledWith(2002, ['m1']);
   });
 
   it('reuses cached ChatGPT images during the final snapshot without downloading or changing cache settings', async () => {
@@ -429,7 +431,7 @@ describe('background-router conversations', () => {
       mode: 'snapshot',
       diff: null,
     });
-    expect(scheduleImageBackfill).toHaveBeenCalledWith(2002);
+    expect(scheduleImageBackfill).toHaveBeenCalledWith(2002, ['m1']);
     expect(storageMocks.syncConversationMessages.mock.invocationCallOrder[0]).toBeLessThan(
       scheduleImageBackfill.mock.invocationCallOrder[0]!,
     );
@@ -465,7 +467,7 @@ describe('background-router conversations', () => {
       mode: 'snapshot',
       diff: null,
     });
-    expect(scheduleImageBackfill).toHaveBeenCalledWith(2004);
+    expect(scheduleImageBackfill).toHaveBeenCalledWith(2004, ['m1']);
     expect(res).toMatchObject({ ok: true, data: { upserted: 1, deleted: 0 } });
   });
 

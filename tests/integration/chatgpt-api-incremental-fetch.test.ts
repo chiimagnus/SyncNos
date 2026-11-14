@@ -1,0 +1,392 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { IDBIndex, IDBKeyRange, indexedDB } from 'fake-indexeddb';
+import { closeDbForTests } from '@platform/idb/schema';
+import { createBackgroundRouter } from '@platform/messaging/background-router';
+import { registerConversationHandlers } from '@services/conversations/background/handlers';
+import { createCurrentPageCaptureService } from '@services/bootstrap/current-page-capture';
+import {
+  getConversationBySourceConversationKey,
+  getConversationTailWindowBySourceAndKey,
+  getConversationMessagesByKeys,
+  getMessagesByConversationId,
+  syncConversationMessages,
+  upsertConversation,
+} from '@services/conversations/data/storage-idb';
+import { readDataRevision } from '@services/data-revisions/storage-idb';
+
+const api = vi.hoisted(() => ({ requestPage: vi.fn() }));
+vi.mock('@services/integrations/chatgpt/api-capture-settings', () => ({
+  readChatgptApiCaptureEnabled: vi.fn(async () => true),
+}));
+vi.mock('@services/integrations/chatgpt/api-capture', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@services/integrations/chatgpt/api-capture')>();
+  return {
+    ...original,
+    captureCurrentChatgptConversationViaApi: (options: any) =>
+      original.captureCurrentChatgptConversationViaApi({ ...options, requestPage: api.requestPage }),
+  };
+});
+
+const conversationKey = 'advanced-incremental-integration';
+type Node = {
+  id: string;
+  author: { role: string };
+  recipient: string;
+  channel?: string;
+  status: string;
+  content: { content_type: string; parts: string[] };
+  metadata: { parent_id?: string };
+};
+const node = (id: string, role: 'user' | 'assistant', content: string, parent?: string): Node => ({
+  id,
+  author: { role },
+  recipient: 'all',
+  ...(role === 'assistant' ? { channel: 'final' } : null),
+  status: 'finished_successfully',
+  content: { content_type: 'text', parts: [content] },
+  metadata: parent ? { parent_id: parent } : {},
+});
+const initial = [
+  node('u1', 'user', 'first'),
+  node('a1', 'assistant', 'first answer', 'u1'),
+  node('u2', 'user', 'second', 'a1'),
+  node('a2', 'assistant', 'second answer', 'u2'),
+];
+
+async function deleteDb() {
+  await new Promise<void>((resolve, reject) => {
+    const request = indexedDB.deleteDatabase('webclipper');
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+beforeEach(async () => {
+  closeDbForTests();
+  globalThis.indexedDB = indexedDB;
+  globalThis.IDBKeyRange = IDBKeyRange;
+  await deleteDb();
+  vi.stubGlobal('location', { href: `https://chatgpt.com/c/${conversationKey}` });
+  vi.stubGlobal('chrome', {
+    runtime: { lastError: null },
+    storage: { local: { get: (_keys: string[], callback: (values: object) => void) => callback({}) } },
+  });
+  api.requestPage.mockReset();
+});
+
+afterEach(async () => {
+  vi.unstubAllGlobals();
+  closeDbForTests();
+  await deleteDb();
+});
+
+describe('ChatGPT Advanced end-to-end incremental fetch', () => {
+  it('keeps one canonical current branch across full, incremental, repeated and regenerated Fetch', async () => {
+    const notifications: number[] = [];
+    let injectRevisionConflict = false;
+    let conflictConversationId = 0;
+    const router = createBackgroundRouter({
+      fallback: (message: any) => ({ ok: false, error: { message: `unknown: ${message.type}` } }),
+    });
+    registerConversationHandlers(router as any, {
+      onConversationChanged: async (id) => {
+        notifications.push(id);
+      },
+      onRemoteCleanupPending: async () => {},
+      scheduleImageBackfill: async () => {},
+    });
+    const capture = createCurrentPageCaptureService({
+      runtime: {
+        send: async (type, payload) => {
+          if (type === 'syncConversationMessages' && payload?.verifiedChatgptApiTail && injectRevisionConflict) {
+            injectRevisionConflict = false;
+            await syncConversationMessages(
+              conflictConversationId,
+              [{ messageKey: 'concurrent', role: 'user', contentMarkdown: 'unrelated edit', sequence: 0 }],
+              { mode: 'snapshot' },
+            );
+          }
+          return router.dispatch({ type, ...payload });
+        },
+      },
+      collectorsRegistry: {
+        pickActive: () => ({
+          id: 'chatgpt',
+          collector: { isCaptureAvailable: () => true },
+        }),
+        list: () => [],
+      },
+      videoCapture: { captureVideoTranscript: vi.fn() as any },
+    });
+
+    let activeNodes: Node[] = initial;
+    let olderNodes: Node[] | null = null;
+    let hasPrevious = false;
+    let nonHeadPages = 0;
+    api.requestPage.mockImplementation(async (request: { before?: string; numTurns: number }) => {
+      if (request.numTurns === 1)
+        return {
+          conversation_id: conversationKey,
+          current_node: activeNodes.at(-1)!.id,
+          messages: [activeNodes.at(-1)],
+        };
+      nonHeadPages += 1;
+      if (request.before) {
+        if (!olderNodes) throw new Error('older page unexpectedly requested');
+        return {
+          conversation_id: conversationKey,
+          messages: olderNodes,
+          page_info: {
+            start_cursor: olderNodes[0]!.id,
+            end_cursor: olderNodes.at(-1)!.id,
+            has_previous_page: false,
+          },
+        };
+      }
+      return {
+        conversation_id: conversationKey,
+        current_node: activeNodes.at(-1)!.id,
+        title: 'Test conversation',
+        messages: activeNodes,
+        page_info: {
+          start_cursor: activeNodes[0]!.id,
+          end_cursor: activeNodes.at(-1)!.id,
+          has_previous_page: hasPrevious,
+        },
+      };
+    });
+
+    await capture.captureCurrentPage();
+    const conversation = await getConversationBySourceConversationKey('chatgpt', conversationKey);
+    const id = Number(conversation?.id);
+    expect(id).toBeGreaterThan(0);
+    expect(conversation?.chatgptApiCheckpoint?.lastUserKey).toBe('u2');
+    expect((await getMessagesByConversationId(id)).map((item) => item.messageKey)).toEqual(['u1', 'a1', 'u2', 'a2']);
+
+    activeNodes = [
+      ...initial.slice(2),
+      node('u3', 'user', 'third', 'a2'),
+      node('a3', 'assistant', 'third answer', 'u3'),
+    ];
+    hasPrevious = true;
+    const beforeNext = nonHeadPages;
+    await capture.captureCurrentPage();
+    expect(nonHeadPages - beforeNext).toBe(1);
+    expect((await getMessagesByConversationId(id)).map((item) => item.messageKey)).toEqual([
+      'u1',
+      'a1',
+      'u2',
+      'a2',
+      'u3',
+      'a3',
+    ]);
+    const originalRevision = await readDataRevision('messages');
+    const originalActivity = (await getConversationBySourceConversationKey('chatgpt', conversationKey))?.lastActivityAt;
+    const originalNotifications = notifications.length;
+    await capture.captureCurrentPage();
+    expect(await readDataRevision('messages')).toBe(originalRevision);
+    expect((await getConversationBySourceConversationKey('chatgpt', conversationKey))?.lastActivityAt).toBe(
+      originalActivity,
+    );
+    expect(notifications).toHaveLength(originalNotifications);
+
+    activeNodes = [...activeNodes.slice(0, -1), node('a4', 'assistant', 'regenerated answer', 'u3')];
+    await capture.captureCurrentPage();
+    expect((await getMessagesByConversationId(id)).map((item) => item.messageKey)).toEqual([
+      'u1',
+      'a1',
+      'u2',
+      'a2',
+      'u3',
+      'a4',
+    ]);
+    expect((await getMessagesByConversationId(id)).at(-1)?.contentMarkdown).toBe('regenerated answer');
+    expect(
+      (await getConversationBySourceConversationKey('chatgpt', conversationKey))?.chatgptApiCheckpoint?.lastUserKey,
+    ).toBe('u3');
+
+    activeNodes = [
+      node('u3-edited', 'user', 'changed third question', 'a2'),
+      node('a5', 'assistant', 'answer to edited question', 'u3-edited'),
+    ];
+    olderNodes = initial;
+    const beforeEdit = nonHeadPages;
+    await capture.captureCurrentPage();
+    expect(nonHeadPages - beforeEdit).toBe(2);
+    expect((await getMessagesByConversationId(id)).map((item) => item.messageKey)).toEqual([
+      'u1',
+      'a1',
+      'u2',
+      'a2',
+      'u3-edited',
+      'a5',
+    ]);
+    expect(
+      (await getConversationBySourceConversationKey('chatgpt', conversationKey))?.chatgptApiCheckpoint?.lastUserKey,
+    ).toBe('u3-edited');
+
+    olderNodes = null;
+    activeNodes = [
+      activeNodes[0]!,
+      { ...node('a6', 'assistant', 'streaming answer', 'u3-edited'), status: 'in_progress' },
+    ];
+    await capture.captureCurrentPage();
+    expect((await getMessagesByConversationId(id)).map((item) => item.messageKey)).toEqual([
+      'u1',
+      'a1',
+      'u2',
+      'a2',
+      'u3-edited',
+      'a5',
+      'a6',
+    ]);
+    expect(
+      (await getConversationBySourceConversationKey('chatgpt', conversationKey))?.chatgptApiCheckpoint?.lastUserKey,
+    ).toBe('u3-edited');
+
+    activeNodes = [activeNodes[0]!, node('a6', 'assistant', 'completed regenerated answer', 'u3-edited')];
+    const beforeFinish = nonHeadPages;
+    await capture.captureCurrentPage();
+    expect(nonHeadPages - beforeFinish).toBe(1);
+    expect((await getMessagesByConversationId(id)).map((item) => item.messageKey)).toEqual([
+      'u1',
+      'a1',
+      'u2',
+      'a2',
+      'u3-edited',
+      'a6',
+    ]);
+    expect((await getMessagesByConversationId(id)).at(-1)?.contentMarkdown).toBe('completed regenerated answer');
+
+    const concurrent = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'revision-from-another-tab',
+    });
+    conflictConversationId = Number(concurrent.id);
+    olderNodes = initial;
+    injectRevisionConflict = true;
+    const beforeConflict = nonHeadPages;
+    await capture.captureCurrentPage();
+    expect(injectRevisionConflict).toBe(false);
+    expect(nonHeadPages - beforeConflict).toBe(3);
+    expect((await getMessagesByConversationId(id)).map((item) => item.messageKey)).toEqual([
+      'u1',
+      'a1',
+      'u2',
+      'a2',
+      'u3-edited',
+      'a6',
+    ]);
+    expect(
+      (await getConversationBySourceConversationKey('chatgpt', conversationKey))?.chatgptApiCheckpoint?.lastUserKey,
+    ).toBe('u3-edited');
+
+    // Real tool-heavy API pages may lack the parent links needed to traverse from the latest assistant.
+    // The saved assistant overlap still provides a bounded boundary before the newly appended user.
+    olderNodes = null;
+    activeNodes = [
+      node('u3-edited', 'user', 'changed third question', 'a2'),
+      node('a6', 'assistant', 'completed regenerated answer'),
+      node('u4', 'user', 'fresh follow-up'),
+      node('a7', 'assistant', 'fresh answer'),
+    ];
+    const beforeMissingParents = nonHeadPages;
+    await capture.captureCurrentPage();
+    expect(nonHeadPages - beforeMissingParents).toBe(1);
+    expect((await getMessagesByConversationId(id)).map((item) => item.messageKey)).toEqual([
+      'u1',
+      'a1',
+      'u2',
+      'a2',
+      'u3-edited',
+      'a6',
+      'u4',
+      'a7',
+    ]);
+    expect(
+      (await getConversationBySourceConversationKey('chatgpt', conversationKey))?.chatgptApiCheckpoint?.lastUserKey,
+    ).toBe('u4');
+  });
+
+  it('updates an actual 10000-message IndexedDB history without loading the old message list', async () => {
+    const conversation = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey,
+      title: 'Long saved history',
+    });
+    const conversationId = Number(conversation.id);
+    const firstTenThousand = Array.from({ length: 10_000 }, (_, i) => ({
+      messageKey: `m${i}`,
+      role: i % 2 === 0 ? 'user' : 'assistant',
+      contentMarkdown: `message-${i}`,
+      sequence: i,
+      updatedAt: i + 1,
+    }));
+    const encoded = new TextEncoder().encode(JSON.stringify(['message-9998', 'm9997']));
+    const hash = await crypto.subtle.digest('SHA-256', encoded);
+    const signature = Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, '0')).join('');
+    await syncConversationMessages(conversationId, firstTenThousand, {
+      mode: 'snapshot',
+      checkpoint: { lastUserKey: 'm9998', userSignature: signature, includeThinking: true },
+    });
+    const beforeRevision = await readDataRevision('messages');
+    const latest = [
+      node('m9998', 'user', 'message-9998', 'm9997'),
+      node('m9999', 'assistant', 'message-9999', 'm9998'),
+      node('m10000', 'user', 'message-10000', 'm9999'),
+      node('m10001', 'assistant', 'message-10001', 'm10000'),
+    ];
+    const pageRequests: Array<{ numTurns: number; before?: string }> = [];
+    api.requestPage.mockImplementation(async (request: { numTurns: number; before?: string }) => {
+      pageRequests.push(request);
+      if (request.before) throw new Error('old history must not be requested');
+      if (request.numTurns === 1)
+        return {
+          conversation_id: conversationKey,
+          current_node: latest.at(-1)!.id,
+          messages: [latest.at(-1)],
+        };
+      return {
+        conversation_id: conversationKey,
+        current_node: latest.at(-1)!.id,
+        title: 'Long saved history',
+        messages: latest,
+        page_info: { start_cursor: latest[0]!.id, end_cursor: latest.at(-1)!.id, has_previous_page: true },
+      };
+    });
+    const router = createBackgroundRouter({
+      fallback: (message: any) => ({ ok: false, error: { message: `unknown: ${message.type}` } }),
+    });
+    registerConversationHandlers(router as any, {
+      onConversationChanged: async () => {},
+      onRemoteCleanupPending: async () => {},
+      scheduleImageBackfill: async () => {},
+    });
+    const capture = createCurrentPageCaptureService({
+      runtime: { send: async (type, payload) => router.dispatch({ type, ...payload }) },
+      collectorsRegistry: {
+        pickActive: () => ({ id: 'chatgpt', collector: { isCaptureAvailable: () => true } }),
+        list: () => [],
+      },
+      videoCapture: { captureVideoTranscript: vi.fn() as any },
+    });
+    const getAllSpy = vi.spyOn(IDBIndex.prototype, 'getAll');
+    try {
+      await capture.captureCurrentPage();
+      expect(pageRequests.map((req) => req.numTurns)).toEqual([10, 1, 1]);
+      expect(
+        getAllSpy.mock.instances.filter((instance) => instance.name === 'by_conversationId_sequence'),
+      ).toHaveLength(0);
+    } finally {
+      getAllSpy.mockRestore();
+    }
+    expect(await readDataRevision('messages')).toBeGreaterThan(beforeRevision);
+    const tail = await getConversationTailWindowBySourceAndKey('chatgpt', conversationKey, 4);
+    expect(tail.messages.map((message) => message.messageKey)).toEqual(['m9998', 'm9999', 'm10000', 'm10001']);
+    expect(
+      (await getConversationMessagesByKeys(conversationId, ['m0', 'm5000'])).map((item) => item.messageKey),
+    ).toEqual(['m0', 'm5000']);
+  }, 60_000);
+});

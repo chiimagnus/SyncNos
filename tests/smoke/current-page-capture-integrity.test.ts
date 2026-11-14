@@ -62,15 +62,21 @@ function createHarness(input: {
   video?: any;
   url?: string;
   syncResponse?: any;
+  tailResponse?: any;
   enrich?: (snapshot: any) => any;
   collectorAvailable?: boolean;
   availabilityError?: string;
 }) {
   const calls: Array<{ type: string; payload?: any }> = [];
+  const tailReads: Array<{ type: string; payload?: any }> = [];
   const activities: CurrentPageCaptureActivity[] = [];
   const capture = vi.fn((_options?: any) => input.snapshot);
   const runtime = {
     send: vi.fn(async (type: string, payload?: any) => {
+      if (type === 'getConversationTailWindowBySourceAndKey') {
+        tailReads.push({ type, payload });
+        return { ok: true, data: input.tailResponse || { conversationId: null, messages: [], checkpoint: null } };
+      }
       calls.push({ type, payload });
       if (type === 'fetchActiveTabArticle') {
         return { ok: true, data: input.article || { conversationId: 9, title: 'Article', isNew: true } };
@@ -111,7 +117,7 @@ function createHarness(input: {
     videoCapture,
     onActivity: (activity) => activities.push(activity),
   });
-  return { service, activities, calls, capture, runtime, videoCapture };
+  return { service, activities, calls, tailReads, capture, runtime, videoCapture };
 }
 
 beforeEach(() => {
@@ -371,6 +377,87 @@ describe('current page capture integrity routing', () => {
     await expect(harness.service.captureCurrentPage()).resolves.toMatchObject({ kind: 'chat' });
     expect(chatgptApiMocks.capture).toHaveBeenCalledTimes(1);
     expect(harness.capture).not.toHaveBeenCalled();
+  });
+
+  it('saves a verified Advanced tail as scoped incremental changes instead of replacing the full history', async () => {
+    const checkpoint = { lastUserKey: 'u-old', userSignature: 'a'.repeat(64), includeThinking: true };
+    const snapshot = chatSnapshot();
+    snapshot.messages = [
+      { messageKey: 'u-old', role: 'user', contentMarkdown: 'question', sequence: 0 },
+      { messageKey: 'a-new', role: 'assistant', contentMarkdown: 'regenerated reply', sequence: 1 },
+    ];
+    chatgptApiMocks.readEnabled.mockResolvedValue(true);
+    chatgptApiMocks.capture.mockResolvedValue({
+      snapshot,
+      checkpoint,
+      verifiedTail: true,
+      verifyCurrent: vi.fn(async () => {}),
+    });
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      snapshot,
+      url: 'https://chatgpt.com/c/conversation-1',
+      tailResponse: {
+        conversationId: 7,
+        checkpoint,
+        messagesRevision: 12,
+        messages: [
+          { messageKey: 'u-old', role: 'user', sequence: 100 },
+          { messageKey: 'a-old', role: 'assistant', sequence: 101 },
+        ],
+      },
+    });
+    await harness.service.captureCurrentPage();
+    expect(harness.tailReads).toHaveLength(1);
+    expect(harness.tailReads[0].payload).toMatchObject({ compact: true, limit: 200 });
+    expect(chatgptApiMocks.capture).toHaveBeenCalledWith(expect.objectContaining({ trustedCheckpoint: checkpoint }));
+    const persisted = harness.calls.find((call) => call.type === 'syncConversationMessages')?.payload;
+    expect(persisted).toMatchObject({
+      mode: 'incremental',
+      diff: { added: ['a-new'], updated: [], removed: ['a-old'] },
+      expectedCheckpoint: checkpoint,
+      expectedMessagesRevision: 12,
+      chatgptApiCheckpoint: checkpoint,
+    });
+    expect(persisted.messages).toMatchObject([
+      { messageKey: 'a-new', contentMarkdown: 'regenerated reply', sequence: 101 },
+    ]);
+  });
+
+  it('never deletes an old answer from a verified but still-streaming tail', async () => {
+    const checkpoint = { lastUserKey: 'u-old', userSignature: 'b'.repeat(64), includeThinking: true };
+    const snapshot = chatSnapshot({ completeness: 'partial' });
+    snapshot.messages = [
+      { messageKey: 'u-old', role: 'user', contentMarkdown: 'question', sequence: 0 },
+      { messageKey: 'streaming', role: 'assistant', contentMarkdown: 'loading', sequence: 1 },
+    ];
+    chatgptApiMocks.readEnabled.mockResolvedValue(true);
+    chatgptApiMocks.capture.mockResolvedValue({
+      snapshot,
+      checkpoint: null,
+      verifiedTail: true,
+      verifyCurrent: vi.fn(async () => {}),
+    });
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      snapshot,
+      url: 'https://chatgpt.com/c/conversation-1',
+      tailResponse: {
+        conversationId: 7,
+        checkpoint,
+        messagesRevision: 14,
+        messages: [
+          { messageKey: 'u-old', role: 'user', sequence: 4 },
+          { messageKey: 'a-old', role: 'assistant', sequence: 5 },
+        ],
+      },
+    });
+    await harness.service.captureCurrentPage();
+    const persisted = harness.calls.find((call) => call.type === 'syncConversationMessages')?.payload;
+    expect(persisted.mode).toBe('incremental');
+    expect(persisted.diff.removed).toEqual([]);
+    expect(persisted).not.toHaveProperty('chatgptApiCheckpoint');
+    expect(persisted.trustedChatgptApiPartial).toBe(true);
   });
 
   it('persists a trusted Advanced checkpoint only after final HEAD verification', async () => {
@@ -805,10 +892,13 @@ describe('current page capture integrity routing', () => {
       snapshot: chatSnapshot(),
       url: 'https://chatgpt.com/c/conversation-1',
     });
-    harness.runtime.send.mockImplementationOnce(async (type: string, payload?: any) => {
-      harness.calls.push({ type, payload });
-      vi.stubGlobal('location', { href: 'https://chatgpt.com/c/conversation-2' });
-      return { ok: true, data: { id: 7, __isNew: true } };
+    const normalSend = harness.runtime.send.getMockImplementation()!;
+    harness.runtime.send.mockImplementation(async (type: string, payload?: any) => {
+      const result = await normalSend(type, payload);
+      if (type === 'upsertConversation') {
+        vi.stubGlobal('location', { href: 'https://chatgpt.com/c/conversation-2' });
+      }
+      return result;
     });
 
     await expect(harness.service.captureCurrentPage()).resolves.toMatchObject({ conversationId: 7, isNew: true });

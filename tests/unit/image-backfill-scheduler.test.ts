@@ -122,6 +122,35 @@ describe('image backfill scheduler', () => {
     expect(pack.alarm.when).toBe(now + 30_000);
   });
 
+  it('keeps newly queued image recovery scoped to keys and falls back to full recovery after worker restart', async () => {
+    const pack = makeInfra();
+    pack.storage[AI_CHAT_IMAGE_CACHE_ENABLED_STORAGE_KEY] = true;
+    const scheduler = createImageBackfillScheduler({ onConversationChanged: vi.fn() }, pack.infra);
+    await scheduler.enqueueWithKeys(7, ['new-1', 'new-2']);
+    expect(pack.storage[AI_CHAT_IMAGE_BACKFILL_QUEUE_STORAGE_KEY]).toEqual({ '7': pack.infra.now() });
+    await scheduler.flush();
+    expect(backfillMocks.backfillConversationImages).toHaveBeenCalledWith({
+      conversationId: 7,
+      messageKeys: ['new-1', 'new-2'],
+    });
+
+    // An MV3 service-worker restart loses only the optional in-memory hint, not the durable conversation queue.
+    await scheduler.enqueueWithKeys(7, ['new-3']);
+    const restarted = createImageBackfillScheduler({ onConversationChanged: vi.fn() }, pack.infra);
+    await restarted.flush();
+    expect(backfillMocks.backfillConversationImages).toHaveBeenLastCalledWith({ conversationId: 7 });
+  });
+
+  it('does not narrow a previously queued full-image recovery when a new incremental image arrives', async () => {
+    const pack = makeInfra();
+    pack.storage[AI_CHAT_IMAGE_CACHE_ENABLED_STORAGE_KEY] = true;
+    pack.storage[AI_CHAT_IMAGE_BACKFILL_QUEUE_STORAGE_KEY] = { '7': pack.infra.now() };
+    const scheduler = createImageBackfillScheduler({ onConversationChanged: vi.fn() }, pack.infra);
+    await scheduler.enqueueWithKeys(7, ['new-image']);
+    await scheduler.flush();
+    expect(backfillMocks.backfillConversationImages).toHaveBeenLastCalledWith({ conversationId: 7 });
+  });
+
   it('keeps durable work queued without falling back to synchronous downloads when alarms are unavailable', async () => {
     const pack = makeInfra(1_000_000, false);
     pack.storage[AI_CHAT_IMAGE_CACHE_ENABLED_STORAGE_KEY] = true;

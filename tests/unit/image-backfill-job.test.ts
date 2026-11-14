@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const storageMocks = vi.hoisted(() => ({
   getMessagesByConversationId: vi.fn(),
+  getConversationMessagesByKeys: vi.fn(),
   patchConversationMessageMarkdownBatch: vi.fn(),
 }));
 const imageInlineMocks = vi.hoisted(() => ({
@@ -102,6 +103,26 @@ describe('image-backfill-job', () => {
       fileIds: ['file_image_1'],
       concurrency: 4,
     });
+  });
+
+  it('repairs only specified message keys without scanning the historical conversation', async () => {
+    storageMocks.getConversationMessagesByKeys.mockResolvedValue([
+      { messageKey: 'new-image', contentMarkdown: '![](chatgpt-file://file_new)' },
+    ]);
+    imageInlineMocks.inlineChatImagesInMessages.mockImplementation(async (input: any) =>
+      inlineResult([{ ...input.messages[0], contentMarkdown: '![](syncnos-asset://123)' }]),
+    );
+    const result = await backfillConversationImages({ conversationId: 42, messageKeys: ['new-image'] });
+    expect(storageMocks.getConversationMessagesByKeys).toHaveBeenCalledWith(42, ['new-image']);
+    expect(storageMocks.getMessagesByConversationId).not.toHaveBeenCalled();
+    expect(storageMocks.patchConversationMessageMarkdownBatch).toHaveBeenCalledWith(42, [
+      {
+        messageKey: 'new-image',
+        beforeMarkdown: '![](chatgpt-file://file_new)',
+        afterMarkdown: '![](syncnos-asset://123)',
+      },
+    ]);
+    expect(result.scannedMessages).toBe(1);
   });
 
   it('does not count conflict-only candidates as updated messages', async () => {

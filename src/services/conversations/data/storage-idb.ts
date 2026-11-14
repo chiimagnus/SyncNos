@@ -802,6 +802,7 @@ export async function upsertConversation(
   return {
     ...outcome.record,
     __isNew: outcome.isNew,
+    __conversationChanged: outcome.conversationChanged,
     __semanticContentChanged: outcome.semanticContentChanged,
   };
 }
@@ -1412,8 +1413,11 @@ export async function syncConversationMessages(
     conversationContentChanged?: boolean;
     checkpoint?: ChatgptApiCheckpoint;
     preserveCheckpointTail?: boolean;
+    expectedCheckpoint?: ChatgptApiCheckpoint;
+    expectedMessagesRevision?: number;
+    reportChanged?: boolean;
   },
-): Promise<{ upserted: number; deleted: number }> {
+): Promise<{ upserted: number; deleted: number; changed?: boolean }> {
   const requestedMode = options?.mode;
   if (requestedMode !== undefined && !['snapshot', 'incremental', 'append'].includes(String(requestedMode))) {
     throw new Error(`Unknown message persistence mode: ${String(requestedMode)}`);
@@ -1431,25 +1435,50 @@ export async function syncConversationMessages(
   ) {
     throw new Error('chatgpt_api_checkpoint_invalid');
   }
+  if (
+    options?.expectedMessagesRevision !== undefined &&
+    (!Number.isSafeInteger(options.expectedMessagesRevision) ||
+      options.expectedMessagesRevision < 0 ||
+      !options.expectedCheckpoint ||
+      mode !== 'incremental')
+  )
+    throw new Error('chatgpt_api_storage_conflict');
+  const revisionStore = DATA_REVISION_STORE_BY_SCOPE.messages;
   const db = await openDb();
   let conversationActivityChanged = false;
+  let messagesChanged = false;
 
   const result = await runTrackedTransaction(
     {
       db,
-      stores: ['messages', 'conversations'],
+      stores: [
+        'messages',
+        'conversations',
+        ...(options?.expectedMessagesRevision !== undefined ? [revisionStore] : []),
+      ],
       revisionScopes: ['messages', 'conversations'],
     },
     async ({ stores, markChanged }) => {
       let activityConversation: any = await reqToPromise(stores.conversations.get(conversationId as any));
       if (!activityConversation) throw new Error('conversation not found');
       if (checkpoint && activityConversation.source !== 'chatgpt') throw new Error('chatgpt_api_checkpoint_source');
+      if (options?.expectedMessagesRevision !== undefined) {
+        const storedRevision = normalizeDataRevisionRecord(
+          await reqToPromise(stores[revisionStore].get(DATA_REVISION_RECORD_KEY)),
+        ).revision;
+        if (
+          storedRevision !== options.expectedMessagesRevision ||
+          !storedValueEqual(activityConversation.chatgptApiCheckpoint, options.expectedCheckpoint)
+        )
+          throw new Error('chatgpt_api_storage_conflict');
+      }
       let semanticContentChanged = options?.conversationContentChanged === true;
       let changedMessages = false;
       let changedPrefix = false;
       const committedCheckpoint: ChatgptApiCheckpoint | undefined = activityConversation.chatgptApiCheckpoint;
       const markMessagesChanged = () => {
         changedMessages = true;
+        messagesChanged = true;
         markChanged('messages');
       };
       const commitActivity = async () => {
@@ -1483,6 +1512,7 @@ export async function syncConversationMessages(
       if (committedCheckpoint && anchorSequence === -Infinity) changedPrefix = true;
       const affectsPrefix = (existing: any, nextSequence: number) => {
         if (committedCheckpoint && (Number(existing?.sequence) <= anchorSequence || nextSequence <= anchorSequence)) {
+          if (options?.expectedMessagesRevision !== undefined) throw new Error('chatgpt_api_storage_conflict');
           changedPrefix = true;
         }
       };
@@ -1691,7 +1721,7 @@ export async function syncConversationMessages(
     },
   );
   if (conversationActivityChanged) invalidateConversationListStatsCache();
-  return result;
+  return options?.reportChanged ? { ...result, changed: messagesChanged } : result;
 }
 
 function normalizeConversationListSiteFilterKey(value: unknown): string {
@@ -2295,17 +2325,74 @@ export async function getConversationBySourceConversationKey(
   return item ? normalizeConversationListRecord(item) : null;
 }
 
+export async function getConversationMessagesByKeys(
+  conversationId: number,
+  messageKeys: readonly string[],
+): Promise<ConversationMessage[]> {
+  const keys = Array.from(new Set(messageKeys.map((key) => safeString(key)).filter(Boolean)));
+  if (!Number.isSafeInteger(conversationId) || conversationId <= 0 || !keys.length) return [];
+  const db = await openDb();
+  const { t, stores } = tx(db, ['messages'], 'readonly');
+  const done = txDone(t);
+  const index = stores.messages.index('by_conversationId_messageKey');
+  const rows = await Promise.all(keys.map((key) => reqToPromise(index.get([conversationId, key] as any))));
+  await done;
+  return rows
+    .filter(Boolean)
+    .sort((a: any, b: any) => Number(a.sequence) - Number(b.sequence)) as ConversationMessage[];
+}
+
 export async function getConversationTailWindowBySourceAndKey(
   source: string,
   conversationKey: string,
   limit: number,
-): Promise<{ conversation: Conversation | null; messages: ConversationMessage[] }> {
-  const conversation = await getConversationBySourceConversationKey(source, conversationKey);
-  if (!conversation) return { conversation: null, messages: [] };
+  options?: { withRevision?: boolean },
+): Promise<{ conversation: Conversation | null; messages: ConversationMessage[]; messagesRevision?: number }> {
+  const normalizedSource = safeString(source);
+  const normalizedKey = safeString(conversationKey);
+  if (!normalizedSource || !normalizedKey) return { conversation: null, messages: [] };
+  const revisionStore = DATA_REVISION_STORE_BY_SCOPE.messages;
+  const db = await openDb();
+  const { t, stores } = tx(
+    db,
+    options?.withRevision ? ['conversations', 'messages', revisionStore] : ['conversations', 'messages'],
+    'readonly',
+  );
+  const done = txDone(t);
+  const row = await reqToPromise(
+    stores.conversations.index('by_source_conversationKey').get([normalizedSource, normalizedKey] as any),
+  );
+  const revisionRequest = options?.withRevision
+    ? reqToPromise(stores[revisionStore].get(DATA_REVISION_RECORD_KEY))
+    : Promise.resolve(null);
+  if (!row) {
+    await done;
+    return { conversation: null, messages: [] };
+  }
+  const conversation = normalizeConversationListRecord(row as Conversation);
   const conversationId = Number(conversation.id);
-  if (!Number.isFinite(conversationId) || conversationId <= 0) return { conversation, messages: [] };
-  const messages = await getMessagesTailByConversationId(conversationId, limit);
-  return { conversation, messages };
+  const cursor = stores.messages
+    .index('by_conversationId_sequence')
+    .openCursor(IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any), 'prev');
+  const messages: ConversationMessage[] = [];
+  await new Promise<void>((resolve, reject) => {
+    cursor.onerror = () => reject(cursor.error || new Error('cursor failed'));
+    cursor.onsuccess = () => {
+      const item = cursor.result;
+      if (!item) return resolve();
+      messages.push(item.value);
+      if (messages.length >= Math.floor(limit)) return resolve();
+      item.continue();
+    };
+  });
+  const revision = await revisionRequest;
+  await done;
+  messages.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+  return {
+    conversation,
+    messages,
+    ...(options?.withRevision ? { messagesRevision: normalizeDataRevisionRecord(revision).revision } : null),
+  };
 }
 
 function toConversationListOpenTarget(input: any): ConversationListOpenTarget | null {
@@ -2340,37 +2427,6 @@ export async function getMessagesByConversationId(conversationId: number): Promi
   const items = (await reqToPromise(
     idx.getAll(IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any)) as any,
   )) as any[];
-  await txDone(t);
-  items.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
-  return items as any;
-}
-
-async function getMessagesTailByConversationId(conversationId: number, limit: number): Promise<ConversationMessage[]> {
-  const normalizedConversationId = Number(conversationId);
-  const normalizedLimit = Number(limit);
-  if (!Number.isFinite(normalizedConversationId) || normalizedConversationId <= 0) return [];
-  if (!Number.isFinite(normalizedLimit) || normalizedLimit <= 0) return [];
-
-  const tailLimit = Math.floor(normalizedLimit);
-  const db = await openDb();
-  const { t, stores } = tx(db, ['messages'], 'readonly');
-  const idx = stores.messages.index('by_conversationId_sequence');
-  const range = IDBKeyRange.bound(
-    [normalizedConversationId, -Infinity] as any,
-    [normalizedConversationId, Infinity] as any,
-  );
-  const cursorReq = idx.openCursor(range, 'prev');
-  const items: any[] = [];
-  await new Promise<void>((resolve, reject) => {
-    cursorReq.onerror = () => reject(cursorReq.error || new Error('cursor failed'));
-    cursorReq.onsuccess = () => {
-      const cursor = cursorReq.result as IDBCursorWithValue | null;
-      if (!cursor) return resolve();
-      items.push(cursor.value);
-      if (items.length >= tailLimit) return resolve();
-      cursor.continue();
-    };
-  });
   await txDone(t);
   items.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
   return items as any;

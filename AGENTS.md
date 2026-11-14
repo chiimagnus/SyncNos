@@ -39,8 +39,10 @@ collectors -> services/shared
 - 会话列表必须使用 `bootstrap + loadMore` 分页，禁止恢复全量读取。
 - ChatGPT 与 Google AI Studio 禁止自动保存；其虚拟历史不能靠可见窗口证明完整。
   Google AI Studio 继续手动扫描；ChatGPT 默认 DOM 采集只能安全追加。
-  ChatGPT Advanced 必须由用户显式开启、逐页保存；仅确认完整且当前会话未变化时才可覆盖旧历史，
-  中途失败保留已存内容，不静默回退 DOM。具体边界见 [`docs/collectors.md`](docs/collectors.md)。
+  ChatGPT Advanced 由用户显式开启：首次和无法证实交界时逐页安全暂存，
+  完整且会话稳定时才可覆盖全量历史；已有可信完整前缀时，仅验证当前分支与最新节点后
+  原子替换对应尾部。生成中只安全追加，中断保留已存内容，不静默回退 DOM。
+  具体边界见 [`docs/collectors.md`](docs/collectors.md)。
 - AI 对话正文持久化不得等待图片网络；ChatGPT 未缓存内容图片保留可恢复身份，
   禁止持久化临时 signed URL / session credential。用户上传和 AI 生成图片属于内容，
   普通 tool/MCP 截图与视觉执行产物不属于内容。

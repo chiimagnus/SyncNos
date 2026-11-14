@@ -1,5 +1,6 @@
 import {
   getMessagesByConversationId,
+  getConversationMessagesByKeys,
   patchConversationMessageMarkdownBatch,
   type ConversationMessageMarkdownPatch,
 } from '@services/conversations/data/storage-idb';
@@ -18,13 +19,16 @@ export type BackfillConversationImagesResult = {
 
 export async function backfillConversationImages(input: {
   conversationId: number;
+  messageKeys?: string[];
 }): Promise<BackfillConversationImagesResult> {
   const conversationId = Number(input.conversationId);
   if (!Number.isFinite(conversationId) || conversationId <= 0) {
     throw new Error('invalid conversationId');
   }
 
-  const messages = await getMessagesByConversationId(conversationId);
+  const messages = input.messageKeys?.length
+    ? await getConversationMessagesByKeys(conversationId, input.messageKeys)
+    : await getMessagesByConversationId(conversationId);
   const beforeMarkdown = new Map<string, string>();
   for (const msg of messages) {
     const key = msg && (msg as any).messageKey ? String((msg as any).messageKey) : '';
