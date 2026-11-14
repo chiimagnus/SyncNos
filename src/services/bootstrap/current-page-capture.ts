@@ -580,8 +580,8 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
               // The last user message survives regenerated or replaced assistant replies.
               const anchor =
                 response?.ok && Array.isArray(messages)
-                  ? messages.findLast((message: any) => message?.role === 'user' && isStableAnchor(message)) ??
-                    messages.findLast(isStableAnchor)
+                  ? (messages.findLast((message: any) => message?.role === 'user' && isStableAnchor(message)) ??
+                    messages.findLast(isStableAnchor))
                   : null;
               if (anchor) savedTailMessageKey = anchor.messageKey;
             } catch (_error) {

@@ -835,7 +835,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     const now = typeof options.now === 'function' ? options.now : Date.now;
     const historyQuietMs = Number.isFinite(options.historyQuietMs)
       ? Math.max(0, Number(options.historyQuietMs))
-      : 12_000;
+      : 1_500;
     let lastTopSignature = '';
     let topChangedAt = now();
     let stableTopSamples = 0;
@@ -897,7 +897,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         now,
         startAtBottom: true,
         holdAtTop: true,
-        topProbeDelayMs: Math.max(1, Math.floor(historyQuietMs / 2)),
+        topProbeDelayMs: Math.max(1, Math.min(150, Math.floor(historyQuietMs / 2))),
         ...(savedTailMessageKey ? { stopAtKey: savedTailMessageKey } : null),
       });
       if (sweep.stoppedAtKey) {

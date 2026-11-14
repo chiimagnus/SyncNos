@@ -688,7 +688,7 @@ export async function runVirtualizedPass<T>(
       const state = readBoundaryState('top');
       if (!state) return null;
       const probeRequired = options.holdAtTop && !!adapter.canProbeTop;
-      if (state === 'confirmed' && (!probeRequired || (topProbeCount >= 2 && now() - topProbeAt >= probeDelayMs))) {
+      if (state === 'confirmed' && (!probeRequired || topProbeCount >= 1)) {
         try {
           adapter.onTopConfirmed?.(accumulator);
         } catch (_error) {
@@ -698,12 +698,7 @@ export async function runVirtualizedPass<T>(
         reachedTop = true;
         return stable;
       }
-      if (
-        probeRequired &&
-        topProbeCount < 2 &&
-        now() - Math.max(topProgressAt, topProbeAt) >= probeDelayMs &&
-        adapter.canProbeTop?.()
-      ) {
+      if (probeRequired && topProbeCount < 1 && now() - topProgressAt >= probeDelayMs && adapter.canProbeTop?.()) {
         const maxTop = Math.max(0, stable.metrics.scrollHeight - stable.metrics.clientHeight);
         const reentryTop = Math.min(maxTop, Math.max(1, Math.floor(stable.metrics.clientHeight * overlapRatio)));
         if (reentryTop > 0) {
@@ -727,6 +722,17 @@ export async function runVirtualizedPass<T>(
         }
       }
       lastPendingSignature = signature;
+      // Once the top edge has been retriggered, an idle page must not consume the full
+      // network-loading timeout when it exposes neither new history nor a loader.
+      if (
+        probeRequired &&
+        topProbeCount >= 1 &&
+        adapter.canProbeTop?.() &&
+        now() - Math.max(topProgressAt, topProbeAt) >= Math.max(2_500, probeDelayMs * 3)
+      ) {
+        addReason('boundary_stalled');
+        return null;
+      }
       if (now() > progressDeadline) {
         if (options.holdAtTop && adapter.canProbeTop?.() === false) {
           progressDeadline = now() + boundaryTimeoutMs;

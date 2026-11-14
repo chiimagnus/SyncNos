@@ -232,6 +232,7 @@ function simulatedLazyChatgptHistory(
   autoLoad = true,
   loadDelayMs = 5,
   needsTopReentry = false,
+  ordinalOffset = 0,
 ) {
   const dom = setupChatgptDom('', 'https://chatgpt.com/c/lazy-hydrated-history');
   (dom.window as any).scrollTo = vi.fn();
@@ -249,6 +250,7 @@ function simulatedLazyChatgptHistory(
   let scrollMovesDuringLoad = 0;
   let visitedTop = false;
   let topReentryArmed = false;
+  let edgeReentries = 0;
 
   const render = () => {
     const start = totalTurns - loaded;
@@ -258,12 +260,12 @@ function simulatedLazyChatgptHistory(
       const ordinal = first + offset;
       const actual = start + ordinal;
       return `<div data-turn-key="turn-${actual}">
-        <div data-content-search-turn-key="fallback-turn-${ordinal}">
-          <div data-chatgpt-search-unit-key="fallback-turn-${ordinal}:0:user"
+        <div data-content-search-turn-key="fallback-turn-${ordinal + ordinalOffset}">
+          <div data-chatgpt-search-unit-key="fallback-turn-${ordinal + ordinalOffset}:0:user"
             data-chatgpt-search-message-ids="user-${actual}" data-message-author-role="user">
             <div data-user-message-bubble><div class="whitespace-pre-wrap">Question ${actual}</div></div>
           </div>
-          <div data-chatgpt-search-unit-key="fallback-turn-${ordinal}:1:assistant"
+          <div data-chatgpt-search-unit-key="fallback-turn-${ordinal + ordinalOffset}:1:assistant"
             data-chatgpt-search-message-ids="assistant-${actual}" data-message-author-role="assistant">
             <div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary">Answer ${actual}</div>
           </div>
@@ -303,7 +305,10 @@ function simulatedLazyChatgptHistory(
           visitedTop = true;
         } else if (visitedTop) {
           if (top >= (loaded - 1) * 100) returnedToBottom += 1;
-          else topReentryArmed = true;
+          else {
+            topReentryArmed = true;
+            edgeReentries += 1;
+          }
         }
         render();
       },
@@ -316,6 +321,7 @@ function simulatedLazyChatgptHistory(
     getTopArrivals: () => topArrivals,
     getBottomReturns: () => returnedToBottom,
     getMovesDuringLoad: () => scrollMovesDuringLoad,
+    getEdgeReentries: () => edgeReentries,
     now: () => clock,
     sleep: async (ms: number) => {
       clock += Math.max(1, ms);
@@ -403,6 +409,39 @@ describe('chatgpt current DOM', () => {
       Array.from({ length: 27 }, (_, index) => [`user-${index}`, `assistant-${index}`]).flat(),
     );
     expect(prepared.metrics).toMatchObject({ reachedTop: true, reachedBottom: true });
+  });
+
+  it('finishes at an idle true top without a fixed 12-second delay or a second probe', async () => {
+    const test = simulatedLazyChatgptHistory(5, 5, false);
+    const prepared = await prepare(currentDef(test.dom), {
+      now: test.now,
+      sleep: test.sleep,
+      pollMs: 40,
+      historyQuietMs: 1_500,
+    });
+    expect(prepared.records).toHaveLength(10);
+    expect(prepared.metrics).toMatchObject({ reachedTop: true, reachedBottom: true });
+    expect(test.now()).toBeGreaterThanOrEqual(1_500);
+    expect(test.now()).toBeLessThan(2_400);
+    expect(test.getEdgeReentries()).toBe(1);
+    expect(test.getBottomReturns()).toBe(1);
+  });
+
+  it('ends promptly as partial when the page exposes no loader but refuses to expose older turns', async () => {
+    const test = simulatedLazyChatgptHistory(5, 5, false, 5, false, 8);
+    const prepared = await prepare(currentDef(test.dom), {
+      now: test.now,
+      sleep: test.sleep,
+      pollMs: 40,
+      historyQuietMs: 1_500,
+      boundaryTimeoutMs: 120_000,
+      totalDeadlineMs: 300_000,
+    });
+    expect(prepared.metrics.reachedTop).toBe(false);
+    expect(prepared.reasons).toContain('boundary_stalled');
+    expect(prepared.reasons).not.toContain('total_deadline_exhausted');
+    expect(test.now()).toBeLessThan(4_000);
+    expect(test.getBottomReturns()).toBe(1);
   });
 
   it('does not certify incomplete history after a single sweep hits its step budget', async () => {
