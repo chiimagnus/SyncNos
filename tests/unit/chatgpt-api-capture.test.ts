@@ -1979,8 +1979,37 @@ describe('ChatGPT paged API transport', () => {
     expect(incremental.verifiedTail).toBe(true);
     expect(incremental.snapshot.messages.map((item: any) => item.messageKey)).toEqual(['user-2', 'assistant-2']);
     expect(incremental.snapshot.captureMeta.completeness).toBe('complete');
-    expect(pages.calls.map((item) => item.numTurns)).toEqual([10, 1]);
+    expect(pages.calls.map((item) => item.numTurns)).toEqual([10]);
     expect(onPage).not.toHaveBeenCalled();
+  });
+
+  it('pages backward when a tool-heavy newest window does not yet contain the saved anchor', async () => {
+    const original = requestPages([responsePage([...older, ...newer], false, true)]);
+    const full = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: original.requestPage,
+    });
+    const latest = [
+      message({ id: 'user-3', role: 'user', parts: ['third'], parent: 'assistant-2' }),
+      message({ id: 'assistant-3', role: 'assistant', channel: 'final', parts: ['third answer'], parent: 'user-3' }),
+    ];
+    const pages = requestPages([responsePage(latest, true, true), responsePage(newer, true)]);
+    const result = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: pages.requestPage,
+      trustedCheckpoint: full.checkpoint!,
+    });
+    expect(result.verifiedTail).toBe(true);
+    expect(result.snapshot.messages.map((item: any) => item.messageKey)).toEqual([
+      'user-2',
+      'assistant-2',
+      'user-3',
+      'assistant-3',
+    ]);
+    expect(pages.calls.map((item) => [item.numTurns, item.before || null])).toEqual([
+      [10, null],
+      [10, 'user-3'],
+    ]);
   });
 
   it('invalidates a saved user when an attachment ID changes but its display label does not', async () => {
@@ -2045,7 +2074,7 @@ describe('ChatGPT paged API transport', () => {
     });
     expect(capture.verifiedTail).toBe(true);
     expect(capture.checkpoint?.userSignature).toBe(saved.checkpoint?.userSignature);
-    expect(next.calls.map((item) => item.numTurns)).toEqual([10, 1]);
+    expect(next.calls.map((item) => item.numTurns)).toEqual([10]);
   });
 
   it('hashes original user part structure when different API content renders the same Markdown', async () => {
@@ -2095,7 +2124,7 @@ describe('ChatGPT paged API transport', () => {
       trustedCheckpoint: full.checkpoint!,
     });
     expect(result.verifiedTail).toBe(true);
-    expect(pages.calls.map((item) => item.numTurns)).toEqual([10, 1]);
+    expect(pages.calls.map((item) => item.numTurns)).toEqual([10]);
   });
 
   it('uses a saved assistant overlap to resume across a new user turn with incomplete raw parents', async () => {
@@ -2127,7 +2156,7 @@ describe('ChatGPT paged API transport', () => {
       'user-new',
       'assistant-new',
     ]);
-    expect(pages.calls.map((item) => item.numTurns)).toEqual([10, 1]);
+    expect(pages.calls.map((item) => item.numTurns)).toEqual([10]);
   });
 
   it('never accepts an unrelated saved user outside the current raw parent chain as a tail boundary', async () => {
@@ -2158,7 +2187,7 @@ describe('ChatGPT paged API transport', () => {
       trustedCheckpoint: full.checkpoint!,
     });
     expect(result.verifiedTail).not.toBe(true);
-    expect(requests.calls.filter((item) => item.numTurns === 10)).toHaveLength(2);
+    expect(requests.calls.map((item) => item.numTurns)).toEqual([10, 10, 1]);
   });
 
   it('falls back to the same full pagination when the old user content changed', async () => {
@@ -2203,7 +2232,7 @@ describe('ChatGPT paged API transport', () => {
     });
     expect(incremental.verifiedTail).toBe(true);
     expect(incremental.checkpoint?.lastUserKey).toBe('user-9999');
-    expect(requests.calls.map((item) => item.numTurns)).toEqual([10, 1]);
+    expect(requests.calls.map((item) => item.numTurns)).toEqual([10]);
   });
 
   it('safely stages the latest buffered history if a checkpoint search fails during a later page request', async () => {
