@@ -386,6 +386,131 @@ describe('ChatGPT Advanced end-to-end incremental fetch', () => {
     }
   });
 
+  it('does not let a stale completed full capture erase a concurrent newer local snapshot', async () => {
+    const router = createBackgroundRouter({
+      fallback: (message: any) => ({ ok: false, error: { message: `unknown: ${message.type}` } }),
+    });
+    registerConversationHandlers(router as any, {
+      onConversationChanged: async () => {},
+      onRemoteCleanupPending: async () => {},
+      scheduleImageBackfill: async () => {},
+    });
+    let injected = false;
+    let concurrentConversationId = 0;
+    const capture = createCurrentPageCaptureService({
+      runtime: {
+        send: async (type, payload) => {
+          if (!injected && type === 'syncConversationMessages' && payload?.mode === 'snapshot') {
+            injected = true;
+            concurrentConversationId = Number(payload.conversationId);
+            await syncConversationMessages(
+              concurrentConversationId,
+              [
+                ...initial.map((item, index) => ({
+                  messageKey: item.id,
+                  role: item.author.role,
+                  contentMarkdown: item.content.parts.join('\n'),
+                  sequence: index,
+                })),
+                { messageKey: 'u-concurrent', role: 'user', contentMarkdown: 'newer from another tab', sequence: 4 },
+              ],
+              { mode: 'snapshot' },
+            );
+          }
+          return router.dispatch({ type, ...payload });
+        },
+      },
+      collectorsRegistry: {
+        pickActive: () => ({ id: 'chatgpt', collector: { isCaptureAvailable: () => true } }),
+        list: () => [],
+      },
+      videoCapture: { captureVideoTranscript: vi.fn() as any },
+    });
+    api.requestPage.mockImplementation(async ({ numTurns }: { numTurns: number }) => ({
+      conversation_id: conversationKey,
+      current_node: initial.at(-1)!.id,
+      messages: numTurns === 1 ? initial.slice(-1) : initial,
+      ...(numTurns === 1
+        ? null
+        : {
+            title: 'A saved conversation',
+            page_info: {
+              start_cursor: initial[0]!.id,
+              end_cursor: initial.at(-1)!.id,
+              has_previous_page: false,
+            },
+          }),
+    }));
+
+    await expect(capture.captureCurrentPage()).rejects.toMatchObject({
+      code: 'chatgpt_api_storage_conflict',
+      message: expect.stringMatching(/another tab|其他标签页/i),
+    });
+    expect(injected).toBe(true);
+    expect((await getMessagesByConversationId(concurrentConversationId)).map((message) => message.messageKey)).toEqual([
+      'u1',
+      'a1',
+      'u2',
+      'a2',
+      'u-concurrent',
+    ]);
+  });
+
+  it('rejects an unresolved sibling branch without persisting its abandoned messages', async () => {
+    const router = createBackgroundRouter({
+      fallback: (message: any) => ({ ok: false, error: { message: `unknown: ${message.type}` } }),
+    });
+    registerConversationHandlers(router as any, {
+      onConversationChanged: async () => {},
+      onRemoteCleanupPending: async () => {},
+      scheduleImageBackfill: async () => {},
+    });
+    const capture = createCurrentPageCaptureService({
+      runtime: { send: async (type, payload) => router.dispatch({ type, ...payload }) },
+      collectorsRegistry: {
+        pickActive: () => ({ id: 'chatgpt', collector: { isCaptureAvailable: () => true } }),
+        list: () => [],
+      },
+      videoCapture: { captureVideoTranscript: vi.fn() as any },
+    });
+    let activeNodes: Node[] = initial;
+    api.requestPage.mockImplementation(async ({ numTurns }: { numTurns: number }) => ({
+      conversation_id: conversationKey,
+      current_node: activeNodes.at(-1)!.id,
+      messages: numTurns === 1 ? activeNodes.slice(-1) : activeNodes,
+      ...(numTurns === 1
+        ? null
+        : {
+            title: 'A saved conversation',
+            page_info: {
+              start_cursor: activeNodes[0]!.id,
+              end_cursor: activeNodes.at(-1)!.id,
+              has_previous_page: false,
+            },
+          }),
+    }));
+    await capture.captureCurrentPage();
+    const stored = await getConversationBySourceConversationKey('chatgpt', conversationKey);
+    const conversationId = Number(stored?.id);
+    const previousMessages = await getMessagesByConversationId(conversationId);
+    const previousRevision = await readDataRevision('messages');
+    activeNodes = [
+      node('u2', 'user', 'second', 'a1'),
+      node('abandoned-sibling', 'assistant', 'obsolete reply', 'u2'),
+      node('u3', 'user', 'new question', 'u2'),
+      node('active-sibling', 'assistant', 'current reply', 'unknown-parent'),
+    ];
+    await expect(capture.captureCurrentPage()).rejects.toMatchObject({
+      code: 'chatgpt_api_branch_ambiguous',
+      message: expect.stringMatching(/branch|分支/i),
+    });
+    expect(await getMessagesByConversationId(conversationId)).toEqual(previousMessages);
+    expect(await readDataRevision('messages')).toBe(previousRevision);
+    expect((await getConversationBySourceConversationKey('chatgpt', conversationKey))?.chatgptApiCheckpoint).toEqual(
+      stored?.chatgptApiCheckpoint,
+    );
+  });
+
   it('updates an actual 10000-message IndexedDB history without loading the old message list', async () => {
     const conversation = await upsertConversation({
       sourceType: 'chat',
@@ -401,7 +526,7 @@ describe('ChatGPT Advanced end-to-end incremental fetch', () => {
       sequence: i,
       updatedAt: i + 1,
     }));
-    const encoded = new TextEncoder().encode(JSON.stringify(['message-9998', 'm9997']));
+    const encoded = new TextEncoder().encode(JSON.stringify(['message-9998', ['text', ['message-9998']], 'm9997', []]));
     const hash = await crypto.subtle.digest('SHA-256', encoded);
     const signature = Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, '0')).join('');
     await syncConversationMessages(conversationId, firstTenThousand, {

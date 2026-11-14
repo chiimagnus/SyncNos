@@ -1,4 +1,5 @@
 import { parseChatgptDurableConversationRoute } from '@services/shared/chatgpt-route';
+import { chatgptFileIdFromAssetPointer } from '@services/shared/chatgpt-image-identity';
 import { CHATGPT_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { sendMessage } from '@platform/runtime/runtime';
 import { buildChatgptApiSnapshot, type ChatgptApiSnapshotResult } from '@services/integrations/chatgpt/api-snapshot';
@@ -66,9 +67,29 @@ function currentNodeSignature(message: any): string {
   ]);
 }
 
-async function userSignature(markdown: string, parentId: unknown): Promise<string> {
-  const normalizedParent = typeof parentId === 'string' ? parentId : '';
-  const bytes = new TextEncoder().encode(JSON.stringify([markdown, normalizedParent]));
+async function userSignature(markdown: string, rawUser: any): Promise<string> {
+  const content = rawUser?.content;
+  const rawContent = Array.isArray(content?.parts)
+    ? [
+        String(content?.content_type || ''),
+        content.parts.map((part: any) => {
+          if (typeof part === 'string' || typeof part === 'number' || typeof part === 'boolean') return part;
+          if (!part || typeof part !== 'object' || Array.isArray(part)) return null;
+          const text =
+            typeof part.text === 'string' ? part.text : typeof part.content === 'string' ? part.content : null;
+          return [String(part.content_type || ''), text ?? chatgptFileIdFromAssetPointer(part.asset_pointer)];
+        }),
+      ]
+    : [String(content?.content_type || ''), content?.text || content?.content || ''];
+  const parentId = typeof rawUser?.metadata?.parent_id === 'string' ? rawUser.metadata.parent_id : '';
+  const attachments = Array.isArray(rawUser?.metadata?.attachments)
+    ? rawUser.metadata.attachments.map((attachment: any) => [
+        String(attachment?.id || ''),
+        String(attachment?.name || ''),
+        String(attachment?.mime_type || ''),
+      ])
+    : [];
+  const bytes = new TextEncoder().encode(JSON.stringify([markdown, rawContent, parentId, attachments]));
   const hash = await crypto.subtle.digest('SHA-256', bytes);
   return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
@@ -84,7 +105,7 @@ async function latestUserCheckpoint(
   if (!rawUser) return null;
   return {
     lastUserKey: user.messageKey,
-    userSignature: await userSignature(String(user.contentMarkdown || ''), rawUser.metadata?.parent_id),
+    userSignature: await userSignature(String(user.contentMarkdown || ''), rawUser),
     includeThinking,
   };
 }
@@ -350,7 +371,7 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
         checkpointUser &&
         rawUser &&
         input.trustedCheckpoint.includeThinking === (input?.includeThinking !== false) &&
-        (await userSignature(String(checkpointUser.contentMarkdown || ''), rawUser.metadata?.parent_id)) ===
+        (await userSignature(String(checkpointUser.contentMarkdown || ''), rawUser)) ===
           input.trustedCheckpoint.userSignature
       ) {
         const stableTail = scopedResult.snapshot.captureMeta.completeness === 'complete' && !currentNodeInProgress;
@@ -379,6 +400,7 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
         }
       }
     }
+    if (completed && unresolvedBranches) throw apiCaptureError('chatgpt_api_branch_ambiguous');
     if (input?.trustedCheckpoint && !unresolvedBranches) candidateStage = result;
     // Partial snapshots can only append; a head fetch is needed only before a possible complete replacement.
     const changedWhileFetching =
@@ -403,7 +425,7 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
         ),
       };
     }
-    if (input?.onPage && (!input.trustedCheckpoint || completed)) {
+    if (input?.onPage && !unresolvedBranches && (!input.trustedCheckpoint || completed)) {
       const messages = result.snapshot.messages as Array<{ messageKey: string; contentMarkdown: string }>;
       const toStage = new Set<string>();
       for (const message of messages) {

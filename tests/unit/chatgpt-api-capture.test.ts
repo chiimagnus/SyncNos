@@ -1983,6 +1983,101 @@ describe('ChatGPT paged API transport', () => {
     expect(onPage).not.toHaveBeenCalled();
   });
 
+  it('invalidates a saved user when an attachment ID changes but its display label does not', async () => {
+    const userWithFile = (fileId: string) =>
+      message({
+        id: 'user-file',
+        role: 'user',
+        parts: ['review the file'],
+        attachments: [{ id: fileId, name: 'results.pdf', mime_type: 'application/pdf' }],
+      });
+    const answer = message({
+      id: 'assistant-file',
+      role: 'assistant',
+      channel: 'final',
+      parts: ['reviewed'],
+      parent: 'user-file',
+    });
+    const baseline = requestPages([responsePage([userWithFile('file-original'), answer], false, true)]);
+    const full = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: baseline.requestPage,
+    });
+    const pages = requestPages([
+      responsePage([userWithFile('file-replacement'), answer], true, true),
+      responsePage([message({ id: 'older-user', role: 'user', parts: ['older'] })], false),
+    ]);
+    const capture = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: pages.requestPage,
+      trustedCheckpoint: full.checkpoint!,
+    });
+    expect(capture.verifiedTail).not.toBe(true);
+    expect(capture.checkpoint?.userSignature).not.toBe(full.checkpoint?.userSignature);
+    expect(pages.calls.map((item) => item.numTurns)).toEqual([10, 10, 1]);
+  });
+
+  it('ignores rotating download URLs when the attachment identity is unchanged', async () => {
+    const answer = message({
+      id: 'assistant-file',
+      role: 'assistant',
+      channel: 'final',
+      parts: ['done'],
+      parent: 'user-file',
+    });
+    const user = (url: string) =>
+      message({
+        id: 'user-file',
+        role: 'user',
+        parts: ['review'],
+        attachments: [{ id: 'file-stable', name: 'results.pdf', mime_type: 'application/pdf', download_url: url }],
+      });
+    const first = requestPages([responsePage([user('https://example.com/temporary-a'), answer], false, true)]);
+    const saved = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: first.requestPage,
+    });
+    const next = requestPages([responsePage([user('https://example.com/temporary-b'), answer], true, true)]);
+    const capture = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: next.requestPage,
+      trustedCheckpoint: saved.checkpoint!,
+    });
+    expect(capture.verifiedTail).toBe(true);
+    expect(capture.checkpoint?.userSignature).toBe(saved.checkpoint?.userSignature);
+    expect(next.calls.map((item) => item.numTurns)).toEqual([10, 1]);
+  });
+
+  it('hashes original user part structure when different API content renders the same Markdown', async () => {
+    const answer = message({
+      id: 'assistant-structured',
+      role: 'assistant',
+      channel: 'final',
+      parts: ['answer'],
+      parent: 'user-structured',
+    });
+    const user = (parts: string[]) => message({ id: 'user-structured', role: 'user', parts });
+    const baseline = requestPages([responsePage([user(['first', 'second']), answer], false, true)]);
+    const saved = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: baseline.requestPage,
+    });
+    const updated = requestPages([
+      responsePage([user(['first\nsecond']), answer], true, true),
+      responsePage([message({ id: 'earlier', role: 'user', parts: ['old'] })], false),
+    ]);
+    const capture = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: updated.requestPage,
+      trustedCheckpoint: saved.checkpoint!,
+    });
+    expect(capture.snapshot.messages.find((item: any) => item.messageKey === 'user-structured')?.contentMarkdown).toBe(
+      'first\nsecond',
+    );
+    expect(capture.verifiedTail).not.toBe(true);
+    expect(updated.calls.map((item) => item.numTurns)).toEqual([10, 10, 1]);
+  });
+
   it('reuses a stable last user despite missing parent links in a tool-heavy response', async () => {
     const rawTail = [
       message({ id: 'user-tool-heavy', role: 'user', parts: ['question'] }),
@@ -2360,17 +2455,27 @@ describe('ChatGPT paged API transport', () => {
     }
   });
 
-  it('does not refetch the head when the saved history is already partial', async () => {
+  it('rejects unresolved siblings without spending a HEAD request', async () => {
     const branching = structuredClone([...older, ...newer]);
     branching[1]!.metadata.parent_id = 'user-1';
     branching[2]!.metadata.parent_id = 'user-1';
     branching[3]!.metadata.parent_id = 'unresolved-parent';
+    const { requestPage } = requestPages([responsePage(branching, false, true)]);
+    const onPage = vi.fn(async () => {});
+    await expect(
+      captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage, onPage }),
+    ).rejects.toMatchObject({ code: 'chatgpt_api_branch_ambiguous' });
+    expect(requestPage).toHaveBeenCalledTimes(1);
+    expect(onPage).not.toHaveBeenCalled();
+  });
+
+  it('does not refetch the head when the saved history is already partial', async () => {
     const streaming = [
       message({ id: 'user-streaming', role: 'user', parts: ['question'] }),
       message({ id: 'tool-running', role: 'tool', contentType: 'code', status: 'in_progress', hidden: true }),
     ];
     const schemaDrift = [message({ id: 'user-drift', role: 'user', contentType: 'unexpected', parts: ['question'] })];
-    for (const items of [branching, streaming, schemaDrift]) {
+    for (const items of [streaming, schemaDrift]) {
       const { requestPage } = requestPages([responsePage(items, false, true)]);
       const result = await captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage });
       expect(result.snapshot.captureMeta.completeness).toBe('partial');

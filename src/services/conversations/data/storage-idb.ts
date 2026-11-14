@@ -1413,7 +1413,7 @@ export async function syncConversationMessages(
     conversationContentChanged?: boolean;
     checkpoint?: ChatgptApiCheckpoint;
     preserveCheckpointTail?: boolean;
-    expectedCheckpoint?: ChatgptApiCheckpoint;
+    expectedCheckpoint?: ChatgptApiCheckpoint | null;
     expectedMessagesRevision?: number;
     reportChanged?: boolean;
   },
@@ -1439,8 +1439,8 @@ export async function syncConversationMessages(
     options?.expectedMessagesRevision !== undefined &&
     (!Number.isSafeInteger(options.expectedMessagesRevision) ||
       options.expectedMessagesRevision < 0 ||
-      !options.expectedCheckpoint ||
-      mode !== 'incremental')
+      (mode !== 'incremental' && mode !== 'snapshot') ||
+      (mode === 'incremental' && !options.expectedCheckpoint))
   )
     throw new Error('chatgpt_api_storage_conflict');
   const revisionStore = DATA_REVISION_STORE_BY_SCOPE.messages;
@@ -1462,13 +1462,15 @@ export async function syncConversationMessages(
       let activityConversation: any = await reqToPromise(stores.conversations.get(conversationId as any));
       if (!activityConversation) throw new Error('conversation not found');
       if (checkpoint && activityConversation.source !== 'chatgpt') throw new Error('chatgpt_api_checkpoint_source');
+      if (options?.expectedMessagesRevision !== undefined && activityConversation.source !== 'chatgpt')
+        throw new Error('chatgpt_api_storage_conflict');
       if (options?.expectedMessagesRevision !== undefined) {
         const storedRevision = normalizeDataRevisionRecord(
           await reqToPromise(stores[revisionStore].get(DATA_REVISION_RECORD_KEY)),
         ).revision;
         if (
           storedRevision !== options.expectedMessagesRevision ||
-          !storedValueEqual(activityConversation.chatgptApiCheckpoint, options.expectedCheckpoint)
+          !storedValueEqual(activityConversation.chatgptApiCheckpoint ?? null, options.expectedCheckpoint ?? null)
         )
           throw new Error('chatgpt_api_storage_conflict');
       }
@@ -2367,8 +2369,13 @@ export async function getConversationTailWindowBySourceAndKey(
     ? reqToPromise(stores[revisionStore].get(DATA_REVISION_RECORD_KEY))
     : Promise.resolve(null);
   if (!row) {
+    const revision = await revisionRequest;
     await done;
-    return { conversation: null, messages: [] };
+    return {
+      conversation: null,
+      messages: [],
+      ...(options?.withRevision ? { messagesRevision: normalizeDataRevisionRecord(revision).revision } : null),
+    };
   }
   const conversation = normalizeConversationListRecord(row as Conversation);
   const conversationId = Number(conversation.id);

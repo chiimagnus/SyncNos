@@ -4596,6 +4596,51 @@ describe('ChatGPT Advanced checkpoint integrity', () => {
     expect((await getConversationById(id))?.chatgptApiCheckpoint).toBeUndefined();
   });
 
+  it('reads a revision for an as-yet unsaved ChatGPT conversation before a guarded first snapshot', async () => {
+    const tail = await getConversationTailWindowBySourceAndKey('chatgpt', 'not-yet-saved', 1, {
+      withRevision: true,
+    });
+    expect(tail).toMatchObject({ conversation: null, messages: [] });
+    expect(tail.messagesRevision).toBe(await readDataRevision('messages'));
+  });
+
+  it('rejects a stale guarded complete snapshot without deleting a concurrent new message', async () => {
+    const convo = await upsertConversation({ sourceType: 'chat', source: 'chatgpt', conversationKey: 'revision-full' });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, initial, { mode: 'snapshot' });
+    const firstRead = await getConversationTailWindowBySourceAndKey('chatgpt', 'revision-full', 1, {
+      withRevision: true,
+    });
+    const newer = [
+      ...initial,
+      { messageKey: 'u2', role: 'user', contentMarkdown: 'concurrent prompt', sequence: 2, updatedAt: 3 },
+    ];
+    await syncConversationMessages(id, newer, { mode: 'snapshot', checkpoint });
+    const writtenRevision = await readDataRevision('messages');
+    await expect(
+      syncConversationMessages(id, initial, {
+        mode: 'snapshot',
+        checkpoint,
+        expectedCheckpoint: null,
+        expectedMessagesRevision: firstRead.messagesRevision,
+      }),
+    ).rejects.toThrow('chatgpt_api_storage_conflict');
+    expect((await getMessagesByConversationId(id)).map((message) => message.messageKey)).toEqual(['u1', 'a1', 'u2']);
+    expect((await getConversationById(id))?.chatgptApiCheckpoint).toEqual(checkpoint);
+    expect(await readDataRevision('messages')).toBe(writtenRevision);
+
+    const latest = await getConversationTailWindowBySourceAndKey('chatgpt', 'revision-full', 1, {
+      withRevision: true,
+    });
+    await syncConversationMessages(id, newer, {
+      mode: 'snapshot',
+      checkpoint,
+      expectedCheckpoint: checkpoint,
+      expectedMessagesRevision: latest.messagesRevision,
+    });
+    expect(await readDataRevision('messages')).toBe(writtenRevision);
+  });
+
   it('reads a bounded window and message revision consistently for atomic tail replacement', async () => {
     const convo = await upsertConversation({ sourceType: 'chat', source: 'chatgpt', conversationKey: 'revision-tail' });
     const id = Number(convo.id);

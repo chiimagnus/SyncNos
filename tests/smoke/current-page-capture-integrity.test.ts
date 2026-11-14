@@ -75,7 +75,10 @@ function createHarness(input: {
     send: vi.fn(async (type: string, payload?: any) => {
       if (type === 'getConversationTailWindowBySourceAndKey') {
         tailReads.push({ type, payload });
-        return { ok: true, data: input.tailResponse || { conversationId: null, messages: [], checkpoint: null } };
+        return {
+          ok: true,
+          data: input.tailResponse || { conversationId: null, messages: [], checkpoint: null, messagesRevision: 0 },
+        };
       }
       calls.push({ type, payload });
       if (type === 'fetchActiveTabArticle') {
@@ -475,7 +478,14 @@ describe('current page capture integrity routing', () => {
     expect(verifyCurrent).toHaveBeenCalledTimes(1);
     expect(chatgptApiMocks.capture).toHaveBeenCalledWith(expect.objectContaining({ includeThinking: true }));
     const persisted = harness.calls.find((call) => call.type === 'syncConversationMessages');
-    expect(persisted?.payload).toMatchObject({ mode: 'snapshot', chatgptApiCheckpoint: checkpoint });
+    expect(persisted?.payload).toMatchObject({
+      mode: 'snapshot',
+      chatgptApiCheckpoint: checkpoint,
+      expectedCheckpoint: null,
+      expectedMessagesRevision: 0,
+      verifiedChatgptApiTail: true,
+    });
+    expect(harness.tailReads.map(({ payload }) => payload?.limit)).toEqual([200, 1]);
   });
 
   it('rejects an Advanced full save if the Thinking setting changes during capture', async () => {
@@ -615,6 +625,12 @@ describe('current page capture integrity routing', () => {
     const result = await harness.service.captureCurrentPage();
     const writes = harness.calls.filter(({ type }) => type === 'syncConversationMessages');
     expect(writes.map(({ payload }) => payload.mode)).toEqual(['append', 'snapshot']);
+    expect(writes[1].payload).toMatchObject({
+      verifiedChatgptApiTail: true,
+      expectedCheckpoint: null,
+      expectedMessagesRevision: 0,
+    });
+    expect(harness.tailReads.map(({ payload }) => payload?.limit)).toEqual([200, 1]);
     expect(writes[0].payload.messages[0].captureMergePolicy).toBe('preserve-existing-content');
     expect(writes[1].payload.messages[0].captureMergePolicy).toBeUndefined();
     expect(staged.messages[0].captureMergePolicy).toBeUndefined();

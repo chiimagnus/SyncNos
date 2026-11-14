@@ -368,6 +368,10 @@ export const en = {
   chatgptApiCaptureRateLimited: 'ChatGPT is receiving too many requests. Please try again later.',
   chatgptApiCaptureSessionExpired: 'Your ChatGPT sign-in may have expired. Refresh ChatGPT and try again.',
   chatgptApiCaptureNavigationChanged: 'The page changed while capturing. Save the current conversation again.',
+  chatgptApiCaptureBranchAmbiguous:
+    'Cannot verify the active ChatGPT branch. Existing saved content was preserved. Reload and try again.',
+  chatgptApiCaptureStorageConflict:
+    'Another tab updated this conversation. Newer saved content was preserved. Fetch again.',
   fetchingDots: 'Fetching...',
   checkingDots: 'Checking...',
   savedPrefix: 'Saved: ',

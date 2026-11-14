@@ -86,11 +86,15 @@ function userFacingCaptureError(error: unknown): Error {
   const message =
     code === 'chatgpt_api_navigation_changed'
       ? t('chatgptApiCaptureNavigationChanged')
-      : status === 429
-        ? t('chatgptApiCaptureRateLimited')
-        : sessionUnavailable
-          ? t('chatgptApiCaptureSessionExpired')
-          : t('chatgptApiCaptureTemporarilyUnavailable');
+      : code === 'chatgpt_api_branch_ambiguous'
+        ? t('chatgptApiCaptureBranchAmbiguous')
+        : code === 'chatgpt_api_storage_conflict'
+          ? t('chatgptApiCaptureStorageConflict')
+          : status === 429
+            ? t('chatgptApiCaptureRateLimited')
+            : sessionUnavailable
+              ? t('chatgptApiCaptureSessionExpired')
+              : t('chatgptApiCaptureTemporarilyUnavailable');
   return Object.assign(new Error(message), {
     code,
     ...(Number.isFinite(status) && status > 0 ? { status } : null),
@@ -262,6 +266,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       includeThinking?: boolean;
       checkpoint?: ChatgptApiCheckpoint | null;
       trustedTail?: ChatgptTrustedTailWindow;
+      fullSnapshotGuard?: { checkpoint: ChatgptApiCheckpoint | null; messagesRevision: number };
       trustedChatgptApiPartial?: boolean;
     },
   ) {
@@ -355,10 +360,11 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         ? { chatgptApiCheckpoint: options.checkpoint }
         : null),
       ...(options?.trustedChatgptApiPartial ? { trustedChatgptApiPartial: true } : null),
-      ...(options?.trustedTail
+      ...(options?.trustedTail || (persistence.mode === 'snapshot' && options?.fullSnapshotGuard)
         ? {
-            expectedCheckpoint: options.trustedTail.checkpoint,
-            expectedMessagesRevision: options.trustedTail.messagesRevision,
+            expectedCheckpoint: options.trustedTail?.checkpoint ?? options.fullSnapshotGuard?.checkpoint ?? null,
+            expectedMessagesRevision:
+              options.trustedTail?.messagesRevision ?? options.fullSnapshotGuard?.messagesRevision,
             verifiedChatgptApiTail: true,
           }
         : null),
@@ -434,6 +440,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       let includeThinking: boolean | undefined;
       let checkpoint: ChatgptApiCheckpoint | null = null;
       let trustedTail: ChatgptTrustedTailWindow | null = null;
+      let fullSnapshotGuard: { checkpoint: ChatgptApiCheckpoint | null; messagesRevision: number } | null = null;
       let capturedVerifiedTail = false;
       let stageChatgptPage: ((page: { snapshot: any }) => Promise<void>) | undefined;
       const applyApiCapture = async (capture: Awaited<ReturnType<typeof captureCurrentChatgptConversationViaApi>>) => {
@@ -443,7 +450,23 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
           snapshot = await target.collector.enrichApiSnapshotWithRenderedGraphics(snapshot);
         }
         checkpoint = null;
+        fullSnapshotGuard = null;
         if (snapshot?.captureMeta?.completeness !== 'complete') return;
+        if (capture.verifiedTail !== true) {
+          const revisionResponse = await send(CORE_MESSAGE_TYPES.GET_CONVERSATION_TAIL_WINDOW_BY_SOURCE_AND_KEY, {
+            source: 'chatgpt',
+            conversationKey: expectedChatgptConversationId,
+            limit: 1,
+            compact: true,
+          });
+          const revision = revisionResponse?.data?.messagesRevision;
+          if (!revisionResponse?.ok || !Number.isSafeInteger(revision) || revision < 0)
+            throw new Error('chatgpt_api_tail_unavailable');
+          fullSnapshotGuard = {
+            checkpoint: revisionResponse.data.checkpoint || null,
+            messagesRevision: revision,
+          };
+        }
         await capture.verifyCurrent();
         const currentThinking =
           (await storageGet([AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]))?.[AI_CHAT_INCLUDE_THINKING_STORAGE_KEY] !== false;
@@ -563,6 +586,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
           ...(includeThinking !== undefined ? { includeThinking } : null),
           ...(checkpoint ? { checkpoint } : null),
           ...(capturedVerifiedTail && trustedTail ? { trustedTail } : null),
+          ...(fullSnapshotGuard ? { fullSnapshotGuard } : null),
           ...(expectedChatgptConversationId ? { trustedChatgptApiPartial: true } : null),
         });
       let saved;
