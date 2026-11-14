@@ -182,30 +182,24 @@ describe('current page capture integrity routing', () => {
     expect(prepare).toHaveBeenCalledWith({ manual: true, savedTailMessageKey: 'stable-last-user' });
   });
 
-  it('persists DOM-only verified history without invoking Advanced API Fetch', async () => {
+  it('reuses a persisted stable DOM anchor without requiring a full-history completion marker', async () => {
     const prepare = vi.fn(async () => ({ prepared: true }));
-    const coverage = { anchorKey: 'older-user', anchorOrdinal: 4, singleSweepSettled: true };
     const harness = createHarness({
       collectorId: 'chatgpt',
       url: 'https://chatgpt.com/c/conversation-1',
-      snapshot: { ...chatSnapshot({ completeness: 'partial' }), domCoverage: coverage },
+      snapshot: chatSnapshot({ completeness: 'partial' }),
       prepare,
       tailResponse: {
         conversationId: 7,
         messages: [{ messageKey: 'latest-assistant', role: 'assistant', sequence: 11 }],
-        domCoverage: coverage,
         messagesRevision: 4,
       },
     });
     await harness.service.captureCurrentPage();
-    expect(prepare).toHaveBeenCalledWith({
-      manual: true,
-      savedTailMessageKey: 'latest-assistant',
-      savedDomCoverage: coverage,
-    });
+    expect(prepare).toHaveBeenCalledWith({ manual: true, savedTailMessageKey: 'latest-assistant' });
     const save = harness.calls.find((call) => call.type === 'syncConversationMessages');
-    expect(save?.payload?.chatgptDomCoverage).toEqual(coverage);
     expect(save?.payload?.mode).toBe('append');
+    expect(save?.payload?.chatgptDomCoverage).toBeUndefined();
     expect(chatgptApiMocks.capture).not.toHaveBeenCalled();
   });
 

@@ -7,12 +7,6 @@ export type ChatgptApiCheckpoint = {
   includeThinking: boolean;
 };
 
-export type ChatgptDomCoverage = {
-  anchorKey: string;
-  anchorOrdinal: number | null;
-  singleSweepSettled: true;
-};
-
 export type Conversation = {
   id: number;
   sourceType?: string;
@@ -20,7 +14,6 @@ export type Conversation = {
   conversationKey: string;
   canonicalChatIdentity?: string;
   chatgptApiCheckpoint?: ChatgptApiCheckpoint;
-  chatgptDomCoverage?: ChatgptDomCoverage;
   listSourceKey?: string;
   listSiteKey?: string;
   title?: string;

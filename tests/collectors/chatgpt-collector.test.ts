@@ -356,15 +356,6 @@ async function prepare(def: any, options: any = {}) {
     pollMs: 0,
     sleep: async () => {},
     historyQuietMs: 0,
-    ...(options.savedTailMessageKey
-      ? {
-          savedDomCoverage: {
-            anchorKey: options.savedTailMessageKey,
-            anchorOrdinal: Number(options.savedTailMessageKey.match(/(?:message-|user-|assistant-)(\d+)$/)?.[1] || 0),
-            singleSweepSettled: true,
-          },
-        }
-      : null),
     ...options,
   });
 }
@@ -411,10 +402,7 @@ describe('chatgpt current DOM', () => {
     expect(prepared.records.map((record: any) => record.key)).toEqual(
       Array.from({ length: 27 }, (_, index) => [`user-${index}`, `assistant-${index}`]).flat(),
     );
-    expect(prepared.domCoverage).toMatchObject({
-      anchorKey: 'user-26',
-      anchorOrdinal: 26,
-    });
+    expect(prepared.metrics).toMatchObject({ reachedTop: true, reachedBottom: true });
   });
 
   it('does not certify incomplete history after a single sweep hits its step budget', async () => {
@@ -426,8 +414,7 @@ describe('chatgpt current DOM', () => {
       pollMs: 1,
       historyQuietMs: 12,
     });
-    expect(prepared.domCoverage).toBeNull();
-    expect(prepared.metrics.domHistorySettled).toBe(false);
+    expect(prepared.metrics.reachedTop).toBe(false);
     expect(prepared.reasons).toContain('step_budget_exhausted');
     expect(prepared.records.length).toBeLessThan(54);
     expect(test.atBottom()).toBe(true);
@@ -446,7 +433,7 @@ describe('chatgpt current DOM', () => {
     expect(test.getBottomReturns()).toBe(1);
     expect(test.getMovesDuringLoad()).toBe(0);
     expect(prepared.records).toHaveLength(54);
-    expect(prepared.domCoverage).toMatchObject({ anchorKey: 'user-26', anchorOrdinal: 26 });
+    expect(prepared.metrics.reachedTop).toBe(true);
   });
 
   it('does not move the scroller while older history is still loading, and reports a stalled load as incomplete', async () => {
@@ -464,7 +451,6 @@ describe('chatgpt current DOM', () => {
     expect(test.getBottomReturns()).toBe(1);
     expect(prepared.metrics.reachedTop).toBe(false);
     expect(prepared.reasons).toContain('total_deadline_exhausted');
-    expect(prepared.domCoverage).toBeNull();
   });
 
   it('waits for genuinely slow history loading beyond the former 30-second boundary without scrolling', async () => {
@@ -481,7 +467,7 @@ describe('chatgpt current DOM', () => {
     expect(test.getMovesDuringLoad()).toBe(0);
     expect(test.getBottomReturns()).toBe(1);
     expect(prepared.records).toHaveLength(20);
-    expect(prepared.domCoverage).toMatchObject({ anchorKey: 'user-9', singleSweepSettled: true });
+    expect(prepared.metrics.reachedTop).toBe(true);
   });
 
   it('terminates an in-flight top-loading wait when the user navigates to another conversation', async () => {
@@ -505,7 +491,6 @@ describe('chatgpt current DOM', () => {
     expect(test.getMovesDuringLoad()).toBe(0);
     expect(prepared.identityVerified).toBe(false);
     expect(prepared.records).toHaveLength(0);
-    expect(prepared.domCoverage).toBeNull();
   });
 
   it('collects a 120-turn simulated history without restarting from the bottom', async () => {
@@ -523,23 +508,23 @@ describe('chatgpt current DOM', () => {
     expect(prepared.records).toHaveLength(240);
     expect(prepared.records.at(0)?.key).toBe('user-0');
     expect(prepared.records.at(-1)?.key).toBe('assistant-119');
-    expect(prepared.domCoverage).toMatchObject({ anchorKey: 'user-119', anchorOrdinal: 119 });
+    expect(prepared.metrics.reachedTop).toBe(true);
   }, 20_000);
 
-  it('ignores a saved tail within the same sweep if its historical ordinal has shifted', async () => {
+  it('stops at a saved stable user key without any full-history completion marker', async () => {
     const test = simulatedLazyChatgptHistory(27, 5);
-    const def = currentDef(test.dom);
-    const prepared = await prepare(def, {
-      savedTailMessageKey: 'assistant-26',
-      savedDomCoverage: { anchorKey: 'user-26', anchorOrdinal: 0 },
+    const prepared = await prepare(currentDef(test.dom), {
+      savedTailMessageKey: 'user-26',
       now: test.now,
       sleep: test.sleep,
       pollMs: 1,
       historyQuietMs: 12,
     });
-    expect(prepared.metrics.stoppedAtKey).toBe(false);
-    expect(prepared.records).toHaveLength(54);
-    expect(prepared.domCoverage).toMatchObject({ anchorKey: 'user-26', anchorOrdinal: 26 });
+    expect(prepared.metrics.stoppedAtKey).toBe(true);
+    expect(prepared.metrics.reachedTop).toBe(false);
+    expect(prepared.records.map((record: any) => record.key)).toEqual(['user-26', 'assistant-26']);
+    expect(test.getLoaded()).toBe(5);
+    expect(test.getBottomReturns()).toBe(0);
   });
 
   it('falls back to the whole original sweep if the saved message was edited away', async () => {
