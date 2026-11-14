@@ -4,10 +4,10 @@ current_task_id = ""
 [[tasks]]
 id = "P1-T1"
 title = "核实分页分支契约与锚点可用性"
-status = "pending"
+status = "completed"
 plan = "plan-p1.md#p1-t1"
-commit = ""
-note = ""
+commit = "a8eb03ed9"
+note = "只读真实 API：10 turns 可含 1214 原始节点且 parent_id 大量存在；实际 sibling/编辑验收仍归 T3。测试 94/94。"
 
 [[tasks]]
 id = "P1-T2"
