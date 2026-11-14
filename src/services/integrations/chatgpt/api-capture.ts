@@ -2,8 +2,12 @@ import { parseChatgptDurableConversationRoute } from '@services/shared/chatgpt-r
 import { CHATGPT_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { sendMessage } from '@platform/runtime/runtime';
 import { buildChatgptApiSnapshot, type ChatgptApiSnapshotResult } from '@services/integrations/chatgpt/api-snapshot';
+import type { ChatgptApiCheckpoint } from '@services/conversations/domain/models';
 
-type CaptureResult = ChatgptApiSnapshotResult & { verifyCurrent: () => Promise<void> };
+type CaptureResult = ChatgptApiSnapshotResult & {
+  verifyCurrent: () => Promise<void>;
+  checkpoint: ChatgptApiCheckpoint | null;
+};
 type PageRequest = { conversationId: string; before?: string; numTurns: number; timeoutMs: number };
 
 function apiCaptureError(code: string, status?: number): Error & { code: string; status?: number } {
@@ -61,6 +65,29 @@ function currentNodeSignature(message: any): string {
   ]);
 }
 
+async function userSignature(markdown: string, parentId: unknown): Promise<string> {
+  const normalizedParent = typeof parentId === 'string' ? parentId : '';
+  const bytes = new TextEncoder().encode(JSON.stringify([markdown, normalizedParent]));
+  const hash = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function latestUserCheckpoint(
+  messages: readonly any[],
+  rawNodes: readonly any[],
+  includeThinking: boolean,
+): Promise<ChatgptApiCheckpoint | null> {
+  const user = messages.findLast((message) => message?.role === 'user');
+  if (!user?.messageKey) return null;
+  const rawUser = rawNodes.findLast((message) => message?.id === user.messageKey);
+  if (!rawUser) return null;
+  return {
+    lastUserKey: user.messageKey,
+    userSignature: await userSignature(String(user.contentMarkdown || ''), rawUser.metadata?.parent_id),
+    includeThinking,
+  };
+}
+
 function sanitizedConversationUrl(rawUrl: string): string {
   const url = new URL(rawUrl);
   url.search = '';
@@ -82,6 +109,7 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
   requestPage?: (request: PageRequest) => Promise<any>;
   timeoutMs?: number;
   capturedAt?: number;
+  includeThinking?: boolean;
   onPage?: (result: ChatgptApiSnapshotResult) => Promise<void>;
 }): Promise<CaptureResult> {
   const readCurrentUrl = input?.readCurrentUrl || (() => String(globalThis.location?.href || ''));
@@ -255,8 +283,13 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
     }
     if (completed) {
       assertRoute();
+      const checkpoint =
+        result.snapshot.captureMeta.completeness === 'complete'
+          ? await latestUserCheckpoint(result.snapshot.messages, retained, input?.includeThinking !== false)
+          : null;
       return {
         ...result,
+        checkpoint,
         verifyCurrent: async () => {
           if (!(await latestMatches())) throw apiCaptureError('chatgpt_api_conversation_changed');
         },

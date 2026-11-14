@@ -1,5 +1,6 @@
 import * as idb from '@services/conversations/data/storage-idb';
 import type {
+  ChatgptApiCheckpoint,
   Conversation,
   ConversationListCursor,
   ConversationListOpenTarget,
@@ -77,6 +78,9 @@ export function syncConversationMessages(
     mode?: 'snapshot' | 'incremental' | 'append';
     diff?: { added?: string[]; updated?: string[]; removed?: string[] } | null;
     activityAt?: number;
+    conversationContentChanged?: boolean;
+    checkpoint?: ChatgptApiCheckpoint;
+    preserveCheckpointTail?: boolean;
   },
 ) {
   return idb.syncConversationMessages(conversationId, messages, options);

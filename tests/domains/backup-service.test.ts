@@ -684,6 +684,42 @@ describe('backup service', () => {
     expect(chromeMock.__setPayloads.some((payload) => 'inpage_display_mode' in payload)).toBe(false);
   });
 
+  it('never exports or trusts a local ChatGPT Advanced checkpoint during Backup merge', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+    const checkpoint = { lastUserKey: 'u1', userSignature: 'd'.repeat(64), includeThinking: true };
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'checkpoint-backup',
+      title: 'Backup checkpoint',
+      url: 'https://chatgpt.com/c/checkpoint-backup',
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(
+      id,
+      [{ messageKey: 'u1', role: 'user', contentMarkdown: 'test', sequence: 0, updatedAt: 1 }],
+      { mode: 'snapshot', checkpoint },
+    );
+    const exported = await exportBackupZip();
+    const entries = await extractZipEntries(exported.blob);
+    const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
+    const group = manifest.sources.find((source: any) => source.source === 'chatgpt');
+    expect(group?.files).toHaveLength(1);
+    const bundlePath = group.files[0];
+    const bundle = JSON.parse(new TextDecoder().decode(entries.get(bundlePath)!));
+    expect(bundle.conversation).not.toHaveProperty('chatgptApiCheckpoint');
+
+    bundle.conversation.chatgptApiCheckpoint = checkpoint;
+    entries.set(bundlePath, new TextEncoder().encode(JSON.stringify(bundle)));
+    await importBackupZipMerge(entries);
+    expect((await getConversationById(id))?.chatgptApiCheckpoint).toBeUndefined();
+    expect((await getMessagesByConversationId(id)).map((row) => row.messageKey)).toEqual(['u1']);
+  });
+
   it('round-trips canonical Video metadata, cues and chapters through the ZIP backup without duplication', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global

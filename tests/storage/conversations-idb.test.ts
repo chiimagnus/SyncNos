@@ -4500,6 +4500,85 @@ describe('canonical video storage', () => {
   });
 });
 
+describe('ChatGPT Advanced checkpoint integrity', () => {
+  const checkpoint = { lastUserKey: 'u1', userSignature: 'a'.repeat(64), includeThinking: true };
+  const initial = [
+    { messageKey: 'u1', role: 'user', contentMarkdown: 'question', sequence: 0, updatedAt: 1 },
+    { messageKey: 'a1', role: 'assistant', contentMarkdown: 'answer', sequence: 1, updatedAt: 2 },
+  ];
+
+  it('establishes a full-history checkpoint atomically and preserves a valid prefix through a partial tail', async () => {
+    const convo = await upsertConversation({ sourceType: 'chat', source: 'chatgpt', conversationKey: 'checkpoint-1' });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, initial, { mode: 'snapshot', checkpoint, activityAt: 100 });
+    expect((await getConversationById(id))?.chatgptApiCheckpoint).toEqual(checkpoint);
+    const beforeRevision = await readDataRevision('conversations');
+    await syncConversationMessages(id, initial, { mode: 'snapshot', checkpoint, activityAt: 100 });
+    expect(await readDataRevision('conversations')).toBe(beforeRevision);
+
+    await syncConversationMessages(
+      id,
+      [{ messageKey: 'a2', role: 'assistant', contentMarkdown: 'streaming', sequence: 2, updatedAt: 3 }],
+      {
+        mode: 'append',
+        diff: { added: ['a2'], updated: [], removed: [] },
+        preserveCheckpointTail: true,
+      },
+    );
+    expect((await getConversationById(id))?.chatgptApiCheckpoint).toEqual(checkpoint);
+
+    await syncConversationMessages(
+      id,
+      [{ messageKey: 'u1', role: 'user', contentMarkdown: 'edited question', sequence: 0, updatedAt: 4 }],
+      { mode: 'incremental', diff: { added: [], updated: ['u1'], removed: [] } },
+    );
+    expect((await getConversationById(id))?.chatgptApiCheckpoint).toBeUndefined();
+  });
+
+  it('rolls back the entire snapshot when its declared checkpoint user does not exist', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'checkpoint-rollback',
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, initial, { mode: 'snapshot', checkpoint });
+    const original = await getMessagesByConversationId(id);
+    await expect(
+      syncConversationMessages(id, [{ ...initial[0], contentMarkdown: 'uncommitted edit' }], {
+        mode: 'snapshot',
+        checkpoint: { ...checkpoint, lastUserKey: 'missing' },
+      }),
+    ).rejects.toThrow('chatgpt_api_checkpoint_user_missing');
+    expect(await getMessagesByConversationId(id)).toEqual(original);
+    expect((await getConversationById(id))?.chatgptApiCheckpoint).toEqual(checkpoint);
+  });
+
+  it('invalidates an old checkpoint after an untrusted DOM append or branch merge', async () => {
+    const original = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'checkpoint-merge',
+    });
+    const id = Number(original.id);
+    await syncConversationMessages(id, initial, { mode: 'snapshot', checkpoint });
+    await syncConversationMessages(
+      id,
+      [{ messageKey: 'a2', role: 'assistant', contentMarkdown: 'DOM reply', sequence: 2 }],
+      { mode: 'append', diff: { added: ['a2'], updated: [], removed: [] } },
+    );
+    expect((await getConversationById(id))?.chatgptApiCheckpoint).toBeUndefined();
+    await syncConversationMessages(id, initial, { mode: 'snapshot', checkpoint });
+    const duplicate = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'checkpoint-merge-other',
+    });
+    await mergeConversationsByIds({ keepConversationId: id, removeConversationId: Number(duplicate.id) });
+    expect((await getConversationById(id))?.chatgptApiCheckpoint).toBeUndefined();
+  });
+});
+
 describe('ChatGPT paged saves through real IndexedDB message ordering', () => {
   it.each([false, true])('keeps stable chronological order if pagination %s', async (interrupted) => {
     const conversationId = 'paging-idb-integration';

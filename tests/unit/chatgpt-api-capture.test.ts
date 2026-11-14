@@ -1984,6 +1984,8 @@ describe('ChatGPT paged API transport', () => {
       'user-2',
     ]);
     expect(result.snapshot.captureMeta).toMatchObject({ completeness: 'complete', identityVerified: true });
+    expect(result.checkpoint).toMatchObject({ lastUserKey: 'user-2', includeThinking: true });
+    expect(result.checkpoint?.userSignature).toMatch(/^[0-9a-f]{64}$/);
     expect(result.snapshot.conversation.url).toBe(base);
   });
 

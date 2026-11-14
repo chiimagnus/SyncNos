@@ -1,4 +1,4 @@
-import type { Conversation, ConversationMessage } from '@services/conversations/domain/models';
+import type { ChatgptApiCheckpoint, Conversation, ConversationMessage } from '@services/conversations/domain/models';
 import {
   normalizeCanonicalVideoChapters,
   normalizeCanonicalVideoTranscriptCues,
@@ -895,6 +895,8 @@ async function mergeConversationsInTransaction(
     ),
   });
 
+  delete mergedConversation.chatgptApiCheckpoint;
+
   const mappingMutation = await migrateSyncMappingKey(stores.sync_mappings, stores[GITHUB_CLEANUP_OUTBOX_STORE], {
     legacySource: remove.source,
     legacyConversationKey: remove.conversationKey,
@@ -1408,6 +1410,8 @@ export async function syncConversationMessages(
     diff?: { added?: string[]; updated?: string[]; removed?: string[] } | null;
     activityAt?: number;
     conversationContentChanged?: boolean;
+    checkpoint?: ChatgptApiCheckpoint;
+    preserveCheckpointTail?: boolean;
   },
 ): Promise<{ upserted: number; deleted: number }> {
   const requestedMode = options?.mode;
@@ -1417,6 +1421,16 @@ export async function syncConversationMessages(
   const mode = requestedMode || 'snapshot';
   const activityAtProvided = !!options && Object.prototype.hasOwnProperty.call(options, 'activityAt');
   const activityAt = activityAtProvided ? parseRequestedActivityTimestamp(options?.activityAt, false, 'activityAt') : 0;
+  const checkpoint = options?.checkpoint;
+  if (
+    checkpoint &&
+    ((mode !== 'snapshot' && mode !== 'incremental') ||
+      !safeString(checkpoint.lastUserKey) ||
+      !/^[0-9a-f]{64}$/.test(checkpoint.userSignature) ||
+      typeof checkpoint.includeThinking !== 'boolean')
+  ) {
+    throw new Error('chatgpt_api_checkpoint_invalid');
+  }
   const db = await openDb();
   let conversationActivityChanged = false;
 
@@ -1424,23 +1438,55 @@ export async function syncConversationMessages(
     {
       db,
       stores: ['messages', 'conversations'],
-      revisionScopes: activityAtProvided ? ['messages', 'conversations'] : ['messages'],
+      revisionScopes: ['messages', 'conversations'],
     },
     async ({ stores, markChanged }) => {
       let activityConversation: any = await reqToPromise(stores.conversations.get(conversationId as any));
       if (!activityConversation) throw new Error('conversation not found');
+      if (checkpoint && activityConversation.source !== 'chatgpt') throw new Error('chatgpt_api_checkpoint_source');
       let semanticContentChanged = options?.conversationContentChanged === true;
+      let changedMessages = false;
+      let changedPrefix = false;
+      const committedCheckpoint: ChatgptApiCheckpoint | undefined = activityConversation.chatgptApiCheckpoint;
+      const markMessagesChanged = () => {
+        changedMessages = true;
+        markChanged('messages');
+      };
       const commitActivity = async () => {
-        if (!activityAtProvided || !semanticContentChanged) return;
-        const current = normalizeStoredActivityTimestamp(activityConversation.lastActivityAt);
-        if (activityAt <= current) return;
-        activityConversation = { ...activityConversation, lastActivityAt: activityAt };
-        await reqToPromise(stores.conversations.put(activityConversation));
+        const next = { ...activityConversation };
+        if (checkpoint) {
+          const user: any = await reqToPromise(
+            stores.messages.index('by_conversationId_messageKey').get([conversationId, checkpoint.lastUserKey] as any),
+          );
+          if (!user || user.role !== 'user') throw new Error('chatgpt_api_checkpoint_user_missing');
+          next.chatgptApiCheckpoint = checkpoint;
+        } else if (changedMessages && (!options?.preserveCheckpointTail || changedPrefix))
+          delete next.chatgptApiCheckpoint;
+        if (activityAtProvided && semanticContentChanged) {
+          const current = normalizeStoredActivityTimestamp(next.lastActivityAt);
+          if (activityAt > current) {
+            next.lastActivityAt = activityAt;
+            conversationActivityChanged = true;
+          }
+        }
+        if (conversationRecordsEquivalent(activityConversation, next)) return;
+        await reqToPromise(stores.conversations.put(next));
         markChanged('conversations');
-        conversationActivityChanged = true;
+        activityConversation = next;
+      };
+      const idx = stores.messages.index('by_conversationId_messageKey');
+      const anchorRow: any = committedCheckpoint
+        ? await reqToPromise(idx.get([conversationId, committedCheckpoint.lastUserKey] as any))
+        : null;
+      const anchorSequence =
+        anchorRow?.role === 'user' && Number.isFinite(anchorRow.sequence) ? anchorRow.sequence : -Infinity;
+      if (committedCheckpoint && anchorSequence === -Infinity) changedPrefix = true;
+      const affectsPrefix = (existing: any, nextSequence: number) => {
+        if (committedCheckpoint && (Number(existing?.sequence) <= anchorSequence || nextSequence <= anchorSequence)) {
+          changedPrefix = true;
+        }
       };
 
-      const idx = stores.messages.index('by_conversationId_messageKey');
       const diff = options?.diff || null;
       const normalizeKeys = (value: unknown): string[] => {
         if (!Array.isArray(value)) return [];
@@ -1460,7 +1506,10 @@ export async function syncConversationMessages(
         const removedKeys = mode === 'incremental' ? normalizeKeys(diff?.removed) : [];
         const hasEffectiveDiff =
           !!diff && (mode === 'append' ? requestedKeys.length > 0 : requestedKeys.length > 0 || removedKeys.length > 0);
-        if (!hasEffectiveDiff) return { upserted: 0, deleted: 0 };
+        if (!hasEffectiveDiff) {
+          await commitActivity();
+          return { upserted: 0, deleted: 0 };
+        }
         const upsertKeys = Array.from(byKey.keys()).filter((key) => requestedKeySet.has(key));
 
         const hasTailPolicy =
@@ -1500,9 +1549,10 @@ export async function syncConversationMessages(
                 const sequence = sequenceByKey.get(key);
                 if (sequence === undefined || Number(row?.sequence) === sequence) continue;
                 const nextRow = { ...row, sequence };
+                affectsPrefix(row, sequence);
                 await reqToPromise(stores.messages.put(nextRow));
                 existingByKey.set(row?.messageKey, nextRow);
-                markChanged('messages');
+                markMessagesChanged();
               }
               nextTailSequence = reconciled.keys.length;
             }
@@ -1547,13 +1597,15 @@ export async function syncConversationMessages(
           }
           if (existing) {
             if (!messageRecordsEquivalent(existing, record)) {
+              affectsPrefix(existing, sequence);
               await reqToPromise(stores.messages.put(record));
-              markChanged('messages');
+              markMessagesChanged();
             }
           } else {
+            affectsPrefix(null, sequence);
             const id = await reqToPromise(stores.messages.add(record));
             record.id = id as any;
-            markChanged('messages');
+            markMessagesChanged();
           }
           existingByKey?.set(key, record);
           upserted += 1;
@@ -1563,8 +1615,9 @@ export async function syncConversationMessages(
           const existing: any = await reqToPromise(idx.get([conversationId, key]) as any);
           const id = Number(existing && existing.id);
           if (!Number.isFinite(id) || id <= 0) continue;
+          affectsPrefix(existing, Number(existing.sequence));
           await reqToPromise(stores.messages.delete(id));
-          markChanged('messages');
+          markMessagesChanged();
           deleted += 1;
           semanticContentChanged = true;
         }
@@ -1611,12 +1664,12 @@ export async function syncConversationMessages(
         if (existing) {
           if (!messageRecordsEquivalent(existing, record)) {
             await reqToPromise(stores.messages.put(record));
-            markChanged('messages');
+            markMessagesChanged();
           }
         } else {
           const id = await reqToPromise(stores.messages.add(record));
           record.id = id as any;
-          markChanged('messages');
+          markMessagesChanged();
         }
         existingByKey.set(m.messageKey, record);
         upserted += 1;
@@ -1628,7 +1681,7 @@ export async function syncConversationMessages(
         const id = Number(row.id);
         if (!Number.isFinite(id) || id <= 0) continue;
         await reqToPromise(stores.messages.delete(id));
-        markChanged('messages');
+        markMessagesChanged();
         deleted += 1;
         if (!structuralAliasKeys.has(String(row.messageKey))) semanticContentChanged = true;
       }

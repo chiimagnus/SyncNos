@@ -115,6 +115,10 @@ function createHarness(input: {
 }
 
 beforeEach(() => {
+  vi.stubGlobal('chrome', {
+    runtime: { lastError: null },
+    storage: { local: { get: (_keys: string[], callback: (values: object) => void) => callback({}) } },
+  });
   chatgptApiMocks.readEnabled.mockReset();
   chatgptApiMocks.capture.mockReset();
   chatgptApiMocks.readEnabled.mockResolvedValue(false);
@@ -367,6 +371,50 @@ describe('current page capture integrity routing', () => {
     await expect(harness.service.captureCurrentPage()).resolves.toMatchObject({ kind: 'chat' });
     expect(chatgptApiMocks.capture).toHaveBeenCalledTimes(1);
     expect(harness.capture).not.toHaveBeenCalled();
+  });
+
+  it('persists a trusted Advanced checkpoint only after final HEAD verification', async () => {
+    const checkpoint = { lastUserKey: 'm1', userSignature: 'e'.repeat(64), includeThinking: true };
+    const snapshot = chatSnapshot();
+    const verifyCurrent = vi.fn(async () => {});
+    chatgptApiMocks.readEnabled.mockResolvedValue(true);
+    chatgptApiMocks.capture.mockResolvedValue({ snapshot, checkpoint, verifyCurrent });
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      snapshot,
+      url: 'https://chatgpt.com/c/conversation-1',
+    });
+    await harness.service.captureCurrentPage();
+    expect(verifyCurrent).toHaveBeenCalledTimes(1);
+    expect(chatgptApiMocks.capture).toHaveBeenCalledWith(expect.objectContaining({ includeThinking: true }));
+    const persisted = harness.calls.find((call) => call.type === 'syncConversationMessages');
+    expect(persisted?.payload).toMatchObject({ mode: 'snapshot', chatgptApiCheckpoint: checkpoint });
+  });
+
+  it('rejects an Advanced full save if the Thinking setting changes during capture', async () => {
+    let includeThinking = true;
+    vi.stubGlobal('chrome', {
+      runtime: { lastError: null },
+      storage: {
+        local: {
+          get: (_keys: string[], callback: (values: object) => void) =>
+            callback({ [AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]: includeThinking }),
+        },
+      },
+    });
+    const snapshot = chatSnapshot();
+    chatgptApiMocks.readEnabled.mockResolvedValue(true);
+    chatgptApiMocks.capture.mockImplementation(async () => {
+      includeThinking = false;
+      return verifiedApiResult(snapshot);
+    });
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      snapshot,
+      url: 'https://chatgpt.com/c/conversation-1',
+    });
+    await expect(harness.service.captureCurrentPage()).rejects.toMatchObject({ code: 'chatgpt_api_settings_changed' });
+    expect(harness.calls).toEqual([]);
   });
 
   it.each([true, false])('applies the thinking preference to manual ChatGPT saves (enabled=%s)', async (enabled) => {

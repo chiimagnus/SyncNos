@@ -1,12 +1,19 @@
 import type { VideoChapter, VideoPlatform } from '@services/shared/video-capture';
 import type { VideoTranscriptCue } from '@services/conversations/domain/video-content';
 
+export type ChatgptApiCheckpoint = {
+  lastUserKey: string;
+  userSignature: string;
+  includeThinking: boolean;
+};
+
 export type Conversation = {
   id: number;
   sourceType?: string;
   source: string;
   conversationKey: string;
   canonicalChatIdentity?: string;
+  chatgptApiCheckpoint?: ChatgptApiCheckpoint;
   listSourceKey?: string;
   listSiteKey?: string;
   title?: string;

@@ -220,9 +220,18 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
 
     const result = await getConversationTailWindowBySourceAndKey(source, conversationKey, limit);
     const conversationId = Number(result.conversation?.id);
+    const compact = source === 'chatgpt' && msg?.compact === true;
     return router.ok({
       conversationId: Number.isFinite(conversationId) && conversationId > 0 ? conversationId : null,
-      messages: Array.isArray(result.messages) ? result.messages : [],
+      messages: compact
+        ? result.messages.map((message) => ({
+            messageKey: message.messageKey,
+            role: message.role,
+            sequence: message.sequence,
+            updatedAt: message.updatedAt,
+          }))
+        : result.messages,
+      ...(compact ? { checkpoint: result.conversation?.chatgptApiCheckpoint ?? null } : null),
     });
   });
 
@@ -437,6 +446,8 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
       diff,
       ...(hasActivityAt ? { activityAt: Number(activityAt) } : null),
       ...(conversationContentChanged ? { conversationContentChanged: true } : null),
+      ...(msg?.chatgptApiCheckpoint ? { checkpoint: msg.chatgptApiCheckpoint } : null),
+      ...(msg?.trustedChatgptApiPartial === true ? { preserveCheckpointTail: true } : null),
     });
     if (msg.deferRemoteSync !== true) {
       fireAndForget(

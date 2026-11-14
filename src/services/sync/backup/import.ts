@@ -490,6 +490,7 @@ export async function importBackupZipMerge(
 
           const existing: AnyRecord = await reqToPromise(idx.get([source, conversationKey]) as any);
           const normalizedMerged = normalizeConversationListRecord(mergeConversationRecord(existing, incoming));
+          delete normalizedMerged.chatgptApiCheckpoint;
           normalizedMerged.source = source;
           normalizedMerged.conversationKey = conversationKey;
           const rememberLocalId = (localId: number) => {

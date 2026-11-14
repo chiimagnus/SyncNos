@@ -1,6 +1,8 @@
 import { t } from '@i18n';
 import { hydrateChatgptDeepResearchSnapshot } from '@collectors/chatgpt/chatgpt-deep-research-hydrator';
-import { applyThinkingCapturePreference } from '@services/shared/thinking-block';
+import { AI_CHAT_INCLUDE_THINKING_STORAGE_KEY, applyThinkingCapturePreference } from '@services/shared/thinking-block';
+import { storageGet } from '@services/shared/storage';
+import type { ChatgptApiCheckpoint } from '@services/conversations/domain/models';
 import { resolveActiveOrInpageCollector, type CollectorRegistryLike } from '@collectors/registry';
 import { DISCOURSE_OP_NOT_FOUND_ERROR, isDiscourseOpNotFoundErrorMessage } from '@collectors/web/article-fetch-errors';
 import { ARTICLE_MESSAGE_TYPES, CORE_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
@@ -248,7 +250,13 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
   async function saveSnapshot(
     snapshot: any,
     collectorId: string | null,
-    options?: { expectedChatgptConversationId?: string; deferRemoteSync?: boolean },
+    options?: {
+      expectedChatgptConversationId?: string;
+      deferRemoteSync?: boolean;
+      includeThinking?: boolean;
+      checkpoint?: ChatgptApiCheckpoint | null;
+      trustedChatgptApiPartial?: boolean;
+    },
   ) {
     if (!snapshot || !snapshot.conversation) return null;
     const safeSnapshot =
@@ -262,7 +270,10 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
           }
         : snapshot;
 
-    const integrity = resolveCaptureIntegrity(collectorId, await applyThinkingCapturePreference(safeSnapshot));
+    const integrity = resolveCaptureIntegrity(
+      collectorId,
+      await applyThinkingCapturePreference(safeSnapshot, options?.includeThinking),
+    );
     if (!integrity.ok) return null;
     const normalizedSnapshot = integrity.snapshot;
     const activityAt = Date.now();
@@ -295,6 +306,10 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       conversationContentChanged: (conversation as any)?.__semanticContentChanged === true,
       activityAt,
       ...(options?.deferRemoteSync ? { deferRemoteSync: true } : null),
+      ...(integrity.meta?.completeness === 'complete' && options?.checkpoint
+        ? { chatgptApiCheckpoint: options.checkpoint }
+        : null),
+      ...(options?.trustedChatgptApiPartial ? { trustedChatgptApiPartial: true } : null),
     });
     if (!messagesRes?.ok) {
       throw new Error(messagesRes?.error?.message || 'syncConversationMessages failed');
@@ -364,8 +379,13 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       let snapshot: any;
       let expectedChatgptConversationId = '';
       let firstPageIsNew: boolean | null = null;
+      let includeThinking: boolean | undefined;
+      let checkpoint: ChatgptApiCheckpoint | null = null;
       if (target.kind === 'chat' && target.useChatgptApi) {
+        includeThinking =
+          (await storageGet([AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]))?.[AI_CHAT_INCLUDE_THINKING_STORAGE_KEY] !== false;
         const apiCapture = await captureCurrentChatgptConversationViaApi({
+          includeThinking,
           onPage: async (page) => {
             const staged = {
               ...page.snapshot,
@@ -374,6 +394,8 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
             const savedPage = await saveSnapshot(staged, 'chatgpt', {
               expectedChatgptConversationId: String(page.snapshot?.conversation?.conversationKey || ''),
               deferRemoteSync: true,
+              includeThinking,
+              trustedChatgptApiPartial: true,
             });
             if (!savedPage) throw new Error('chatgpt_api_no_safe_messages');
             savedPagedConversationId = savedPage.conversationId;
@@ -385,7 +407,14 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         if (typeof target.collector.enrichApiSnapshotWithRenderedGraphics === 'function') {
           snapshot = await target.collector.enrichApiSnapshotWithRenderedGraphics(snapshot);
         }
-        if (snapshot?.captureMeta?.completeness === 'complete') await apiCapture.verifyCurrent();
+        if (snapshot?.captureMeta?.completeness === 'complete') {
+          await apiCapture.verifyCurrent();
+          const currentThinking =
+            (await storageGet([AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]))?.[AI_CHAT_INCLUDE_THINKING_STORAGE_KEY] !==
+            false;
+          if (currentThinking !== includeThinking) throw new Error('chatgpt_api_settings_changed');
+          checkpoint = apiCapture.checkpoint;
+        }
       } else {
         let preparedCapture: unknown;
         if (typeof target.collector.prepareManualCapture === 'function') {
@@ -414,6 +443,9 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
 
       const saved = await saveSnapshot(snapshot, target.collectorId, {
         ...(expectedChatgptConversationId ? { expectedChatgptConversationId } : null),
+        ...(includeThinking !== undefined ? { includeThinking } : null),
+        ...(checkpoint ? { checkpoint } : null),
+        ...(expectedChatgptConversationId ? { trustedChatgptApiPartial: true } : null),
       });
       if (!saved) {
         throw new Error(t('noVisibleConversationFound'));
