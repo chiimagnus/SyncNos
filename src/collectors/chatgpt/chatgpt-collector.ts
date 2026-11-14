@@ -245,7 +245,15 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
   }
 
   function getConversationRoot(): any {
-    return env.document.querySelector('main');
+    const roots = Array.from(env.document.querySelectorAll('main')) as HTMLElement[];
+    if (roots.length <= 1) return roots[0] || null;
+    const rendered = (root: HTMLElement) => {
+      const rect = root.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0 && env.window.getComputedStyle(root).visibility !== 'hidden';
+    };
+    const transcripts = roots.filter((root) => root.querySelector('[data-rail-chat-transcript]'));
+    const conversations = roots.filter((root) => root.querySelector(CHATGPT_TURN_SELECTOR));
+    return transcripts.find(rendered) || conversations.find(rendered) || transcripts[0] || conversations[0] || roots[0];
   }
 
   function getConversationScrollSeed(): any {
@@ -832,6 +840,13 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     const expectedIdentity = sampleIdentity();
     if (!expectedIdentity) return 'skipped';
     let attempted = false;
+    let inFlight = false;
+    const visibleOrdinals = () =>
+      new Map<string, number>(
+        readTurnShells(getConversationRoot())
+          .map((turn) => [turnKeyOf(turn), structuralTurnOrdinal(turn)] as const)
+          .filter((entry): entry is readonly [string, number] => !!entry[0] && entry[1] !== null),
+      );
 
     while (now() < deadline && isVisible() && sampleIdentity() === expectedIdentity) {
       const transcript = (
@@ -841,14 +856,17 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       ).find((node) => node.getAttribute('data-chatgpt-conversation-selection-target') === conversationId);
       const indicator = transcript?.querySelector('[role="status"] [data-loading-indicator]');
       const sentinel = indicator?.closest('[role="status"]')?.parentElement as HTMLElement | undefined;
-      if (!sentinel || sentinel.parentElement !== transcript || !scrollRoot.contains(sentinel)) break;
+      if (!root.isConnected || !scrollRoot.isConnected) return 'pending';
+      if (!sentinel || sentinel.parentElement !== transcript || !scrollRoot.contains(sentinel))
+        return inFlight ? 'pending' : attempted ? 'ready' : 'skipped';
 
       const viewport = scrollRoot.getBoundingClientRect();
       const position = sentinel.getBoundingClientRect();
       if (!viewport.height || !position.height || !Number.isFinite(position.top)) break;
-      if (position.bottom >= viewport.top && position.top <= viewport.bottom) break;
+      if (position.bottom >= viewport.top && position.top <= viewport.bottom) return attempted ? 'pending' : 'skipped';
 
-      const beforeHeight = scrollRoot.scrollHeight;
+      const beforeOrdinals = visibleOrdinals();
+      if (!beforeOrdinals.size) return attempted ? 'pending' : 'skipped';
       const previous = {
         transform: sentinel.style.transform,
         opacity: sentinel.style.opacity,
@@ -856,6 +874,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       };
       const transform = `translateY(${Math.round(viewport.top + viewport.height / 2 - position.top)}px)`;
       attempted = true;
+      inFlight = true;
       try {
         sentinel.style.transform = transform;
         sentinel.style.opacity = '0';
@@ -870,20 +889,27 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       const pageDeadline = Math.min(deadline, now() + pageTimeout);
       let changed = false;
       while (now() < pageDeadline && isVisible() && sampleIdentity() === expectedIdentity) {
-        if (!sentinel.isConnected || !transcript.contains(sentinel)) {
-          changed = true;
-          break;
-        }
-        if (Math.abs(scrollRoot.scrollHeight - beforeHeight) > 1) {
+        const currentOrdinals = visibleOrdinals();
+        if (
+          Array.from(currentOrdinals).some(([key, ordinal]) => {
+            const before = beforeOrdinals.get(key);
+            return before !== undefined && ordinal > before;
+          })
+        ) {
           changed = true;
           break;
         }
         await sleep(Math.min(100, Math.max(1, pageDeadline - now())));
       }
-      // A request can still be in flight. Never scroll if the observed page did not settle.
+      // Height changes and transient React remounts do not prove that older turns were loaded.
       if (!changed) return 'pending';
+      inFlight = false;
     }
-    return !attempted ? 'skipped' : isVisible() && sampleIdentity() === expectedIdentity ? 'ready' : 'pending';
+    return inFlight
+      ? 'pending'
+      : attempted && isVisible() && sampleIdentity() === expectedIdentity
+        ? 'ready'
+        : 'skipped';
   }
 
   // Manual-only dynamic sweep. The provider re-queries after every wait; no turn/message node
@@ -896,11 +922,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     const scrollRuntime = { document: env.document, window: env.window };
     const initialIdentityGuard = manualAdapter.readIdentity();
     const sampleIdentity = createIdentitySampler(initialIdentityGuard);
-    const scrollRestorer = createScrollRootRestorer({
-      ...scrollRuntime,
-      getSeed: manualAdapter.readScrollSeed,
-      sampleIdentity,
-    });
+    let scrollRestorer: ReturnType<typeof createScrollRootRestorer> | null = null;
     const durableConversationKey = initialIdentityGuard.durableId ? identityConversationKey(initialIdentityGuard) : '';
     const accumulator = createPreparedAccumulator<any>({
       source: 'chatgpt',
@@ -930,13 +952,11 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       },
       harvest: (target: PreparedAccumulator<any>) => harvestRenderedInto(target, null, { newestFirst: true }),
     };
-    let nativeLoadPending = false;
     try {
       const now = options.now || Date.now;
       const startedAt = now();
       const preload = savedTailMessageKey ? 'skipped' : await preloadNativeHistory(sampleIdentity, options);
       if (preload === 'pending') {
-        nativeLoadPending = true;
         // The native request may still be in flight. Save the visible window without moving it.
         addPreparedReason(accumulator, 'boundary_stalled');
         addPreparedReason(accumulator, 'top_not_reached');
@@ -945,6 +965,13 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         }
         accumulator.sweepMetrics = { steps: 0, reachedTop: false, reachedBottom: false, stoppedAtKey: false };
       } else {
+        // Let the native virtualizer rebase the user's viewport before we snapshot it.
+        // Prepending older turns can change scrollTop without changing the visible message.
+        scrollRestorer = createScrollRootRestorer({
+          ...scrollRuntime,
+          getSeed: manualAdapter.readScrollSeed,
+          sampleIdentity,
+        });
         const totalDeadlineMs =
           preload === 'ready'
             ? Math.max(1, Math.min(300_000, Number(options.totalDeadlineMs) || 300_000) - (now() - startedAt))
@@ -971,8 +998,8 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         accumulator.completeness = sweep.completeness;
       }
     } finally {
-      // No scroll was initiated during a pending native load; do not move its live viewport.
-      if (!nativeLoadPending) {
+      // A pending native request never starts a sweep, so it needs no scroll restoration.
+      if (scrollRestorer) {
         const restoreResult = scrollRestorer.restore();
         if (!restoreResult.restored) {
           accumulator.completeness = 'partial';
@@ -1035,6 +1062,9 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         warningFlags: [],
       },
       messages,
+      ...(finalPrepared.completeness === 'complete' && !finalPrepared.reasons.length
+        ? { domHistoryVerified: true }
+        : null),
       captureMeta: {
         completeness: 'partial',
         identityVerified: true,

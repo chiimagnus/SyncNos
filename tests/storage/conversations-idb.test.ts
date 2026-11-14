@@ -4676,6 +4676,72 @@ describe('canonical video storage', () => {
   });
 });
 
+describe('ChatGPT DOM history completeness in IndexedDB', () => {
+  const first = { messageKey: 'user-0', role: 'user', contentMarkdown: 'first', sequence: 0, updatedAt: 1 };
+  const last = { messageKey: 'assistant-1', role: 'assistant', contentMarkdown: 'last', sequence: 1, updatedAt: 2 };
+
+  it('stores verified full-history status atomically, preserves it through append, and clears it on replacement', async () => {
+    const conversation = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'dom-verified-status',
+    });
+    const id = conversation.id;
+    await syncConversationMessages(id, [last], {
+      mode: 'append',
+      diff: { added: [last.messageKey], updated: [], removed: [] },
+    });
+    expect((await getConversationById(id))?.chatgptDomHistoryVerified).toBeUndefined();
+
+    await syncConversationMessages(id, [first, last], {
+      mode: 'append',
+      diff: { added: [first.messageKey, last.messageKey], updated: [], removed: [] },
+      domHistoryVerified: true,
+    });
+    const persisted = await getConversationTailWindowBySourceAndKey('chatgpt', 'dom-verified-status', 16);
+    expect(persisted.conversation?.chatgptDomHistoryVerified).toBe(true);
+    expect(persisted.messages).toHaveLength(2);
+    const revision = await readDataRevision('conversations');
+    await syncConversationMessages(id, [first, last], {
+      mode: 'append',
+      diff: { added: [first.messageKey, last.messageKey], updated: [], removed: [] },
+      domHistoryVerified: true,
+    });
+    expect(await readDataRevision('conversations')).toBe(revision);
+
+    await syncConversationMessages(
+      id,
+      [{ messageKey: 'user-2', role: 'user', contentMarkdown: 'new', sequence: 2, updatedAt: 3 }],
+      { mode: 'append', diff: { added: ['user-2'], updated: [], removed: [] } },
+    );
+    expect((await getConversationById(id))?.chatgptDomHistoryVerified).toBe(true);
+
+    await syncConversationMessages(id, [last], { mode: 'snapshot' });
+    expect((await getConversationById(id))?.chatgptDomHistoryVerified).toBeUndefined();
+    expect((await getMessagesByConversationId(id)).map((m) => m.messageKey)).toEqual([last.messageKey]);
+  });
+
+  it('rejects a non-ChatGPT history marker without mutating conversation or messages', async () => {
+    const conversation = await upsertConversation({
+      sourceType: 'chat',
+      source: 'claude',
+      conversationKey: 'dom-marker-foreign',
+    });
+    const id = conversation.id;
+    const before = await readDataRevision('messages');
+    await expect(
+      syncConversationMessages(id, [first], {
+        mode: 'append',
+        diff: { added: [first.messageKey], updated: [], removed: [] },
+        domHistoryVerified: true,
+      }),
+    ).rejects.toThrow('chatgpt_dom_history_source');
+    expect(await getMessagesByConversationId(id)).toEqual([]);
+    expect((await getConversationById(id))?.chatgptDomHistoryVerified).toBeUndefined();
+    expect(await readDataRevision('messages')).toBe(before);
+  });
+});
+
 describe('ChatGPT Advanced checkpoint integrity', () => {
   const checkpoint = { lastUserKey: 'u1', userSignature: 'a'.repeat(64), includeThinking: true };
   const initial = [

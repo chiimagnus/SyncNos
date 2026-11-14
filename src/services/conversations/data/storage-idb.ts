@@ -1412,6 +1412,7 @@ export async function syncConversationMessages(
     activityAt?: number;
     conversationContentChanged?: boolean;
     checkpoint?: ChatgptApiCheckpoint;
+    domHistoryVerified?: true;
     preserveCheckpointTail?: boolean;
     expectedCheckpoint?: ChatgptApiCheckpoint | null;
     expectedMessagesRevision?: number;
@@ -1462,6 +1463,8 @@ export async function syncConversationMessages(
       let activityConversation: any = await reqToPromise(stores.conversations.get(conversationId as any));
       if (!activityConversation) throw new Error('conversation not found');
       if (checkpoint && activityConversation.source !== 'chatgpt') throw new Error('chatgpt_api_checkpoint_source');
+      if (options?.domHistoryVerified && activityConversation.source !== 'chatgpt')
+        throw new Error('chatgpt_dom_history_source');
       if (options?.expectedMessagesRevision !== undefined && activityConversation.source !== 'chatgpt')
         throw new Error('chatgpt_api_storage_conflict');
       if (options?.expectedMessagesRevision !== undefined) {
@@ -1483,6 +1486,8 @@ export async function syncConversationMessages(
       };
       const commitActivity = async () => {
         const next = { ...activityConversation };
+        if (options?.domHistoryVerified) next.chatgptDomHistoryVerified = true;
+        else if (mode !== 'append' && messagesChanged) delete next.chatgptDomHistoryVerified;
         if (checkpoint) {
           const user: any = await reqToPromise(
             stores.messages.index('by_conversationId_messageKey').get([conversationId, checkpoint.lastUserKey] as any),
