@@ -448,6 +448,20 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       let trustedTail: ChatgptTrustedTailWindow | null = null;
       let capturedVerifiedTail = false;
       let stageChatgptPage: ((page: { snapshot: any }) => Promise<void>) | undefined;
+      const applyApiCapture = async (capture: Awaited<ReturnType<typeof captureCurrentChatgptConversationViaApi>>) => {
+        snapshot = capture.snapshot;
+        expectedChatgptConversationId = String(snapshot?.conversation?.conversationKey || '').trim();
+        if (typeof target.collector.enrichApiSnapshotWithRenderedGraphics === 'function') {
+          snapshot = await target.collector.enrichApiSnapshotWithRenderedGraphics(snapshot);
+        }
+        checkpoint = null;
+        if (snapshot?.captureMeta?.completeness !== 'complete') return;
+        await capture.verifyCurrent();
+        const currentThinking =
+          (await storageGet([AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]))?.[AI_CHAT_INCLUDE_THINKING_STORAGE_KEY] !== false;
+        if (currentThinking !== includeThinking) throw new Error('chatgpt_api_settings_changed');
+        checkpoint = capture.checkpoint;
+      };
       if (target.kind === 'chat' && target.useChatgptApi) {
         includeThinking =
           (await storageGet([AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]))?.[AI_CHAT_INCLUDE_THINKING_STORAGE_KEY] !== false;
@@ -527,20 +541,8 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
             : null),
           onPage: stageChatgptPage,
         });
-        snapshot = apiCapture.snapshot;
         capturedVerifiedTail = apiCapture.verifiedTail === true;
-        expectedChatgptConversationId = String(snapshot?.conversation?.conversationKey || '').trim();
-        if (typeof target.collector.enrichApiSnapshotWithRenderedGraphics === 'function') {
-          snapshot = await target.collector.enrichApiSnapshotWithRenderedGraphics(snapshot);
-        }
-        if (snapshot?.captureMeta?.completeness === 'complete') {
-          await apiCapture.verifyCurrent();
-          const currentThinking =
-            (await storageGet([AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]))?.[AI_CHAT_INCLUDE_THINKING_STORAGE_KEY] !==
-            false;
-          if (currentThinking !== includeThinking) throw new Error('chatgpt_api_settings_changed');
-          checkpoint = apiCapture.checkpoint;
-        }
+        await applyApiCapture(apiCapture);
       } else {
         let preparedCapture: unknown;
         if (typeof target.collector.prepareManualCapture === 'function') {
@@ -591,21 +593,8 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
           includeThinking,
           onPage: stageChatgptPage,
         });
-        snapshot = fullCapture.snapshot;
         capturedVerifiedTail = false;
-        checkpoint = null;
-        expectedChatgptConversationId = String(snapshot?.conversation?.conversationKey || '').trim();
-        if (typeof target.collector.enrichApiSnapshotWithRenderedGraphics === 'function') {
-          snapshot = await target.collector.enrichApiSnapshotWithRenderedGraphics(snapshot);
-        }
-        if (snapshot?.captureMeta?.completeness === 'complete') {
-          await fullCapture.verifyCurrent();
-          const currentThinking =
-            (await storageGet([AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]))?.[AI_CHAT_INCLUDE_THINKING_STORAGE_KEY] !==
-            false;
-          if (currentThinking !== includeThinking) throw new Error('chatgpt_api_settings_changed');
-          checkpoint = fullCapture.checkpoint;
-        }
+        await applyApiCapture(fullCapture);
         saved = await persist();
       }
       if (!saved) throw new Error(t('noVisibleConversationFound'));

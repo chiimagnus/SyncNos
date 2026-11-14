@@ -1473,11 +1473,9 @@ export async function syncConversationMessages(
           throw new Error('chatgpt_api_storage_conflict');
       }
       let semanticContentChanged = options?.conversationContentChanged === true;
-      let changedMessages = false;
       let changedPrefix = false;
       const committedCheckpoint: ChatgptApiCheckpoint | undefined = activityConversation.chatgptApiCheckpoint;
       const markMessagesChanged = () => {
-        changedMessages = true;
         messagesChanged = true;
         markChanged('messages');
       };
@@ -1489,7 +1487,7 @@ export async function syncConversationMessages(
           );
           if (!user || user.role !== 'user') throw new Error('chatgpt_api_checkpoint_user_missing');
           next.chatgptApiCheckpoint = checkpoint;
-        } else if (changedMessages && (!options?.preserveCheckpointTail || changedPrefix))
+        } else if (messagesChanged && (!options?.preserveCheckpointTail || changedPrefix))
           delete next.chatgptApiCheckpoint;
         if (activityAtProvided && semanticContentChanged) {
           const current = normalizeStoredActivityTimestamp(next.lastActivityAt);
