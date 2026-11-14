@@ -202,6 +202,7 @@ describe('current-page-capture chatgpt deep research hydration', () => {
     const result = await service.captureCurrentPage();
     expect(result.kind).toBe('chat');
     expect(seen.map((entry) => entry.type)).toEqual([
+      'getConversationTailWindowBySourceAndKey',
       'chatgptExtractDeepResearch',
       'upsertConversation',
       'syncConversationMessages',
@@ -266,6 +267,7 @@ describe('current-page-capture chatgpt deep research hydration', () => {
     await service.captureCurrentPage();
 
     expect(seen.map((entry) => entry.type)).toEqual([
+      'getConversationTailWindowBySourceAndKey',
       'chatgptExtractDeepResearch',
       'upsertConversation',
       'syncConversationMessages',

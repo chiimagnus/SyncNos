@@ -1012,6 +1012,67 @@ describe('conversations storage-idb', () => {
     expect(finalMessages[1]?.contentMarkdown).toBe('streaming complete');
   });
 
+  it('merges earlier DOM messages without overwriting stored content', async () => {
+    const conversation = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'dom-history-backfill',
+      title: 'DOM history backfill',
+      lastActivityAt: 5,
+    });
+    const id = Number(conversation.id);
+    const initial = [
+      { messageKey: 'u2', role: 'user', contentMarkdown: 'newest question', sequence: 0, updatedAt: 10 },
+      { messageKey: 'a2', role: 'assistant', contentMarkdown: 'edited saved answer', sequence: 1, updatedAt: 11 },
+    ];
+    await syncConversationMessages(id, initial, {
+      mode: 'append',
+      diff: { added: ['u2', 'a2'] },
+    });
+    const incoming = [
+      { messageKey: 'u0', role: 'user', contentMarkdown: 'oldest question', sequence: 0 },
+      { messageKey: 'a0', role: 'assistant', contentMarkdown: 'oldest answer', sequence: 1 },
+      { messageKey: 'u1', role: 'user', contentMarkdown: 'older question', sequence: 2 },
+      { messageKey: 'a1', role: 'assistant', contentMarkdown: 'older answer', sequence: 3 },
+      { messageKey: 'u2', role: 'user', contentMarkdown: 'newest question', sequence: 4 },
+      { messageKey: 'a2', role: 'assistant', contentMarkdown: 'outdated scraped answer', sequence: 5 },
+    ].map((row) => ({
+      ...row,
+      captureSequencePolicy: 'reconcile-existing-order',
+      captureMergePolicy: 'preserve-existing-content',
+    }));
+    await syncConversationMessages(id, incoming, {
+      mode: 'append',
+      diff: { added: incoming.map((row) => row.messageKey) },
+    });
+    const saved = await getMessagesByConversationId(id);
+    expect(saved.map((row) => [row.messageKey, row.sequence])).toEqual(
+      incoming.map((row, index) => [row.messageKey, index]),
+    );
+    expect(saved.find((row) => row.messageKey === 'a2')?.contentMarkdown).toBe('edited saved answer');
+    expect(saved.find((row) => row.messageKey === 'a2')?.updatedAt).toBe(11);
+
+    const revisionsBefore = {
+      messages: await readDataRevision('messages'),
+      conversations: await readDataRevision('conversations'),
+    };
+    await syncConversationMessages(id, incoming, {
+      mode: 'append',
+      diff: { added: incoming.map((row) => row.messageKey) },
+    });
+    expect(await readDataRevision('messages')).toBe(revisionsBefore.messages);
+    expect(await readDataRevision('conversations')).toBe(revisionsBefore.conversations);
+
+    await syncConversationMessages(
+      id,
+      [{ messageKey: 'u3', role: 'user', contentMarkdown: 'changed by another capture', sequence: 6 }],
+      {
+        mode: 'append',
+        diff: { added: ['u3'] },
+      },
+    );
+  });
+
   it('advances capture activity only when message semantics actually change', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',
@@ -2070,6 +2131,60 @@ describe('conversations storage-idb', () => {
     );
 
     expect((await getMessagesByConversationId(id)).map((message) => message.sequence)).toEqual([0, 1]);
+  });
+
+  it('appends a verified DOM tail without reading or rewriting thousands of stored messages', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'dom-verified-tail',
+      title: 'Tail-only DOM',
+    });
+    const id = Number(convo.id);
+    const existing = Array.from({ length: 2000 }, (_, index) => ({
+      messageKey: `old-${index}`,
+      role: index % 2 === 0 ? 'user' : 'assistant',
+      contentMarkdown: `historic-${index}`,
+      sequence: index,
+      updatedAt: 1,
+    }));
+    await syncConversationMessages(id, existing);
+    const integrity = resolveCaptureIntegrity('chatgpt', {
+      conversation: { sourceType: 'chat', source: 'chatgpt', conversationKey: 'dom-verified-tail' },
+      messages: [
+        { messageKey: 'old-1999', role: 'assistant', contentMarkdown: 'partial-looking regression', sequence: 0 },
+        { messageKey: 'new-2000', role: 'user', contentMarkdown: 'new question', sequence: 1 },
+        { messageKey: 'new-2001', role: 'assistant', contentMarkdown: 'new answer', sequence: 2 },
+      ],
+      captureMeta: { completeness: 'partial', identityVerified: true, metrics: { stoppedAtKey: true } },
+    });
+    expect(integrity.ok).toBe(true);
+    if (!integrity.ok) return;
+    expect(
+      integrity.snapshot.messages.every((row: any) => row.captureSequencePolicy === 'preserve-existing-tail'),
+    ).toBe(true);
+    const getAll = vi.spyOn(IDBIndex.prototype, 'getAll');
+    try {
+      await syncConversationMessages(id, integrity.snapshot.messages, integrity.persistence);
+      expect(getAll).not.toHaveBeenCalled();
+    } finally {
+      getAll.mockRestore();
+    }
+
+    const stored = await getMessagesByConversationId(id);
+    expect(stored).toHaveLength(2002);
+    expect(stored[1999]).toMatchObject({
+      messageKey: 'old-1999',
+      contentMarkdown: 'historic-1999',
+      sequence: 1999,
+      updatedAt: 1,
+    });
+    expect(stored.at(-2)).toMatchObject({ messageKey: 'new-2000', sequence: 2000 });
+    expect(stored.at(-1)).toMatchObject({ messageKey: 'new-2001', sequence: 2001 });
+
+    const revisionAfterFirstCapture = await readDataRevision('messages');
+    await syncConversationMessages(id, integrity.snapshot.messages, integrity.persistence);
+    expect(await readDataRevision('messages')).toBe(revisionAfterFirstCapture);
   });
 
   it('reconciles newly discovered virtual partial prefixes before existing anchored rows', async () => {

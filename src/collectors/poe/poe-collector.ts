@@ -324,7 +324,7 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
     accumulator: PreparedAccumulator<any>,
   ): Promise<{ added: number; updated: number }> {
     const messages = collectMessages();
-    const records: Array<Omit<PreparedMessageRecord<any>, 'firstSeenIndex'>> = messages.map((message) => ({
+    const records: PreparedMessageRecord<any>[] = messages.map((message) => ({
       key: message.messageKey,
       turnKey: message.messageKey,
       withinTurn: 0,
@@ -477,10 +477,7 @@ export function createPoeCollectorDef(env: CollectorEnv): CollectorDefinition {
     accumulator.completeness = 'partial';
     accumulator.reasons.push(...prepared.reasons.filter((reason: string) => !accumulator.reasons.includes(reason)));
     accumulator.sweepMetrics = { ...prepared.metrics };
-    mergePreparedRecords(
-      accumulator,
-      prepared.records.map(({ firstSeenIndex: _firstSeenIndex, ...record }: any) => record),
-    );
+    mergePreparedRecords(accumulator, prepared.records);
     await harvestCurrentInto(accumulator);
 
     if (!identityGuardsMatch(accumulator.identityGuard, sampleIdentityGuard())) return null;

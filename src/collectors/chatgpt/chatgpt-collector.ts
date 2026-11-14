@@ -668,7 +668,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     return null;
   }
 
-  const BOUNDARY_LOADING_SELECTOR = "[data-chatgpt-conversation-selection-target='true'] [role='status']";
+  const BOUNDARY_LOADING_SELECTOR = '[data-chatgpt-conversation-selection-target] [role="status"]';
 
   function hasBoundaryLoadingSignal(boundary: VirtualizedBoundary, root = getConversationRoot()): boolean {
     if (!root?.querySelectorAll) return false;
@@ -690,22 +690,20 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   function readManualBoundaryState(boundary: VirtualizedBoundary): VirtualizedBoundaryState {
     const root = getConversationRoot();
-    if (!root) return 'pending';
+    if (!root || env.document.visibilityState === 'hidden') return 'unverified';
     if (hasBoundaryLoadingSignal(boundary, root)) return 'pending';
     if (boundary === 'top') {
-      const turns = readTurnShells(root);
-      const ordinals = turns.map(structuralTurnOrdinal).filter((value): value is number => value !== null);
-      const firstTurn = turns[0] || null;
+      const firstTurn = readTurnShells(root)[0];
+      if (!firstTurn) return 'unverified';
       const firstTurnUnits = firstTurn
         ? (Array.from(firstTurn.querySelectorAll?.(CHATGPT_MESSAGE_UNIT_SELECTOR) || []) as any[])
         : [];
-      if (firstTurn?.hasAttribute?.('data-turn-id') && !ordinals.length) return 'pending';
       const currentOneBasedLayout =
         !!firstTurn?.hasAttribute?.('data-turn-key') &&
         !firstTurnUnits.some((unit) => roleFromWrapper(unit) === 'assistant') &&
         hasFallbackAssistantActivity(firstTurn);
       const expectedTopOrdinal = currentOneBasedLayout ? 1 : 0;
-      if (ordinals.length && Math.min(...ordinals) > expectedTopOrdinal) return 'pending';
+      if (structuralTurnOrdinal(firstTurn) !== expectedTopOrdinal) return 'unverified';
     }
     return 'confirmed';
   }
@@ -728,13 +726,13 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
   async function harvestRenderedInto(
     accumulator: PreparedAccumulator<any>,
     _root: any,
-    _options: any = {},
+    options: { newestFirst?: boolean } = {},
   ): Promise<{ added: number; updated: number }> {
     mergeIdentityAnchors(accumulator.identityGuard, manualAdapter.readIdentity());
     const { descriptors, inputsByKey, unresolvedIdentity } = manualAdapter.readWindow();
     if (unresolvedIdentity) addPreparedReason(accumulator, 'unstable_identity');
     const existingByKey = new Map(accumulator.records.map((record) => [record.key, record]));
-    const records: Array<Omit<PreparedMessageRecord<any>, 'firstSeenIndex'>> = [];
+    const records: PreparedMessageRecord<any>[] = [];
     for (let i = 0; i < descriptors.length; i += 1) {
       const descriptor = descriptors[i];
       const existing = existingByKey.get(descriptor.key);
@@ -763,7 +761,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         payload: message,
       });
     }
-    return mergePreparedRecords(accumulator, records);
+    return mergePreparedRecords(accumulator, records, options);
   }
 
   async function enrichApiSnapshotWithRenderedGraphics(snapshot: any): Promise<any> {
@@ -826,44 +824,48 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       identityVerified: !!durableConversationKey,
       identityGuard: initialIdentityGuard,
     });
+    const savedTailMessageKey =
+      durableConversationKey && typeof options.savedTailMessageKey === 'string'
+        ? options.savedTailMessageKey.trim()
+        : '';
 
+    const adapter = {
+      getScrollSeed: manualAdapter.readScrollSeed,
+      sampleIdentity,
+      readDescriptorKeys: manualAdapter.readDescriptorKeys,
+      readUnresolvedKeys: manualAdapter.readUnresolvedKeys,
+      readBoundaryState: manualAdapter.readBoundaryState,
+      onTopConfirmed: (target: PreparedAccumulator<any>) => {
+        const canonicalGuard = manualAdapter.readIdentity();
+        target.identityGuard = { ...canonicalGuard, anchors: canonicalGuard.anchors.slice() };
+        if (!target.conversationKey) {
+          target.conversationKey = identityConversationKey(canonicalGuard);
+          target.identityVerified = !!target.conversationKey;
+        }
+        if (!target.conversationKey) addPreparedReason(target, 'unstable_identity');
+      },
+      harvest: (target: PreparedAccumulator<any>) => harvestRenderedInto(target, null, { newestFirst: true }),
+    };
     try {
-      const sweep = await runVirtualizedSweep(
-        scrollRuntime,
-        {
-          getScrollSeed: manualAdapter.readScrollSeed,
-          sampleIdentity,
-          readDescriptorKeys: manualAdapter.readDescriptorKeys,
-          readUnresolvedKeys: manualAdapter.readUnresolvedKeys,
-          readBoundaryState: manualAdapter.readBoundaryState,
-          onTopConfirmed: (target) => {
-            const canonicalGuard = manualAdapter.readIdentity();
-            target.identityGuard = {
-              ...canonicalGuard,
-              anchors: canonicalGuard.anchors.slice(),
-            };
-            if (!target.conversationKey) {
-              target.conversationKey = identityConversationKey(canonicalGuard);
-              target.identityVerified = !!target.conversationKey;
-            }
-            if (!target.conversationKey) addPreparedReason(target, 'unstable_identity');
-          },
-          harvest: (target) => harvestRenderedInto(target, null, { allowEditing: true }),
-        },
-        accumulator,
-        {
-          totalDeadlineMs: options.totalDeadlineMs,
-          maxSteps: options.maxSteps,
-          stableSamples: options.stableSamples,
-          pollMs: options.pollMs,
-          stepTimeoutMs: options.stepTimeoutMs,
-          boundaryTimeoutMs: options.boundaryTimeoutMs,
-          overlapRatio: options.overlapRatio,
-          maxOverlapRecoveries: options.maxOverlapRecoveries,
-          sleep: options.sleep,
-          now: options.now,
-        },
-      );
+      const sweep = await runVirtualizedSweep(scrollRuntime, adapter, accumulator, {
+        totalDeadlineMs: options.totalDeadlineMs,
+        maxSteps: options.maxSteps,
+        stableSamples: options.stableSamples,
+        pollMs: options.pollMs,
+        stepTimeoutMs: options.stepTimeoutMs,
+        boundaryTimeoutMs: options.boundaryTimeoutMs ?? 45_000,
+        overlapRatio: options.overlapRatio,
+        maxOverlapRecoveries: options.maxOverlapRecoveries,
+        sleep: options.sleep,
+        now: options.now,
+        startAtBottom: true,
+        holdAtTop: true,
+        ...(savedTailMessageKey ? { stopAtKey: savedTailMessageKey } : null),
+      });
+      if (sweep.stoppedAtKey) {
+        const index = accumulator.records.findIndex((record) => record.key === savedTailMessageKey);
+        accumulator.records = accumulator.records.slice(index);
+      }
       accumulator.completeness = sweep.completeness;
     } finally {
       const restoreResult = scrollRestorer.restore();
@@ -901,12 +903,12 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     accumulator.completeness = prepared.completeness;
     accumulator.reasons.push(...prepared.reasons.filter((reason) => !accumulator.reasons.includes(reason)));
     accumulator.sweepMetrics = { ...prepared.metrics };
-    mergePreparedRecords(
-      accumulator,
-      prepared.records.map(({ firstSeenIndex: _firstSeenIndex, ...record }) => record),
-    );
+    mergePreparedRecords(accumulator, prepared.records);
     const root = getConversationRoot();
-    const finalLive = root ? await harvestRenderedInto(accumulator, root) : { added: 0, updated: 0 };
+    const finalLive =
+      root && prepared.metrics.stoppedAtKey !== true
+        ? await harvestRenderedInto(accumulator, root)
+        : { added: 0, updated: 0 };
     if (accumulator.completeness === 'complete' && (finalLive.added > 0 || finalLive.updated > 0)) {
       accumulator.completeness = 'partial';
       addPreparedReason(accumulator, 'final_live_changed');

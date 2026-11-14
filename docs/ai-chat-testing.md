@@ -236,6 +236,20 @@ SYNCNOS-STREAM-END
 - partial capture 只能安全 merge / append，不能删除窗口外旧消息。
 - 只有真正证明完整历史时才能产生 complete / destructive snapshot。
 - 手动完整采集若会 sweep 历史，结束后应恢复用户原滚动位置。
+- ChatGPT DOM 首次采集只做一次底部→顶部扫描：分批历史（例如 5→10→15→27 轮）
+  到达 `fallback-turn-0` 后不得返回底部重扫，而应在顶端等待加载并沿新增历史继续向上。
+  顶部完成必须同时验证：物理滚动位置、最早回合编号、独立于回合外的真实加载器已消失。
+  现实 ChatGPT 的历史加载器在 `[data-chatgpt-conversation-selection-target="<会话ID>"]`
+  中，由 `[role="status"] [data-loading-indicator]` 渲染；
+  切勿将选择器误写成 `data-chatgpt-conversation-selection-target="true"`。
+  `fallback-turn-0` 与正在加载的状态可以同时存在，不能据此提前宣告完成。
+  顶部无加载指示、却缺少起点编号时，必须立即 partial，不能反复边缘滚动；
+  加载中保持原位等待新窗口，超时也只报告 partial。
+  已存会话再次手动抓取或新增 1 轮时，不论历史是否曾被标为完整，
+  都应以最近的正式消息键提前停止；最后一条为临时或合成键时向前选稳定键。
+  编辑、重试与换分支导致锚点失效时才向旧消息继续扫描，始终安全追加。
+  不读取整个 IndexedDB 消息列表；途中导航、中断或加载超时只允许安全追加，不得删除旧消息、
+  改变已有正文或导致重复消息。无变化的重复抓取不应推进活动时间。
 
 涉及虚拟列表、分页历史或完整性语义的改动，本用例必须跑满 12 轮。
 

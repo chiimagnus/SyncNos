@@ -161,7 +161,7 @@ describe('virtualized chat scroll root', () => {
 });
 
 describe('virtualized chat prepared accumulator', () => {
-  it('returns a plain prepared token and updates changed records in place', () => {
+  it('returns a plain prepared token and replaces changed records', () => {
     const accumulator = createPreparedAccumulator<{ text: string }>({
       source: 'chatgpt',
       conversationKey: 'conversation-a',
@@ -172,14 +172,16 @@ describe('virtualized chat prepared accumulator', () => {
         { key: 'm1', turnKey: 't1', withinTurn: 0, fingerprint: 'a', payload: { text: 'first' } },
       ]),
     ).toEqual({ added: 1, updated: 0 });
+    const oldRecords = accumulator.records;
     expect(
       mergePreparedRecords(accumulator, [
         { key: 'm1', turnKey: 't1', withinTurn: 0, fingerprint: 'b', payload: { text: 'final' } },
       ]),
     ).toEqual({ added: 0, updated: 1 });
+    expect(oldRecords[0].payload.text).toBe('first');
     const prepared = finishPreparedCapture(accumulator);
     expect(JSON.parse(JSON.stringify(prepared))).toEqual(prepared);
-    expect(prepared.records[0]).toMatchObject({ firstSeenIndex: 0, payload: { text: 'final' } });
+    expect(prepared.records[0]).toMatchObject({ payload: { text: 'final' } });
   });
 
   it('rejects malformed prepared tokens and consumes a valid token once', () => {
@@ -194,7 +196,7 @@ describe('virtualized chat prepared accumulator', () => {
     ]);
     const prepared = finishPreparedCapture(accumulator);
     expect(readPreparedCapture({ ...prepared, records: [{ key: '' }] }, 'chatgpt')).toBeNull();
-    expect(readPreparedCapture({ ...prepared, metrics: { samples: Number.NaN, messages: 1 } }, 'chatgpt')).toBeNull();
+    expect(readPreparedCapture({ ...prepared, metrics: { steps: Number.NaN } }, 'chatgpt')).toBeNull();
 
     const consume = createPreparedCaptureConsumer<{ text: string }>('chatgpt');
     expect(consume(prepared)).toBe(prepared);
@@ -229,7 +231,7 @@ describe('virtualized chat prepared accumulator', () => {
       identityGuard: { route: sentinel, durableId: sentinel, anchors: [sentinel], topAnchor: sentinel },
     });
     addPreparedReason(accumulator, sentinel);
-    accumulator.sweepMetrics = { passes: 1, reachedTop: false };
+    accumulator.sweepMetrics = { reachedTop: false };
     const prepared = finishPreparedCapture(accumulator);
     const diagnostics = JSON.stringify({ reasons: prepared.reasons, metrics: prepared.metrics });
     expect(prepared.reasons).toEqual(['invalid_reason']);
@@ -445,6 +447,208 @@ describe('virtualized chat single pass', () => {
     expect(result).toMatchObject({ reachedTop: true, reachedBottom: true });
     expect(physicalTop).toBe(0);
     expect(finishPreparedCapture(accumulator).records.map((record) => record.key)).toEqual(['a', 'b', 'c', 'd', 'e']);
+
+    const reverseAccumulator = createPreparedAccumulator<{ text: string }>({
+      source: 'test',
+      conversationKey: 'conversation',
+      identityVerified: true,
+    });
+    const reverse = await runVirtualizedPass(
+      { document: dom.window.document, window: dom.window as any },
+      adapter,
+      reverseAccumulator,
+      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, startAtBottom: true },
+    );
+    expect(reverse).toMatchObject({ reachedTop: true, reachedBottom: true });
+    expect(finishPreparedCapture(reverseAccumulator).records.map((record) => record.key)).toEqual([
+      'a',
+      'b',
+      'c',
+      'd',
+      'e',
+    ]);
+  });
+
+  it('collects an unsaved conversation newest-first without relying on any local key', async () => {
+    const test = harness([
+      { top: 0, keys: ['a', 'b'] },
+      { top: 60, keys: ['b', 'c'] },
+      { top: 120, keys: ['c', 'd'] },
+      { top: 180, keys: ['d', 'e'] },
+    ]);
+    const visited: string[] = [];
+    const harvest = test.adapter.harvest;
+    test.adapter.harvest = async (accumulator) => {
+      visited.push(test.adapter.readDescriptorKeys().at(-1) || '');
+      return harvest(accumulator);
+    };
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, startAtBottom: true },
+    );
+    expect(result).toMatchObject({
+      stoppedAtKey: false,
+      reachedTop: true,
+      reachedBottom: true,
+      completeness: 'complete',
+    });
+    expect(visited.at(0)).toBe('e');
+    expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual([
+      'a',
+      'b',
+      'c',
+      'd',
+      'e',
+    ]);
+  });
+
+  it('rechecks the logical top after older messages load during a newest-first sweep', async () => {
+    const test = harness([
+      { top: 0, keys: ['a', 'b'] },
+      { top: 60, keys: ['b', 'c'] },
+      { top: 120, keys: ['c', 'd'] },
+      { top: 180, keys: ['d', 'e'] },
+    ]);
+    let olderLoaded = false;
+    const originalKeys = test.adapter.readDescriptorKeys;
+    test.adapter.readDescriptorKeys = () =>
+      olderLoaded && test.getTop() === 0 ? ['z', ...originalKeys()] : originalKeys();
+    test.adapter.harvest = async (target) =>
+      mergePreparedRecords(
+        target,
+        test.adapter.readDescriptorKeys().map((key) => ({
+          key,
+          turnKey: key,
+          withinTurn: 0,
+          fingerprint: key,
+          payload: { text: key },
+        })),
+        { newestFirst: true },
+      );
+    (test.adapter as any).readBoundaryState = (boundary: 'top' | 'bottom') =>
+      boundary === 'top' && !olderLoaded ? 'pending' : 'confirmed';
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      {
+        startAtBottom: true,
+        stableSamples: 1,
+        pollMs: 0,
+        overlapRatio: 0.6,
+        sleep: async () => {
+          olderLoaded = true;
+        },
+      },
+    );
+    expect(olderLoaded).toBe(true);
+    expect(result).toMatchObject({ reachedTop: true, reachedBottom: true, completeness: 'complete' });
+    expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual([
+      'z',
+      'a',
+      'b',
+      'c',
+      'd',
+      'e',
+    ]);
+  });
+
+  it('starts from the latest window and stops at the saved tail key without visiting old history', async () => {
+    const test = harness([
+      { top: 0, keys: ['a', 'b'] },
+      { top: 60, keys: ['b', 'c'] },
+      { top: 120, keys: ['c', 'd'] },
+      { top: 180, keys: ['d', 'e'] },
+    ]);
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, stopAtKey: 'b' },
+    );
+    expect(result).toMatchObject({
+      stoppedAtKey: true,
+      reachedBottom: true,
+      reachedTop: false,
+      completeness: 'partial',
+      steps: 3,
+    });
+    expect(result.reasons).not.toContain('top_not_reached');
+    expect(test.getTop()).toBeGreaterThan(0);
+    expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual(['b', 'c', 'd', 'e']);
+  });
+
+  it('stops after two recent windows even when 160 older windows exist', async () => {
+    const windows = Array.from({ length: 160 }, (_, index) => ({
+      top: index * 60,
+      keys: [`m${index}`, `m${index + 1}`],
+    }));
+    const test = harness(windows, { initialScrollHeight: windows.at(-1)!.top + 100 });
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, stopAtKey: 'm158' },
+    );
+    expect(result).toMatchObject({ stoppedAtKey: true, steps: 2, reachedTop: false, reachedBottom: true });
+    expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual([
+      'm158',
+      'm159',
+      'm160',
+    ]);
+  });
+
+  it('does not trust a saved key after an unanchored virtualized gap', async () => {
+    const test = harness([
+      { top: 0, keys: ['old', 'anchor'] },
+      { top: 180, keys: ['new-a', 'new-b'] },
+    ]);
+    test.adapter.harvest = async (target) =>
+      mergePreparedRecords(
+        target,
+        test.adapter.readDescriptorKeys().map((key) => ({
+          key,
+          turnKey: key,
+          withinTurn: 0,
+          fingerprint: key,
+          payload: { text: key },
+        })),
+        { newestFirst: true },
+      );
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, stopAtKey: 'anchor' },
+    );
+    expect(result).toMatchObject({ stoppedAtKey: false, reachedTop: true, completeness: 'partial' });
+    expect(result.reasons).toContain('order_unanchored');
+    expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual([
+      'old',
+      'anchor',
+      'new-a',
+      'new-b',
+    ]);
+  });
+
+  it('does not accept a missing local tail as an incremental boundary', async () => {
+    const test = harness([
+      { top: 0, keys: ['a', 'b'] },
+      { top: 60, keys: ['b', 'c'] },
+      { top: 120, keys: ['c', 'd'] },
+      { top: 180, keys: ['d', 'e'] },
+    ]);
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, stopAtKey: 'retired-message' },
+    );
+    expect(result.stoppedAtKey).toBe(false);
+    expect(result.reachedTop).toBe(true);
+    expect(finishPreparedCapture(test.accumulator).records).toHaveLength(5);
   });
 
   it('survives replacement and node recycling because each window is plain data', async () => {
@@ -490,6 +694,101 @@ describe('virtualized chat single pass', () => {
     );
     expect(result.maxScrollExtent).toBe(400);
     expect(finishPreparedCapture(test.accumulator).records.at(-1)?.key).toBe('g');
+  });
+
+  it('holds at the top during pending lazy history without re-entering or restarting', async () => {
+    const test = harness(
+      [
+        { top: 0, keys: ['a', 'b'] },
+        { top: 60, keys: ['b', 'c'] },
+        { top: 120, keys: ['c', 'd'] },
+      ],
+      { initialScrollHeight: 300 },
+    );
+    const scrollDescriptor = Object.getOwnPropertyDescriptor(test.root, 'scrollTop')!;
+    let reachedTop = false;
+    let scrollDownAfterTop = 0;
+    Object.defineProperty(test.root, 'scrollTop', {
+      configurable: true,
+      get: scrollDescriptor.get,
+      set(value: number) {
+        if (reachedTop && value > 0) scrollDownAfterTop += 1;
+        scrollDescriptor.set!.call(this, value);
+        if (value === 0) reachedTop = true;
+      },
+    });
+    let clock = 0;
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      {
+        ...test.adapter,
+        readBoundaryState: (boundary) => (boundary === 'top' ? 'pending' : 'confirmed'),
+      },
+      test.accumulator,
+      {
+        startAtBottom: true,
+        holdAtTop: true,
+        stableSamples: 1,
+        pollMs: 5,
+        boundaryTimeoutMs: 30,
+        totalDeadlineMs: 100,
+        now: () => clock,
+        sleep: async (ms) => {
+          clock += Math.max(1, ms);
+        },
+      },
+    );
+    expect(result.reasons).toContain('boundary_stalled');
+    expect(result.completeness).toBe('partial');
+    expect(scrollDownAfterTop).toBe(0);
+  });
+
+  it('does not mistake a loader reflow for newly prepended history or reset the idle timeout', async () => {
+    const test = harness(
+      [
+        { top: 0, keys: ['a', 'b'] },
+        { top: 60, keys: ['b', 'c'] },
+        { top: 120, keys: ['c', 'd'] },
+      ],
+      { initialScrollHeight: 300 },
+    );
+    let now = 0;
+    let harvestsAtTop = 0;
+    let reflows = 0;
+    const originalHarvest = test.adapter.harvest;
+    test.adapter.harvest = async (target) => {
+      if (test.getTop() === 0) harvestsAtTop += 1;
+      return originalHarvest(target);
+    };
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      {
+        ...test.adapter,
+        readBoundaryState: (boundary) => (boundary === 'top' ? 'pending' : 'confirmed'),
+      },
+      test.accumulator,
+      {
+        startAtBottom: true,
+        holdAtTop: true,
+        stableSamples: 1,
+        pollMs: 5,
+        boundaryTimeoutMs: 35,
+        totalDeadlineMs: 150,
+        now: () => now,
+        sleep: async (ms) => {
+          now += Math.max(1, ms);
+          if (test.getTop() === 0) {
+            reflows += 1;
+            test.setScrollHeight(300 + (reflows % 2) * 5);
+          }
+        },
+      },
+    );
+    expect(reflows).toBeGreaterThan(3);
+    expect(result.reasons).toContain('boundary_stalled');
+    expect(result.reasons).not.toContain('total_deadline_exhausted');
+    expect(harvestsAtTop).toBe(1);
+    expect(result.reachedTop).toBe(false);
   });
 
   it('waits for a provider-confirmed logical top before sweeping downward', async () => {
@@ -763,6 +1062,60 @@ describe('virtualized chat single pass', () => {
     expect(result.reasons).toContain('step_timeout');
   });
 
+  it('does not wait or invent completion when the provider cannot verify the actual top', async () => {
+    const test = harness([{ top: 0, keys: ['a'] }]);
+    let waits = 0;
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      {
+        ...test.adapter,
+        readBoundaryState: (boundary) => (boundary === 'top' ? 'unverified' : 'confirmed'),
+      },
+      test.accumulator,
+      {
+        startAtBottom: true,
+        holdAtTop: true,
+        stableSamples: 1,
+        pollMs: 0,
+        sleep: async () => {
+          waits += 1;
+        },
+      },
+    );
+    expect(result).toMatchObject({ completeness: 'partial', reachedTop: false, reachedBottom: true });
+    expect(result.reasons).toContain('top_not_reached');
+    expect(result.reasons).not.toContain('boundary_stalled');
+    expect(waits).toBeLessThan(5);
+  });
+
+  it('exits a pending reverse-top probe promptly when the requested step budget is exhausted', async () => {
+    const test = harness([{ top: 0, keys: ['a'] }]);
+    let waited = 0;
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      {
+        ...test.adapter,
+        readBoundaryState: (boundary) => (boundary === 'top' ? 'pending' : 'confirmed'),
+      },
+      test.accumulator,
+      {
+        startAtBottom: true,
+        holdAtTop: true,
+        maxSteps: 1,
+        stableSamples: 1,
+        pollMs: 0,
+        boundaryTimeoutMs: 30_000,
+        sleep: async () => {
+          waited += 1;
+        },
+      },
+    );
+    expect(result).toMatchObject({ completeness: 'partial', steps: 1, reachedTop: false });
+    expect(result.reasons).toContain('step_budget_exhausted');
+    expect(result.reasons).not.toContain('boundary_stalled');
+    expect(waited).toBeLessThan(5);
+  });
+
   it('reports step budget exhaustion without discarding prior stable data', async () => {
     const test = harness([
       { top: 0, keys: ['a'] },
@@ -787,7 +1140,13 @@ describe('virtualized chat single pass', () => {
     let calls = 0;
     test.adapter.harvest = async (target) => {
       calls += 1;
-      if (calls === 2) throw new Error('PRIVATE_CONTENT');
+      if (calls === 2) {
+        mergePreparedRecords(target, [
+          { key: 'a', turnKey: 'a', withinTurn: 0, fingerprint: 'new', payload: { text: 'incorrect' } },
+          { key: 'b', turnKey: 'b', withinTurn: 1, fingerprint: 'b', payload: { text: 'partial' } },
+        ]);
+        throw new Error('PRIVATE_CONTENT');
+      }
       return harvest(target);
     };
     const result = await runVirtualizedPass(
@@ -797,7 +1156,9 @@ describe('virtualized chat single pass', () => {
       { stableSamples: 1, pollMs: 0, overlapRatio: 0.6 },
     );
     expect(result.reasons).toContain('extraction_error');
-    expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual(['a']);
+    const records = finishPreparedCapture(test.accumulator).records;
+    expect(records.map((record) => record.key)).toEqual(['a']);
+    expect(records[0].payload.text).toBe('a:1');
     expect(JSON.stringify(result)).not.toContain('PRIVATE_CONTENT');
   });
 
@@ -916,7 +1277,6 @@ describe('virtualized chat single-pass sweep', () => {
       { stableSamples: 1, pollMs: 0 },
     );
     expect(result).toMatchObject({ completeness: 'complete', reachedTop: true, reachedBottom: true });
-    expect(result.passes).toBe(1);
   });
 
   it('waits within the current window for an unresolved turn instead of starting another pass', async () => {
@@ -940,7 +1300,6 @@ describe('virtualized chat single-pass sweep', () => {
       },
     );
     expect(result.completeness).toBe('complete');
-    expect(result.passes).toBe(1);
     expect(unresolvedReads).toBeGreaterThanOrEqual(2);
     expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual(['a']);
   });
@@ -996,7 +1355,6 @@ describe('virtualized chat single-pass sweep', () => {
       { stableSamples: 1, pollMs: 0, stepTimeoutMs: 3, sleep: async () => {} },
     );
     expect(result.completeness).toBe('partial');
-    expect(result).toMatchObject({ passes: 1 });
     expect(result.reasons).toContain('unresolved_turn');
   });
 
@@ -1054,7 +1412,6 @@ describe('virtualized chat single-pass sweep', () => {
     );
 
     expect(result.completeness).toBe('partial');
-    expect(result.passes).toBe(1);
     expect(result.reasons).toContain('invalid_reason');
     expect(JSON.stringify(result)).not.toContain('PRIVATE_PROVIDER_ERROR');
   });
@@ -1077,7 +1434,6 @@ describe('virtualized chat single-pass sweep', () => {
       },
     );
     expect(result.completeness).toBe('partial');
-    expect(result.passes).toBe(1);
     expect(result.reasons).toContain('total_deadline_exhausted');
   });
 
@@ -1102,7 +1458,6 @@ describe('virtualized chat single-pass sweep', () => {
       },
     );
     expect(result.completeness).toBe('complete');
-    expect(result.passes).toBe(1);
   });
 
   it('invalidates data when identity changes during the pass', async () => {

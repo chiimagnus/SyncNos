@@ -556,8 +556,44 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         await applyApiCapture(apiCapture);
       } else {
         let preparedCapture: unknown;
+        let savedTailMessageKey = '';
+        if (target.collectorId === 'chatgpt') {
+          const route = parseChatgptDurableConversationRoute(pageUrl);
+          if (route) {
+            try {
+              const response = await send(CORE_MESSAGE_TYPES.GET_CONVERSATION_TAIL_WINDOW_BY_SOURCE_AND_KEY, {
+                source: 'chatgpt',
+                conversationKey: route.conversationId,
+                limit: 16,
+                compact: true,
+              });
+              const messages = response?.data?.messages;
+              const isStableAnchor = (message: any) =>
+                (message?.role === 'user' || message?.role === 'assistant') &&
+                typeof message.messageKey === 'string' &&
+                !!message.messageKey.trim() &&
+                !message.messageKey.startsWith('fallback_') &&
+                !message.messageKey.startsWith('chatgpt-turn:') &&
+                !message.messageKey.startsWith('chatgpt_turn_') &&
+                Number.isSafeInteger(message.sequence) &&
+                message.sequence >= 0;
+              // The last user message survives regenerated or replaced assistant replies.
+              const anchor =
+                response?.ok && Array.isArray(messages)
+                  ? (messages.findLast((message: any) => message?.role === 'user' && isStableAnchor(message)) ??
+                    messages.findLast(isStableAnchor))
+                  : null;
+              if (anchor) savedTailMessageKey = anchor.messageKey;
+            } catch (_error) {
+              // A missing local optimization hint cannot prevent a safe full DOM sweep.
+            }
+          }
+        }
         if (typeof target.collector.prepareManualCapture === 'function') {
-          preparedCapture = await target.collector.prepareManualCapture({ manual: true });
+          preparedCapture = await target.collector.prepareManualCapture({
+            manual: true,
+            ...(savedTailMessageKey ? { savedTailMessageKey } : null),
+          });
         }
         snapshot = await Promise.resolve(target.collector.capture({ manual: true, preparedCapture }));
         if (!snapshot) throw new Error(t('noVisibleConversationFound'));

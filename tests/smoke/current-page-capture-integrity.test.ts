@@ -139,6 +139,133 @@ afterEach(() => {
 });
 
 describe('current page capture integrity routing', () => {
+  it('passes the latest stable saved ChatGPT DOM key to the manual sweep', async () => {
+    const prepare = vi.fn(async () => ({ prepared: true }));
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      url: 'https://chatgpt.com/c/conversation-1',
+      snapshot: chatSnapshot({ completeness: 'partial' }),
+      prepare,
+      tailResponse: {
+        conversationId: 7,
+        messages: [{ messageKey: 'last-stored-assistant', role: 'assistant', sequence: 101 }],
+        checkpoint: null,
+        messagesRevision: 3,
+      },
+    });
+    await harness.service.captureCurrentPage();
+    expect(harness.tailReads).toEqual([
+      {
+        type: 'getConversationTailWindowBySourceAndKey',
+        payload: { source: 'chatgpt', conversationKey: 'conversation-1', limit: 16, compact: true },
+      },
+    ]);
+    expect(prepare).toHaveBeenCalledWith({ manual: true, savedTailMessageKey: 'last-stored-assistant' });
+  });
+
+  it('prefers the latest saved user message when an assistant reply is regenerated', async () => {
+    const prepare = vi.fn(async () => ({ prepared: true }));
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      url: 'https://chatgpt.com/c/conversation-1',
+      snapshot: chatSnapshot({ completeness: 'partial' }),
+      prepare,
+      tailResponse: {
+        messages: [
+          { messageKey: 'stable-older-user', role: 'user', sequence: 10 },
+          { messageKey: 'stable-last-user', role: 'user', sequence: 12 },
+          { messageKey: 'saved-assistant-about-to-change', role: 'assistant', sequence: 13 },
+        ],
+      },
+    });
+    await harness.service.captureCurrentPage();
+    expect(prepare).toHaveBeenCalledWith({ manual: true, savedTailMessageKey: 'stable-last-user' });
+  });
+
+  it('skips transient assistant keys and anchors to the previous saved stable message', async () => {
+    const prepare = vi.fn(async () => ({ prepared: true }));
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      url: 'https://chatgpt.com/c/conversation-1',
+      snapshot: chatSnapshot({ completeness: 'partial' }),
+      prepare,
+      tailResponse: {
+        messages: [
+          { messageKey: 'stable-previous-assistant', role: 'assistant', sequence: 20 },
+          { messageKey: 'stable-last-user', role: 'user', sequence: 21 },
+          { messageKey: 'chatgpt_turn_runtime-id_assistant', role: 'assistant', sequence: 22 },
+        ],
+      },
+    });
+    await harness.service.captureCurrentPage();
+    expect(prepare).toHaveBeenCalledWith({ manual: true, savedTailMessageKey: 'stable-last-user' });
+  });
+
+  it('reuses a persisted stable DOM anchor without requiring a full-history completion marker', async () => {
+    const prepare = vi.fn(async () => ({ prepared: true }));
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      url: 'https://chatgpt.com/c/conversation-1',
+      snapshot: chatSnapshot({ completeness: 'partial' }),
+      prepare,
+      tailResponse: {
+        conversationId: 7,
+        messages: [{ messageKey: 'latest-assistant', role: 'assistant', sequence: 11 }],
+        messagesRevision: 4,
+      },
+    });
+    await harness.service.captureCurrentPage();
+    expect(prepare).toHaveBeenCalledWith({ manual: true, savedTailMessageKey: 'latest-assistant' });
+    const save = harness.calls.find((call) => call.type === 'syncConversationMessages');
+    expect(save?.payload?.mode).toBe('append');
+    expect(save?.payload?.chatgptDomCoverage).toBeUndefined();
+    expect(chatgptApiMocks.capture).not.toHaveBeenCalled();
+  });
+
+  it('ignores previously persisted DOM coverage without a single-sweep completion proof', async () => {
+    const prepare = vi.fn(async () => ({ prepared: true }));
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      url: 'https://chatgpt.com/c/conversation-1',
+      snapshot: chatSnapshot({ completeness: 'partial' }),
+      prepare,
+      tailResponse: {
+        messages: [{ messageKey: 'saved-last-user', role: 'user', sequence: 27 }],
+        domCoverage: { anchorKey: 'saved-last-user', anchorOrdinal: 4 },
+      },
+    });
+    await harness.service.captureCurrentPage();
+    expect(prepare).toHaveBeenCalledWith({ manual: true, savedTailMessageKey: 'saved-last-user' });
+  });
+
+  it('does not use an API provisional turn key as a DOM scroll anchor', async () => {
+    const prepare = vi.fn(async () => ({ prepared: true }));
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      url: 'https://chatgpt.com/c/conversation-1',
+      snapshot: chatSnapshot({ completeness: 'partial' }),
+      prepare,
+      tailResponse: {
+        messages: [{ messageKey: 'chatgpt-turn:api-provisional-turn', role: 'assistant', sequence: 10 }],
+      },
+    });
+    await harness.service.captureCurrentPage();
+    expect(prepare).toHaveBeenCalledWith({ manual: true });
+  });
+
+  it('falls back to the usual manual sweep when no safe local DOM tail exists', async () => {
+    const prepare = vi.fn(async () => ({ prepared: true }));
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      url: 'https://chatgpt.com/c/conversation-1',
+      snapshot: chatSnapshot({ completeness: 'partial' }),
+      prepare,
+      tailResponse: { messages: [{ messageKey: 'untrusted', role: 'user', sequence: null }] },
+    });
+    await harness.service.captureCurrentPage();
+    expect(prepare).toHaveBeenCalledWith({ manual: true });
+  });
+
   it('routes supported Bilibili and YouTube URLs through Video before the web fallback', async () => {
     for (const url of [
       'https://www.bilibili.com/video/BV1FwY4zkEef/',
