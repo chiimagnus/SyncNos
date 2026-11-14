@@ -161,7 +161,7 @@ describe('virtualized chat scroll root', () => {
 });
 
 describe('virtualized chat prepared accumulator', () => {
-  it('returns a plain prepared token and updates changed records in place', () => {
+  it('returns a plain prepared token and replaces changed records', () => {
     const accumulator = createPreparedAccumulator<{ text: string }>({
       source: 'chatgpt',
       conversationKey: 'conversation-a',
@@ -172,14 +172,16 @@ describe('virtualized chat prepared accumulator', () => {
         { key: 'm1', turnKey: 't1', withinTurn: 0, fingerprint: 'a', payload: { text: 'first' } },
       ]),
     ).toEqual({ added: 1, updated: 0 });
+    const oldRecords = accumulator.records;
     expect(
       mergePreparedRecords(accumulator, [
         { key: 'm1', turnKey: 't1', withinTurn: 0, fingerprint: 'b', payload: { text: 'final' } },
       ]),
     ).toEqual({ added: 0, updated: 1 });
+    expect(oldRecords[0].payload.text).toBe('first');
     const prepared = finishPreparedCapture(accumulator);
     expect(JSON.parse(JSON.stringify(prepared))).toEqual(prepared);
-    expect(prepared.records[0]).toMatchObject({ firstSeenIndex: 0, payload: { text: 'final' } });
+    expect(prepared.records[0]).toMatchObject({ payload: { text: 'final' } });
   });
 
   it('rejects malformed prepared tokens and consumes a valid token once', () => {
@@ -194,7 +196,7 @@ describe('virtualized chat prepared accumulator', () => {
     ]);
     const prepared = finishPreparedCapture(accumulator);
     expect(readPreparedCapture({ ...prepared, records: [{ key: '' }] }, 'chatgpt')).toBeNull();
-    expect(readPreparedCapture({ ...prepared, metrics: { samples: Number.NaN, messages: 1 } }, 'chatgpt')).toBeNull();
+    expect(readPreparedCapture({ ...prepared, metrics: { steps: Number.NaN } }, 'chatgpt')).toBeNull();
 
     const consume = createPreparedCaptureConsumer<{ text: string }>('chatgpt');
     expect(consume(prepared)).toBe(prepared);
@@ -229,7 +231,7 @@ describe('virtualized chat prepared accumulator', () => {
       identityGuard: { route: sentinel, durableId: sentinel, anchors: [sentinel], topAnchor: sentinel },
     });
     addPreparedReason(accumulator, sentinel);
-    accumulator.sweepMetrics = { passes: 1, reachedTop: false };
+    accumulator.sweepMetrics = { reachedTop: false };
     const prepared = finishPreparedCapture(accumulator);
     const diagnostics = JSON.stringify({ reasons: prepared.reasons, metrics: prepared.metrics });
     expect(prepared.reasons).toEqual(['invalid_reason']);
@@ -989,7 +991,13 @@ describe('virtualized chat single pass', () => {
     let calls = 0;
     test.adapter.harvest = async (target) => {
       calls += 1;
-      if (calls === 2) throw new Error('PRIVATE_CONTENT');
+      if (calls === 2) {
+        mergePreparedRecords(target, [
+          { key: 'a', turnKey: 'a', withinTurn: 0, fingerprint: 'new', payload: { text: 'incorrect' } },
+          { key: 'b', turnKey: 'b', withinTurn: 1, fingerprint: 'b', payload: { text: 'partial' } },
+        ]);
+        throw new Error('PRIVATE_CONTENT');
+      }
       return harvest(target);
     };
     const result = await runVirtualizedPass(
@@ -999,7 +1007,9 @@ describe('virtualized chat single pass', () => {
       { stableSamples: 1, pollMs: 0, overlapRatio: 0.6 },
     );
     expect(result.reasons).toContain('extraction_error');
-    expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual(['a']);
+    const records = finishPreparedCapture(test.accumulator).records;
+    expect(records.map((record) => record.key)).toEqual(['a']);
+    expect(records[0].payload.text).toBe('a:1');
     expect(JSON.stringify(result)).not.toContain('PRIVATE_CONTENT');
   });
 
@@ -1118,7 +1128,6 @@ describe('virtualized chat single-pass sweep', () => {
       { stableSamples: 1, pollMs: 0 },
     );
     expect(result).toMatchObject({ completeness: 'complete', reachedTop: true, reachedBottom: true });
-    expect(result.passes).toBe(1);
   });
 
   it('waits within the current window for an unresolved turn instead of starting another pass', async () => {
@@ -1142,7 +1151,6 @@ describe('virtualized chat single-pass sweep', () => {
       },
     );
     expect(result.completeness).toBe('complete');
-    expect(result.passes).toBe(1);
     expect(unresolvedReads).toBeGreaterThanOrEqual(2);
     expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual(['a']);
   });
@@ -1198,7 +1206,6 @@ describe('virtualized chat single-pass sweep', () => {
       { stableSamples: 1, pollMs: 0, stepTimeoutMs: 3, sleep: async () => {} },
     );
     expect(result.completeness).toBe('partial');
-    expect(result).toMatchObject({ passes: 1 });
     expect(result.reasons).toContain('unresolved_turn');
   });
 
@@ -1256,7 +1263,6 @@ describe('virtualized chat single-pass sweep', () => {
     );
 
     expect(result.completeness).toBe('partial');
-    expect(result.passes).toBe(1);
     expect(result.reasons).toContain('invalid_reason');
     expect(JSON.stringify(result)).not.toContain('PRIVATE_PROVIDER_ERROR');
   });
@@ -1279,7 +1285,6 @@ describe('virtualized chat single-pass sweep', () => {
       },
     );
     expect(result.completeness).toBe('partial');
-    expect(result.passes).toBe(1);
     expect(result.reasons).toContain('total_deadline_exhausted');
   });
 
@@ -1304,7 +1309,6 @@ describe('virtualized chat single-pass sweep', () => {
       },
     );
     expect(result.completeness).toBe('complete');
-    expect(result.passes).toBe(1);
   });
 
   it('invalidates data when identity changes during the pass', async () => {

@@ -172,7 +172,6 @@ export type PreparedMessageRecord<T> = {
   withinTurn: number;
   fingerprint: string;
   payload: T;
-  firstSeenIndex: number;
 };
 
 export type PreparedIdentityGuard = {
@@ -189,7 +188,6 @@ export type PreparedAccumulator<T> = {
   identityGuard: PreparedIdentityGuard;
   records: PreparedMessageRecord<T>[];
   reasons: string[];
-  samples: number;
   completeness: 'complete' | 'partial';
   sweepMetrics: Record<string, number | boolean>;
 };
@@ -203,7 +201,7 @@ export type VirtualizedPreparedCapture<T> = {
   records: PreparedMessageRecord<T>[];
   reasons: string[];
   completeness: 'complete' | 'partial';
-  metrics: Record<string, number | boolean> & { samples: number; messages: number };
+  metrics: Record<string, number | boolean>;
 };
 
 export function createPreparedAccumulator<T>(input: {
@@ -226,7 +224,6 @@ export function createPreparedAccumulator<T>(input: {
     },
     records: [],
     reasons: [],
-    samples: 0,
     completeness: 'partial',
     sweepMetrics: {},
   };
@@ -265,10 +262,9 @@ export function addPreparedReason<T>(accumulator: PreparedAccumulator<T>, reason
 
 export function mergePreparedRecords<T>(
   accumulator: PreparedAccumulator<T>,
-  records: Array<Omit<PreparedMessageRecord<T>, 'firstSeenIndex'>>,
+  records: PreparedMessageRecord<T>[],
   options: { newestFirst?: boolean } = {},
 ): { added: number; updated: number } {
-  accumulator.samples += 1;
   const incoming = records
     .map((record) => ({ ...record, key: String(record?.key || '').trim() }))
     .filter((record) => !!record.key);
@@ -282,38 +278,32 @@ export function mergePreparedRecords<T>(
     uniqueIncoming.push(record);
   }
 
+  accumulator.records = accumulator.records.slice();
   let updated = 0;
-  const existingByKey = new Map(accumulator.records.map((record) => [record.key, record]));
+  const positions = new Map(accumulator.records.map((record, index) => [record.key, index]));
   for (const record of uniqueIncoming) {
-    const existing = existingByKey.get(record.key);
-    if (!existing || existing.fingerprint === record.fingerprint) continue;
-    existing.turnKey = record.turnKey;
-    existing.withinTurn = record.withinTurn;
-    existing.fingerprint = record.fingerprint;
-    existing.payload = record.payload;
+    const index = positions.get(record.key);
+    if (index === undefined) continue;
+    const existing = accumulator.records[index];
+    if (existing.fingerprint === record.fingerprint) continue;
+    accumulator.records[index] = record;
     updated += 1;
   }
 
   if (!accumulator.records.length) {
-    for (const record of uniqueIncoming) {
-      accumulator.records.push({ ...record, firstSeenIndex: accumulator.records.length });
-    }
+    accumulator.records.push(...uniqueIncoming);
     return { added: uniqueIncoming.length, updated };
   }
 
-  const knownIncoming = uniqueIncoming.filter((record) => existingByKey.has(record.key));
+  const knownIncoming = uniqueIncoming.filter((record) => positions.has(record.key));
   if (!knownIncoming.length) {
     addPreparedReason(accumulator, 'order_unanchored');
-    const inserted = uniqueIncoming
-      .filter((record) => !existingByKey.has(record.key))
-      .map((record, index) => ({ ...record, firstSeenIndex: accumulator.records.length + index }));
-    if (options.newestFirst) accumulator.records.unshift(...inserted);
-    else accumulator.records.push(...inserted);
-    return { added: inserted.length, updated };
+    if (options.newestFirst) accumulator.records.unshift(...uniqueIncoming);
+    else accumulator.records.push(...uniqueIncoming);
+    return { added: uniqueIncoming.length, updated };
   }
 
-  const currentPositions = new Map(accumulator.records.map((record, index) => [record.key, index]));
-  const knownPositions = knownIncoming.map((record) => currentPositions.get(record.key) as number);
+  const knownPositions = knownIncoming.map((record) => positions.get(record.key) as number);
   if (knownPositions.some((position, index) => index > 0 && position <= knownPositions[index - 1])) {
     addPreparedReason(accumulator, 'order_conflict');
     return { added: 0, updated };
@@ -322,12 +312,12 @@ export function mergePreparedRecords<T>(
   let added = 0;
   let cursor = 0;
   while (cursor < uniqueIncoming.length) {
-    if (existingByKey.has(uniqueIncoming[cursor].key)) {
+    if (positions.has(uniqueIncoming[cursor].key)) {
       cursor += 1;
       continue;
     }
     const start = cursor;
-    while (cursor < uniqueIncoming.length && !existingByKey.has(uniqueIncoming[cursor].key)) cursor += 1;
+    while (cursor < uniqueIncoming.length && !positions.has(uniqueIncoming[cursor].key)) cursor += 1;
     const unknownRun = uniqueIncoming.slice(start, cursor);
     const previousKnown = start > 0 ? uniqueIncoming[start - 1].key : '';
     const nextKnown = cursor < uniqueIncoming.length ? uniqueIncoming[cursor].key : '';
@@ -340,13 +330,8 @@ export function mergePreparedRecords<T>(
       insertionIndex = previousIndex < 0 ? accumulator.records.length : previousIndex + 1;
     }
 
-    const preparedRun = unknownRun.map((record) => ({
-      ...record,
-      firstSeenIndex: accumulator.records.length + added,
-    }));
-    accumulator.records.splice(insertionIndex, 0, ...preparedRun);
-    for (const prepared of preparedRun) existingByKey.set(prepared.key, prepared);
-    added += preparedRun.length;
+    accumulator.records.splice(insertionIndex, 0, ...unknownRun);
+    added += unknownRun.length;
   }
 
   return { added, updated };
@@ -362,14 +347,10 @@ export function finishPreparedCapture<T>(accumulator: PreparedAccumulator<T>): V
       ...accumulator.identityGuard,
       anchors: accumulator.identityGuard.anchors.slice(),
     },
-    records: accumulator.records.map((record) => ({ ...record })),
+    records: accumulator.records.slice(),
     reasons: accumulator.reasons.slice(),
     completeness: accumulator.completeness,
-    metrics: {
-      samples: accumulator.samples,
-      messages: accumulator.records.length,
-      ...accumulator.sweepMetrics,
-    },
+    metrics: { ...accumulator.sweepMetrics },
   };
 }
 
@@ -398,16 +379,12 @@ function isPreparedRecord<T>(value: unknown): value is PreparedMessageRecord<T> 
     Number.isInteger(value.withinTurn) &&
     Number(value.withinTurn) >= 0 &&
     typeof value.fingerprint === 'string' &&
-    Number.isInteger(value.firstSeenIndex) &&
-    Number(value.firstSeenIndex) >= 0 &&
     'payload' in value
   );
 }
 
 function isPreparedMetrics(value: unknown): value is VirtualizedPreparedCapture<unknown>['metrics'] {
   if (!isPlainRecord(value)) return false;
-  if (!Number.isFinite(value.samples) || Number(value.samples) < 0) return false;
-  if (!Number.isFinite(value.messages) || Number(value.messages) < 0) return false;
   return Object.values(value).every(
     (metric) => typeof metric === 'boolean' || (typeof metric === 'number' && Number.isFinite(metric)),
   );
@@ -457,8 +434,6 @@ export type VirtualizedPassResult = {
   steps: number;
   maxScrollExtent: number;
   reasons: string[];
-  added: number;
-  updated: number;
   unresolvedKeys: string[];
   stoppedAtKey: boolean;
 };
@@ -499,21 +474,6 @@ function boundedRatio(value: unknown, fallback: number): number {
   const number = Number(value);
   if (!Number.isFinite(number) || number <= 0) return fallback;
   return Math.min(0.95, Math.max(0.1, number));
-}
-
-function checkpointAccumulatorData<T>(accumulator: PreparedAccumulator<T>) {
-  return {
-    records: accumulator.records.map((record) => ({ ...record })),
-    samples: accumulator.samples,
-  };
-}
-
-function restoreAccumulatorData<T>(
-  accumulator: PreparedAccumulator<T>,
-  checkpoint: ReturnType<typeof checkpointAccumulatorData<T>>,
-): void {
-  accumulator.records = checkpoint.records;
-  accumulator.samples = checkpoint.samples;
 }
 
 function invalidateAccumulatorIdentity<T>(accumulator: PreparedAccumulator<T>): void {
@@ -571,9 +531,16 @@ export async function runVirtualizedPass<T>(
   let previousTop = 0;
   let overlapRecoveries = 0;
   let boundaryRecoveries = 0;
-  let added = 0;
-  let updated = 0;
   const unresolvedKeys = new Set<string>();
+  const result = (keys: string[] = []): VirtualizedPassResult => ({
+    reachedTop,
+    reachedBottom,
+    stoppedAtKey,
+    steps,
+    maxScrollExtent,
+    reasons,
+    unresolvedKeys: keys,
+  });
   const readBoundaryState = (boundary: VirtualizedBoundary): VirtualizedBoundaryState | null => {
     if (!adapter.readBoundaryState) return 'confirmed';
     try {
@@ -611,17 +578,7 @@ export async function runVirtualizedPass<T>(
   if (!originalIdentity) {
     addReason('missing_identity');
     invalidateAccumulatorIdentity(accumulator);
-    return {
-      reachedTop,
-      reachedBottom,
-      stoppedAtKey,
-      steps,
-      maxScrollExtent,
-      reasons,
-      added,
-      updated,
-      unresolvedKeys: [],
-    };
+    return result();
   }
 
   const validateAfterAwait = (): boolean => {
@@ -738,23 +695,29 @@ export async function runVirtualizedPass<T>(
     return null;
   };
 
-  const waitForLogicalBottom = async (): Promise<{ stable: StableWindow | null; confirmed: boolean }> => {
+  const waitForLogicalBottom = async (seek = false): Promise<{ stable: StableWindow | null; confirmed: boolean }> => {
     let lastSignature = '';
     let progressDeadline = now() + boundaryTimeoutMs;
     while (!deadlineExceeded()) {
+      if (seek) {
+        const metrics = readScrollMetrics(runtime, root);
+        writeScrollPosition(runtime, root, metrics.left, metrics.scrollHeight - metrics.clientHeight);
+      }
       const stable = await stabilize();
       if (!stable) return { stable: null, confirmed: false };
       const previousExtent = maxScrollExtent;
       maxScrollExtent = Math.max(maxScrollExtent, stable.metrics.scrollHeight);
       if (stable.metrics.scrollHeight + 1 < previousExtent) {
         const recovered = await recoverRegressedBottom(stable.metrics);
-        return { stable: recovered, confirmed: false };
+        if (!seek || !recovered) return { stable: recovered, confirmed: false };
+      } else {
+        boundaryRecoveries = 0;
+        if (isAtScrollBottom(stable.metrics)) {
+          const state = readBoundaryState('bottom');
+          if (!state) return { stable: null, confirmed: false };
+          if (state === 'confirmed') return { stable, confirmed: true };
+        } else if (!seek) return { stable, confirmed: false };
       }
-      boundaryRecoveries = 0;
-      if (!isAtScrollBottom(stable.metrics)) return { stable, confirmed: false };
-      const state = readBoundaryState('bottom');
-      if (!state) return { stable: null, confirmed: false };
-      if (state === 'confirmed') return { stable, confirmed: true };
       const signature = contentFreeWindowSignature(originalIdentity, stable.metrics, stable.keys);
       if (signature !== lastSignature) {
         lastSignature = signature;
@@ -770,60 +733,12 @@ export async function runVirtualizedPass<T>(
     return { stable: null, confirmed: false };
   };
 
-  const acquireLogicalBottom = async (): Promise<StableWindow | null> => {
-    let progressDeadline = now() + boundaryTimeoutMs;
-    let lastSignature = '';
-    while (!deadlineExceeded()) {
-      const metrics = readScrollMetrics(runtime, root);
-      writeScrollPosition(runtime, root, metrics.left, metrics.scrollHeight - metrics.clientHeight);
-      const bottom = await waitForLogicalBottom();
-      if (!bottom.stable) return null;
-      if (bottom.confirmed) {
-        reachedBottom = true;
-        return bottom.stable;
-      }
-      const signature = contentFreeWindowSignature(originalIdentity, bottom.stable.metrics, bottom.stable.keys);
-      if (signature !== lastSignature) {
-        lastSignature = signature;
-        progressDeadline = now() + boundaryTimeoutMs;
-      }
-      if (now() > progressDeadline) {
-        addReason('boundary_stalled');
-        return null;
-      }
-      await sleep(Math.max(1, pollMs));
-      if (!validateAfterAwait()) return null;
-    }
-    return null;
-  };
-
   try {
-    if (deadlineExceeded()) {
-      return {
-        reachedTop,
-        reachedBottom,
-        stoppedAtKey,
-        steps,
-        maxScrollExtent,
-        reasons,
-        added,
-        updated,
-        unresolvedKeys: [],
-      };
-    }
-    let stable = backwards ? await acquireLogicalBottom() : await acquireLogicalTop();
-    if (!stable || !(backwards ? reachedBottom : reachedTop))
-      return {
-        reachedTop,
-        reachedBottom,
-        stoppedAtKey,
-        steps,
-        maxScrollExtent,
-        reasons,
-        added,
-        updated,
-        unresolvedKeys: [],
-      };
+    if (deadlineExceeded()) return result();
+    const bottom = backwards ? await waitForLogicalBottom(true) : null;
+    reachedBottom = bottom?.confirmed === true;
+    let stable = backwards ? (bottom?.stable ?? null) : await acquireLogicalTop();
+    if (!stable || !(backwards ? reachedBottom : reachedTop)) return result();
     previousTop = stable.metrics.top;
 
     while (steps < maxSteps) {
@@ -846,22 +761,19 @@ export async function runVirtualizedPass<T>(
       rememberUnresolvedKeys(stable.unresolvedKeys);
 
       if (deadlineExceeded()) break;
-      const checkpoint = checkpointAccumulatorData(accumulator);
-      let harvested: { added: number; updated: number };
+      const checkpoint = accumulator.records;
       try {
-        harvested = await adapter.harvest(accumulator);
+        await adapter.harvest(accumulator);
       } catch (_error) {
-        restoreAccumulatorData(accumulator, checkpoint);
+        accumulator.records = checkpoint;
         addReason('extraction_error');
         break;
       }
       if (deadlineExceeded() || !validateAfterAwait()) {
-        restoreAccumulatorData(accumulator, checkpoint);
+        accumulator.records = checkpoint;
         if (accumulator.reasons.includes('identity_changed')) invalidateAccumulatorIdentity(accumulator);
         break;
       }
-      added += harvested.added;
-      updated += harvested.updated;
       clearResolvedKeys();
       steps += 1;
       if (
@@ -959,17 +871,7 @@ export async function runVirtualizedPass<T>(
     addReason('pass_failed');
   }
 
-  return {
-    reachedTop,
-    reachedBottom,
-    stoppedAtKey,
-    steps,
-    maxScrollExtent,
-    reasons,
-    added,
-    updated,
-    unresolvedKeys: Array.from(unresolvedKeys),
-  };
+  return result(Array.from(unresolvedKeys));
 }
 
 export type VirtualizedSweepOptions = VirtualizedPassOptions & {
@@ -978,7 +880,6 @@ export type VirtualizedSweepOptions = VirtualizedPassOptions & {
 
 export type VirtualizedSweepResult = {
   completeness: 'complete' | 'partial';
-  passes: number;
   steps: number;
   maxScrollExtent: number;
   reachedTop: boolean;
@@ -1040,17 +941,11 @@ export async function runVirtualizedSweep<T>(
     steps: 0,
     maxScrollExtent: 0,
     reasons: [],
-    added: 0,
-    updated: 0,
     unresolvedKeys: [],
   };
-  let ranPass = false;
   if (validateSweepIdentity()) {
     if (now() > deadline) addPreparedReason(accumulator, 'total_deadline_exhausted');
-    else {
-      ranPass = true;
-      pass = await runVirtualizedPass(runtime, adapter, accumulator, { ...options, deadline });
-    }
+    else pass = await runVirtualizedPass(runtime, adapter, accumulator, { ...options, deadline });
   }
   if (validateSweepIdentity() && now() > deadline) addPreparedReason(accumulator, 'total_deadline_exhausted');
 
@@ -1067,7 +962,6 @@ export async function runVirtualizedSweep<T>(
     !hasBlockingReason;
   accumulator.completeness = complete ? 'complete' : 'partial';
   accumulator.sweepMetrics = {
-    passes: ranPass ? 1 : 0,
     steps: pass.steps,
     maxScrollExtent: pass.maxScrollExtent,
     reachedTop: pass.reachedTop,
@@ -1076,7 +970,6 @@ export async function runVirtualizedSweep<T>(
   };
   return {
     completeness: accumulator.completeness,
-    passes: ranPass ? 1 : 0,
     steps: pass.steps,
     maxScrollExtent: pass.maxScrollExtent,
     reachedTop: pass.reachedTop,

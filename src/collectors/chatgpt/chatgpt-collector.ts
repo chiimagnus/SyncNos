@@ -734,7 +734,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     const { descriptors, inputsByKey, unresolvedIdentity } = manualAdapter.readWindow();
     if (unresolvedIdentity) addPreparedReason(accumulator, 'unstable_identity');
     const existingByKey = new Map(accumulator.records.map((record) => [record.key, record]));
-    const records: Array<Omit<PreparedMessageRecord<any>, 'firstSeenIndex'>> = [];
+    const records: PreparedMessageRecord<any>[] = [];
     for (let i = 0; i < descriptors.length; i += 1) {
       const descriptor = descriptors[i];
       const existing = existingByKey.get(descriptor.key);
@@ -908,10 +908,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     accumulator.completeness = prepared.completeness;
     accumulator.reasons.push(...prepared.reasons.filter((reason) => !accumulator.reasons.includes(reason)));
     accumulator.sweepMetrics = { ...prepared.metrics };
-    mergePreparedRecords(
-      accumulator,
-      prepared.records.map(({ firstSeenIndex: _firstSeenIndex, ...record }) => record),
-    );
+    mergePreparedRecords(accumulator, prepared.records);
     const root = getConversationRoot();
     const finalLive =
       root && prepared.metrics.stoppedAtKey !== true

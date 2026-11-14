@@ -318,7 +318,7 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
   ): Promise<{ added: number; updated: number }> {
     const items = getVisibleItems();
     const existingByKey = new Map(accumulator.records.map((record) => [record.key, record]));
-    const records: Array<Omit<PreparedMessageRecord<any>, 'firstSeenIndex'>> = [];
+    const records: PreparedMessageRecord<any>[] = [];
 
     for (let index = 0; index < items.length; index += 1) {
       const item = items[index];
@@ -493,10 +493,7 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
     accumulator.completeness = prepared.completeness;
     accumulator.reasons.push(...prepared.reasons.filter((reason: string) => !accumulator.reasons.includes(reason)));
     accumulator.sweepMetrics = { ...prepared.metrics };
-    mergePreparedRecords(
-      accumulator,
-      prepared.records.map(({ firstSeenIndex: _firstSeenIndex, ...record }: any) => record),
-    );
+    mergePreparedRecords(accumulator, prepared.records);
 
     const finalLive = await harvestCurrentInto(accumulator, new Map());
     if (accumulator.completeness === 'complete' && (finalLive.added > 0 || finalLive.updated > 0)) {

@@ -171,7 +171,7 @@ export function createGrokCollectorDef(env: CollectorEnv): CollectorDefinition {
     const { entries, missingIdentity } = messageEntries();
     if (missingIdentity) addPreparedReason(accumulator, 'unstable_identity');
     const existing = new Map(accumulator.records.map((record) => [record.key, record]));
-    const records: Array<Omit<PreparedMessageRecord<any>, 'firstSeenIndex'>> = [];
+    const records: PreparedMessageRecord<any>[] = [];
     for (const [index, entry] of entries.entries()) {
       if (!entry.rendered) {
         addPreparedReason(accumulator, 'unresolved_turn');
@@ -272,10 +272,7 @@ export function createGrokCollectorDef(env: CollectorEnv): CollectorDefinition {
     accumulator.reasons.push(...prepared.reasons);
     accumulator.sweepMetrics = { ...prepared.metrics };
     accumulator.completeness = 'partial';
-    mergePreparedRecords(
-      accumulator,
-      prepared.records.map(({ firstSeenIndex: _index, ...record }) => record),
-    );
+    mergePreparedRecords(accumulator, prepared.records);
     await harvest(accumulator);
     if (!sameConversation(prepared.identityGuard)) return null;
     const messages = finishPreparedCapture(accumulator).records.map((record, index) => ({

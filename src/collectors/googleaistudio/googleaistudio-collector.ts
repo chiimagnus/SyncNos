@@ -522,7 +522,7 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
       return output;
     })();
 
-    const records: Array<Omit<PreparedMessageRecord<any>, 'firstSeenIndex'>> = [];
+    const records: PreparedMessageRecord<any>[] = [];
     for (const candidate of candidates) {
       const { descriptor, existing, input } = candidate;
       if (existing) {
@@ -681,10 +681,7 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     accumulator.completeness = prepared.completeness;
     accumulator.reasons.push(...prepared.reasons.filter((reason) => !accumulator.reasons.includes(reason)));
     accumulator.sweepMetrics = { ...prepared.metrics };
-    mergePreparedRecords(
-      accumulator,
-      prepared.records.map(({ firstSeenIndex: _firstSeenIndex, ...record }) => record),
-    );
+    mergePreparedRecords(accumulator, prepared.records);
     const finalLive = await harvestManualInto(accumulator, ctx);
     if (accumulator.completeness === 'complete' && (finalLive.added > 0 || finalLive.updated > 0)) {
       accumulator.completeness = 'partial';

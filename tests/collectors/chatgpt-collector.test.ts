@@ -274,7 +274,6 @@ describe('chatgpt current DOM', () => {
     const test = simulatedVirtualHistory(200);
     const prepared = await prepare(currentDef(test.dom), { savedTailMessageKey: 'removed-original-assistant' });
     expect(prepared.metrics.stoppedAtKey).toBe(false);
-    expect(prepared.metrics.passes).toBe(1);
     expect(prepared.records.map((record: any) => record.key)).toEqual(
       Array.from({ length: 8 }, (_, index) => `message-${index}`),
     );

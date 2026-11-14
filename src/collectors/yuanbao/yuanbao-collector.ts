@@ -267,7 +267,7 @@ export function createYuanbaoCollectorDef(env: CollectorEnv): CollectorDefinitio
     accumulator: PreparedAccumulator<any>,
   ): Promise<{ added: number; updated: number }> {
     const items = getMessageItems();
-    const records: Array<Omit<PreparedMessageRecord<any>, 'firstSeenIndex'>> = [];
+    const records: PreparedMessageRecord<any>[] = [];
     let unresolved = false;
 
     for (let index = 0; index < items.length; index += 1) {
@@ -436,10 +436,7 @@ export function createYuanbaoCollectorDef(env: CollectorEnv): CollectorDefinitio
     accumulator.completeness = 'partial';
     accumulator.reasons.push(...prepared.reasons.filter((reason: string) => !accumulator.reasons.includes(reason)));
     accumulator.sweepMetrics = { ...prepared.metrics };
-    mergePreparedRecords(
-      accumulator,
-      prepared.records.map(({ firstSeenIndex: _firstSeenIndex, ...record }: any) => record),
-    );
+    mergePreparedRecords(accumulator, prepared.records);
     await harvestCurrentInto(accumulator);
 
     if (!identityGuardsMatch(accumulator.identityGuard, sampleIdentityGuard())) return null;

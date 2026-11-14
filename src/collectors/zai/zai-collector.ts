@@ -338,7 +338,7 @@ export function createZaiCollectorDef(env: CollectorEnv): CollectorDefinition {
     const wrappers = getMessageWrappers();
     const lastWrapper = wrappers.at(-1) || null;
     const existingByKey = new Map(accumulator.records.map((record) => [record.key, record]));
-    const records: Array<Omit<PreparedMessageRecord<any>, 'firstSeenIndex'>> = [];
+    const records: PreparedMessageRecord<any>[] = [];
 
     for (let index = 0; index < wrappers.length; index += 1) {
       const wrapper = wrappers[index];
@@ -466,10 +466,7 @@ export function createZaiCollectorDef(env: CollectorEnv): CollectorDefinition {
     if (prepared) {
       accumulator.reasons.push(...prepared.reasons);
       accumulator.sweepMetrics = { ...prepared.metrics };
-      mergePreparedRecords(
-        accumulator,
-        prepared.records.map(({ firstSeenIndex: _firstSeenIndex, ...record }) => record),
-      );
+      mergePreparedRecords(accumulator, prepared.records);
     } else {
       addPreparedReason(accumulator, 'top_not_reached');
     }

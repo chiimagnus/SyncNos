@@ -351,7 +351,7 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
     accumulator: PreparedAccumulator<any>,
   ): Promise<{ added: number; updated: number }> {
     const existingByKey = new Map(accumulator.records.map((record) => [record.key, record]));
-    const records: Array<Omit<PreparedMessageRecord<any>, 'firstSeenIndex'>> = [];
+    const records: PreparedMessageRecord<any>[] = [];
 
     for (const row of readCurrentRows()) {
       const descriptor = descriptorFromRow(row);
@@ -507,10 +507,7 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
     if (prepared) {
       accumulator.reasons.push(...prepared.reasons);
       accumulator.sweepMetrics = { ...prepared.metrics };
-      mergePreparedRecords(
-        accumulator,
-        prepared.records.map(({ firstSeenIndex: _firstSeenIndex, ...record }) => record),
-      );
+      mergePreparedRecords(accumulator, prepared.records);
     } else {
       addPreparedReason(accumulator, 'top_not_reached');
     }
