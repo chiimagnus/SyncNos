@@ -743,6 +743,54 @@ describe('virtualized chat single pass', () => {
     expect(scrollDownAfterTop).toBe(0);
   });
 
+  it('does not mistake a loader reflow for newly prepended history or reset the idle timeout', async () => {
+    const test = harness(
+      [
+        { top: 0, keys: ['a', 'b'] },
+        { top: 60, keys: ['b', 'c'] },
+        { top: 120, keys: ['c', 'd'] },
+      ],
+      { initialScrollHeight: 300 },
+    );
+    let now = 0;
+    let harvestsAtTop = 0;
+    let reflows = 0;
+    const originalHarvest = test.adapter.harvest;
+    test.adapter.harvest = async (target) => {
+      if (test.getTop() === 0) harvestsAtTop += 1;
+      return originalHarvest(target);
+    };
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      {
+        ...test.adapter,
+        readBoundaryState: (boundary) => (boundary === 'top' ? 'pending' : 'confirmed'),
+      },
+      test.accumulator,
+      {
+        startAtBottom: true,
+        holdAtTop: true,
+        stableSamples: 1,
+        pollMs: 5,
+        boundaryTimeoutMs: 35,
+        totalDeadlineMs: 150,
+        now: () => now,
+        sleep: async (ms) => {
+          now += Math.max(1, ms);
+          if (test.getTop() === 0) {
+            reflows += 1;
+            test.setScrollHeight(300 + (reflows % 2) * 5);
+          }
+        },
+      },
+    );
+    expect(reflows).toBeGreaterThan(3);
+    expect(result.reasons).toContain('boundary_stalled');
+    expect(result.reasons).not.toContain('total_deadline_exhausted');
+    expect(harvestsAtTop).toBe(1);
+    expect(result.reachedTop).toBe(false);
+  });
+
   it('waits for a provider-confirmed logical top before sweeping downward', async () => {
     const test = harness(
       [
@@ -1012,6 +1060,32 @@ describe('virtualized chat single pass', () => {
       },
     );
     expect(result.reasons).toContain('step_timeout');
+  });
+
+  it('does not wait or invent completion when the provider cannot verify the actual top', async () => {
+    const test = harness([{ top: 0, keys: ['a'] }]);
+    let waits = 0;
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      {
+        ...test.adapter,
+        readBoundaryState: (boundary) => (boundary === 'top' ? 'unverified' : 'confirmed'),
+      },
+      test.accumulator,
+      {
+        startAtBottom: true,
+        holdAtTop: true,
+        stableSamples: 1,
+        pollMs: 0,
+        sleep: async () => {
+          waits += 1;
+        },
+      },
+    );
+    expect(result).toMatchObject({ completeness: 'partial', reachedTop: false, reachedBottom: true });
+    expect(result.reasons).toContain('top_not_reached');
+    expect(result.reasons).not.toContain('boundary_stalled');
+    expect(waits).toBeLessThan(5);
   });
 
   it('exits a pending reverse-top probe promptly when the requested step budget is exhausted', async () => {

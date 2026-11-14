@@ -260,12 +260,12 @@ function simulatedLazyChatgptHistory(
       const ordinal = first + offset;
       const actual = start + ordinal;
       return `<div data-turn-key="turn-${actual}">
-        <div data-content-search-turn-key="fallback-turn-${ordinal + ordinalOffset}">
-          <div data-chatgpt-search-unit-key="fallback-turn-${ordinal + ordinalOffset}:0:user"
+        <div data-content-search-turn-key="fallback-turn-${actual + ordinalOffset}">
+          <div data-chatgpt-search-unit-key="fallback-turn-${actual + ordinalOffset}:0:user"
             data-chatgpt-search-message-ids="user-${actual}" data-message-author-role="user">
             <div data-user-message-bubble><div class="whitespace-pre-wrap">Question ${actual}</div></div>
           </div>
-          <div data-chatgpt-search-unit-key="fallback-turn-${ordinal + ordinalOffset}:1:assistant"
+          <div data-chatgpt-search-unit-key="fallback-turn-${actual + ordinalOffset}:1:assistant"
             data-chatgpt-search-message-ids="assistant-${actual}" data-message-author-role="assistant">
             <div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary">Answer ${actual}</div>
           </div>
@@ -275,7 +275,8 @@ function simulatedLazyChatgptHistory(
     scroller.innerHTML =
       loadAt === null
         ? turnsHtml
-        : '<div data-chatgpt-conversation-selection-target="true"><span role="status"></span></div>' + turnsHtml;
+        : '<div data-chatgpt-conversation-selection-target="lazy-hydrated-history" data-rail-chat-transcript="true"><div class="flex items-center justify-center gap-2 py-4"><div role="status"><div data-loading-indicator=""><svg></svg></div></div></div></div>' +
+          turnsHtml;
     for (const element of Array.from(scroller.querySelectorAll('[data-chatgpt-search-unit-key]'))) {
       (element as any).getBoundingClientRect = () => ({
         top: 0,
@@ -361,7 +362,6 @@ async function prepare(def: any, options: any = {}) {
     stableSamples: 1,
     pollMs: 0,
     sleep: async () => {},
-    historyQuietMs: 0,
     ...options,
   });
 }
@@ -397,7 +397,6 @@ describe('chatgpt current DOM', () => {
       now: test.now,
       sleep: test.sleep,
       pollMs: 1,
-      historyQuietMs: 12,
     });
     expect(test.getLoaded()).toBe(27);
     expect(test.getTopArrivals()).toBeGreaterThan(3);
@@ -411,36 +410,33 @@ describe('chatgpt current DOM', () => {
     expect(prepared.metrics).toMatchObject({ reachedTop: true, reachedBottom: true });
   });
 
-  it('finishes at an idle true top without a fixed 12-second delay or a second probe', async () => {
+  it('confirms a real structural top immediately without waiting or probing', async () => {
     const test = simulatedLazyChatgptHistory(5, 5, false);
     const prepared = await prepare(currentDef(test.dom), {
       now: test.now,
       sleep: test.sleep,
       pollMs: 40,
-      historyQuietMs: 1_500,
     });
     expect(prepared.records).toHaveLength(10);
     expect(prepared.metrics).toMatchObject({ reachedTop: true, reachedBottom: true });
-    expect(test.now()).toBeGreaterThanOrEqual(1_500);
-    expect(test.now()).toBeLessThan(2_400);
-    expect(test.getEdgeReentries()).toBe(1);
+    expect(test.now()).toBeLessThan(200);
+    expect(test.getEdgeReentries()).toBe(0);
     expect(test.getBottomReturns()).toBe(1);
   });
 
-  it('ends promptly as partial when the page exposes no loader but refuses to expose older turns', async () => {
+  it('returns partial immediately when the visible top is not the first turn and has no loader', async () => {
     const test = simulatedLazyChatgptHistory(5, 5, false, 5, false, 8);
     const prepared = await prepare(currentDef(test.dom), {
       now: test.now,
       sleep: test.sleep,
       pollMs: 40,
-      historyQuietMs: 1_500,
       boundaryTimeoutMs: 120_000,
       totalDeadlineMs: 300_000,
     });
     expect(prepared.metrics.reachedTop).toBe(false);
-    expect(prepared.reasons).toContain('boundary_stalled');
-    expect(prepared.reasons).not.toContain('total_deadline_exhausted');
-    expect(test.now()).toBeLessThan(4_000);
+    expect(prepared.reasons).toContain('top_not_reached');
+    expect(prepared.reasons).not.toContain('boundary_stalled');
+    expect(test.now()).toBeLessThan(200);
     expect(test.getBottomReturns()).toBe(1);
   });
 
@@ -451,7 +447,6 @@ describe('chatgpt current DOM', () => {
       now: test.now,
       sleep: test.sleep,
       pollMs: 1,
-      historyQuietMs: 12,
     });
     expect(prepared.metrics.reachedTop).toBe(false);
     expect(prepared.reasons).toContain('step_budget_exhausted');
@@ -459,20 +454,19 @@ describe('chatgpt current DOM', () => {
     expect(test.atBottom()).toBe(true);
   });
 
-  it('triggers an otherwise stalled lazy page with a small top-edge entry, never a bottom restart', async () => {
+  it('does not fabricate a complete history or re-enter the top when loading has no signal', async () => {
     const test = simulatedLazyChatgptHistory(27, 5, true, 5, true);
     const prepared = await prepare(currentDef(test.dom), {
       now: test.now,
       sleep: test.sleep,
       pollMs: 1,
-      historyQuietMs: 12,
     });
-    expect(test.getLoaded()).toBe(27);
-    expect(test.getTopArrivals()).toBeGreaterThan(3);
+    expect(test.getLoaded()).toBe(5);
+    expect(test.getEdgeReentries()).toBe(0);
     expect(test.getBottomReturns()).toBe(1);
-    expect(test.getMovesDuringLoad()).toBe(0);
-    expect(prepared.records).toHaveLength(54);
-    expect(prepared.metrics.reachedTop).toBe(true);
+    expect(prepared.records).toHaveLength(10);
+    expect(prepared.metrics.reachedTop).toBe(false);
+    expect(prepared.reasons).toContain('top_not_reached');
   });
 
   it('does not move the scroller while older history is still loading, and reports a stalled load as incomplete', async () => {
@@ -481,7 +475,6 @@ describe('chatgpt current DOM', () => {
       now: test.now,
       sleep: test.sleep,
       pollMs: 1,
-      historyQuietMs: 12,
       boundaryTimeoutMs: 35,
       totalDeadlineMs: 160,
     });
@@ -489,7 +482,7 @@ describe('chatgpt current DOM', () => {
     expect(test.getMovesDuringLoad()).toBe(0);
     expect(test.getBottomReturns()).toBe(1);
     expect(prepared.metrics.reachedTop).toBe(false);
-    expect(prepared.reasons).toContain('total_deadline_exhausted');
+    expect(prepared.reasons).toContain('boundary_stalled');
   });
 
   it('waits for genuinely slow history loading beyond the former 30-second boundary without scrolling', async () => {
@@ -498,7 +491,6 @@ describe('chatgpt current DOM', () => {
       now: test.now,
       sleep: test.sleep,
       pollMs: 500,
-      historyQuietMs: 12,
       boundaryTimeoutMs: 120_000,
       totalDeadlineMs: 180_000,
     });
@@ -522,7 +514,6 @@ describe('chatgpt current DOM', () => {
         }
       },
       pollMs: 1,
-      historyQuietMs: 12,
       boundaryTimeoutMs: 35,
       totalDeadlineMs: 160,
     });
@@ -538,7 +529,6 @@ describe('chatgpt current DOM', () => {
       now: test.now,
       sleep: test.sleep,
       pollMs: 1,
-      historyQuietMs: 12,
     });
     expect(test.getLoaded()).toBe(120);
     expect(test.getTopArrivals()).toBeGreaterThanOrEqual(20);
@@ -557,7 +547,6 @@ describe('chatgpt current DOM', () => {
       now: test.now,
       sleep: test.sleep,
       pollMs: 1,
-      historyQuietMs: 12,
     });
     expect(prepared.metrics.stoppedAtKey).toBe(true);
     expect(prepared.metrics.reachedTop).toBe(false);
@@ -619,9 +608,9 @@ describe('chatgpt current DOM', () => {
 
   it('does not declare a modern turn window complete when older ordinals may be missing', () => {
     const partial = currentDef(articleTurnDom({ firstOrdinal: 7 }));
-    expect(partial.collector.__test.manualAdapter.readBoundaryState('top')).toBe('pending');
+    expect(partial.collector.__test.manualAdapter.readBoundaryState('top')).toBe('unverified');
     const unknown = currentDef(articleTurnDom({ includeOrdinal: false }));
-    expect(unknown.collector.__test.manualAdapter.readBoundaryState('top')).toBe('pending');
+    expect(unknown.collector.__test.manualAdapter.readBoundaryState('top')).toBe('unverified');
   });
 
   it('retains visible modern messages as a partial capture when history cannot reach the true top', async () => {
@@ -1304,7 +1293,7 @@ A --> B</code></pre>
     const adapter = currentDef(dom).collector.__test.manualAdapter;
 
     turn.setAttribute('data-content-search-turn-key', 'fallback-turn-10');
-    expect(adapter.readBoundaryState('top')).toBe('pending');
+    expect(adapter.readBoundaryState('top')).toBe('unverified');
     turn.setAttribute('data-content-search-turn-key', 'fallback-turn-0');
     expect(adapter.readBoundaryState('top')).toBe('confirmed');
 
@@ -1313,11 +1302,69 @@ A --> B</code></pre>
     dom.window.document.querySelector('main')?.prepend(unrelated);
     expect(adapter.readBoundaryState('top')).toBe('confirmed');
 
+    const unrelatedStatus = dom.window.document.createElement('div');
+    unrelatedStatus.setAttribute('role', 'status');
+    dom.window.document.querySelector('main')?.prepend(unrelatedStatus);
+    expect(adapter.readBoundaryState('top')).toBe('confirmed');
+    unrelatedStatus.remove();
+
     const boundary = dom.window.document.createElement('div');
-    boundary.setAttribute('data-chatgpt-conversation-selection-target', 'true');
-    boundary.innerHTML = '<div role="status">Loading earlier messages</div>';
+    boundary.setAttribute('data-chatgpt-conversation-selection-target', 'current-conversation-id');
+    boundary.innerHTML = '<div role="status"><div data-loading-indicator=""><svg></svg></div></div>';
     dom.window.document.querySelector('main')?.prepend(boundary);
     expect(adapter.readBoundaryState('top')).toBe('pending');
+    boundary.remove();
+    expect(adapter.readBoundaryState('top')).toBe('confirmed');
+  });
+
+  it('does not mistake fallback-turn-0 for the true top while the real transcript spinner is visible', async () => {
+    const dom = currentDom();
+    const main = dom.window.document.querySelector('main')!;
+    const loader = dom.window.document.createElement('div');
+    loader.setAttribute('data-chatgpt-conversation-selection-target', 'current-conversation-id');
+    loader.setAttribute('data-rail-chat-transcript', 'true');
+    loader.innerHTML =
+      '<div class="flex items-center justify-center gap-2 py-4">' +
+      '<div role="status"><div data-loading-indicator=""><svg></svg></div></div></div>';
+    main.prepend(loader);
+    const def = currentDef(dom);
+    expect(def.collector.__test.manualAdapter.readBoundaryState('top')).toBe('pending');
+    let clock = 0;
+    const prepared = await prepare(def, {
+      now: () => clock,
+      sleep: async (ms: number) => {
+        clock += Math.max(1, ms);
+      },
+      pollMs: 4,
+      boundaryTimeoutMs: 40,
+      totalDeadlineMs: 300,
+    });
+    expect(prepared.metrics.reachedTop).toBe(false);
+    expect(prepared.reasons).toContain('boundary_stalled');
+    expect(prepared.reasons).toContain('top_not_reached');
+    expect(prepared.completeness).toBe('partial');
+
+    loader.remove();
+    const finished = await prepare(def, {
+      now: () => clock,
+      sleep: async (ms: number) => {
+        clock += Math.max(1, ms);
+      },
+    });
+    expect(finished.metrics.reachedTop).toBe(true);
+    expect(finished.reasons).not.toContain('boundary_stalled');
+  });
+
+  it('stops a manual history scan when the ChatGPT tab becomes hidden', async () => {
+    const dom = currentDom();
+    Object.defineProperty(dom.window.document, 'visibilityState', { configurable: true, value: 'hidden' });
+    const def = currentDef(dom);
+    expect(def.collector.__test.manualAdapter.readBoundaryState('top')).toBe('unverified');
+    expect(def.collector.__test.manualAdapter.readBoundaryState('bottom')).toBe('unverified');
+    const prepared = await prepare(def);
+    expect(prepared.completeness).toBe('partial');
+    expect(prepared.reasons).toContain('bottom_not_reached');
+    expect(prepared.metrics.reachedTop).toBe(false);
   });
 
   it('uses the current inner timeline scroller as the manual sweep seed', () => {

@@ -20,7 +20,6 @@ import {
   finishPreparedCapture,
   mergePreparedRecords,
   createPreparedCaptureConsumer,
-  resolveScrollRoot,
   runVirtualizedSweep,
   type PreparedAccumulator,
   type VirtualizedBoundary,
@@ -669,7 +668,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     return null;
   }
 
-  const BOUNDARY_LOADING_SELECTOR = "[data-chatgpt-conversation-selection-target='true'] [role='status']";
+  const BOUNDARY_LOADING_SELECTOR = '[data-chatgpt-conversation-selection-target] [role="status"]';
 
   function hasBoundaryLoadingSignal(boundary: VirtualizedBoundary, root = getConversationRoot()): boolean {
     if (!root?.querySelectorAll) return false;
@@ -691,22 +690,20 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   function readManualBoundaryState(boundary: VirtualizedBoundary): VirtualizedBoundaryState {
     const root = getConversationRoot();
-    if (!root) return 'pending';
+    if (!root || env.document.visibilityState === 'hidden') return 'unverified';
     if (hasBoundaryLoadingSignal(boundary, root)) return 'pending';
     if (boundary === 'top') {
-      const turns = readTurnShells(root);
-      const ordinals = turns.map(structuralTurnOrdinal).filter((value): value is number => value !== null);
-      const firstTurn = turns[0] || null;
+      const firstTurn = readTurnShells(root)[0];
+      if (!firstTurn) return 'unverified';
       const firstTurnUnits = firstTurn
         ? (Array.from(firstTurn.querySelectorAll?.(CHATGPT_MESSAGE_UNIT_SELECTOR) || []) as any[])
         : [];
-      if (firstTurn?.hasAttribute?.('data-turn-id') && !ordinals.length) return 'pending';
       const currentOneBasedLayout =
         !!firstTurn?.hasAttribute?.('data-turn-key') &&
         !firstTurnUnits.some((unit) => roleFromWrapper(unit) === 'assistant') &&
         hasFallbackAssistantActivity(firstTurn);
       const expectedTopOrdinal = currentOneBasedLayout ? 1 : 0;
-      if (ordinals.length && Math.min(...ordinals) > expectedTopOrdinal) return 'pending';
+      if (structuralTurnOrdinal(firstTurn) !== expectedTopOrdinal) return 'unverified';
     }
     return 'confirmed';
   }
@@ -832,46 +829,12 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         ? options.savedTailMessageKey.trim()
         : '';
 
-    const now = typeof options.now === 'function' ? options.now : Date.now;
-    const historyQuietMs = Number.isFinite(options.historyQuietMs)
-      ? Math.max(0, Number(options.historyQuietMs))
-      : 1_500;
-    let lastTopSignature = '';
-    let topChangedAt = now();
-    let stableTopSamples = 0;
     const adapter = {
       getScrollSeed: manualAdapter.readScrollSeed,
       sampleIdentity,
       readDescriptorKeys: manualAdapter.readDescriptorKeys,
       readUnresolvedKeys: manualAdapter.readUnresolvedKeys,
-      ...(historyQuietMs > 0 ? { canProbeTop: () => !hasBoundaryLoadingSignal('top') } : null),
-      readBoundaryState: (boundary: VirtualizedBoundary) => {
-        const state = manualAdapter.readBoundaryState(boundary);
-        if (boundary !== 'top') return state;
-        if (state !== 'confirmed') {
-          lastTopSignature = '';
-          stableTopSamples = 0;
-          return 'pending';
-        }
-        const keys = manualAdapter.readDescriptorKeys();
-        const scrollRoot = resolveScrollRoot(scrollRuntime, manualAdapter.readScrollSeed());
-        const signature = [
-          (scrollRoot as HTMLElement).scrollHeight,
-          keys[0] || '',
-          keys.at(-1) || '',
-          keys.length,
-        ].join('|');
-        if (signature !== lastTopSignature) {
-          lastTopSignature = signature;
-          topChangedAt = now();
-          stableTopSamples = 0;
-        } else {
-          stableTopSamples += 1;
-        }
-        return state === 'confirmed' && stableTopSamples >= 2 && now() - topChangedAt >= historyQuietMs
-          ? 'confirmed'
-          : 'pending';
-      },
+      readBoundaryState: manualAdapter.readBoundaryState,
       onTopConfirmed: (target: PreparedAccumulator<any>) => {
         const canonicalGuard = manualAdapter.readIdentity();
         target.identityGuard = { ...canonicalGuard, anchors: canonicalGuard.anchors.slice() };
@@ -890,14 +853,13 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         stableSamples: options.stableSamples,
         pollMs: options.pollMs,
         stepTimeoutMs: options.stepTimeoutMs,
-        boundaryTimeoutMs: options.boundaryTimeoutMs ?? 120_000,
+        boundaryTimeoutMs: options.boundaryTimeoutMs ?? 45_000,
         overlapRatio: options.overlapRatio,
         maxOverlapRecoveries: options.maxOverlapRecoveries,
         sleep: options.sleep,
-        now,
+        now: options.now,
         startAtBottom: true,
         holdAtTop: true,
-        topProbeDelayMs: Math.max(1, Math.min(150, Math.floor(historyQuietMs / 2))),
         ...(savedTailMessageKey ? { stopAtKey: savedTailMessageKey } : null),
       });
       if (sweep.stoppedAtKey) {
