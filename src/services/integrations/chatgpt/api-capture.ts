@@ -375,29 +375,27 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
           input.trustedCheckpoint.userSignature
       ) {
         const stableTail = scopedResult.snapshot.captureMeta.completeness === 'complete' && !currentNodeInProgress;
-        if (!stableTail || (await latestMatches())) {
-          assertRoute();
-          result = scopedResult;
-          if (!stableTail) {
-            const meta = result.snapshot.captureMeta;
-            result.snapshot.captureMeta = {
-              ...meta,
-              completeness: 'partial',
-              reasons: Array.from(new Set([...(meta.reasons || []), 'chatgpt_api_unfinished_turn_partial'])),
-            };
-          }
-          const checkpoint = stableTail
-            ? await latestUserCheckpoint(result.snapshot.messages, retained, input?.includeThinking !== false)
-            : null;
-          return {
-            ...result,
-            verifiedTail: true,
-            checkpoint,
-            verifyCurrent: async () => {
-              if (!(await latestMatches())) throw apiCaptureError('chatgpt_api_conversation_changed');
-            },
+        assertRoute();
+        result = scopedResult;
+        if (!stableTail) {
+          const meta = result.snapshot.captureMeta;
+          result.snapshot.captureMeta = {
+            ...meta,
+            completeness: 'partial',
+            reasons: Array.from(new Set([...(meta.reasons || []), 'chatgpt_api_unfinished_turn_partial'])),
           };
         }
+        const checkpoint = stableTail
+          ? await latestUserCheckpoint(result.snapshot.messages, retained, input?.includeThinking !== false)
+          : null;
+        return {
+          ...result,
+          verifiedTail: true,
+          checkpoint,
+          verifyCurrent: async () => {
+            if (!(await latestMatches())) throw apiCaptureError('chatgpt_api_conversation_changed');
+          },
+        };
       }
     }
     if (completed && unresolvedBranches) throw apiCaptureError('chatgpt_api_branch_ambiguous');

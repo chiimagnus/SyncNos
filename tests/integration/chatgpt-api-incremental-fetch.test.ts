@@ -170,8 +170,11 @@ describe('ChatGPT Advanced end-to-end incremental fetch', () => {
     ];
     hasPrevious = true;
     const beforeNext = nonHeadPages;
+    const beforeHeadChecks = api.requestPage.mock.calls.filter(([request]) => request.numTurns === 1).length;
     await capture.captureCurrentPage();
     expect(nonHeadPages - beforeNext).toBe(1);
+    expect(api.requestPage.mock.calls.filter(([request]) => request.numTurns === 1)).toHaveLength(beforeHeadChecks + 1);
+    expect(api.requestPage.mock.calls.slice(-2).map(([request]) => request.numTurns)).toEqual([10, 1]);
     expect((await getMessagesByConversationId(id)).map((item) => item.messageKey)).toEqual([
       'u1',
       'a1',
@@ -189,6 +192,33 @@ describe('ChatGPT Advanced end-to-end incremental fetch', () => {
       originalActivity,
     );
     expect(notifications).toHaveLength(originalNotifications);
+
+    // A changed remote HEAD after the initial page must stop before any IndexedDB mutation.
+    const beforeRemoteChange = await getMessagesByConversationId(id);
+    const beforeRemoteRevision = await readDataRevision('messages');
+    const stableNodes = activeNodes;
+    api.requestPage.mockImplementationOnce(async (request: { numTurns: number }) => {
+      expect(request.numTurns).toBe(10);
+      const captured = activeNodes;
+      activeNodes = [...captured.slice(0, -1), node('a3-replaced', 'assistant', 'changed remotely', 'u3')];
+      return {
+        conversation_id: conversationKey,
+        current_node: captured.at(-1)!.id,
+        title: 'Test conversation',
+        messages: captured,
+        page_info: {
+          start_cursor: captured[0]!.id,
+          end_cursor: captured.at(-1)!.id,
+          has_previous_page: true,
+        },
+      };
+    });
+    await expect(capture.captureCurrentPage()).rejects.toMatchObject({
+      code: 'chatgpt_api_conversation_changed',
+    });
+    expect(await getMessagesByConversationId(id)).toEqual(beforeRemoteChange);
+    expect(await readDataRevision('messages')).toBe(beforeRemoteRevision);
+    activeNodes = stableNodes;
 
     activeNodes = [...activeNodes.slice(0, -1), node('a4', 'assistant', 'regenerated answer', 'u3')];
     await capture.captureCurrentPage();
@@ -577,7 +607,7 @@ describe('ChatGPT Advanced end-to-end incremental fetch', () => {
     const getAllSpy = vi.spyOn(IDBIndex.prototype, 'getAll');
     try {
       await capture.captureCurrentPage();
-      expect(pageRequests.map((req) => req.numTurns)).toEqual([10, 1, 1]);
+      expect(pageRequests.map((req) => req.numTurns)).toEqual([10, 1]);
       expect(
         getAllSpy.mock.instances.filter((instance) => instance.name === 'by_conversationId_sequence'),
       ).toHaveLength(0);
