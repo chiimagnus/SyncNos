@@ -266,20 +266,9 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     },
   ) {
     if (!snapshot || !snapshot.conversation) return null;
-    const safeSnapshot =
-      collectorId === 'chatgpt' && snapshot.captureMeta?.completeness === 'partial' && Array.isArray(snapshot.messages)
-        ? {
-            ...snapshot,
-            messages: snapshot.messages.map((message: any) => ({
-              ...message,
-              captureMergePolicy: message.captureMergePolicy ?? 'preserve-existing-content',
-            })),
-          }
-        : snapshot;
-
     const integrity = resolveCaptureIntegrity(
       collectorId,
-      await applyThinkingCapturePreference(safeSnapshot, options?.includeThinking),
+      await applyThinkingCapturePreference(snapshot, options?.includeThinking),
     );
     if (!integrity.ok) return null;
     const normalizedSnapshot = integrity.snapshot;
