@@ -306,7 +306,6 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         throw new Error('chatgpt_api_storage_conflict');
 
       const previousTail = window.messages.filter((item) => item.sequence > oldAnchor.sequence);
-      const previousKeys = new Set(previousTail.map((item) => item.messageKey));
       const previousByKey = new Map(previousTail.map((item) => [item.messageKey, item]));
       const isPartialTail = integrity.meta?.completeness !== 'complete';
       let nextProvisionalSequence = Math.max(oldAnchor.sequence, ...previousTail.map((item) => item.sequence)) + 1;
@@ -322,8 +321,8 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       persistence = {
         mode: 'incremental',
         diff: {
-          added: currentTail.filter((item) => !previousKeys.has(item.messageKey)).map((item) => item.messageKey),
-          updated: currentTail.filter((item) => previousKeys.has(item.messageKey)).map((item) => item.messageKey),
+          added: currentTail.filter((item) => !previousByKey.has(item.messageKey)).map((item) => item.messageKey),
+          updated: currentTail.filter((item) => previousByKey.has(item.messageKey)).map((item) => item.messageKey),
           removed:
             integrity.meta?.completeness === 'complete'
               ? previousTail.filter((item) => !currentKeys.has(item.messageKey)).map((item) => item.messageKey)

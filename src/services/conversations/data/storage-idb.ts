@@ -2388,7 +2388,7 @@ export async function getConversationTailWindowBySourceAndKey(
   });
   const revision = await revisionRequest;
   await done;
-  messages.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+  messages.reverse();
   return {
     conversation,
     messages,
@@ -2429,7 +2429,6 @@ export async function getMessagesByConversationId(conversationId: number): Promi
     idx.getAll(IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any)) as any,
   )) as any[];
   await txDone(t);
-  items.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
   return items as any;
 }
 

@@ -2569,14 +2569,17 @@ describe('conversations storage-idb', () => {
           sequence,
           updatedAt: sequence,
         };
-      }),
+      }).reverse(),
     );
 
+    expect((await getMessagesByConversationId(id)).map((message) => message.sequence)).toEqual(
+      Array.from({ length: 300 }, (_, index) => index + 1),
+    );
     const windowResult = await getConversationTailWindowBySourceAndKey('debug', 'tail_window_k1', 200);
     expect(windowResult.conversation?.id).toBe(id);
-    expect(windowResult.messages).toHaveLength(200);
-    expect(windowResult.messages[0]?.sequence).toBe(101);
-    expect(windowResult.messages[199]?.sequence).toBe(300);
+    expect(windowResult.messages.map((message) => message.sequence)).toEqual(
+      Array.from({ length: 200 }, (_, index) => index + 101),
+    );
   });
 
   it('patches mapping nested state through one writer and keeps mapping identity stable', async () => {
