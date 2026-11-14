@@ -50,6 +50,7 @@ function message(input: MessageInput) {
     },
     ...(input.status ? { status: input.status } : null),
     metadata: {
+      ...(input.parent !== undefined ? { parent_id: input.parent } : null),
       ...(input.turnId ? { turn_id: input.turnId } : null),
       ...(input.hidden ? { is_visually_hidden_from_conversation: true } : null),
       ...(input.attachments ? { attachments: input.attachments } : null),
@@ -2047,6 +2048,32 @@ describe('ChatGPT paged API transport', () => {
     const result = await captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage });
     expect(result.snapshot.captureMeta).toEqual({ completeness: 'complete', identityVerified: true });
     expect(result.snapshot.messages.every((m: any) => !m.captureMergePolicy)).toBe(true);
+  });
+
+  it('keeps different children of the same parent partial across page boundaries', async () => {
+    const latest = [
+      message({ id: 'user-2', role: 'user', parts: ['new question'], parent: 'user-1' }),
+      message({ id: 'assistant-2', role: 'assistant', channel: 'final', parts: ['current answer'], parent: 'user-2' }),
+    ];
+    const previous = [
+      message({ id: 'user-1', role: 'user', parts: ['first question'] }),
+      message({
+        id: 'assistant-old',
+        role: 'assistant',
+        channel: 'final',
+        parts: ['abandoned answer'],
+        parent: 'user-1',
+      }),
+    ];
+    expect(latest[0]!.metadata.parent_id).toBe('user-1');
+    const { requestPage } = requestPages([responsePage(latest, true, true), responsePage(previous, false)]);
+    const result = await captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage });
+    expect(result.snapshot.captureMeta).toMatchObject({
+      completeness: 'partial',
+      reasons: ['chatgpt_api_branch_ambiguous'],
+    });
+    expect(result.snapshot.messages.map((item: any) => item.messageKey)).toContain('assistant-old');
+    expect(requestPage).toHaveBeenCalledTimes(2);
   });
 
   it('keeps ambiguous sibling branches partial even when all parents are present', async () => {
