@@ -1,0 +1,26 @@
+version = 1
+current_task_id = ""
+
+[[tasks]]
+id = "P1-T1"
+title = "核实分页分支契约与锚点可用性"
+status = "pending"
+plan = "plan-p1.md#p1-t1"
+commit = ""
+note = ""
+
+[[tasks]]
+id = "P1-T2"
+title = "建立原子可信校验点与有界本地读取"
+status = "pending"
+plan = "plan-p1.md#p1-t2"
+commit = ""
+note = ""
+
+[[tasks]]
+id = "P1-T3"
+title = "提前停页并原子替换当前分支尾部"
+status = "pending"
+plan = "plan-p1.md#p1-t3"
+commit = ""
+note = ""
