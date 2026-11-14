@@ -568,19 +568,20 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
                 compact: true,
               });
               const messages = response?.data?.messages;
+              const isStableAnchor = (message: any) =>
+                (message?.role === 'user' || message?.role === 'assistant') &&
+                typeof message.messageKey === 'string' &&
+                !!message.messageKey.trim() &&
+                !message.messageKey.startsWith('fallback_') &&
+                !message.messageKey.startsWith('chatgpt-turn:') &&
+                !message.messageKey.startsWith('chatgpt_turn_') &&
+                Number.isSafeInteger(message.sequence) &&
+                message.sequence >= 0;
+              // The last user message survives regenerated or replaced assistant replies.
               const anchor =
                 response?.ok && Array.isArray(messages)
-                  ? messages.findLast(
-                      (message: any) =>
-                        (message?.role === 'user' || message?.role === 'assistant') &&
-                        typeof message.messageKey === 'string' &&
-                        !!message.messageKey.trim() &&
-                        !message.messageKey.startsWith('fallback_') &&
-                        !message.messageKey.startsWith('chatgpt-turn:') &&
-                        !message.messageKey.startsWith('chatgpt_turn_') &&
-                        Number.isSafeInteger(message.sequence) &&
-                        message.sequence >= 0,
-                    )
+                  ? messages.findLast((message: any) => message?.role === 'user' && isStableAnchor(message)) ??
+                    messages.findLast(isStableAnchor)
                   : null;
               if (anchor) savedTailMessageKey = anchor.messageKey;
             } catch (_error) {

@@ -163,6 +163,25 @@ describe('current page capture integrity routing', () => {
     expect(prepare).toHaveBeenCalledWith({ manual: true, savedTailMessageKey: 'last-stored-assistant' });
   });
 
+  it('prefers the latest saved user message when an assistant reply is regenerated', async () => {
+    const prepare = vi.fn(async () => ({ prepared: true }));
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      url: 'https://chatgpt.com/c/conversation-1',
+      snapshot: chatSnapshot({ completeness: 'partial' }),
+      prepare,
+      tailResponse: {
+        messages: [
+          { messageKey: 'stable-older-user', role: 'user', sequence: 10 },
+          { messageKey: 'stable-last-user', role: 'user', sequence: 12 },
+          { messageKey: 'saved-assistant-about-to-change', role: 'assistant', sequence: 13 },
+        ],
+      },
+    });
+    await harness.service.captureCurrentPage();
+    expect(prepare).toHaveBeenCalledWith({ manual: true, savedTailMessageKey: 'stable-last-user' });
+  });
+
   it('skips transient assistant keys and anchors to the previous saved stable message', async () => {
     const prepare = vi.fn(async () => ({ prepared: true }));
     const harness = createHarness({
