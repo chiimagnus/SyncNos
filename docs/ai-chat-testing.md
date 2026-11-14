@@ -236,6 +236,10 @@ SYNCNOS-STREAM-END
 - partial capture 只能安全 merge / append，不能删除窗口外旧消息。
 - 只有真正证明完整历史时才能产生 complete / destructive snapshot。
 - 手动完整采集若会 sweep 历史，结束后应恢复用户原滚动位置。
+- ChatGPT DOM 首次采集若识别到原生加载节点，应先通过网页的 `IntersectionObserver`
+  分批预加载旧消息，而不通过滚动反复触发请求、不调用 React 私有函数或 Advanced API。
+  预加载本身不代表 DOM 已包含所有消息，仍须一次底部→顶部扫描虚拟列表并核验顺序；
+  原生加载卡住时不得在请求尚未完成期间滚动，只能保存可见窗口的 partial。
 - ChatGPT DOM 首次采集只做一次底部→顶部扫描：分批历史（例如 5→10→15→27 轮）
   到达 `fallback-turn-0` 后不得返回底部重扫，而应在顶端等待加载并沿新增历史继续向上。
   顶部完成必须同时验证：物理滚动位置、最早回合编号、独立于回合外的真实加载器已消失。
