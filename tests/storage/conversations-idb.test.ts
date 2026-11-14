@@ -1412,7 +1412,7 @@ describe('conversations storage-idb', () => {
     }
   });
 
-  it('reuses the preserve-tail working set without redundant per-key reads', async () => {
+  it('appends protected tail messages using only the latest sequence and exact key reads', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',
       source: 'debug',
@@ -1428,6 +1428,7 @@ describe('conversations storage-idb', () => {
 
     const getAllSpy = vi.spyOn(IDBIndex.prototype, 'getAll');
     const getSpy = vi.spyOn(IDBIndex.prototype, 'get');
+    const cursorSpy = vi.spyOn(IDBIndex.prototype, 'openCursor');
     try {
       await syncConversationMessages(
         id,
@@ -1456,11 +1457,16 @@ describe('conversations storage-idb', () => {
       const perKeyReads = getSpy.mock.contexts.filter(
         (context) => String((context as IDBIndex)?.name || '') === 'by_conversationId_messageKey',
       );
-      expect(sequenceReads).toHaveLength(1);
-      expect(perKeyReads).toHaveLength(0);
+      const tailCursors = cursorSpy.mock.contexts.filter(
+        (context) => String((context as IDBIndex)?.name || '') === 'by_conversationId_sequence',
+      );
+      expect(sequenceReads).toHaveLength(0);
+      expect(perKeyReads).toHaveLength(2);
+      expect(tailCursors).toHaveLength(1);
     } finally {
       getAllSpy.mockRestore();
       getSpy.mockRestore();
+      cursorSpy.mockRestore();
     }
 
     expect((await getMessagesByConversationId(id)).map(({ messageKey, sequence }) => [messageKey, sequence])).toEqual([
@@ -1469,6 +1475,58 @@ describe('conversations storage-idb', () => {
       ['m3', 21],
     ]);
   });
+
+  it('keeps a 10000-message protected append bounded to a reverse cursor and the changed keys', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'large-protected-tail',
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(
+      id,
+      Array.from({ length: 10_000 }, (_, index) => ({
+        messageKey: `m${index}`,
+        role: index % 2 === 0 ? 'user' : 'assistant',
+        contentMarkdown: `history-${index}`,
+        sequence: index,
+      })),
+    );
+
+    const getAllSpy = vi.spyOn(IDBIndex.prototype, 'getAll');
+    const cursorSpy = vi.spyOn(IDBIndex.prototype, 'openCursor');
+    try {
+      await syncConversationMessages(
+        id,
+        [
+          {
+            messageKey: 'm10000',
+            role: 'user',
+            contentMarkdown: 'still generating',
+            sequence: 0,
+            captureSequencePolicy: 'preserve-existing-tail',
+          },
+        ],
+        { mode: 'append', diff: { added: ['m10000'], updated: [], removed: [] } },
+      );
+      expect(
+        getAllSpy.mock.contexts.filter((index) => String((index as IDBIndex)?.name) === 'by_conversationId_sequence'),
+      ).toHaveLength(0);
+      expect(
+        cursorSpy.mock.contexts.filter((index) => String((index as IDBIndex)?.name) === 'by_conversationId_sequence'),
+      ).toHaveLength(1);
+    } finally {
+      getAllSpy.mockRestore();
+      cursorSpy.mockRestore();
+    }
+
+    const result = await getMessagesByConversationId(id);
+    expect(result).toHaveLength(10_001);
+    expect(result[0]?.messageKey).toBe('m0');
+    expect(result[9999]?.messageKey).toBe('m9999');
+    expect(result[10000]?.messageKey).toBe('m10000');
+    expect(result[10000]?.sequence).toBe(10_000);
+  }, 30_000);
 
   it('keeps exact stored message-key matching when reusing an append working set', async () => {
     const convo = await upsertConversation({

@@ -1552,7 +1552,7 @@ export async function syncConversationMessages(
         const sequenceOverrides = new Map<string, number>();
         let existingByKey: Map<unknown, any> | null = null;
         let nextTailSequence = 0;
-        if (hasTailPolicy || reconcileKeys.length) {
+        if (reconcileKeys.length) {
           const seqIdx = stores.messages.index('by_conversationId_sequence');
           const range = IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any);
           const storedRows = (await reqToPromise(seqIdx.getAll(range) as any)) as any[];
@@ -1566,27 +1566,30 @@ export async function syncConversationMessages(
             .filter((sequence) => Number.isFinite(sequence));
           nextTailSequence = finiteSequences.length ? Math.max(...finiteSequences) + 1 : 0;
 
-          if (reconcileKeys.length) {
-            const reconciled = mergeAnchoredMessageOrder(storedRows, reconcileKeys);
-            if (reconciled.anchored && reconciled.changed) {
-              const sequenceByKey = new Map(reconciled.keys.map((key, index) => [key, index]));
-              for (const key of reconcileKeys) {
-                const sequence = sequenceByKey.get(key);
-                if (sequence !== undefined) sequenceOverrides.set(key, sequence);
-              }
-              for (const row of storedRows) {
-                const key = safeString(row?.messageKey);
-                const sequence = sequenceByKey.get(key);
-                if (sequence === undefined || Number(row?.sequence) === sequence) continue;
-                const nextRow = { ...row, sequence };
-                affectsPrefix(row, sequence);
-                await reqToPromise(stores.messages.put(nextRow));
-                existingByKey.set(row?.messageKey, nextRow);
-                markMessagesChanged();
-              }
-              nextTailSequence = reconciled.keys.length;
+          const reconciled = mergeAnchoredMessageOrder(storedRows, reconcileKeys);
+          if (reconciled.anchored && reconciled.changed) {
+            const sequenceByKey = new Map(reconciled.keys.map((key, index) => [key, index]));
+            for (const key of reconcileKeys) {
+              const sequence = sequenceByKey.get(key);
+              if (sequence !== undefined) sequenceOverrides.set(key, sequence);
             }
+            for (const row of storedRows) {
+              const key = safeString(row?.messageKey);
+              const sequence = sequenceByKey.get(key);
+              if (sequence === undefined || Number(row?.sequence) === sequence) continue;
+              const nextRow = { ...row, sequence };
+              affectsPrefix(row, sequence);
+              await reqToPromise(stores.messages.put(nextRow));
+              existingByKey.set(row?.messageKey, nextRow);
+              markMessagesChanged();
+            }
+            nextTailSequence = reconciled.keys.length;
           }
+        } else if (hasTailPolicy) {
+          const seqIdx = stores.messages.index('by_conversationId_sequence');
+          const range = IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any);
+          const latest = await reqToPromise(seqIdx.openCursor(range, 'prev'));
+          nextTailSequence = latest && Number.isFinite(latest.value?.sequence) ? latest.value.sequence + 1 : 0;
         }
 
         let upserted = 0;
