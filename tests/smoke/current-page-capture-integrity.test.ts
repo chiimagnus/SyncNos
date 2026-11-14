@@ -149,6 +149,7 @@ describe('current page capture integrity routing', () => {
       tailResponse: {
         conversationId: 7,
         messages: [{ messageKey: 'last-stored-assistant', role: 'assistant', sequence: 101 }],
+        domHistoryVerified: true,
         checkpoint: null,
         messagesRevision: 3,
       },
@@ -171,6 +172,7 @@ describe('current page capture integrity routing', () => {
       snapshot: chatSnapshot({ completeness: 'partial' }),
       prepare,
       tailResponse: {
+        domHistoryVerified: true,
         messages: [
           { messageKey: 'stable-older-user', role: 'user', sequence: 10 },
           { messageKey: 'stable-last-user', role: 'user', sequence: 12 },
@@ -190,6 +192,7 @@ describe('current page capture integrity routing', () => {
       snapshot: chatSnapshot({ completeness: 'partial' }),
       prepare,
       tailResponse: {
+        domHistoryVerified: true,
         messages: [
           { messageKey: 'stable-previous-assistant', role: 'assistant', sequence: 20 },
           { messageKey: 'stable-last-user', role: 'user', sequence: 21 },
@@ -201,7 +204,7 @@ describe('current page capture integrity routing', () => {
     expect(prepare).toHaveBeenCalledWith({ manual: true, savedTailMessageKey: 'stable-last-user' });
   });
 
-  it('reuses a persisted stable DOM anchor without requiring a full-history completion marker', async () => {
+  it('uses a saved DOM tail only after verified complete history', async () => {
     const prepare = vi.fn(async () => ({ prepared: true }));
     const harness = createHarness({
       collectorId: 'chatgpt',
@@ -211,6 +214,7 @@ describe('current page capture integrity routing', () => {
       tailResponse: {
         conversationId: 7,
         messages: [{ messageKey: 'latest-assistant', role: 'assistant', sequence: 11 }],
+        domHistoryVerified: true,
         messagesRevision: 4,
       },
     });
@@ -222,7 +226,57 @@ describe('current page capture integrity routing', () => {
     expect(chatgptApiMocks.capture).not.toHaveBeenCalled();
   });
 
-  it('ignores previously persisted DOM coverage without a single-sweep completion proof', async () => {
+  it('atomically invalidates trusted DOM history when an incremental sweep misses the saved boundary', async () => {
+    const prepare = vi.fn(async () => ({ prepared: true }));
+    const snapshot = {
+      ...chatSnapshot({ completeness: 'partial' }),
+      domHistoryVerified: false,
+      captureMeta: {
+        completeness: 'partial',
+        identityVerified: true,
+        reasons: ['top_not_reached', 'bottom_not_reached'],
+        metrics: { reachedTop: false, reachedBottom: false, stoppedAtKey: false },
+      },
+    };
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      url: 'https://chatgpt.com/c/conversation-1',
+      snapshot,
+      prepare,
+      tailResponse: {
+        messages: [{ messageKey: 'previous-user', role: 'user', sequence: 3 }],
+        domHistoryVerified: true,
+      },
+    });
+    await harness.service.captureCurrentPage();
+    expect(prepare).toHaveBeenCalledWith({ manual: true, savedTailMessageKey: 'previous-user' });
+    const save = harness.calls.find((call) => call.type === 'syncConversationMessages');
+    expect(save?.payload).toMatchObject({
+      mode: 'append',
+      chatgptDomHistoryVerified: false,
+    });
+    expect(save?.payload?.diff?.removed || []).toEqual([]);
+    expect(chatgptApiMocks.capture).not.toHaveBeenCalled();
+  });
+
+  it('re-certifies DOM history after a full, structurally verified scan', async () => {
+    const prepare = vi.fn(async () => ({ prepared: true }));
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      url: 'https://chatgpt.com/c/conversation-1',
+      snapshot: { ...chatSnapshot({ completeness: 'partial' }), domHistoryVerified: true },
+      prepare,
+      tailResponse: { messages: [], domHistoryVerified: false },
+    });
+    await harness.service.captureCurrentPage();
+    expect(prepare).toHaveBeenCalledWith({ manual: true });
+    expect(harness.calls.find((call) => call.type === 'syncConversationMessages')?.payload).toMatchObject({
+      chatgptDomHistoryVerified: true,
+      mode: 'append',
+    });
+  });
+
+  it('does not skip missing historical messages for legacy partial DOM coverage', async () => {
     const prepare = vi.fn(async () => ({ prepared: true }));
     const harness = createHarness({
       collectorId: 'chatgpt',
@@ -235,7 +289,86 @@ describe('current page capture integrity routing', () => {
       },
     });
     await harness.service.captureCurrentPage();
-    expect(prepare).toHaveBeenCalledWith({ manual: true, savedTailMessageKey: 'saved-last-user' });
+    expect(prepare).toHaveBeenCalledWith({ manual: true });
+  });
+
+  it('does not trust an unverified stable stored tail without complete history', async () => {
+    const prepare = vi.fn(async () => ({ prepared: true }));
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      url: 'https://chatgpt.com/c/conversation-1',
+      snapshot: chatSnapshot({ completeness: 'partial' }),
+      prepare,
+      tailResponse: {
+        messages: [{ messageKey: 'stable-but-only-tail', role: 'user', sequence: 9 }],
+        domHistoryVerified: false,
+      },
+    });
+    await harness.service.captureCurrentPage();
+    expect(prepare).toHaveBeenCalledWith({ manual: true });
+  });
+
+  it('coalesces concurrent same-tab DOM captures and permits a later independent retry', async () => {
+    const blocker = deferred<any>();
+    const prepare = vi.fn(() => blocker.promise);
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      url: 'https://chatgpt.com/c/conversation-1',
+      snapshot: chatSnapshot({ completeness: 'partial' }),
+      prepare,
+      tailResponse: { messages: [] },
+    });
+    const first = harness.service.captureCurrentPage();
+    const second = harness.service.captureCurrentPage();
+    expect(second).toBe(first);
+    await vi.waitFor(() => expect(prepare).toHaveBeenCalledTimes(1));
+    blocker.resolve({ prepared: true });
+    const [a, b] = await Promise.all([first, second]);
+    expect(a).toEqual(b);
+    expect(harness.capture).toHaveBeenCalledTimes(1);
+    expect(harness.calls.filter((call) => call.type === 'syncConversationMessages')).toHaveLength(1);
+    await harness.service.captureCurrentPage();
+    expect(harness.capture).toHaveBeenCalledTimes(2);
+  });
+
+  it('refuses to coalesce a different route and does not persist a stale capture after navigation', async () => {
+    const blocker = deferred<any>();
+    const prepare = vi.fn(() => blocker.promise);
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      url: 'https://chatgpt.com/c/conversation-1',
+      snapshot: chatSnapshot({ completeness: 'partial' }),
+      prepare,
+    });
+    const first = harness.service.captureCurrentPage();
+    await vi.waitFor(() => expect(prepare).toHaveBeenCalledTimes(1));
+    vi.stubGlobal('location', { href: 'https://chatgpt.com/c/unrelated-conversation' });
+    await expect(harness.service.captureCurrentPage()).rejects.toMatchObject({ code: 'CAPTURE_TARGET_CHANGED' });
+    blocker.resolve({ prepared: true });
+    await expect(first).rejects.toMatchObject({ code: 'CAPTURE_TARGET_CHANGED' });
+    expect(harness.calls.find((call) => call.type === 'upsertConversation')).toBeUndefined();
+    expect(harness.calls.find((call) => call.type === 'syncConversationMessages')).toBeUndefined();
+  });
+
+  it('releases the same-tab capture lock after rejection', async () => {
+    const prepare = vi.fn().mockRejectedValueOnce(new Error('native loader failed')).mockResolvedValueOnce({
+      prepared: true,
+    });
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      url: 'https://chatgpt.com/c/conversation-1',
+      snapshot: chatSnapshot({ completeness: 'partial' }),
+      prepare,
+    });
+    const first = harness.service.captureCurrentPage();
+    const second = harness.service.captureCurrentPage();
+    expect(second).toBe(first);
+    await expect(first).rejects.toThrow('native loader failed');
+    await expect(second).rejects.toThrow('native loader failed');
+    const result = await harness.service.captureCurrentPage();
+    expect(result).toMatchObject({ kind: 'chat' });
+    expect(prepare).toHaveBeenCalledTimes(2);
+    expect(harness.capture).toHaveBeenCalledTimes(1);
   });
 
   it('does not use an API provisional turn key as a DOM scroll anchor', async () => {

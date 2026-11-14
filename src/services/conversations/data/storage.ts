@@ -85,6 +85,7 @@ export function syncConversationMessages(
     activityAt?: number;
     conversationContentChanged?: boolean;
     checkpoint?: ChatgptApiCheckpoint;
+    domHistoryVerified?: boolean;
     preserveCheckpointTail?: boolean;
     expectedCheckpoint?: ChatgptApiCheckpoint;
     expectedMessagesRevision?: number;

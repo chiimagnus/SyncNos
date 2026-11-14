@@ -20,6 +20,7 @@ import {
   finishPreparedCapture,
   mergePreparedRecords,
   createPreparedCaptureConsumer,
+  resolveScrollRoot,
   runVirtualizedSweep,
   type PreparedAccumulator,
   type VirtualizedBoundary,
@@ -244,7 +245,15 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
   }
 
   function getConversationRoot(): any {
-    return env.document.querySelector('main');
+    const roots = Array.from(env.document.querySelectorAll('main')) as HTMLElement[];
+    if (roots.length <= 1) return roots[0] || null;
+    const rendered = (root: HTMLElement) => {
+      const rect = root.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0 && env.window.getComputedStyle(root).visibility !== 'hidden';
+    };
+    const transcripts = roots.filter((root) => root.querySelector('[data-rail-chat-transcript]'));
+    const conversations = roots.filter((root) => root.querySelector(CHATGPT_TURN_SELECTOR));
+    return transcripts.find(rendered) || conversations.find(rendered) || transcripts[0] || conversations[0] || roots[0];
   }
 
   function getConversationScrollSeed(): any {
@@ -802,8 +811,109 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     };
   }
 
+  // Ask the page's own history IntersectionObserver to load older pages before the
+  // one backward DOM harvest. Moving its sentinel is not a data/API request.
+  async function preloadNativeHistory(
+    sampleIdentity: () => string | null,
+    options: {
+      sleep?: (ms: number) => Promise<void>;
+      now?: () => number;
+      boundaryTimeoutMs?: number;
+      totalDeadlineMs?: number;
+    },
+  ): Promise<'skipped' | 'ready' | 'pending'> {
+    const isVisible = () => env.document.visibilityState !== 'hidden';
+    if (!isVisible()) return 'skipped';
+    const root = getConversationRoot();
+    const conversationId = findConversationIdFromUrl();
+    if (!conversationId) return 'skipped';
+    const scrollSeed = manualAdapter.readScrollSeed();
+    if (!root || !scrollSeed?.hasAttribute?.('data-app-action-timeline-scroll')) return 'skipped';
+    const scrollRoot = resolveScrollRoot({ document: env.document, window: env.window }, scrollSeed) as HTMLElement;
+    if (scrollRoot !== scrollSeed) return 'skipped';
+
+    const now = options.now || Date.now;
+    const sleep = options.sleep || ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+    const totalBudget = Math.min(300_000, Math.max(1, Number(options.totalDeadlineMs) || 300_000));
+    const deadline = now() + Math.min(120_000, Math.floor(totalBudget / 2));
+    const pageTimeout = Math.min(45_000, Math.max(1, Number(options.boundaryTimeoutMs) || 45_000));
+    const expectedIdentity = sampleIdentity();
+    if (!expectedIdentity) return 'skipped';
+    let attempted = false;
+    let inFlight = false;
+    const visibleOrdinals = () =>
+      new Map<string, number>(
+        readTurnShells(getConversationRoot())
+          .map((turn) => [turnKeyOf(turn), structuralTurnOrdinal(turn)] as const)
+          .filter((entry): entry is readonly [string, number] => !!entry[0] && entry[1] !== null),
+      );
+
+    while (now() < deadline && isVisible() && sampleIdentity() === expectedIdentity) {
+      const transcript = (
+        Array.from(
+          root.querySelectorAll('[data-rail-chat-transcript][data-chatgpt-conversation-selection-target]'),
+        ) as Element[]
+      ).find((node) => node.getAttribute('data-chatgpt-conversation-selection-target') === conversationId);
+      const indicator = transcript?.querySelector('[role="status"] [data-loading-indicator]');
+      const sentinel = indicator?.closest('[role="status"]')?.parentElement as HTMLElement | undefined;
+      if (!root.isConnected || !scrollRoot.isConnected) return 'pending';
+      if (!sentinel || sentinel.parentElement !== transcript || !scrollRoot.contains(sentinel))
+        return inFlight ? 'pending' : attempted ? 'ready' : 'skipped';
+
+      const viewport = scrollRoot.getBoundingClientRect();
+      const position = sentinel.getBoundingClientRect();
+      if (!viewport.height || !position.height || !Number.isFinite(position.top)) break;
+      if (position.bottom >= viewport.top && position.top <= viewport.bottom) return attempted ? 'pending' : 'skipped';
+
+      const beforeOrdinals = visibleOrdinals();
+      if (!beforeOrdinals.size) return attempted ? 'pending' : 'skipped';
+      const previous = {
+        transform: sentinel.style.transform,
+        opacity: sentinel.style.opacity,
+        pointerEvents: sentinel.style.pointerEvents,
+      };
+      const transform = `translateY(${Math.round(viewport.top + viewport.height / 2 - position.top)}px)`;
+      attempted = true;
+      inFlight = true;
+      try {
+        sentinel.style.transform = transform;
+        sentinel.style.opacity = '0';
+        sentinel.style.pointerEvents = 'none';
+        await sleep(Math.min(850, Math.max(1, deadline - now())));
+      } finally {
+        if (sentinel.style.transform === transform) sentinel.style.transform = previous.transform;
+        if (sentinel.style.opacity === '0') sentinel.style.opacity = previous.opacity;
+        if (sentinel.style.pointerEvents === 'none') sentinel.style.pointerEvents = previous.pointerEvents;
+      }
+
+      const pageDeadline = Math.min(deadline, now() + pageTimeout);
+      let changed = false;
+      while (now() < pageDeadline && isVisible() && sampleIdentity() === expectedIdentity) {
+        const currentOrdinals = visibleOrdinals();
+        if (
+          Array.from(currentOrdinals).some(([key, ordinal]) => {
+            const before = beforeOrdinals.get(key);
+            return before !== undefined && ordinal > before;
+          })
+        ) {
+          changed = true;
+          break;
+        }
+        await sleep(Math.min(100, Math.max(1, pageDeadline - now())));
+      }
+      // Height changes and transient React remounts do not prove that older turns were loaded.
+      if (!changed) return 'pending';
+      inFlight = false;
+    }
+    return inFlight
+      ? 'pending'
+      : attempted && isVisible() && sampleIdentity() === expectedIdentity
+        ? 'ready'
+        : 'skipped';
+  }
+
   // Manual-only dynamic sweep. The provider re-queries after every wait; no turn/message node
-  // survives across an await. The original scroll root is restored exactly once in finally.
+  // survives across an await. Restore scroll after sweeping, not while native history is pending.
   async function prepareManualCapture(options: any = {}): Promise<any | null> {
     if (!matches({ hostname: env.location.hostname })) return null;
     const root = manualAdapter.readRoot();
@@ -812,11 +922,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     const scrollRuntime = { document: env.document, window: env.window };
     const initialIdentityGuard = manualAdapter.readIdentity();
     const sampleIdentity = createIdentitySampler(initialIdentityGuard);
-    const scrollRestorer = createScrollRootRestorer({
-      ...scrollRuntime,
-      getSeed: manualAdapter.readScrollSeed,
-      sampleIdentity,
-    });
+    let scrollRestorer: ReturnType<typeof createScrollRootRestorer> | null = null;
     const durableConversationKey = initialIdentityGuard.durableId ? identityConversationKey(initialIdentityGuard) : '';
     const accumulator = createPreparedAccumulator<any>({
       source: 'chatgpt',
@@ -847,31 +953,58 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       harvest: (target: PreparedAccumulator<any>) => harvestRenderedInto(target, null, { newestFirst: true }),
     };
     try {
-      const sweep = await runVirtualizedSweep(scrollRuntime, adapter, accumulator, {
-        totalDeadlineMs: options.totalDeadlineMs,
-        maxSteps: options.maxSteps,
-        stableSamples: options.stableSamples,
-        pollMs: options.pollMs,
-        stepTimeoutMs: options.stepTimeoutMs,
-        boundaryTimeoutMs: options.boundaryTimeoutMs ?? 45_000,
-        overlapRatio: options.overlapRatio,
-        maxOverlapRecoveries: options.maxOverlapRecoveries,
-        sleep: options.sleep,
-        now: options.now,
-        startAtBottom: true,
-        holdAtTop: true,
-        ...(savedTailMessageKey ? { stopAtKey: savedTailMessageKey } : null),
-      });
-      if (sweep.stoppedAtKey) {
-        const index = accumulator.records.findIndex((record) => record.key === savedTailMessageKey);
-        accumulator.records = accumulator.records.slice(index);
+      const now = options.now || Date.now;
+      const startedAt = now();
+      const preload = savedTailMessageKey ? 'skipped' : await preloadNativeHistory(sampleIdentity, options);
+      if (preload === 'pending') {
+        // The native request may still be in flight. Save the visible window without moving it.
+        addPreparedReason(accumulator, 'boundary_stalled');
+        addPreparedReason(accumulator, 'top_not_reached');
+        if (env.document.visibilityState !== 'hidden' && sampleIdentity()) {
+          await harvestRenderedInto(accumulator, root, { newestFirst: true });
+        }
+        accumulator.sweepMetrics = { steps: 0, reachedTop: false, reachedBottom: false, stoppedAtKey: false };
+      } else {
+        // Let the native virtualizer rebase the user's viewport before we snapshot it.
+        // Prepending older turns can change scrollTop without changing the visible message.
+        scrollRestorer = createScrollRootRestorer({
+          ...scrollRuntime,
+          getSeed: manualAdapter.readScrollSeed,
+          sampleIdentity,
+        });
+        const totalDeadlineMs =
+          preload === 'ready'
+            ? Math.max(1, Math.min(300_000, Number(options.totalDeadlineMs) || 300_000) - (now() - startedAt))
+            : options.totalDeadlineMs;
+        const sweep = await runVirtualizedSweep(scrollRuntime, adapter, accumulator, {
+          totalDeadlineMs,
+          maxSteps: options.maxSteps,
+          stableSamples: options.stableSamples,
+          pollMs: options.pollMs,
+          stepTimeoutMs: options.stepTimeoutMs,
+          boundaryTimeoutMs: options.boundaryTimeoutMs ?? 45_000,
+          overlapRatio: options.overlapRatio,
+          maxOverlapRecoveries: options.maxOverlapRecoveries,
+          sleep: options.sleep,
+          now: options.now,
+          startAtBottom: true,
+          holdAtTop: true,
+          ...(savedTailMessageKey ? { stopAtKey: savedTailMessageKey } : null),
+        });
+        if (sweep.stoppedAtKey) {
+          const index = accumulator.records.findIndex((record) => record.key === savedTailMessageKey);
+          accumulator.records = accumulator.records.slice(index);
+        }
+        accumulator.completeness = sweep.completeness;
       }
-      accumulator.completeness = sweep.completeness;
     } finally {
-      const restoreResult = scrollRestorer.restore();
-      if (!restoreResult.restored) {
-        accumulator.completeness = 'partial';
-        addPreparedReason(accumulator, 'restore_failed');
+      // A pending native request never starts a sweep, so it needs no scroll restoration.
+      if (scrollRestorer) {
+        const restoreResult = scrollRestorer.restore();
+        if (!restoreResult.restored) {
+          accumulator.completeness = 'partial';
+          addPreparedReason(accumulator, 'restore_failed');
+        }
       }
     }
 
@@ -929,6 +1062,11 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         warningFlags: [],
       },
       messages,
+      ...(finalPrepared.completeness === 'complete' && !finalPrepared.reasons.length
+        ? { domHistoryVerified: true }
+        : finalPrepared.metrics.stoppedAtKey && finalPrepared.metrics.reachedBottom && !finalPrepared.reasons.length
+          ? null
+          : { domHistoryVerified: false }),
       captureMeta: {
         completeness: 'partial',
         identityVerified: true,

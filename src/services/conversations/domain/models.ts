@@ -14,6 +14,7 @@ export type Conversation = {
   conversationKey: string;
   canonicalChatIdentity?: string;
   chatgptApiCheckpoint?: ChatgptApiCheckpoint;
+  chatgptDomHistoryVerified?: true;
   listSourceKey?: string;
   listSiteKey?: string;
   title?: string;

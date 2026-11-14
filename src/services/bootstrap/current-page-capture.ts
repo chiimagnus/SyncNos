@@ -359,6 +359,11 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       ...(integrity.meta?.completeness === 'complete' && options?.checkpoint
         ? { chatgptApiCheckpoint: options.checkpoint }
         : null),
+      ...(collectorId === 'chatgpt' &&
+      !options?.expectedChatgptConversationId &&
+      typeof normalizedSnapshot.domHistoryVerified === 'boolean'
+        ? { chatgptDomHistoryVerified: normalizedSnapshot.domHistoryVerified }
+        : null),
       ...(options?.trustedChatgptApiPartial ? { trustedChatgptApiPartial: true } : null),
       ...(options?.trustedTail || (persistence.mode === 'snapshot' && options?.fullSnapshotGuard)
         ? {
@@ -382,7 +387,24 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
     };
   }
 
-  async function captureCurrentPage(): Promise<CurrentPageCaptureResult> {
+  let inFlightCapture: { url: string; promise: Promise<CurrentPageCaptureResult> } | null = null;
+  function captureCurrentPage(): Promise<CurrentPageCaptureResult> {
+    const url = currentUrl();
+    if (inFlightCapture) {
+      if (inFlightCapture.url === url) return inFlightCapture.promise;
+      return Promise.reject(Object.assign(new Error('Capture target changed'), { code: 'CAPTURE_TARGET_CHANGED' }));
+    }
+    const pending = runCaptureCurrentPage();
+    inFlightCapture = { url, promise: pending };
+    void pending
+      .finally(() => {
+        if (inFlightCapture?.promise === pending) inFlightCapture = null;
+      })
+      .catch(() => undefined);
+    return pending;
+  }
+
+  async function runCaptureCurrentPage(): Promise<CurrentPageCaptureResult> {
     const pageUrl = currentUrl();
     let savedPagedConversationId: number | null = null;
     setCaptureActivity('capturing', 'info', t('fetchingDots'), pageUrl);
@@ -583,7 +605,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
                   ? (messages.findLast((message: any) => message?.role === 'user' && isStableAnchor(message)) ??
                     messages.findLast(isStableAnchor))
                   : null;
-              if (anchor) savedTailMessageKey = anchor.messageKey;
+              if (response?.data?.domHistoryVerified === true && anchor) savedTailMessageKey = anchor.messageKey;
             } catch (_error) {
               // A missing local optimization hint cannot prevent a safe full DOM sweep.
             }
@@ -616,6 +638,9 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         }
       }
 
+      if (target.collectorId === 'chatgpt' && !target.useChatgptApi && pageUrl !== currentUrl()) {
+        throw Object.assign(new Error('Capture target changed'), { code: 'CAPTURE_TARGET_CHANGED' });
+      }
       const persist = () =>
         saveSnapshot(snapshot, target.collectorId, {
           ...(expectedChatgptConversationId ? { expectedChatgptConversationId } : null),
