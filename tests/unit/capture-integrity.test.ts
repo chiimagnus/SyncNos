@@ -115,13 +115,35 @@ describe('resolveCaptureIntegrity', () => {
       messageKey: 'm1',
       captureSequencePolicy: 'reconcile-existing-order',
     });
-    expect(result.snapshot.messages[0]).not.toHaveProperty('captureMergePolicy');
+    expect(result.snapshot.messages[0]).toHaveProperty('captureMergePolicy', 'preserve-existing-content');
     expect(result.meta).toEqual({
       completeness: 'partial',
       identityVerified: true,
       reasons: ['timeout'],
       metrics: { passes: 2 },
     });
+  });
+
+  it('keeps explicit merge policy and leaves other collectors unchanged', () => {
+    const input = snapshot({
+      captureMeta: { completeness: 'partial', identityVerified: true },
+      messages: [
+        {
+          messageKey: 'm1',
+          role: 'assistant',
+          contentMarkdown: 'updated',
+          captureMergePolicy: 'preserve-existing-markdown',
+        },
+      ],
+    });
+    const chatgpt = resolveCaptureIntegrity('chatgpt', input);
+    expect(chatgpt.ok && chatgpt.snapshot.messages[0].captureMergePolicy).toBe('preserve-existing-markdown');
+    const claude = resolveCaptureIntegrity('claude', {
+      ...input,
+      conversation: { source: 'claude', conversationKey: 'conversation-1' },
+      messages: [{ messageKey: 'm1', role: 'assistant', contentMarkdown: 'updated' }],
+    });
+    expect(claude.ok && claude.snapshot.messages[0].captureMergePolicy).toBeUndefined();
   });
 
   it.each(['order_unanchored', 'order_conflict'])(

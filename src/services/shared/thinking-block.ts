@@ -5,7 +5,7 @@ export { composeThinkingMarkdown, splitThinkingMarkdown } from '@services/shared
 
 export const AI_CHAT_INCLUDE_THINKING_STORAGE_KEY = 'ai_chat_include_thinking_v1';
 
-export async function applyThinkingCapturePreference(snapshot: any): Promise<any> {
+export async function applyThinkingCapturePreference(snapshot: any, includeThinking?: boolean): Promise<any> {
   if (!Array.isArray(snapshot?.messages)) return snapshot;
   if (
     !snapshot.messages.some(
@@ -14,8 +14,11 @@ export async function applyThinkingCapturePreference(snapshot: any): Promise<any
   ) {
     return snapshot;
   }
-  const local = await storageGet([AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]);
-  if (local?.[AI_CHAT_INCLUDE_THINKING_STORAGE_KEY] !== false) return snapshot;
+  const enabled =
+    includeThinking === undefined
+      ? (await storageGet([AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]))?.[AI_CHAT_INCLUDE_THINKING_STORAGE_KEY] !== false
+      : includeThinking;
+  if (enabled) return snapshot;
   return {
     ...snapshot,
     messages: snapshot.messages.flatMap((message: any) => {

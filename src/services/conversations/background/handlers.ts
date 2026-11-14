@@ -37,7 +37,7 @@ type AnyRouter = {
 type ConversationHandlersDeps = {
   onConversationChanged: (conversationId: number, reason: AutoSyncConversationChangedReason) => void | Promise<void>;
   onRemoteCleanupPending: () => void | Promise<void>;
-  scheduleImageBackfill: (conversationId: number) => Promise<void>;
+  scheduleImageBackfill: (conversationId: number, messageKeys?: string[]) => Promise<void>;
 };
 
 function fireAndForget(task: void | Promise<void>) {
@@ -218,11 +218,26 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     const limit = normalizeTailWindowLimit(msg?.limit);
     if (limit == null) return invalidArgument('limit', 'invalid limit', msg?.limit);
 
-    const result = await getConversationTailWindowBySourceAndKey(source, conversationKey, limit);
+    const compact = source === 'chatgpt' && msg?.compact === true;
+    const result = compact
+      ? await getConversationTailWindowBySourceAndKey(source, conversationKey, limit, { withRevision: true })
+      : await getConversationTailWindowBySourceAndKey(source, conversationKey, limit);
     const conversationId = Number(result.conversation?.id);
     return router.ok({
       conversationId: Number.isFinite(conversationId) && conversationId > 0 ? conversationId : null,
-      messages: Array.isArray(result.messages) ? result.messages : [],
+      messages: compact
+        ? result.messages.map((message) => ({
+            messageKey: message.messageKey,
+            role: message.role,
+            sequence: message.sequence,
+          }))
+        : result.messages,
+      ...(compact
+        ? {
+            checkpoint: result.conversation?.chatgptApiCheckpoint ?? null,
+            messagesRevision: result.messagesRevision,
+          }
+        : null),
     });
   });
 
@@ -357,6 +372,7 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
     }
     let imageWarningFlags: string[] = [];
     let shouldScheduleChatImageBackfill = false;
+    let chatImageMessageKeys: string[] = [];
     if (sourceType === 'article') {
       try {
         const local = await storageGet(['web_article_cache_images_enabled']);
@@ -427,9 +443,10 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
           // Keep the original image data in the message if local caching fails.
         }
       }
-      shouldScheduleChatImageBackfill =
-        msg.deferRemoteSync !== true &&
-        messages.some((message: any) => hasCacheableChatImageReference(message?.contentMarkdown));
+      chatImageMessageKeys = messages
+        .filter((message: any) => message?.messageKey && hasCacheableChatImageReference(message.contentMarkdown))
+        .map((message: any) => String(message.messageKey));
+      shouldScheduleChatImageBackfill = msg.deferRemoteSync !== true && chatImageMessageKeys.length > 0;
     }
 
     const res = await syncConversationMessages(conversationId, messages, {
@@ -437,15 +454,26 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
       diff,
       ...(hasActivityAt ? { activityAt: Number(activityAt) } : null),
       ...(conversationContentChanged ? { conversationContentChanged: true } : null),
+      ...(msg?.chatgptApiCheckpoint ? { checkpoint: msg.chatgptApiCheckpoint } : null),
+      ...(msg?.trustedChatgptApiPartial === true ? { preserveCheckpointTail: true } : null),
+      ...(msg?.verifiedChatgptApiTail === true
+        ? {
+            expectedCheckpoint: msg?.expectedCheckpoint,
+            expectedMessagesRevision: msg?.expectedMessagesRevision,
+          }
+        : null),
+      ...(msg?.verifiedChatgptApiTail === true || msg?.trustedChatgptApiPartial === true || msg?.chatgptApiCheckpoint
+        ? { reportChanged: true }
+        : null),
     });
-    if (msg.deferRemoteSync !== true) {
+    if (msg.deferRemoteSync !== true && (res.changed !== false || msg?.conversationMetadataChanged === true)) {
       fireAndForget(
         deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.syncConversationMessages),
       );
     }
-    if (shouldScheduleChatImageBackfill) {
+    if (shouldScheduleChatImageBackfill && res.changed !== false) {
       try {
-        await deps.scheduleImageBackfill(conversationId);
+        await deps.scheduleImageBackfill(conversationId, chatImageMessageKeys);
       } catch (error) {
         console.warn('[ImageBackfill] enqueue failed but message persistence already succeeded', {
           conversationId,

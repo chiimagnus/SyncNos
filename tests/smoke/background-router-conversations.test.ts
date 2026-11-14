@@ -9,6 +9,7 @@ const storageMocks = vi.hoisted(() => ({
   findConversationBySourceAndKey: vi.fn(),
   findConversationById: vi.fn(),
   getConversationDetail: vi.fn(),
+  getConversationTailWindowBySourceAndKey: vi.fn(),
   mergeConversationsByIds: vi.fn(),
   syncConversationMessages: vi.fn(),
   upsertConversation: vi.fn(),
@@ -33,6 +34,7 @@ vi.mock('@services/conversations/data/storage', () => ({
   findConversationBySourceAndKey: storageMocks.findConversationBySourceAndKey,
   findConversationById: storageMocks.findConversationById,
   getConversationDetail: storageMocks.getConversationDetail,
+  getConversationTailWindowBySourceAndKey: storageMocks.getConversationTailWindowBySourceAndKey,
   mergeConversationsByIds: storageMocks.mergeConversationsByIds,
   syncConversationMessages: storageMocks.syncConversationMessages,
   upsertConversation: storageMocks.upsertConversation,
@@ -112,6 +114,7 @@ afterEach(() => {
   storageMocks.findConversationBySourceAndKey.mockReset();
   storageMocks.findConversationById.mockReset();
   storageMocks.getConversationDetail.mockReset();
+  storageMocks.getConversationTailWindowBySourceAndKey.mockReset();
   storageMocks.mergeConversationsByIds.mockReset();
   localStorageMocks.storageGet.mockReset();
   imageInlineMocks.inlineChatImagesInMessages.mockReset();
@@ -119,6 +122,64 @@ afterEach(() => {
 });
 
 describe('background-router conversations', () => {
+  it('reuses the tail query for compact Advanced checkpoints without changing the existing full-message response', async () => {
+    const checkpoint = { lastUserKey: 'u1', userSignature: 'a'.repeat(64), includeThinking: true };
+    storageMocks.getConversationTailWindowBySourceAndKey.mockResolvedValue({
+      conversation: { id: 42, chatgptApiCheckpoint: checkpoint },
+      messages: [{ messageKey: 'u1', role: 'user', sequence: 0, contentMarkdown: 'private text', updatedAt: 1 }],
+    });
+    const router = createRouter();
+    const full = await router.dispatch({
+      type: 'getConversationTailWindowBySourceAndKey',
+      source: 'chatgpt',
+      conversationKey: 'c1',
+      limit: 200,
+    });
+    expect(full.data.messages[0].contentMarkdown).toBe('private text');
+    expect(full.data).not.toHaveProperty('checkpoint');
+
+    const compact = await router.dispatch({
+      type: 'getConversationTailWindowBySourceAndKey',
+      source: 'chatgpt',
+      conversationKey: 'c1',
+      limit: 200,
+      compact: true,
+    });
+    expect(compact.data).toMatchObject({ conversationId: 42, checkpoint });
+    expect(compact.data.messages).toEqual([{ messageKey: 'u1', role: 'user', sequence: 0 }]);
+  });
+
+  it('forwards only an explicit verified checkpoint and trusted Advanced partial to persistence', async () => {
+    const checkpoint = { lastUserKey: 'u1', userSignature: 'b'.repeat(64), includeThinking: false };
+    storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
+    const router = createRouter();
+    await router.dispatch({
+      type: 'syncConversationMessages',
+      conversationId: 42,
+      mode: 'snapshot',
+      messages: [],
+      chatgptApiCheckpoint: checkpoint,
+    });
+    expect(storageMocks.syncConversationMessages).toHaveBeenCalledWith(42, [], {
+      mode: 'snapshot',
+      diff: null,
+      checkpoint,
+      reportChanged: true,
+    });
+    await router.dispatch({
+      type: 'syncConversationMessages',
+      conversationId: 42,
+      mode: 'append',
+      messages: [],
+      trustedChatgptApiPartial: true,
+    });
+    expect(storageMocks.syncConversationMessages).toHaveBeenLastCalledWith(42, [], {
+      mode: 'append',
+      diff: null,
+      preserveCheckpointTail: true,
+      reportChanged: true,
+    });
+  });
   it.each([
     [true, 'createConversation'],
     [false, 'upsertConversation'],
@@ -311,7 +372,7 @@ describe('background-router conversations', () => {
     expect(onConversationChanged).toHaveBeenCalledTimes(1);
     expect(onConversationChanged).toHaveBeenCalledWith(2002, 'syncConversationMessages');
     expect(scheduleImageBackfill).toHaveBeenCalledOnce();
-    expect(scheduleImageBackfill).toHaveBeenCalledWith(2002);
+    expect(scheduleImageBackfill).toHaveBeenCalledWith(2002, ['m1']);
   });
 
   it('reuses cached ChatGPT images during the final snapshot without downloading or changing cache settings', async () => {
@@ -370,7 +431,7 @@ describe('background-router conversations', () => {
       mode: 'snapshot',
       diff: null,
     });
-    expect(scheduleImageBackfill).toHaveBeenCalledWith(2002);
+    expect(scheduleImageBackfill).toHaveBeenCalledWith(2002, ['m1']);
     expect(storageMocks.syncConversationMessages.mock.invocationCallOrder[0]).toBeLessThan(
       scheduleImageBackfill.mock.invocationCallOrder[0]!,
     );
@@ -406,7 +467,7 @@ describe('background-router conversations', () => {
       mode: 'snapshot',
       diff: null,
     });
-    expect(scheduleImageBackfill).toHaveBeenCalledWith(2004);
+    expect(scheduleImageBackfill).toHaveBeenCalledWith(2004, ['m1']);
     expect(res).toMatchObject({ ok: true, data: { upserted: 1, deleted: 0 } });
   });
 

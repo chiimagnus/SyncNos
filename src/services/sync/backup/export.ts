@@ -44,6 +44,7 @@ function csvCell(raw: unknown) {
 function stripLocalConversation(conversation: AnyRecord) {
   const c = conversation && typeof conversation === 'object' ? { ...conversation } : {};
   delete (c as any).id;
+  delete (c as any).chatgptApiCheckpoint;
   return c;
 }
 

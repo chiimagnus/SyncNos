@@ -1,4 +1,4 @@
-import type { Conversation, ConversationMessage } from '@services/conversations/domain/models';
+import type { ChatgptApiCheckpoint, Conversation, ConversationMessage } from '@services/conversations/domain/models';
 import {
   normalizeCanonicalVideoChapters,
   normalizeCanonicalVideoTranscriptCues,
@@ -802,6 +802,7 @@ export async function upsertConversation(
   return {
     ...outcome.record,
     __isNew: outcome.isNew,
+    __conversationChanged: outcome.conversationChanged,
     __semanticContentChanged: outcome.semanticContentChanged,
   };
 }
@@ -894,6 +895,8 @@ async function mergeConversationsInTransaction(
       normalizeStoredActivityTimestamp(remove.lastActivityAt),
     ),
   });
+
+  delete mergedConversation.chatgptApiCheckpoint;
 
   const mappingMutation = await migrateSyncMappingKey(stores.sync_mappings, stores[GITHUB_CLEANUP_OUTBOX_STORE], {
     legacySource: remove.source,
@@ -1408,8 +1411,13 @@ export async function syncConversationMessages(
     diff?: { added?: string[]; updated?: string[]; removed?: string[] } | null;
     activityAt?: number;
     conversationContentChanged?: boolean;
+    checkpoint?: ChatgptApiCheckpoint;
+    preserveCheckpointTail?: boolean;
+    expectedCheckpoint?: ChatgptApiCheckpoint | null;
+    expectedMessagesRevision?: number;
+    reportChanged?: boolean;
   },
-): Promise<{ upserted: number; deleted: number }> {
+): Promise<{ upserted: number; deleted: number; changed?: boolean }> {
   const requestedMode = options?.mode;
   if (requestedMode !== undefined && !['snapshot', 'incremental', 'append'].includes(String(requestedMode))) {
     throw new Error(`Unknown message persistence mode: ${String(requestedMode)}`);
@@ -1417,30 +1425,98 @@ export async function syncConversationMessages(
   const mode = requestedMode || 'snapshot';
   const activityAtProvided = !!options && Object.prototype.hasOwnProperty.call(options, 'activityAt');
   const activityAt = activityAtProvided ? parseRequestedActivityTimestamp(options?.activityAt, false, 'activityAt') : 0;
+  const checkpoint = options?.checkpoint;
+  if (
+    checkpoint &&
+    ((mode !== 'snapshot' && mode !== 'incremental') ||
+      !safeString(checkpoint.lastUserKey) ||
+      !/^[0-9a-f]{64}$/.test(checkpoint.userSignature) ||
+      typeof checkpoint.includeThinking !== 'boolean')
+  ) {
+    throw new Error('chatgpt_api_checkpoint_invalid');
+  }
+  if (
+    options?.expectedMessagesRevision !== undefined &&
+    (!Number.isSafeInteger(options.expectedMessagesRevision) ||
+      options.expectedMessagesRevision < 0 ||
+      (mode !== 'incremental' && mode !== 'snapshot') ||
+      (mode === 'incremental' && !options.expectedCheckpoint))
+  )
+    throw new Error('chatgpt_api_storage_conflict');
+  const revisionStore = DATA_REVISION_STORE_BY_SCOPE.messages;
   const db = await openDb();
   let conversationActivityChanged = false;
+  let messagesChanged = false;
 
   const result = await runTrackedTransaction(
     {
       db,
-      stores: ['messages', 'conversations'],
-      revisionScopes: activityAtProvided ? ['messages', 'conversations'] : ['messages'],
+      stores: [
+        'messages',
+        'conversations',
+        ...(options?.expectedMessagesRevision !== undefined ? [revisionStore] : []),
+      ],
+      revisionScopes: ['messages', 'conversations'],
     },
     async ({ stores, markChanged }) => {
       let activityConversation: any = await reqToPromise(stores.conversations.get(conversationId as any));
       if (!activityConversation) throw new Error('conversation not found');
+      if (checkpoint && activityConversation.source !== 'chatgpt') throw new Error('chatgpt_api_checkpoint_source');
+      if (options?.expectedMessagesRevision !== undefined && activityConversation.source !== 'chatgpt')
+        throw new Error('chatgpt_api_storage_conflict');
+      if (options?.expectedMessagesRevision !== undefined) {
+        const storedRevision = normalizeDataRevisionRecord(
+          await reqToPromise(stores[revisionStore].get(DATA_REVISION_RECORD_KEY)),
+        ).revision;
+        if (
+          storedRevision !== options.expectedMessagesRevision ||
+          !storedValueEqual(activityConversation.chatgptApiCheckpoint ?? null, options.expectedCheckpoint ?? null)
+        )
+          throw new Error('chatgpt_api_storage_conflict');
+      }
       let semanticContentChanged = options?.conversationContentChanged === true;
+      let changedPrefix = false;
+      const committedCheckpoint: ChatgptApiCheckpoint | undefined = activityConversation.chatgptApiCheckpoint;
+      const markMessagesChanged = () => {
+        messagesChanged = true;
+        markChanged('messages');
+      };
       const commitActivity = async () => {
-        if (!activityAtProvided || !semanticContentChanged) return;
-        const current = normalizeStoredActivityTimestamp(activityConversation.lastActivityAt);
-        if (activityAt <= current) return;
-        activityConversation = { ...activityConversation, lastActivityAt: activityAt };
-        await reqToPromise(stores.conversations.put(activityConversation));
+        const next = { ...activityConversation };
+        if (checkpoint) {
+          const user: any = await reqToPromise(
+            stores.messages.index('by_conversationId_messageKey').get([conversationId, checkpoint.lastUserKey] as any),
+          );
+          if (!user || user.role !== 'user') throw new Error('chatgpt_api_checkpoint_user_missing');
+          next.chatgptApiCheckpoint = checkpoint;
+        } else if (messagesChanged && (!options?.preserveCheckpointTail || changedPrefix))
+          delete next.chatgptApiCheckpoint;
+        if (activityAtProvided && semanticContentChanged) {
+          const current = normalizeStoredActivityTimestamp(next.lastActivityAt);
+          if (activityAt > current) {
+            next.lastActivityAt = activityAt;
+            conversationActivityChanged = true;
+          }
+        }
+        if (conversationRecordsEquivalent(activityConversation, next)) return;
+        await reqToPromise(stores.conversations.put(next));
         markChanged('conversations');
-        conversationActivityChanged = true;
+        activityConversation = next;
+      };
+      const idx = stores.messages.index('by_conversationId_messageKey');
+      const anchorRow: any = committedCheckpoint
+        ? await reqToPromise(idx.get([conversationId, committedCheckpoint.lastUserKey] as any))
+        : null;
+      const anchorSequence =
+        anchorRow?.role === 'user' && Number.isFinite(anchorRow.sequence) ? anchorRow.sequence : -Infinity;
+      if (committedCheckpoint && anchorSequence === -Infinity) changedPrefix = true;
+      const affectsPrefix = (existing: any, nextSequence: number) => {
+        if (committedCheckpoint && (Number(existing?.sequence) <= anchorSequence || nextSequence <= anchorSequence)) {
+          if (options?.expectedMessagesRevision !== undefined) throw new Error('chatgpt_api_storage_conflict');
+          changedPrefix = true;
+        }
       };
 
-      const idx = stores.messages.index('by_conversationId_messageKey');
       const diff = options?.diff || null;
       const normalizeKeys = (value: unknown): string[] => {
         if (!Array.isArray(value)) return [];
@@ -1460,7 +1536,10 @@ export async function syncConversationMessages(
         const removedKeys = mode === 'incremental' ? normalizeKeys(diff?.removed) : [];
         const hasEffectiveDiff =
           !!diff && (mode === 'append' ? requestedKeys.length > 0 : requestedKeys.length > 0 || removedKeys.length > 0);
-        if (!hasEffectiveDiff) return { upserted: 0, deleted: 0 };
+        if (!hasEffectiveDiff) {
+          await commitActivity();
+          return { upserted: 0, deleted: 0 };
+        }
         const upsertKeys = Array.from(byKey.keys()).filter((key) => requestedKeySet.has(key));
 
         const hasTailPolicy =
@@ -1473,7 +1552,7 @@ export async function syncConversationMessages(
         const sequenceOverrides = new Map<string, number>();
         let existingByKey: Map<unknown, any> | null = null;
         let nextTailSequence = 0;
-        if (hasTailPolicy || reconcileKeys.length) {
+        if (reconcileKeys.length) {
           const seqIdx = stores.messages.index('by_conversationId_sequence');
           const range = IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any);
           const storedRows = (await reqToPromise(seqIdx.getAll(range) as any)) as any[];
@@ -1487,26 +1566,30 @@ export async function syncConversationMessages(
             .filter((sequence) => Number.isFinite(sequence));
           nextTailSequence = finiteSequences.length ? Math.max(...finiteSequences) + 1 : 0;
 
-          if (reconcileKeys.length) {
-            const reconciled = mergeAnchoredMessageOrder(storedRows, reconcileKeys);
-            if (reconciled.anchored && reconciled.changed) {
-              const sequenceByKey = new Map(reconciled.keys.map((key, index) => [key, index]));
-              for (const key of reconcileKeys) {
-                const sequence = sequenceByKey.get(key);
-                if (sequence !== undefined) sequenceOverrides.set(key, sequence);
-              }
-              for (const row of storedRows) {
-                const key = safeString(row?.messageKey);
-                const sequence = sequenceByKey.get(key);
-                if (sequence === undefined || Number(row?.sequence) === sequence) continue;
-                const nextRow = { ...row, sequence };
-                await reqToPromise(stores.messages.put(nextRow));
-                existingByKey.set(row?.messageKey, nextRow);
-                markChanged('messages');
-              }
-              nextTailSequence = reconciled.keys.length;
+          const reconciled = mergeAnchoredMessageOrder(storedRows, reconcileKeys);
+          if (reconciled.anchored && reconciled.changed) {
+            const sequenceByKey = new Map(reconciled.keys.map((key, index) => [key, index]));
+            for (const key of reconcileKeys) {
+              const sequence = sequenceByKey.get(key);
+              if (sequence !== undefined) sequenceOverrides.set(key, sequence);
             }
+            for (const row of storedRows) {
+              const key = safeString(row?.messageKey);
+              const sequence = sequenceByKey.get(key);
+              if (sequence === undefined || Number(row?.sequence) === sequence) continue;
+              const nextRow = { ...row, sequence };
+              affectsPrefix(row, sequence);
+              await reqToPromise(stores.messages.put(nextRow));
+              existingByKey.set(row?.messageKey, nextRow);
+              markMessagesChanged();
+            }
+            nextTailSequence = reconciled.keys.length;
           }
+        } else if (hasTailPolicy) {
+          const seqIdx = stores.messages.index('by_conversationId_sequence');
+          const range = IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any);
+          const latest = await reqToPromise(seqIdx.openCursor(range, 'prev'));
+          nextTailSequence = latest && Number.isFinite(latest.value?.sequence) ? latest.value.sequence + 1 : 0;
         }
 
         let upserted = 0;
@@ -1547,13 +1630,15 @@ export async function syncConversationMessages(
           }
           if (existing) {
             if (!messageRecordsEquivalent(existing, record)) {
+              affectsPrefix(existing, sequence);
               await reqToPromise(stores.messages.put(record));
-              markChanged('messages');
+              markMessagesChanged();
             }
           } else {
+            affectsPrefix(null, sequence);
             const id = await reqToPromise(stores.messages.add(record));
             record.id = id as any;
-            markChanged('messages');
+            markMessagesChanged();
           }
           existingByKey?.set(key, record);
           upserted += 1;
@@ -1563,8 +1648,9 @@ export async function syncConversationMessages(
           const existing: any = await reqToPromise(idx.get([conversationId, key]) as any);
           const id = Number(existing && existing.id);
           if (!Number.isFinite(id) || id <= 0) continue;
+          affectsPrefix(existing, Number(existing.sequence));
           await reqToPromise(stores.messages.delete(id));
-          markChanged('messages');
+          markMessagesChanged();
           deleted += 1;
           semanticContentChanged = true;
         }
@@ -1611,12 +1697,12 @@ export async function syncConversationMessages(
         if (existing) {
           if (!messageRecordsEquivalent(existing, record)) {
             await reqToPromise(stores.messages.put(record));
-            markChanged('messages');
+            markMessagesChanged();
           }
         } else {
           const id = await reqToPromise(stores.messages.add(record));
           record.id = id as any;
-          markChanged('messages');
+          markMessagesChanged();
         }
         existingByKey.set(m.messageKey, record);
         upserted += 1;
@@ -1628,7 +1714,7 @@ export async function syncConversationMessages(
         const id = Number(row.id);
         if (!Number.isFinite(id) || id <= 0) continue;
         await reqToPromise(stores.messages.delete(id));
-        markChanged('messages');
+        markMessagesChanged();
         deleted += 1;
         if (!structuralAliasKeys.has(String(row.messageKey))) semanticContentChanged = true;
       }
@@ -1638,7 +1724,7 @@ export async function syncConversationMessages(
     },
   );
   if (conversationActivityChanged) invalidateConversationListStatsCache();
-  return result;
+  return options?.reportChanged ? { ...result, changed: messagesChanged } : result;
 }
 
 function normalizeConversationListSiteFilterKey(value: unknown): string {
@@ -2242,17 +2328,79 @@ export async function getConversationBySourceConversationKey(
   return item ? normalizeConversationListRecord(item) : null;
 }
 
+export async function getConversationMessagesByKeys(
+  conversationId: number,
+  messageKeys: readonly string[],
+): Promise<ConversationMessage[]> {
+  const keys = Array.from(new Set(messageKeys.map((key) => safeString(key)).filter(Boolean)));
+  if (!Number.isSafeInteger(conversationId) || conversationId <= 0 || !keys.length) return [];
+  const db = await openDb();
+  const { t, stores } = tx(db, ['messages'], 'readonly');
+  const done = txDone(t);
+  const index = stores.messages.index('by_conversationId_messageKey');
+  const rows = await Promise.all(keys.map((key) => reqToPromise(index.get([conversationId, key] as any))));
+  await done;
+  return rows
+    .filter(Boolean)
+    .sort((a: any, b: any) => Number(a.sequence) - Number(b.sequence)) as ConversationMessage[];
+}
+
 export async function getConversationTailWindowBySourceAndKey(
   source: string,
   conversationKey: string,
   limit: number,
-): Promise<{ conversation: Conversation | null; messages: ConversationMessage[] }> {
-  const conversation = await getConversationBySourceConversationKey(source, conversationKey);
-  if (!conversation) return { conversation: null, messages: [] };
+  options?: { withRevision?: boolean },
+): Promise<{ conversation: Conversation | null; messages: ConversationMessage[]; messagesRevision?: number }> {
+  const normalizedSource = safeString(source);
+  const normalizedKey = safeString(conversationKey);
+  if (!normalizedSource || !normalizedKey) return { conversation: null, messages: [] };
+  const revisionStore = DATA_REVISION_STORE_BY_SCOPE.messages;
+  const db = await openDb();
+  const { t, stores } = tx(
+    db,
+    options?.withRevision ? ['conversations', 'messages', revisionStore] : ['conversations', 'messages'],
+    'readonly',
+  );
+  const done = txDone(t);
+  const row = await reqToPromise(
+    stores.conversations.index('by_source_conversationKey').get([normalizedSource, normalizedKey] as any),
+  );
+  const revisionRequest = options?.withRevision
+    ? reqToPromise(stores[revisionStore].get(DATA_REVISION_RECORD_KEY))
+    : Promise.resolve(null);
+  if (!row) {
+    const revision = await revisionRequest;
+    await done;
+    return {
+      conversation: null,
+      messages: [],
+      ...(options?.withRevision ? { messagesRevision: normalizeDataRevisionRecord(revision).revision } : null),
+    };
+  }
+  const conversation = normalizeConversationListRecord(row as Conversation);
   const conversationId = Number(conversation.id);
-  if (!Number.isFinite(conversationId) || conversationId <= 0) return { conversation, messages: [] };
-  const messages = await getMessagesTailByConversationId(conversationId, limit);
-  return { conversation, messages };
+  const cursor = stores.messages
+    .index('by_conversationId_sequence')
+    .openCursor(IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any), 'prev');
+  const messages: ConversationMessage[] = [];
+  await new Promise<void>((resolve, reject) => {
+    cursor.onerror = () => reject(cursor.error || new Error('cursor failed'));
+    cursor.onsuccess = () => {
+      const item = cursor.result;
+      if (!item) return resolve();
+      messages.push(item.value);
+      if (messages.length >= Math.floor(limit)) return resolve();
+      item.continue();
+    };
+  });
+  const revision = await revisionRequest;
+  await done;
+  messages.reverse();
+  return {
+    conversation,
+    messages,
+    ...(options?.withRevision ? { messagesRevision: normalizeDataRevisionRecord(revision).revision } : null),
+  };
 }
 
 function toConversationListOpenTarget(input: any): ConversationListOpenTarget | null {
@@ -2288,38 +2436,6 @@ export async function getMessagesByConversationId(conversationId: number): Promi
     idx.getAll(IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any)) as any,
   )) as any[];
   await txDone(t);
-  items.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
-  return items as any;
-}
-
-async function getMessagesTailByConversationId(conversationId: number, limit: number): Promise<ConversationMessage[]> {
-  const normalizedConversationId = Number(conversationId);
-  const normalizedLimit = Number(limit);
-  if (!Number.isFinite(normalizedConversationId) || normalizedConversationId <= 0) return [];
-  if (!Number.isFinite(normalizedLimit) || normalizedLimit <= 0) return [];
-
-  const tailLimit = Math.floor(normalizedLimit);
-  const db = await openDb();
-  const { t, stores } = tx(db, ['messages'], 'readonly');
-  const idx = stores.messages.index('by_conversationId_sequence');
-  const range = IDBKeyRange.bound(
-    [normalizedConversationId, -Infinity] as any,
-    [normalizedConversationId, Infinity] as any,
-  );
-  const cursorReq = idx.openCursor(range, 'prev');
-  const items: any[] = [];
-  await new Promise<void>((resolve, reject) => {
-    cursorReq.onerror = () => reject(cursorReq.error || new Error('cursor failed'));
-    cursorReq.onsuccess = () => {
-      const cursor = cursorReq.result as IDBCursorWithValue | null;
-      if (!cursor) return resolve();
-      items.push(cursor.value);
-      if (items.length >= tailLimit) return resolve();
-      cursor.continue();
-    };
-  });
-  await txDone(t);
-  items.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
   return items as any;
 }
 

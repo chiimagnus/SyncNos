@@ -171,7 +171,9 @@ export function resolveCaptureIntegrity(collectorId: unknown, snapshot: any): Ca
     const key = stableIdentityString(message?.messageKey);
     if (!isStablePartialKey(key)) continue;
     if (!byKey.has(key)) firstPositions.push(key);
-    const captureMergePolicy = normalizedMergePolicy(message?.captureMergePolicy);
+    const captureMergePolicy =
+      normalizedMergePolicy(message?.captureMergePolicy) ??
+      (normalizedCollectorId === 'chatgpt' ? 'preserve-existing-content' : null);
     byKey.set(key, {
       ...message,
       messageKey: key,

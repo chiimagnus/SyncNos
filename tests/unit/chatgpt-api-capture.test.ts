@@ -50,6 +50,7 @@ function message(input: MessageInput) {
     },
     ...(input.status ? { status: input.status } : null),
     metadata: {
+      ...(input.parent !== undefined ? { parent_id: input.parent } : null),
       ...(input.turnId ? { turn_id: input.turnId } : null),
       ...(input.hidden ? { is_visually_hidden_from_conversation: true } : null),
       ...(input.attachments ? { attachments: input.attachments } : null),
@@ -1910,6 +1911,7 @@ describe('ChatGPT paged API transport', () => {
       role: 'assistant',
       channel: 'final',
       parts: ['new answer'],
+      parent: 'user-2',
       status: 'finished_successfully',
     }),
   ];
@@ -1958,6 +1960,283 @@ describe('ChatGPT paged API transport', () => {
     return { requestPage, calls };
   }
 
+  it('stops at a verified saved user even when older history remains available', async () => {
+    const original = requestPages([responsePage([...older, ...newer], false, true)]);
+    const full = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: original.requestPage,
+    });
+    expect(full.checkpoint?.lastUserKey).toBe('user-2');
+
+    const pages = requestPages([responsePage(newer, true, true)]);
+    const onPage = vi.fn(async () => {});
+    const incremental = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: pages.requestPage,
+      trustedCheckpoint: full.checkpoint!,
+      onPage,
+    });
+    expect(incremental.verifiedTail).toBe(true);
+    expect(incremental.snapshot.messages.map((item: any) => item.messageKey)).toEqual(['user-2', 'assistant-2']);
+    expect(incremental.snapshot.captureMeta.completeness).toBe('complete');
+    expect(pages.calls.map((item) => item.numTurns)).toEqual([10, 1]);
+    expect(onPage).not.toHaveBeenCalled();
+  });
+
+  it('invalidates a saved user when an attachment ID changes but its display label does not', async () => {
+    const userWithFile = (fileId: string) =>
+      message({
+        id: 'user-file',
+        role: 'user',
+        parts: ['review the file'],
+        attachments: [{ id: fileId, name: 'results.pdf', mime_type: 'application/pdf' }],
+      });
+    const answer = message({
+      id: 'assistant-file',
+      role: 'assistant',
+      channel: 'final',
+      parts: ['reviewed'],
+      parent: 'user-file',
+    });
+    const baseline = requestPages([responsePage([userWithFile('file-original'), answer], false, true)]);
+    const full = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: baseline.requestPage,
+    });
+    const pages = requestPages([
+      responsePage([userWithFile('file-replacement'), answer], true, true),
+      responsePage([message({ id: 'older-user', role: 'user', parts: ['older'] })], false),
+    ]);
+    const capture = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: pages.requestPage,
+      trustedCheckpoint: full.checkpoint!,
+    });
+    expect(capture.verifiedTail).not.toBe(true);
+    expect(capture.checkpoint?.userSignature).not.toBe(full.checkpoint?.userSignature);
+    expect(pages.calls.map((item) => item.numTurns)).toEqual([10, 10, 1]);
+  });
+
+  it('ignores rotating download URLs when the attachment identity is unchanged', async () => {
+    const answer = message({
+      id: 'assistant-file',
+      role: 'assistant',
+      channel: 'final',
+      parts: ['done'],
+      parent: 'user-file',
+    });
+    const user = (url: string) =>
+      message({
+        id: 'user-file',
+        role: 'user',
+        parts: ['review'],
+        attachments: [{ id: 'file-stable', name: 'results.pdf', mime_type: 'application/pdf', download_url: url }],
+      });
+    const first = requestPages([responsePage([user('https://example.com/temporary-a'), answer], false, true)]);
+    const saved = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: first.requestPage,
+    });
+    const next = requestPages([responsePage([user('https://example.com/temporary-b'), answer], true, true)]);
+    const capture = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: next.requestPage,
+      trustedCheckpoint: saved.checkpoint!,
+    });
+    expect(capture.verifiedTail).toBe(true);
+    expect(capture.checkpoint?.userSignature).toBe(saved.checkpoint?.userSignature);
+    expect(next.calls.map((item) => item.numTurns)).toEqual([10, 1]);
+  });
+
+  it('hashes original user part structure when different API content renders the same Markdown', async () => {
+    const answer = message({
+      id: 'assistant-structured',
+      role: 'assistant',
+      channel: 'final',
+      parts: ['answer'],
+      parent: 'user-structured',
+    });
+    const user = (parts: string[]) => message({ id: 'user-structured', role: 'user', parts });
+    const baseline = requestPages([responsePage([user(['first', 'second']), answer], false, true)]);
+    const saved = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: baseline.requestPage,
+    });
+    const updated = requestPages([
+      responsePage([user(['first\nsecond']), answer], true, true),
+      responsePage([message({ id: 'earlier', role: 'user', parts: ['old'] })], false),
+    ]);
+    const capture = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: updated.requestPage,
+      trustedCheckpoint: saved.checkpoint!,
+    });
+    expect(capture.snapshot.messages.find((item: any) => item.messageKey === 'user-structured')?.contentMarkdown).toBe(
+      'first\nsecond',
+    );
+    expect(capture.verifiedTail).not.toBe(true);
+    expect(updated.calls.map((item) => item.numTurns)).toEqual([10, 10, 1]);
+  });
+
+  it('reuses a stable last user despite missing parent links in a tool-heavy response', async () => {
+    const rawTail = [
+      message({ id: 'user-tool-heavy', role: 'user', parts: ['question'] }),
+      message({ id: 'assistant-tool-heavy', role: 'assistant', channel: 'final', parts: ['answer'] }),
+    ];
+    const baseline = requestPages([responsePage(rawTail, false, true)]);
+    const full = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: baseline.requestPage,
+    });
+    const pages = requestPages([responsePage(rawTail, true, true)]);
+    const result = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: pages.requestPage,
+      trustedCheckpoint: full.checkpoint!,
+    });
+    expect(result.verifiedTail).toBe(true);
+    expect(pages.calls.map((item) => item.numTurns)).toEqual([10, 1]);
+  });
+
+  it('uses a saved assistant overlap to resume across a new user turn with incomplete raw parents', async () => {
+    const original = [
+      message({ id: 'user-overlap', role: 'user', parts: ['old question'] }),
+      message({ id: 'assistant-overlap', role: 'assistant', channel: 'final', parts: ['old answer'] }),
+    ];
+    const baseline = requestPages([responsePage(original, false, true)]);
+    const full = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: baseline.requestPage,
+    });
+    const newer = [
+      ...original,
+      message({ id: 'user-new', role: 'user', parts: ['new question'] }),
+      message({ id: 'assistant-new', role: 'assistant', channel: 'final', parts: ['new answer'] }),
+    ];
+    const pages = requestPages([responsePage(newer, true, true)]);
+    const result = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: pages.requestPage,
+      trustedCheckpoint: full.checkpoint!,
+      trustedTailLastAssistantKey: 'assistant-overlap',
+    });
+    expect(result.verifiedTail).toBe(true);
+    expect(result.snapshot.messages.map((item: any) => item.messageKey)).toEqual([
+      'user-overlap',
+      'assistant-overlap',
+      'user-new',
+      'assistant-new',
+    ]);
+    expect(pages.calls.map((item) => item.numTurns)).toEqual([10, 1]);
+  });
+
+  it('never accepts an unrelated saved user outside the current raw parent chain as a tail boundary', async () => {
+    const saved = [message({ id: 'saved-user', role: 'user', parts: ['original'] })];
+    const baseline = requestPages([responsePage(saved, false, true)]);
+    const full = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: baseline.requestPage,
+    });
+    const unrelated = [
+      ...saved,
+      message({ id: 'different-user', role: 'user', parts: ['new conversation'], parent: 'different-parent' }),
+      message({
+        id: 'different-answer',
+        role: 'assistant',
+        channel: 'final',
+        parts: ['new answer'],
+        parent: 'different-user',
+      }),
+    ];
+    const requests = requestPages([
+      responsePage(unrelated, true, true),
+      responsePage([message({ id: 'older', role: 'user', parts: ['older'] })], false),
+    ]);
+    const result = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: requests.requestPage,
+      trustedCheckpoint: full.checkpoint!,
+    });
+    expect(result.verifiedTail).not.toBe(true);
+    expect(requests.calls.filter((item) => item.numTurns === 10)).toHaveLength(2);
+  });
+
+  it('falls back to the same full pagination when the old user content changed', async () => {
+    const original = requestPages([responsePage([...older, ...newer], false, true)]);
+    const full = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: original.requestPage,
+    });
+    const changed = newer.map((item) => structuredClone(item));
+    changed[0]!.content.parts = ['edited question'];
+    const requests = requestPages([responsePage(changed, true, true), responsePage(older, false)]);
+    const result = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: requests.requestPage,
+      trustedCheckpoint: full.checkpoint!,
+    });
+    expect(result.verifiedTail).not.toBe(true);
+    expect(result.snapshot.messages[2].contentMarkdown).toBe('edited question');
+    expect(requests.calls.map((item) => item.numTurns)).toEqual([10, 10, 1]);
+  });
+
+  it('stops after the newest page even with 1000 older pages and 10000 remote user nodes', async () => {
+    const newest = [message({ id: 'user-9999', role: 'user', parts: ['user-9999'] })];
+    const baseline = requestPages([responsePage(newest, false, true)]);
+    const full = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: baseline.requestPage,
+    });
+    const pages = Array.from({ length: 1000 }, (_, page) => {
+      const start = (999 - page) * 10;
+      const items = Array.from({ length: 10 }, (_, index) => {
+        const id = `user-${start + index}`;
+        return message({ id, role: 'user', parts: [id] });
+      });
+      return responsePage(items, page < 999, page === 0);
+    });
+    const requests = requestPages(pages);
+    const incremental = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: requests.requestPage,
+      trustedCheckpoint: full.checkpoint!,
+    });
+    expect(incremental.verifiedTail).toBe(true);
+    expect(incremental.checkpoint?.lastUserKey).toBe('user-9999');
+    expect(requests.calls.map((item) => item.numTurns)).toEqual([10, 1]);
+  });
+
+  it('safely stages the latest buffered history if a checkpoint search fails during a later page request', async () => {
+    const baseline = requestPages([responsePage([...older, ...newer], false, true)]);
+    const full = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: baseline.requestPage,
+    });
+    const newest = [
+      message({ id: 'user-3', role: 'user', parts: ['new question'] }),
+      message({ id: 'assistant-3', role: 'assistant', channel: 'final', parts: ['new answer'], parent: 'user-3' }),
+    ];
+    const failure = Object.assign(new Error('backend network interrupted'), {
+      code: 'chatgpt_api_page_http',
+      status: 503,
+    });
+    const requests = requestPages([responsePage(newest, true, true), failure, failure]);
+    const onPage = vi.fn(async () => {});
+    await expect(
+      captureCurrentChatgptConversationViaApi({
+        readCurrentUrl: () => base,
+        requestPage: requests.requestPage,
+        trustedCheckpoint: full.checkpoint!,
+        onPage,
+      }),
+    ).rejects.toThrow('backend network interrupted');
+    expect(onPage).toHaveBeenCalledOnce();
+    const staged = onPage.mock.calls[0]![0].snapshot;
+    expect(staged.captureMeta.completeness).toBe('partial');
+    expect(staged.messages.map((item: any) => item.messageKey)).toEqual(['user-3', 'assistant-3']);
+    expect(requests.calls).toHaveLength(3);
+  });
+
   it('reads newest to oldest with one safe persistence callback per page', async () => {
     const { requestPage, calls } = requestPages([responsePage(newer, true, true), responsePage(older, false)]);
     const onPage = vi.fn(async () => {});
@@ -1983,6 +2262,8 @@ describe('ChatGPT paged API transport', () => {
       'user-2',
     ]);
     expect(result.snapshot.captureMeta).toMatchObject({ completeness: 'complete', identityVerified: true });
+    expect(result.checkpoint).toMatchObject({ lastUserKey: 'user-2', includeThinking: true });
+    expect(result.checkpoint?.userSignature).toMatch(/^[0-9a-f]{64}$/);
     expect(result.snapshot.conversation.url).toBe(base);
   });
 
@@ -2049,17 +2330,63 @@ describe('ChatGPT paged API transport', () => {
     expect(result.snapshot.messages.every((m: any) => !m.captureMergePolicy)).toBe(true);
   });
 
-  it('keeps ambiguous sibling branches partial even when all parents are present', async () => {
+  it('keeps only the selected branch across pages when the raw parent chain proves it', async () => {
+    const latest = [
+      message({ id: 'user-2', role: 'user', parts: ['new question'], parent: 'user-1' }),
+      message({ id: 'assistant-2', role: 'assistant', channel: 'final', parts: ['current answer'], parent: 'user-2' }),
+    ];
+    const previous = [
+      message({ id: 'user-1', role: 'user', parts: ['first question'] }),
+      message({
+        id: 'assistant-old',
+        role: 'assistant',
+        channel: 'final',
+        parts: ['abandoned answer'],
+        parent: 'user-1',
+      }),
+    ];
+    expect(latest[0]!.metadata.parent_id).toBe('user-1');
+    const { requestPage } = requestPages([responsePage(latest, true, true), responsePage(previous, false)]);
+    const result = await captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage });
+    expect(result.snapshot.captureMeta).toMatchObject({ completeness: 'complete' });
+    expect(result.snapshot.messages.map((item: any) => item.messageKey)).toEqual(['user-1', 'user-2', 'assistant-2']);
+    expect(requestPage).toHaveBeenCalledTimes(3);
+  });
+
+  it('excludes unrelated earlier history when the current raw chain identifies a different root', async () => {
+    const nodes = [
+      message({ id: 'unrelated-user', role: 'user', parts: ['not current history'], parent: 'shared-root' }),
+      message({ id: 'selected-root', role: 'user', parts: ['current history'], parent: 'shared-root' }),
+      message({
+        id: 'obsolete-sibling',
+        role: 'assistant',
+        channel: 'final',
+        parts: ['old answer'],
+        parent: 'selected-root',
+      }),
+      message({
+        id: 'current-sibling',
+        role: 'assistant',
+        channel: 'final',
+        parts: ['current answer'],
+        parent: 'selected-root',
+      }),
+    ];
+    const { requestPage } = requestPages([responsePage(nodes, false, true)]);
+    const result = await captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage });
+    expect(result.snapshot.captureMeta.completeness).toBe('complete');
+    expect(result.snapshot.messages.map((item: any) => item.messageKey)).toEqual(['selected-root', 'current-sibling']);
+  });
+
+  it('excludes an obsolete sibling when the selected assistant has an intact parent chain', async () => {
     const messages = structuredClone([...older, ...newer]);
     messages[1]!.metadata.parent_id = 'user-1';
     messages[2]!.metadata.parent_id = 'user-1';
     messages[3]!.metadata.parent_id = 'user-2';
     const { requestPage } = requestPages([responsePage(messages, false, true)]);
     const result = await captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage });
-    expect(result.snapshot.captureMeta).toMatchObject({
-      completeness: 'partial',
-      reasons: ['chatgpt_api_branch_ambiguous'],
-    });
+    expect(result.snapshot.captureMeta).toMatchObject({ completeness: 'complete' });
+    expect(result.snapshot.messages.map((item: any) => item.messageKey)).toEqual(['user-1', 'user-2', 'assistant-2']);
   });
 
   it('stages bounded message batches instead of retransmitting the full history on every page', async () => {
@@ -2128,16 +2455,27 @@ describe('ChatGPT paged API transport', () => {
     }
   });
 
-  it('does not refetch the head when the saved history is already partial', async () => {
+  it('rejects unresolved siblings without spending a HEAD request', async () => {
     const branching = structuredClone([...older, ...newer]);
     branching[1]!.metadata.parent_id = 'user-1';
     branching[2]!.metadata.parent_id = 'user-1';
+    branching[3]!.metadata.parent_id = 'unresolved-parent';
+    const { requestPage } = requestPages([responsePage(branching, false, true)]);
+    const onPage = vi.fn(async () => {});
+    await expect(
+      captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage, onPage }),
+    ).rejects.toMatchObject({ code: 'chatgpt_api_branch_ambiguous' });
+    expect(requestPage).toHaveBeenCalledTimes(1);
+    expect(onPage).not.toHaveBeenCalled();
+  });
+
+  it('does not refetch the head when the saved history is already partial', async () => {
     const streaming = [
       message({ id: 'user-streaming', role: 'user', parts: ['question'] }),
       message({ id: 'tool-running', role: 'tool', contentType: 'code', status: 'in_progress', hidden: true }),
     ];
     const schemaDrift = [message({ id: 'user-drift', role: 'user', contentType: 'unexpected', parts: ['question'] })];
-    for (const items of [branching, streaming, schemaDrift]) {
+    for (const items of [streaming, schemaDrift]) {
       const { requestPage } = requestPages([responsePage(items, false, true)]);
       const result = await captureCurrentChatgptConversationViaApi({ readCurrentUrl: () => base, requestPage });
       expect(result.snapshot.captureMeta.completeness).toBe('partial');

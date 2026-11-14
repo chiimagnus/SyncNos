@@ -364,6 +364,8 @@ export const zh: { [K in TranslationKey]: string } = {
   chatgptApiCaptureRateLimited: 'ChatGPT 请求过于频繁，请稍后重试。',
   chatgptApiCaptureSessionExpired: 'ChatGPT 登录状态可能已失效，请刷新 ChatGPT 页面后重试。',
   chatgptApiCaptureNavigationChanged: '页面已切换，请重新保存当前对话。',
+  chatgptApiCaptureBranchAmbiguous: '无法确认 ChatGPT 当前分支，已保留原有记录。请刷新页面后重试。',
+  chatgptApiCaptureStorageConflict: '其他标签页更新了对话，已保留新记录。请重新抓取。',
   fetchingDots: '获取中...',
   checkingDots: '检测中...',
   savedPrefix: '已保存：',

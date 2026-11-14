@@ -1,5 +1,6 @@
 import * as idb from '@services/conversations/data/storage-idb';
 import type {
+  ChatgptApiCheckpoint,
   Conversation,
   ConversationListCursor,
   ConversationListOpenTarget,
@@ -45,8 +46,13 @@ export function getConversationBySourceConversationKey(source: string, conversat
   return idb.getConversationBySourceConversationKey(source, conversationKey);
 }
 
-export function getConversationTailWindowBySourceAndKey(source: string, conversationKey: string, limit: number) {
-  return idb.getConversationTailWindowBySourceAndKey(source, conversationKey, limit);
+export function getConversationTailWindowBySourceAndKey(
+  source: string,
+  conversationKey: string,
+  limit: number,
+  options?: { withRevision?: boolean },
+) {
+  return idb.getConversationTailWindowBySourceAndKey(source, conversationKey, limit, options);
 }
 
 export async function getConversationDetail(conversationId: number) {
@@ -77,6 +83,12 @@ export function syncConversationMessages(
     mode?: 'snapshot' | 'incremental' | 'append';
     diff?: { added?: string[]; updated?: string[]; removed?: string[] } | null;
     activityAt?: number;
+    conversationContentChanged?: boolean;
+    checkpoint?: ChatgptApiCheckpoint;
+    preserveCheckpointTail?: boolean;
+    expectedCheckpoint?: ChatgptApiCheckpoint;
+    expectedMessagesRevision?: number;
+    reportChanged?: boolean;
   },
 ) {
   return idb.syncConversationMessages(conversationId, messages, options);

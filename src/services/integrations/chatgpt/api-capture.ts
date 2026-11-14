@@ -1,9 +1,15 @@
 import { parseChatgptDurableConversationRoute } from '@services/shared/chatgpt-route';
+import { chatgptFileIdFromAssetPointer } from '@services/shared/chatgpt-image-identity';
 import { CHATGPT_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { sendMessage } from '@platform/runtime/runtime';
 import { buildChatgptApiSnapshot, type ChatgptApiSnapshotResult } from '@services/integrations/chatgpt/api-snapshot';
+import type { ChatgptApiCheckpoint } from '@services/conversations/domain/models';
 
-type CaptureResult = ChatgptApiSnapshotResult & { verifyCurrent: () => Promise<void> };
+type CaptureResult = ChatgptApiSnapshotResult & {
+  verifyCurrent: () => Promise<void>;
+  checkpoint: ChatgptApiCheckpoint | null;
+  verifiedTail?: true;
+};
 type PageRequest = { conversationId: string; before?: string; numTurns: number; timeoutMs: number };
 
 function apiCaptureError(code: string, status?: number): Error & { code: string; status?: number } {
@@ -61,6 +67,49 @@ function currentNodeSignature(message: any): string {
   ]);
 }
 
+async function userSignature(markdown: string, rawUser: any): Promise<string> {
+  const content = rawUser?.content;
+  const rawContent = Array.isArray(content?.parts)
+    ? [
+        String(content?.content_type || ''),
+        content.parts.map((part: any) => {
+          if (typeof part === 'string' || typeof part === 'number' || typeof part === 'boolean') return part;
+          if (!part || typeof part !== 'object' || Array.isArray(part)) return null;
+          const text =
+            typeof part.text === 'string' ? part.text : typeof part.content === 'string' ? part.content : null;
+          return [String(part.content_type || ''), text ?? chatgptFileIdFromAssetPointer(part.asset_pointer)];
+        }),
+      ]
+    : [String(content?.content_type || ''), content?.text || content?.content || ''];
+  const parentId = typeof rawUser?.metadata?.parent_id === 'string' ? rawUser.metadata.parent_id : '';
+  const attachments = Array.isArray(rawUser?.metadata?.attachments)
+    ? rawUser.metadata.attachments.map((attachment: any) => [
+        String(attachment?.id || ''),
+        String(attachment?.name || ''),
+        String(attachment?.mime_type || ''),
+      ])
+    : [];
+  const bytes = new TextEncoder().encode(JSON.stringify([markdown, rawContent, parentId, attachments]));
+  const hash = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function latestUserCheckpoint(
+  messages: readonly any[],
+  rawNodes: readonly any[],
+  includeThinking: boolean,
+): Promise<ChatgptApiCheckpoint | null> {
+  const user = messages.findLast((message) => message?.role === 'user');
+  if (!user?.messageKey) return null;
+  const rawUser = rawNodes.findLast((message) => message?.id === user.messageKey);
+  if (!rawUser) return null;
+  return {
+    lastUserKey: user.messageKey,
+    userSignature: await userSignature(String(user.contentMarkdown || ''), rawUser),
+    includeThinking,
+  };
+}
+
 function sanitizedConversationUrl(rawUrl: string): string {
   const url = new URL(rawUrl);
   url.search = '';
@@ -82,6 +131,9 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
   requestPage?: (request: PageRequest) => Promise<any>;
   timeoutMs?: number;
   capturedAt?: number;
+  includeThinking?: boolean;
+  trustedCheckpoint?: ChatgptApiCheckpoint;
+  trustedTailLastAssistantKey?: string;
   onPage?: (result: ChatgptApiSnapshotResult) => Promise<void>;
 }): Promise<CaptureResult> {
   const readCurrentUrl = input?.readCurrentUrl || (() => String(globalThis.location?.href || ''));
@@ -95,12 +147,14 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
   const seenIds = new Set<string>();
   const stagedContent = new Map<string, string>();
   const childByParent = new Map<string, string>();
+  const parentById = new Map<string, string>();
   let hasAlternateBranches = false;
   let cursor = '';
   let title = '';
   let currentNode = '';
   let capturedNodeSignature = '';
   let currentNodeInProgress = false;
+  let candidateStage: ChatgptApiSnapshotResult | null = null;
 
   const assertRoute = () => {
     if (parseChatgptDurableConversationRoute(readCurrentUrl())?.conversationId !== route.conversationId) {
@@ -125,15 +179,33 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
   };
   for (let page = 0; ; page += 1) {
     assertRoute();
-    const data = await requestPageWithRetry(
-      {
-        conversationId: route.conversationId,
-        ...(page ? { before: cursor } : null),
-        numTurns: 10,
-        timeoutMs,
-      },
-      fetchPage,
-    );
+    let data: any;
+    try {
+      data = await requestPageWithRetry(
+        {
+          conversationId: route.conversationId,
+          ...(page ? { before: cursor } : null),
+          numTurns: 10,
+          timeoutMs,
+        },
+        fetchPage,
+      );
+    } catch (error) {
+      if (candidateStage && input?.onPage) {
+        const meta = candidateStage.snapshot.captureMeta;
+        await input.onPage({
+          snapshot: {
+            ...candidateStage.snapshot,
+            captureMeta: {
+              ...meta,
+              completeness: 'partial',
+              reasons: Array.from(new Set([...(meta.reasons || []), 'chatgpt_api_paging'])),
+            },
+          },
+        });
+      }
+      throw error;
+    }
     assertRoute();
 
     const messages = data?.messages;
@@ -169,6 +241,7 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
         const sibling = childByParent.get(parent);
         if (sibling && sibling !== id) hasAlternateBranches = true;
         childByParent.set(parent, id);
+        parentById.set(id, parent);
       }
     }
     const visible = messages.filter(retainForRendering);
@@ -177,6 +250,56 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
     }
     retained.unshift(...visible);
     const completed = pageInfo.has_previous_page === false;
+    const selectedAncestorsTo = (target: string): Set<string> | null => {
+      const ancestors = new Set<string>();
+      let id = currentNode;
+      while (seenIds.has(id) && !ancestors.has(id)) {
+        ancestors.add(id);
+        if (id === target) return ancestors;
+        id = parentById.get(id) || '';
+      }
+      return null;
+    };
+    const trustedAnchor = input?.trustedCheckpoint?.lastUserKey;
+    const selectedTail = trustedAnchor && seenIds.has(trustedAnchor) ? selectedAncestorsTo(trustedAnchor) : null;
+    let unresolvedBranches = hasAlternateBranches;
+    let renderMessages = retained;
+    if (hasAlternateBranches && completed) {
+      const chain = new Set<string>();
+      let node = currentNode;
+      while (seenIds.has(node) && !chain.has(node)) {
+        chain.add(node);
+        const parent = parentById.get(node);
+        if (!parent) break;
+        node = parent;
+      }
+      const userIds = new Set(
+        retained.filter((message) => message?.author?.role === 'user').map((message) => message.id),
+      );
+      const rootUser = Array.from(chain)
+        .reverse()
+        .find((id) => userIds.has(id));
+      const selected = rootUser ? selectedAncestorsTo(rootUser) : null;
+      if (selected) {
+        const selectedParents = new Set(Array.from(selected, (id) => parentById.get(id)).filter(Boolean));
+        const excludedIsAlternate = (message: any): boolean => {
+          let id = message.id;
+          const visited = new Set<string>();
+          while (id && !visited.has(id)) {
+            visited.add(id);
+            const parent = parentById.get(id);
+            if (!parent) return false;
+            if (selected.has(parent) || selectedParents.has(parent)) return true;
+            id = parent;
+          }
+          return false;
+        };
+        if (retained.every((message) => selected.has(message.id) || excludedIsAlternate(message))) {
+          renderMessages = retained.filter((message) => selected.has(message.id));
+          unresolvedBranches = false;
+        }
+      }
+    }
     if (
       !retained.some(
         (message) =>
@@ -194,8 +317,8 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
         data: {
           conversation_id: route.conversationId,
           title,
-          current_node: retained.at(-1)?.id,
-          messages: retained,
+          current_node: renderMessages.at(-1)?.id,
+          messages: renderMessages,
         },
         conversationId: route.conversationId,
         conversationUrl: sanitizedConversationUrl(initialUrl),
@@ -209,14 +332,84 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
       }
       throw error;
     }
+    const savedUserKey = input?.trustedCheckpoint?.lastUserKey;
+    const projected = result.snapshot.messages;
+    const savedUserIndex = projected.findIndex(
+      (message: any) => message.role === 'user' && message.messageKey === savedUserKey,
+    );
+    const newestUserIndex = projected.findLastIndex((message: any) => message.role === 'user');
+    const lastSavedAssistantIndex = projected.findIndex(
+      (message: any) => message.role === 'assistant' && message.messageKey === input?.trustedTailLastAssistantKey,
+    );
+    const linearOverlap =
+      !hasAlternateBranches &&
+      savedUserIndex >= 0 &&
+      (savedUserIndex === newestUserIndex ||
+        (lastSavedAssistantIndex > savedUserIndex && lastSavedAssistantIndex < newestUserIndex));
+    if (input?.trustedCheckpoint && (selectedTail || linearOverlap)) {
+      // ChatGPT's selected-branch pages can omit parent links inside tool-heavy turns.
+      // A matching final user or a saved assistant before newer users provides bounded overlap.
+      const scopedMessages = selectedTail
+        ? retained.filter((message) => selectedTail.has(message.id))
+        : retained.slice(retained.findIndex((message) => message.id === savedUserKey));
+      const scopedResult = buildChatgptApiSnapshot({
+        data: {
+          conversation_id: route.conversationId,
+          title,
+          current_node: scopedMessages.at(-1)?.id,
+          messages: scopedMessages,
+        },
+        conversationId: route.conversationId,
+        conversationUrl: sanitizedConversationUrl(initialUrl),
+        capturedAt: input?.capturedAt,
+      });
+      const checkpointUser = scopedResult.snapshot.messages.find(
+        (message: any) => message.role === 'user' && message.messageKey === input.trustedCheckpoint!.lastUserKey,
+      );
+      const rawUser = checkpointUser && retained.find((message) => message.id === checkpointUser.messageKey);
+      if (
+        checkpointUser &&
+        rawUser &&
+        input.trustedCheckpoint.includeThinking === (input?.includeThinking !== false) &&
+        (await userSignature(String(checkpointUser.contentMarkdown || ''), rawUser)) ===
+          input.trustedCheckpoint.userSignature
+      ) {
+        const stableTail = scopedResult.snapshot.captureMeta.completeness === 'complete' && !currentNodeInProgress;
+        if (!stableTail || (await latestMatches())) {
+          assertRoute();
+          result = scopedResult;
+          if (!stableTail) {
+            const meta = result.snapshot.captureMeta;
+            result.snapshot.captureMeta = {
+              ...meta,
+              completeness: 'partial',
+              reasons: Array.from(new Set([...(meta.reasons || []), 'chatgpt_api_unfinished_turn_partial'])),
+            };
+          }
+          const checkpoint = stableTail
+            ? await latestUserCheckpoint(result.snapshot.messages, retained, input?.includeThinking !== false)
+            : null;
+          return {
+            ...result,
+            verifiedTail: true,
+            checkpoint,
+            verifyCurrent: async () => {
+              if (!(await latestMatches())) throw apiCaptureError('chatgpt_api_conversation_changed');
+            },
+          };
+        }
+      }
+    }
+    if (completed && unresolvedBranches) throw apiCaptureError('chatgpt_api_branch_ambiguous');
+    if (input?.trustedCheckpoint && !unresolvedBranches) candidateStage = result;
     // Partial snapshots can only append; a head fetch is needed only before a possible complete replacement.
     const changedWhileFetching =
       completed &&
       !currentNodeInProgress &&
-      !hasAlternateBranches &&
+      !unresolvedBranches &&
       result.snapshot.captureMeta.completeness === 'complete' &&
       !(await latestMatches());
-    if (!completed || currentNodeInProgress || hasAlternateBranches || changedWhileFetching) {
+    if (!completed || currentNodeInProgress || unresolvedBranches || changedWhileFetching) {
       const meta = result.snapshot.captureMeta;
       result.snapshot.captureMeta = {
         ...meta,
@@ -226,13 +419,13 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
             ...(meta.reasons || []),
             ...(!completed ? ['chatgpt_api_paging'] : []),
             ...(currentNodeInProgress ? ['chatgpt_api_unfinished_turn_partial'] : []),
-            ...(hasAlternateBranches ? ['chatgpt_api_branch_ambiguous'] : []),
+            ...(unresolvedBranches ? ['chatgpt_api_branch_ambiguous'] : []),
             ...(changedWhileFetching ? ['chatgpt_api_conversation_changed'] : []),
           ]),
         ),
       };
     }
-    if (input?.onPage) {
+    if (input?.onPage && !unresolvedBranches && (!input.trustedCheckpoint || completed)) {
       const messages = result.snapshot.messages as Array<{ messageKey: string; contentMarkdown: string }>;
       const toStage = new Set<string>();
       for (const message of messages) {
@@ -255,8 +448,13 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
     }
     if (completed) {
       assertRoute();
+      const checkpoint =
+        result.snapshot.captureMeta.completeness === 'complete'
+          ? await latestUserCheckpoint(result.snapshot.messages, retained, input?.includeThinking !== false)
+          : null;
       return {
         ...result,
+        checkpoint,
         verifyCurrent: async () => {
           if (!(await latestMatches())) throw apiCaptureError('chatgpt_api_conversation_changed');
         },

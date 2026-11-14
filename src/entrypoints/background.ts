@@ -68,8 +68,10 @@ export default defineBackground(() => {
   registerConversationHandlers(router, {
     onConversationChanged: (conversationId, reason) => services.autoSync.onConversationChanged(conversationId, reason),
     onRemoteCleanupPending: () => services.autoSync.onRemoteCleanupPending(),
-    scheduleImageBackfill: (conversationId) =>
-      services.autoSync.imageBackfillScheduler.enqueue(conversationId, 'chat_image'),
+    scheduleImageBackfill: (conversationId, messageKeys) =>
+      messageKeys?.length
+        ? services.autoSync.imageBackfillScheduler.enqueueWithKeys(conversationId, messageKeys)
+        : services.autoSync.imageBackfillScheduler.enqueue(conversationId, 'chat_image'),
   });
   registerDataRevisionHandlers(router);
   registerItemMentionHandlers(router);

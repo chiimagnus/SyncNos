@@ -18,6 +18,8 @@ export type AutoSyncScheduler = {
   flush: () => Promise<void>;
 };
 
+type AutoSyncRunResult = { retryConversationIds: number[]; retryDelayMs: number };
+
 type QueueMap = Record<string, number>;
 
 export function normalizeAutoSyncQueue(value: unknown): QueueMap {
@@ -67,7 +69,7 @@ export function createAutoSyncSchedulerCore(config: {
   infra: AutoSyncSchedulerInfra;
   getInstanceId: () => string;
   isProviderEnabled: () => Promise<boolean>;
-  syncConversations: (conversationIds: number[], instanceId: string) => Promise<void>;
+  syncConversations: (conversationIds: number[], instanceId: string) => Promise<void | AutoSyncRunResult>;
   getFailureRetryDelayMs?: (error: unknown) => number | null | undefined;
   flushWhenAlarmsUnavailable?: boolean;
 }): AutoSyncScheduler {
@@ -166,9 +168,13 @@ export function createAutoSyncSchedulerCore(config: {
     }
 
     try {
-      await syncConversations(dueConversationIds, instanceId);
-      await writeQueue(restQueue);
-      await scheduleNextAlarm(restQueue);
+      const outcome = await syncConversations(dueConversationIds, instanceId);
+      for (const conversationId of outcome?.retryConversationIds || []) {
+        restQueue[String(conversationId)] = now + outcome!.retryDelayMs;
+      }
+      const nextQueue = trimQueue(restQueue, maxItems);
+      await writeQueue(nextQueue);
+      await scheduleNextAlarm(nextQueue);
     } catch (error) {
       if (isAlreadyRunningError(error)) {
         const delayedQueue: QueueMap = { ...queue };

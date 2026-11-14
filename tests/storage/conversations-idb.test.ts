@@ -958,7 +958,7 @@ describe('conversations storage-idb', () => {
     expect(after.map((m) => m.messageKey)).toEqual(['m1']);
   });
 
-  it('reconciles a ChatGPT live-tail append into the later canonical snapshot without duplicating the assistant', async () => {
+  it('reconciles a ChatGPT partial-page append into the later canonical snapshot without duplicating the assistant', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',
       source: 'chatgpt',
@@ -1412,7 +1412,7 @@ describe('conversations storage-idb', () => {
     }
   });
 
-  it('reuses the preserve-tail working set without redundant per-key reads', async () => {
+  it('appends protected tail messages using only the latest sequence and exact key reads', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',
       source: 'debug',
@@ -1428,6 +1428,7 @@ describe('conversations storage-idb', () => {
 
     const getAllSpy = vi.spyOn(IDBIndex.prototype, 'getAll');
     const getSpy = vi.spyOn(IDBIndex.prototype, 'get');
+    const cursorSpy = vi.spyOn(IDBIndex.prototype, 'openCursor');
     try {
       await syncConversationMessages(
         id,
@@ -1456,11 +1457,16 @@ describe('conversations storage-idb', () => {
       const perKeyReads = getSpy.mock.contexts.filter(
         (context) => String((context as IDBIndex)?.name || '') === 'by_conversationId_messageKey',
       );
-      expect(sequenceReads).toHaveLength(1);
-      expect(perKeyReads).toHaveLength(0);
+      const tailCursors = cursorSpy.mock.contexts.filter(
+        (context) => String((context as IDBIndex)?.name || '') === 'by_conversationId_sequence',
+      );
+      expect(sequenceReads).toHaveLength(0);
+      expect(perKeyReads).toHaveLength(2);
+      expect(tailCursors).toHaveLength(1);
     } finally {
       getAllSpy.mockRestore();
       getSpy.mockRestore();
+      cursorSpy.mockRestore();
     }
 
     expect((await getMessagesByConversationId(id)).map(({ messageKey, sequence }) => [messageKey, sequence])).toEqual([
@@ -1469,6 +1475,58 @@ describe('conversations storage-idb', () => {
       ['m3', 21],
     ]);
   });
+
+  it('keeps a 10000-message protected append bounded to a reverse cursor and the changed keys', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'large-protected-tail',
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(
+      id,
+      Array.from({ length: 10_000 }, (_, index) => ({
+        messageKey: `m${index}`,
+        role: index % 2 === 0 ? 'user' : 'assistant',
+        contentMarkdown: `history-${index}`,
+        sequence: index,
+      })),
+    );
+
+    const getAllSpy = vi.spyOn(IDBIndex.prototype, 'getAll');
+    const cursorSpy = vi.spyOn(IDBIndex.prototype, 'openCursor');
+    try {
+      await syncConversationMessages(
+        id,
+        [
+          {
+            messageKey: 'm10000',
+            role: 'user',
+            contentMarkdown: 'still generating',
+            sequence: 0,
+            captureSequencePolicy: 'preserve-existing-tail',
+          },
+        ],
+        { mode: 'append', diff: { added: ['m10000'], updated: [], removed: [] } },
+      );
+      expect(
+        getAllSpy.mock.contexts.filter((index) => String((index as IDBIndex)?.name) === 'by_conversationId_sequence'),
+      ).toHaveLength(0);
+      expect(
+        cursorSpy.mock.contexts.filter((index) => String((index as IDBIndex)?.name) === 'by_conversationId_sequence'),
+      ).toHaveLength(1);
+    } finally {
+      getAllSpy.mockRestore();
+      cursorSpy.mockRestore();
+    }
+
+    const result = await getMessagesByConversationId(id);
+    expect(result).toHaveLength(10_001);
+    expect(result[0]?.messageKey).toBe('m0');
+    expect(result[9999]?.messageKey).toBe('m9999');
+    expect(result[10000]?.messageKey).toBe('m10000');
+    expect(result[10000]?.sequence).toBe(10_000);
+  }, 30_000);
 
   it('keeps exact stored message-key matching when reusing an append working set', async () => {
     const convo = await upsertConversation({
@@ -2511,14 +2569,17 @@ describe('conversations storage-idb', () => {
           sequence,
           updatedAt: sequence,
         };
-      }),
+      }).reverse(),
     );
 
+    expect((await getMessagesByConversationId(id)).map((message) => message.sequence)).toEqual(
+      Array.from({ length: 300 }, (_, index) => index + 1),
+    );
     const windowResult = await getConversationTailWindowBySourceAndKey('debug', 'tail_window_k1', 200);
     expect(windowResult.conversation?.id).toBe(id);
-    expect(windowResult.messages).toHaveLength(200);
-    expect(windowResult.messages[0]?.sequence).toBe(101);
-    expect(windowResult.messages[199]?.sequence).toBe(300);
+    expect(windowResult.messages.map((message) => message.sequence)).toEqual(
+      Array.from({ length: 200 }, (_, index) => index + 101),
+    );
   });
 
   it('patches mapping nested state through one writer and keeps mapping identity stable', async () => {
@@ -4497,6 +4558,187 @@ describe('canonical video storage', () => {
     expect(ordinary.messageKey).toBe('ordinary');
     expect(ordinary).not.toHaveProperty('transcriptCues');
     expect(ordinary).not.toHaveProperty('videoChapters');
+  });
+});
+
+describe('ChatGPT Advanced checkpoint integrity', () => {
+  const checkpoint = { lastUserKey: 'u1', userSignature: 'a'.repeat(64), includeThinking: true };
+  const initial = [
+    { messageKey: 'u1', role: 'user', contentMarkdown: 'question', sequence: 0, updatedAt: 1 },
+    { messageKey: 'a1', role: 'assistant', contentMarkdown: 'answer', sequence: 1, updatedAt: 2 },
+  ];
+
+  it('establishes a full-history checkpoint atomically and preserves a valid prefix through a partial tail', async () => {
+    const convo = await upsertConversation({ sourceType: 'chat', source: 'chatgpt', conversationKey: 'checkpoint-1' });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, initial, { mode: 'snapshot', checkpoint, activityAt: 100 });
+    expect((await getConversationById(id))?.chatgptApiCheckpoint).toEqual(checkpoint);
+    const beforeRevision = await readDataRevision('conversations');
+    await syncConversationMessages(id, initial, { mode: 'snapshot', checkpoint, activityAt: 100 });
+    expect(await readDataRevision('conversations')).toBe(beforeRevision);
+
+    await syncConversationMessages(
+      id,
+      [{ messageKey: 'a2', role: 'assistant', contentMarkdown: 'streaming', sequence: 2, updatedAt: 3 }],
+      {
+        mode: 'append',
+        diff: { added: ['a2'], updated: [], removed: [] },
+        preserveCheckpointTail: true,
+      },
+    );
+    expect((await getConversationById(id))?.chatgptApiCheckpoint).toEqual(checkpoint);
+
+    await syncConversationMessages(
+      id,
+      [{ messageKey: 'u1', role: 'user', contentMarkdown: 'edited question', sequence: 0, updatedAt: 4 }],
+      { mode: 'incremental', diff: { added: [], updated: ['u1'], removed: [] } },
+    );
+    expect((await getConversationById(id))?.chatgptApiCheckpoint).toBeUndefined();
+  });
+
+  it('reads a revision for an as-yet unsaved ChatGPT conversation before a guarded first snapshot', async () => {
+    const tail = await getConversationTailWindowBySourceAndKey('chatgpt', 'not-yet-saved', 1, {
+      withRevision: true,
+    });
+    expect(tail).toMatchObject({ conversation: null, messages: [] });
+    expect(tail.messagesRevision).toBe(await readDataRevision('messages'));
+  });
+
+  it('rejects a stale guarded complete snapshot without deleting a concurrent new message', async () => {
+    const convo = await upsertConversation({ sourceType: 'chat', source: 'chatgpt', conversationKey: 'revision-full' });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, initial, { mode: 'snapshot' });
+    const firstRead = await getConversationTailWindowBySourceAndKey('chatgpt', 'revision-full', 1, {
+      withRevision: true,
+    });
+    const newer = [
+      ...initial,
+      { messageKey: 'u2', role: 'user', contentMarkdown: 'concurrent prompt', sequence: 2, updatedAt: 3 },
+    ];
+    await syncConversationMessages(id, newer, { mode: 'snapshot', checkpoint });
+    const writtenRevision = await readDataRevision('messages');
+    await expect(
+      syncConversationMessages(id, initial, {
+        mode: 'snapshot',
+        checkpoint,
+        expectedCheckpoint: null,
+        expectedMessagesRevision: firstRead.messagesRevision,
+      }),
+    ).rejects.toThrow('chatgpt_api_storage_conflict');
+    expect((await getMessagesByConversationId(id)).map((message) => message.messageKey)).toEqual(['u1', 'a1', 'u2']);
+    expect((await getConversationById(id))?.chatgptApiCheckpoint).toEqual(checkpoint);
+    expect(await readDataRevision('messages')).toBe(writtenRevision);
+
+    const latest = await getConversationTailWindowBySourceAndKey('chatgpt', 'revision-full', 1, {
+      withRevision: true,
+    });
+    await syncConversationMessages(id, newer, {
+      mode: 'snapshot',
+      checkpoint,
+      expectedCheckpoint: checkpoint,
+      expectedMessagesRevision: latest.messagesRevision,
+    });
+    expect(await readDataRevision('messages')).toBe(writtenRevision);
+  });
+
+  it('reads a bounded window and message revision consistently for atomic tail replacement', async () => {
+    const convo = await upsertConversation({ sourceType: 'chat', source: 'chatgpt', conversationKey: 'revision-tail' });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, initial, { mode: 'snapshot', checkpoint });
+    const tail = await getConversationTailWindowBySourceAndKey('chatgpt', 'revision-tail', 200, {
+      withRevision: true,
+    });
+    expect(tail.messagesRevision).toBe(await readDataRevision('messages'));
+    expect(tail.messages.map((item) => item.messageKey)).toEqual(['u1', 'a1']);
+
+    await syncConversationMessages(
+      id,
+      [{ messageKey: 'a1', role: 'assistant', contentMarkdown: 'new reply', sequence: 1, updatedAt: 3 }],
+      {
+        mode: 'incremental',
+        diff: { added: [], updated: ['a1'], removed: [] },
+        expectedCheckpoint: checkpoint,
+        expectedMessagesRevision: tail.messagesRevision,
+        checkpoint,
+      },
+    );
+    expect((await getMessagesByConversationId(id))[1]?.contentMarkdown).toBe('new reply');
+    await expect(
+      syncConversationMessages(id, [], {
+        mode: 'incremental',
+        diff: { added: [], updated: [], removed: ['a1'] },
+        expectedCheckpoint: checkpoint,
+        expectedMessagesRevision: tail.messagesRevision,
+        checkpoint,
+      }),
+    ).rejects.toThrow('chatgpt_api_storage_conflict');
+    expect((await getMessagesByConversationId(id)).map((item) => item.messageKey)).toEqual(['u1', 'a1']);
+  });
+
+  it('never allows an incremental update to overwrite the verified anchor user', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'revision-anchor',
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, initial, { mode: 'snapshot', checkpoint });
+    const tail = await getConversationTailWindowBySourceAndKey('chatgpt', 'revision-anchor', 200, {
+      withRevision: true,
+    });
+    await expect(
+      syncConversationMessages(id, [{ ...initial[0], contentMarkdown: 'mutated anchor' }], {
+        mode: 'incremental',
+        diff: { added: [], updated: ['u1'], removed: [] },
+        expectedCheckpoint: checkpoint,
+        expectedMessagesRevision: tail.messagesRevision,
+        checkpoint,
+      }),
+    ).rejects.toThrow('chatgpt_api_storage_conflict');
+    expect((await getMessagesByConversationId(id))[0]?.contentMarkdown).toBe('question');
+  });
+
+  it('rolls back the entire snapshot when its declared checkpoint user does not exist', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'checkpoint-rollback',
+    });
+    const id = Number(convo.id);
+    await syncConversationMessages(id, initial, { mode: 'snapshot', checkpoint });
+    const original = await getMessagesByConversationId(id);
+    await expect(
+      syncConversationMessages(id, [{ ...initial[0], contentMarkdown: 'uncommitted edit' }], {
+        mode: 'snapshot',
+        checkpoint: { ...checkpoint, lastUserKey: 'missing' },
+      }),
+    ).rejects.toThrow('chatgpt_api_checkpoint_user_missing');
+    expect(await getMessagesByConversationId(id)).toEqual(original);
+    expect((await getConversationById(id))?.chatgptApiCheckpoint).toEqual(checkpoint);
+  });
+
+  it('invalidates an old checkpoint after an untrusted DOM append or branch merge', async () => {
+    const original = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'checkpoint-merge',
+    });
+    const id = Number(original.id);
+    await syncConversationMessages(id, initial, { mode: 'snapshot', checkpoint });
+    await syncConversationMessages(
+      id,
+      [{ messageKey: 'a2', role: 'assistant', contentMarkdown: 'DOM reply', sequence: 2 }],
+      { mode: 'append', diff: { added: ['a2'], updated: [], removed: [] } },
+    );
+    expect((await getConversationById(id))?.chatgptApiCheckpoint).toBeUndefined();
+    await syncConversationMessages(id, initial, { mode: 'snapshot', checkpoint });
+    const duplicate = await upsertConversation({
+      sourceType: 'chat',
+      source: 'debug',
+      conversationKey: 'checkpoint-merge-other',
+    });
+    await mergeConversationsByIds({ keepConversationId: id, removeConversationId: Number(duplicate.id) });
+    expect((await getConversationById(id))?.chatgptApiCheckpoint).toBeUndefined();
   });
 });
 
