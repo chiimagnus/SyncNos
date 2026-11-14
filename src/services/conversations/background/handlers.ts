@@ -230,7 +230,6 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
             messageKey: message.messageKey,
             role: message.role,
             sequence: message.sequence,
-            updatedAt: message.updatedAt,
           }))
         : result.messages,
       ...(compact

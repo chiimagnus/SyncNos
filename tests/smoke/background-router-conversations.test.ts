@@ -146,7 +146,7 @@ describe('background-router conversations', () => {
       compact: true,
     });
     expect(compact.data).toMatchObject({ conversationId: 42, checkpoint });
-    expect(compact.data.messages).toEqual([{ messageKey: 'u1', role: 'user', sequence: 0, updatedAt: 1 }]);
+    expect(compact.data.messages).toEqual([{ messageKey: 'u1', role: 'user', sequence: 0 }]);
   });
 
   it('forwards only an explicit verified checkpoint and trusted Advanced partial to persistence', async () => {
