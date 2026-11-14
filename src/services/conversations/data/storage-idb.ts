@@ -897,6 +897,7 @@ async function mergeConversationsInTransaction(
   });
 
   delete mergedConversation.chatgptApiCheckpoint;
+  delete mergedConversation.chatgptDomHistoryVerified;
 
   const mappingMutation = await migrateSyncMappingKey(stores.sync_mappings, stores[GITHUB_CLEANUP_OUTBOX_STORE], {
     legacySource: remove.source,
@@ -1412,7 +1413,7 @@ export async function syncConversationMessages(
     activityAt?: number;
     conversationContentChanged?: boolean;
     checkpoint?: ChatgptApiCheckpoint;
-    domHistoryVerified?: true;
+    domHistoryVerified?: boolean;
     preserveCheckpointTail?: boolean;
     expectedCheckpoint?: ChatgptApiCheckpoint | null;
     expectedMessagesRevision?: number;
@@ -1463,7 +1464,7 @@ export async function syncConversationMessages(
       let activityConversation: any = await reqToPromise(stores.conversations.get(conversationId as any));
       if (!activityConversation) throw new Error('conversation not found');
       if (checkpoint && activityConversation.source !== 'chatgpt') throw new Error('chatgpt_api_checkpoint_source');
-      if (options?.domHistoryVerified && activityConversation.source !== 'chatgpt')
+      if (typeof options?.domHistoryVerified === 'boolean' && activityConversation.source !== 'chatgpt')
         throw new Error('chatgpt_dom_history_source');
       if (options?.expectedMessagesRevision !== undefined && activityConversation.source !== 'chatgpt')
         throw new Error('chatgpt_api_storage_conflict');
@@ -1486,8 +1487,26 @@ export async function syncConversationMessages(
       };
       const commitActivity = async () => {
         const next = { ...activityConversation };
-        if (options?.domHistoryVerified) next.chatgptDomHistoryVerified = true;
-        else if (mode !== 'append' && messagesChanged) delete next.chatgptDomHistoryVerified;
+        if (options?.domHistoryVerified === true) {
+          const capturedKeys = new Set((messages || []).map((message) => safeString(message?.messageKey)));
+          const writtenKeys = new Set(
+            [
+              ...(Array.isArray(options?.diff?.added) ? options.diff.added : []),
+              ...(Array.isArray(options?.diff?.updated) ? options.diff.updated : []),
+            ].map(safeString),
+          );
+          const allCapturedKeysWritten =
+            capturedKeys.size > 0 &&
+            !capturedKeys.has('') &&
+            (mode === 'snapshot' || Array.from(capturedKeys).every((key) => writtenKeys.has(key)));
+          const range = IDBKeyRange.bound([conversationId, -Infinity] as any, [conversationId, Infinity] as any);
+          const storedCount = await reqToPromise(stores.messages.index('by_conversationId_sequence').count(range));
+          // Full writes + matching cardinality prove set equality without reading every stored message.
+          if (allCapturedKeysWritten && storedCount === capturedKeys.size) next.chatgptDomHistoryVerified = true;
+          else delete next.chatgptDomHistoryVerified;
+        } else if (options?.domHistoryVerified === false || (mode !== 'append' && messagesChanged)) {
+          delete next.chatgptDomHistoryVerified;
+        }
         if (checkpoint) {
           const user: any = await reqToPromise(
             stores.messages.index('by_conversationId_messageKey').get([conversationId, checkpoint.lastUserKey] as any),

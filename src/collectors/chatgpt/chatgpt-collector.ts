@@ -1064,7 +1064,9 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       messages,
       ...(finalPrepared.completeness === 'complete' && !finalPrepared.reasons.length
         ? { domHistoryVerified: true }
-        : null),
+        : finalPrepared.metrics.stoppedAtKey && finalPrepared.metrics.reachedBottom && !finalPrepared.reasons.length
+          ? null
+          : { domHistoryVerified: false }),
       captureMeta: {
         completeness: 'partial',
         identityVerified: true,

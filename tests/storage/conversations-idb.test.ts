@@ -1587,6 +1587,26 @@ describe('conversations storage-idb', () => {
     expect(result[9999]?.messageKey).toBe('m9999');
     expect(result[10000]?.messageKey).toBe('m10000');
     expect(result[10000]?.sequence).toBe(10_000);
+
+    // Verifying a complete DOM scan is allowed to inspect all stored keys once;
+    // ordinary append above must remain bounded to the changed keys.
+    await syncConversationMessages(
+      id,
+      result.map((message) => ({
+        messageKey: message.messageKey,
+        role: message.role,
+        contentMarkdown: message.contentMarkdown,
+        sequence: message.sequence,
+        captureSequencePolicy: 'preserve-existing-tail',
+      })),
+      {
+        mode: 'append',
+        diff: { added: result.map((message) => message.messageKey), updated: [], removed: [] },
+        domHistoryVerified: true,
+      },
+    );
+    expect((await getConversationById(id))?.chatgptDomHistoryVerified).toBe(true);
+    expect((await getMessagesByConversationId(id)).length).toBe(10_001);
   }, 30_000);
 
   it('keeps exact stored message-key matching when reusing an append working set', async () => {
@@ -4721,7 +4741,144 @@ describe('ChatGPT DOM history completeness in IndexedDB', () => {
     expect((await getMessagesByConversationId(id)).map((m) => m.messageKey)).toEqual([last.messageKey]);
   });
 
-  it('rejects a non-ChatGPT history marker without mutating conversation or messages', async () => {
+  it('invalidates a previously verified prefix on an interrupted append, even if no new messages were saved', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'dom-gap-after-partial-append',
+    });
+    const id = convo.id;
+    await syncConversationMessages(id, [first, last], {
+      mode: 'append',
+      diff: { added: [first.messageKey, last.messageKey], updated: [], removed: [] },
+      domHistoryVerified: true,
+    });
+    expect((await getConversationById(id))?.chatgptDomHistoryVerified).toBe(true);
+    const beforeMessages = await getMessagesByConversationId(id);
+    const beforeMessagesRevision = await readDataRevision('messages');
+    await syncConversationMessages(id, [last], {
+      mode: 'append',
+      diff: { added: [], updated: [last.messageKey], removed: [] },
+      domHistoryVerified: false,
+    });
+    expect((await getConversationById(id))?.chatgptDomHistoryVerified).toBeUndefined();
+    expect(await getMessagesByConversationId(id)).toEqual(beforeMessages);
+    expect(await readDataRevision('messages')).toBe(beforeMessagesRevision);
+    const reloaded = await getConversationTailWindowBySourceAndKey('chatgpt', 'dom-gap-after-partial-append', 16);
+    expect(reloaded.conversation?.chatgptDomHistoryVerified).toBeUndefined();
+
+    await syncConversationMessages(id, [first, last], {
+      mode: 'append',
+      diff: { added: [first.messageKey, last.messageKey], updated: [], removed: [] },
+      domHistoryVerified: true,
+    });
+    expect((await getConversationById(id))?.chatgptDomHistoryVerified).toBe(true);
+  });
+
+  it('does not certify history from missing or malformed append diffs', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'dom-untrusted-diff',
+    });
+    const id = convo.id;
+    await syncConversationMessages(id, [first, last], {
+      mode: 'append',
+      diff: { added: [first.messageKey, last.messageKey], updated: [], removed: [] },
+    });
+    await syncConversationMessages(id, [first, last], {
+      mode: 'append',
+      diff: { added: 'user-0' as any, updated: 42 as any, removed: [] },
+      domHistoryVerified: true,
+    });
+    expect((await getConversationById(id))?.chatgptDomHistoryVerified).toBeUndefined();
+    await syncConversationMessages(id, [], {
+      mode: 'append',
+      diff: { added: [], updated: [], removed: [] },
+      domHistoryVerified: true,
+    });
+    expect((await getConversationById(id))?.chatgptDomHistoryVerified).toBeUndefined();
+    expect((await getMessagesByConversationId(id)).map((m) => m.messageKey)).toEqual([
+      first.messageKey,
+      last.messageKey,
+    ]);
+  });
+
+  it('does not let an older tab re-certify incomplete stored history after a concurrent partial capture', async () => {
+    const convo = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'dom-cross-tab-stale-certification',
+    });
+    const id = convo.id;
+    const later = [
+      { messageKey: 'user-2', role: 'user', contentMarkdown: 'third turn', sequence: 2 },
+      { messageKey: 'assistant-3', role: 'assistant', contentMarkdown: 'third reply', sequence: 3 },
+    ];
+    await syncConversationMessages(id, [first, last], {
+      mode: 'append',
+      diff: { added: [first.messageKey, last.messageKey], updated: [], removed: [] },
+      domHistoryVerified: true,
+    });
+    expect((await getConversationById(id))?.chatgptDomHistoryVerified).toBe(true);
+
+    await syncConversationMessages(id, later, {
+      mode: 'append',
+      diff: { added: later.map((m) => m.messageKey), updated: [], removed: [] },
+      domHistoryVerified: false,
+    });
+    expect((await getConversationById(id))?.chatgptDomHistoryVerified).toBeUndefined();
+
+    await syncConversationMessages(id, [first, last], {
+      mode: 'append',
+      diff: { added: [first.messageKey, last.messageKey], updated: [], removed: [] },
+      domHistoryVerified: true,
+    });
+    expect((await getConversationById(id))?.chatgptDomHistoryVerified).toBeUndefined();
+    expect((await getMessagesByConversationId(id)).map((m) => m.messageKey)).toEqual([
+      first.messageKey,
+      last.messageKey,
+      ...later.map((m) => m.messageKey),
+    ]);
+
+    await syncConversationMessages(id, [first, last, ...later], {
+      mode: 'append',
+      diff: { added: [first.messageKey, last.messageKey, ...later.map((m) => m.messageKey)], updated: [], removed: [] },
+      domHistoryVerified: true,
+    });
+    expect((await getConversationById(id))?.chatgptDomHistoryVerified).toBe(true);
+  });
+
+  it('revokes historical DOM certification when two conversation records are merged', async () => {
+    const kept = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'dom-merge-kept',
+    });
+    const removed = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'dom-merge-removed',
+    });
+    await syncConversationMessages(kept.id, [first, last], {
+      mode: 'append',
+      diff: { added: [first.messageKey, last.messageKey], updated: [], removed: [] },
+      domHistoryVerified: true,
+    });
+    await syncConversationMessages(
+      removed.id,
+      [{ messageKey: 'other-user', role: 'user', contentMarkdown: 'other branch', sequence: 2 }],
+      { mode: 'append', diff: { added: ['other-user'], updated: [], removed: [] } },
+    );
+    expect((await getConversationById(kept.id))?.chatgptDomHistoryVerified).toBe(true);
+    await mergeConversationsByIds({ keepConversationId: kept.id, removeConversationId: removed.id });
+    expect((await getConversationById(kept.id))?.chatgptDomHistoryVerified).toBeUndefined();
+    expect((await getMessagesByConversationId(kept.id)).map((message) => message.messageKey).sort()).toEqual(
+      ['user-0', 'assistant-1', 'other-user'].sort(),
+    );
+  });
+
+  it.each([true, false])('rejects a non-ChatGPT history marker (%s) without mutating data', async (verified) => {
     const conversation = await upsertConversation({
       sourceType: 'chat',
       source: 'claude',
@@ -4733,7 +4890,7 @@ describe('ChatGPT DOM history completeness in IndexedDB', () => {
       syncConversationMessages(id, [first], {
         mode: 'append',
         diff: { added: [first.messageKey], updated: [], removed: [] },
-        domHistoryVerified: true,
+        domHistoryVerified: verified,
       }),
     ).rejects.toThrow('chatgpt_dom_history_source');
     expect(await getMessagesByConversationId(id)).toEqual([]);

@@ -456,7 +456,9 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
       ...(hasActivityAt ? { activityAt: Number(activityAt) } : null),
       ...(conversationContentChanged ? { conversationContentChanged: true } : null),
       ...(msg?.chatgptApiCheckpoint ? { checkpoint: msg.chatgptApiCheckpoint } : null),
-      ...(msg?.chatgptDomHistoryVerified === true ? { domHistoryVerified: true } : null),
+      ...(typeof msg?.chatgptDomHistoryVerified === 'boolean'
+        ? { domHistoryVerified: msg.chatgptDomHistoryVerified }
+        : null),
       ...(msg?.trustedChatgptApiPartial === true ? { preserveCheckpointTail: true } : null),
       ...(msg?.verifiedChatgptApiTail === true
         ? {

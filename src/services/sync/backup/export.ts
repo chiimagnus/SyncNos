@@ -45,6 +45,7 @@ function stripLocalConversation(conversation: AnyRecord) {
   const c = conversation && typeof conversation === 'object' ? { ...conversation } : {};
   delete (c as any).id;
   delete (c as any).chatgptApiCheckpoint;
+  delete (c as any).chatgptDomHistoryVerified;
   return c;
 }
 

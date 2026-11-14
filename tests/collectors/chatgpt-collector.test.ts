@@ -502,6 +502,47 @@ describe('chatgpt current DOM', () => {
     expect(prepared.metrics.reachedTop).toBe(true);
   });
 
+  it('invalidates stored history proof when a partial sweep cannot reach its old anchor', async () => {
+    const test = simulatedLazyChatgptHistory(27, 5, false, 5, false, 8);
+    const snapshot = await capturePrepared(currentDef(test.dom), {
+      now: test.now,
+      sleep: test.sleep,
+      pollMs: 1,
+    });
+    expect(snapshot?.domHistoryVerified).toBe(false);
+    expect(snapshot?.captureMeta?.completeness).toBe('partial');
+    expect(snapshot?.captureMeta?.metrics?.stoppedAtKey).toBe(false);
+  });
+
+  it('preserves history verification when an incremental scan reaches its trusted tail anchor', async () => {
+    const test = simulatedLazyChatgptHistory(27, 5, true, 5, false, 0, true);
+    const snapshot = await capturePrepared(currentDef(test.dom), {
+      savedTailMessageKey: 'user-26',
+      now: test.now,
+      sleep: test.sleep,
+      pollMs: 1,
+    });
+    expect(snapshot?.captureMeta?.metrics?.stoppedAtKey).toBe(true);
+    expect(snapshot).not.toHaveProperty('domHistoryVerified');
+  });
+
+  it('revokes history proof when the old anchor is reached but a visible message remains unresolved', async () => {
+    const test = simulatedLazyChatgptHistory(27, 5, true, 5, false, 0, true);
+    const def = currentDef(test.dom);
+    def.collector.__test.manualAdapter.readUnresolvedKeys = () => ['unresolved-message'];
+    const snapshot = await capturePrepared(def, {
+      savedTailMessageKey: 'user-26',
+      now: test.now,
+      sleep: test.sleep,
+      pollMs: 1,
+      stepTimeoutMs: 5,
+      totalDeadlineMs: 100,
+    });
+    expect(snapshot?.captureMeta?.metrics).toMatchObject({ stoppedAtKey: true, reachedBottom: true });
+    expect(snapshot?.captureMeta?.reasons).toContain('unresolved_turn');
+    expect(snapshot?.domHistoryVerified).toBe(false);
+  });
+
   it('keeps saved-tail capture incremental instead of preloading the old history', async () => {
     const test = simulatedLazyChatgptHistory(27, 5, true, 5, false, 0, true);
     const prepared = await prepare(currentDef(test.dom), {

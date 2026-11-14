@@ -361,8 +361,8 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         : null),
       ...(collectorId === 'chatgpt' &&
       !options?.expectedChatgptConversationId &&
-      normalizedSnapshot.domHistoryVerified === true
-        ? { chatgptDomHistoryVerified: true }
+      typeof normalizedSnapshot.domHistoryVerified === 'boolean'
+        ? { chatgptDomHistoryVerified: normalizedSnapshot.domHistoryVerified }
         : null),
       ...(options?.trustedChatgptApiPartial ? { trustedChatgptApiPartial: true } : null),
       ...(options?.trustedTail || (persistence.mode === 'snapshot' && options?.fullSnapshotGuard)

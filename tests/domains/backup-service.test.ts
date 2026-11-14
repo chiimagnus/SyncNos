@@ -684,7 +684,7 @@ describe('backup service', () => {
     expect(chromeMock.__setPayloads.some((payload) => 'inpage_display_mode' in payload)).toBe(false);
   });
 
-  it('never exports or trusts a local ChatGPT Advanced checkpoint during Backup merge', async () => {
+  it('never exports or trusts local ChatGPT completeness proofs during Backup merge', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
@@ -704,6 +704,16 @@ describe('backup service', () => {
       [{ messageKey: 'u1', role: 'user', contentMarkdown: 'test', sequence: 0, updatedAt: 1 }],
       { mode: 'snapshot', checkpoint },
     );
+    await syncConversationMessages(
+      id,
+      [{ messageKey: 'u1', role: 'user', contentMarkdown: 'test', sequence: 0, updatedAt: 1 }],
+      {
+        mode: 'append',
+        diff: { added: ['u1'], updated: [], removed: [] },
+        domHistoryVerified: true,
+      },
+    );
+    expect((await getConversationById(id))?.chatgptDomHistoryVerified).toBe(true);
     const exported = await exportBackupZip();
     const entries = await extractZipEntries(exported.blob);
     const manifest = JSON.parse(new TextDecoder().decode(entries.get('manifest.json')!));
@@ -712,11 +722,14 @@ describe('backup service', () => {
     const bundlePath = group.files[0];
     const bundle = JSON.parse(new TextDecoder().decode(entries.get(bundlePath)!));
     expect(bundle.conversation).not.toHaveProperty('chatgptApiCheckpoint');
+    expect(bundle.conversation).not.toHaveProperty('chatgptDomHistoryVerified');
 
     bundle.conversation.chatgptApiCheckpoint = checkpoint;
+    bundle.conversation.chatgptDomHistoryVerified = true;
     entries.set(bundlePath, new TextEncoder().encode(JSON.stringify(bundle)));
     await importBackupZipMerge(entries);
     expect((await getConversationById(id))?.chatgptApiCheckpoint).toBeUndefined();
+    expect((await getConversationById(id))?.chatgptDomHistoryVerified).toBeUndefined();
     expect((await getMessagesByConversationId(id)).map((row) => row.messageKey)).toEqual(['u1']);
   });
 

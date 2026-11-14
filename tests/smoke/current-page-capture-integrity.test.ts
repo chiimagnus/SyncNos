@@ -226,6 +226,56 @@ describe('current page capture integrity routing', () => {
     expect(chatgptApiMocks.capture).not.toHaveBeenCalled();
   });
 
+  it('atomically invalidates trusted DOM history when an incremental sweep misses the saved boundary', async () => {
+    const prepare = vi.fn(async () => ({ prepared: true }));
+    const snapshot = {
+      ...chatSnapshot({ completeness: 'partial' }),
+      domHistoryVerified: false,
+      captureMeta: {
+        completeness: 'partial',
+        identityVerified: true,
+        reasons: ['top_not_reached', 'bottom_not_reached'],
+        metrics: { reachedTop: false, reachedBottom: false, stoppedAtKey: false },
+      },
+    };
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      url: 'https://chatgpt.com/c/conversation-1',
+      snapshot,
+      prepare,
+      tailResponse: {
+        messages: [{ messageKey: 'previous-user', role: 'user', sequence: 3 }],
+        domHistoryVerified: true,
+      },
+    });
+    await harness.service.captureCurrentPage();
+    expect(prepare).toHaveBeenCalledWith({ manual: true, savedTailMessageKey: 'previous-user' });
+    const save = harness.calls.find((call) => call.type === 'syncConversationMessages');
+    expect(save?.payload).toMatchObject({
+      mode: 'append',
+      chatgptDomHistoryVerified: false,
+    });
+    expect(save?.payload?.diff?.removed || []).toEqual([]);
+    expect(chatgptApiMocks.capture).not.toHaveBeenCalled();
+  });
+
+  it('re-certifies DOM history after a full, structurally verified scan', async () => {
+    const prepare = vi.fn(async () => ({ prepared: true }));
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      url: 'https://chatgpt.com/c/conversation-1',
+      snapshot: { ...chatSnapshot({ completeness: 'partial' }), domHistoryVerified: true },
+      prepare,
+      tailResponse: { messages: [], domHistoryVerified: false },
+    });
+    await harness.service.captureCurrentPage();
+    expect(prepare).toHaveBeenCalledWith({ manual: true });
+    expect(harness.calls.find((call) => call.type === 'syncConversationMessages')?.payload).toMatchObject({
+      chatgptDomHistoryVerified: true,
+      mode: 'append',
+    });
+  });
+
   it('does not skip missing historical messages for legacy partial DOM coverage', async () => {
     const prepare = vi.fn(async () => ({ prepared: true }));
     const harness = createHarness({
