@@ -20,7 +20,7 @@ note = "可信完整采集校验点、Thinking 设置一致性、尾窗轻量读
 [[tasks]]
 id = "P1-T3"
 title = "提前停页并原子替换当前分支尾部"
-status = "pending"
+status = "completed"
 plan = "plan-p1.md#p1-t3"
-commit = ""
-note = ""
+commit = "64fcedf9d"
+note = "增量早停、分支尾部原子替换、父链缺失重叠恢复、10k IDB 压力与图片精准回填；Node22/25 gate 均 3283/3283，Firefox/Zen/Safari/CLI 通过；真实分支操作尚无专用测试会话。"
