@@ -233,8 +233,7 @@ function simulatedLazyChatgptHistory(
   loadDelayMs = 5,
   needsTopReentry = false,
   ordinalOffset = 0,
-  nativePreload = false,
-  reflowDuringLoading = false,
+  persistentLoader = false,
 ) {
   const dom = setupChatgptDom('', 'https://chatgpt.com/c/lazy-hydrated-history');
   (dom.window as any).scrollTo = vi.fn();
@@ -253,9 +252,7 @@ function simulatedLazyChatgptHistory(
   let visitedTop = false;
   let topReentryArmed = false;
   let edgeReentries = 0;
-  let nativeTriggers = 0;
   let scrollWrites = 0;
-  let layoutGrowth = 0;
 
   const render = () => {
     const start = totalTurns - loaded;
@@ -264,7 +261,7 @@ function simulatedLazyChatgptHistory(
     const turnsHtml = Array.from({ length: last - first + 1 }, (_, offset) => {
       const ordinal = first + offset;
       const actual = start + ordinal;
-      const labelOrdinal = (nativePreload ? ordinal : actual) + ordinalOffset;
+      const labelOrdinal = (persistentLoader ? ordinal : actual) + ordinalOffset;
       return `<div data-turn-key="turn-${actual}">
         <div data-content-search-turn-key="fallback-turn-${labelOrdinal}">
           <div data-chatgpt-search-unit-key="fallback-turn-${labelOrdinal}:0:user"
@@ -280,12 +277,12 @@ function simulatedLazyChatgptHistory(
     }).join('');
     const loadingMarker =
       '<div class="flex items-center justify-center gap-2 py-4"><div role="status"><div data-loading-indicator=""><svg></svg></div></div></div>';
-    scroller.innerHTML = nativePreload
+    scroller.innerHTML = persistentLoader
       ? `<div data-chatgpt-conversation-selection-target="lazy-hydrated-history" data-rail-chat-transcript="true">${loaded < totalTurns ? loadingMarker : ''}${turnsHtml}</div>`
       : loadAt === null
         ? turnsHtml
         : `<div data-chatgpt-conversation-selection-target="lazy-hydrated-history" data-rail-chat-transcript="true">${loadingMarker}</div>${turnsHtml}`;
-    if (nativePreload) {
+    if (persistentLoader) {
       (scroller as any).getBoundingClientRect = () => ({ top: 0, bottom: 100, height: 100, width: 100 });
       const marker = scroller.querySelector('[data-rail-chat-transcript] [role="status"]')?.parentElement;
       if (marker) {
@@ -305,7 +302,7 @@ function simulatedLazyChatgptHistory(
   };
   Object.defineProperties(scroller, {
     clientHeight: { value: 100 },
-    scrollHeight: { get: () => loaded * 100 + layoutGrowth },
+    scrollHeight: { get: () => loaded * 100 },
     clientWidth: { value: 100 },
     scrollWidth: { value: 100 },
     scrollTop: {
@@ -339,7 +336,6 @@ function simulatedLazyChatgptHistory(
     getBottomReturns: () => returnedToBottom,
     getMovesDuringLoad: () => scrollMovesDuringLoad,
     getEdgeReentries: () => edgeReentries,
-    getNativeTriggers: () => nativeTriggers,
     getScrollWrites: () => scrollWrites,
     getTop: () => top,
     setTop: (position: number) => {
@@ -347,19 +343,10 @@ function simulatedLazyChatgptHistory(
     },
     now: () => clock,
     sleep: async (ms: number) => {
-      if (nativePreload && loadAt === null && canLoadMore && loaded < totalTurns) {
-        const marker = scroller.querySelector('[data-rail-chat-transcript] [role="status"]')?.parentElement;
-        if ((marker as HTMLElement | undefined)?.style.transform.startsWith('translateY(')) {
-          nativeTriggers += 1;
-          if (reflowDuringLoading) layoutGrowth += 250;
-          loadAt = clock + loadDelayMs;
-        }
-      }
       clock += Math.max(1, ms);
       if (loadAt !== null && clock >= loadAt) {
         const previousLoaded = loaded;
         loaded = Math.min(totalTurns, loaded + 5);
-        layoutGrowth = 0;
         top += (loaded - previousLoaded) * 100;
         topArrivals += 1;
         loadAt = null;
@@ -441,10 +428,10 @@ describe('chatgpt current DOM', () => {
     expect(prepared.metrics).toMatchObject({ reachedTop: true, reachedBottom: true });
   });
 
-  it('preloads 27 native history turns without scrolling, then harvests the virtual DOM once', async () => {
+  it('scrolls through 27 turns when a native history loading marker is present', async () => {
     const test = simulatedLazyChatgptHistory(27, 5, true, 5, false, 0, true);
     const prepared = await prepare(currentDef(test.dom), { now: test.now, sleep: test.sleep, pollMs: 1 });
-    expect(test.getNativeTriggers()).toBe(5);
+    expect(test.getScrollWrites()).toBeGreaterThan(0);
     expect(test.getLoaded()).toBe(27);
     expect(test.getTopArrivals()).toBe(5);
     expect(test.getBottomReturns()).toBe(1);
@@ -456,26 +443,14 @@ describe('chatgpt current DOM', () => {
     expect(prepared.metrics).toMatchObject({ reachedTop: true, reachedBottom: true });
   });
 
-  it('preloads a 120-turn native history before the single backward harvest', async () => {
-    const test = simulatedLazyChatgptHistory(120, 5, true, 5, false, 0, true);
-    const prepared = await prepare(currentDef(test.dom), { now: test.now, sleep: test.sleep, pollMs: 1 });
-    expect(test.getNativeTriggers()).toBe(23);
-    expect(test.getBottomReturns()).toBe(1);
-    expect(test.getMovesDuringLoad()).toBe(0);
-    expect(prepared.records).toHaveLength(240);
-    expect(prepared.records[0]?.key).toBe('user-0');
-    expect(prepared.records.at(-1)?.key).toBe('assistant-119');
-    expect(prepared.metrics.reachedTop).toBe(true);
-  }, 20_000);
-
-  it('preloads and harvests 250 turns (500 messages) with stable identities and no duplicate records', async () => {
+  it('scrolls through 250 turns (500 messages) with stable identities and no duplicate records', async () => {
     const test = simulatedLazyChatgptHistory(250, 5, true, 5, false, 0, true);
     const prepared = await prepare(currentDef(test.dom), {
       now: test.now,
       sleep: test.sleep,
       pollMs: 1,
     });
-    expect(test.getNativeTriggers()).toBe(49);
+    expect(test.getScrollWrites()).toBeGreaterThan(0);
     expect(test.getLoaded()).toBe(250);
     expect(test.getMovesDuringLoad()).toBe(0);
     expect(test.getBottomReturns()).toBe(1);
@@ -486,7 +461,7 @@ describe('chatgpt current DOM', () => {
     expect(prepared.metrics).toMatchObject({ reachedTop: true, reachedBottom: true });
   }, 30_000);
 
-  it('restores the rebased viewport after native history prepends above a middle-scroll position', async () => {
+  it('restores the initial scroll offset after collecting older history from the middle', async () => {
     const test = simulatedLazyChatgptHistory(27, 5, true, 5, false, 0, true);
     test.setTop(200);
     const prepared = await prepare(currentDef(test.dom), {
@@ -494,10 +469,9 @@ describe('chatgpt current DOM', () => {
       sleep: test.sleep,
       pollMs: 1,
     });
-    expect(test.getNativeTriggers()).toBe(5);
     expect(test.getLoaded()).toBe(27);
     expect(prepared.records).toHaveLength(54);
-    expect(test.getTop()).toBe(2400);
+    expect(test.getTop()).toBe(200);
     expect(test.atBottom()).toBe(false);
     expect(prepared.metrics.reachedTop).toBe(true);
   });
@@ -543,7 +517,7 @@ describe('chatgpt current DOM', () => {
     expect(snapshot?.domHistoryVerified).toBe(false);
   });
 
-  it('keeps saved-tail capture incremental instead of preloading the old history', async () => {
+  it('stops incremental capture at a saved tail without visiting old history', async () => {
     const test = simulatedLazyChatgptHistory(27, 5, true, 5, false, 0, true);
     const prepared = await prepare(currentDef(test.dom), {
       savedTailMessageKey: 'user-26',
@@ -551,28 +525,27 @@ describe('chatgpt current DOM', () => {
       sleep: test.sleep,
       pollMs: 1,
     });
-    expect(test.getNativeTriggers()).toBe(0);
+    expect(test.getTopArrivals()).toBe(0);
     expect(test.getLoaded()).toBe(5);
     expect(prepared.metrics.stoppedAtKey).toBe(true);
     expect(prepared.records.map((record: any) => record.key)).toEqual(['user-26', 'assistant-26']);
   });
 
-  it('falls back to partial-safe collection when the native loader stalls', async () => {
+  it('scrolls even with a persistent loader and safely reports stalled history as partial', async () => {
     const test = simulatedLazyChatgptHistory(27, 5, true, 2_000, false, 0, true);
     const prepared = await prepare(currentDef(test.dom), {
       now: test.now,
       sleep: test.sleep,
+      pollMs: 1,
       boundaryTimeoutMs: 20,
       totalDeadlineMs: 160,
     });
-    expect(test.getNativeTriggers()).toBe(1);
+    expect(test.getScrollWrites()).toBeGreaterThan(0);
     expect(test.getLoaded()).toBe(5);
-    expect(test.getMovesDuringLoad()).toBe(0);
-    expect(test.atBottom()).toBe(true);
     expect(prepared.completeness).toBe('partial');
     expect(prepared.reasons).toContain('top_not_reached');
-    expect(prepared.metrics.steps).toBe(0);
-    expect(test.getScrollWrites()).toBe(0);
+    expect(prepared.reasons).toContain('boundary_stalled');
+    expect(prepared.metrics.steps).toBeGreaterThan(0);
     const sentinel = test.dom.window.document.querySelector('[data-rail-chat-transcript] [role="status"]')
       ?.parentElement as HTMLElement;
     expect(sentinel.style.transform).toBe('');
@@ -580,34 +553,16 @@ describe('chatgpt current DOM', () => {
     expect(sentinel.style.pointerEvents).toBe('');
   });
 
-  it('does not mistake image/font reflow for a completed native history request', async () => {
-    const test = simulatedLazyChatgptHistory(27, 5, true, 2_000, false, 0, true, true);
-    const prepared = await prepare(currentDef(test.dom), {
-      now: test.now,
-      sleep: test.sleep,
-      pollMs: 1,
-      boundaryTimeoutMs: 30,
-      totalDeadlineMs: 160,
-    });
-    expect(test.getNativeTriggers()).toBe(1);
-    expect(test.getLoaded()).toBe(5);
-    expect(test.getScrollWrites()).toBe(0);
-    expect(prepared.metrics.steps).toBe(0);
-    expect(prepared.completeness).toBe('partial');
-    expect(prepared.reasons).toContain('boundary_stalled');
-  });
-
-  it('does not preload native history in a hidden ChatGPT tab', async () => {
+  it('does not certify complete history while the ChatGPT tab is hidden', async () => {
     const test = simulatedLazyChatgptHistory(27, 5, true, 5, false, 0, true);
     Object.defineProperty(test.dom.window.document, 'visibilityState', { configurable: true, value: 'hidden' });
     const prepared = await prepare(currentDef(test.dom), { now: test.now, sleep: test.sleep });
-    expect(test.getNativeTriggers()).toBe(0);
     expect(test.getLoaded()).toBe(5);
     expect(prepared.completeness).toBe('partial');
     expect(prepared.records).toHaveLength(0);
   });
 
-  it('discards a native preload after navigating to another conversation', async () => {
+  it('discards a scrolling capture after navigating to another conversation', async () => {
     const test = simulatedLazyChatgptHistory(27, 5, true, 5, false, 0, true);
     let navigated = false;
     const prepared = await prepare(currentDef(test.dom), {
@@ -621,7 +576,6 @@ describe('chatgpt current DOM', () => {
       },
     });
     expect(navigated).toBe(true);
-    expect(test.getNativeTriggers()).toBe(1);
     expect(prepared.identityVerified).toBe(false);
     expect(prepared.records).toHaveLength(0);
   });
