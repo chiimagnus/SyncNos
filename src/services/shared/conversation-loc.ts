@@ -124,7 +124,7 @@ export function parseSyncnosLink(value: unknown): { route: string; messageKey: s
   } catch {
     return null;
   }
-  if (!isSyncnosLinkPage(url.href) || url.search) return null;
+  if (!isSyncnosLinkPage(url.href)) return null;
   if (!url.hash.startsWith('#/open?')) return null;
   const params = new URLSearchParams(url.hash.slice('#/open?'.length));
   const locs = params.getAll('loc');

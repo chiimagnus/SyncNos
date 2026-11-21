@@ -267,7 +267,6 @@ function parseConversationReference(value) {
     /\p{Cc}/u.test(raw) ||
     url.origin !== 'https://chiimagnus.github.io' ||
     url.pathname !== '/SyncNos/' ||
-    url.search ||
     url.username ||
     url.password ||
     !url.hash.startsWith('#/open?')
