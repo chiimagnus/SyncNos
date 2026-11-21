@@ -185,6 +185,7 @@ describe('syncnos CLI local evidence links', () => {
     const messageKey = 'comment_你好_1';
     const loc = Buffer.from(`${source}||${conversationKey}`, 'utf8').toString('base64url');
     const url = `https://chiimagnus.github.io/SyncNos/#/open?${new URLSearchParams({ loc, message: messageKey })}`;
+    const trackedUrl = url.replace('/SyncNos/#', '/SyncNos/?utm_source=chatgpt.com#');
     const messages = [
       { messageKey: 'before', role: 'user', contentMarkdown: '前文' },
       { messageKey, role: 'user', contentMarkdown: '我的观点' },
@@ -206,7 +207,7 @@ describe('syncnos CLI local evidence links', () => {
       },
     });
     try {
-      const get = await run(['get', url], runtimeRoot, homeDir);
+      const get = await run(['get', trackedUrl], runtimeRoot, homeDir);
       expect(get.exitCode).toBe(0);
       expect(get.json?.data).toEqual({
         conversation: { id: 509, source, conversationKey, title: '我的剪藏' },
@@ -220,12 +221,12 @@ describe('syncnos CLI local evidence links', () => {
 
       const numericMessage = await run(['get', '509', '--message-key', messageKey], runtimeRoot, homeDir);
       expect(numericMessage.json?.data?.targetMessage).toEqual(messages[1]);
-      const canonical = await run(['link', url], runtimeRoot, homeDir);
+      const canonical = await run(['link', trackedUrl], runtimeRoot, homeDir);
       expect(canonical.exitCode).toBe(0);
       expect(canonical.json?.data?.url).toBe(url);
       const byId = await run(['link', '509', '--message-key', messageKey], runtimeRoot, homeDir);
       expect(byId.json?.data?.url).toBe(url);
-      const open = await run(['open', url, '--target', 'notion'], runtimeRoot, homeDir);
+      const open = await run(['open', trackedUrl, '--target', 'notion'], runtimeRoot, homeDir);
       expect(open.json?.data).toEqual({ conversationId: 509, target: 'notion' });
       const launch = await run(['open', url, '--target', 'source', '--launch'], runtimeRoot, homeDir);
       expect(launch.json?.data).toEqual({ conversationId: 509, target: 'source' });

@@ -65,6 +65,11 @@ describe('UI background handler locale readiness', () => {
     vi.mocked(openOrFocusExtensionAppTab).mockResolvedValue({ id: 19 } as any);
     const open = handlers.get(UI_MESSAGE_TYPES.OPEN_SYNCNOS_LINK)!;
     await expect(open({ url: link }, sender)).resolves.toMatchObject({ ok: true, data: { opened: true } });
+    const tracked = link.replace('/SyncNos/#', '/SyncNos/?utm_source=chatgpt.com#');
+    await expect(open({ url: tracked }, { url: tracked, tab: { id: 8, url: tracked } })).resolves.toMatchObject({
+      ok: true,
+      data: { opened: true },
+    });
     await expect(
       open({ url: link }, { url: link.replace('message=msg-b', 'message=old'), tab: sender.tab }),
     ).resolves.toMatchObject({ ok: true, data: { opened: true } });

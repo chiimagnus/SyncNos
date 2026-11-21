@@ -80,6 +80,12 @@ describe('conversation-loc', () => {
     ).toBe(-1);
   });
 
+  it('ignores outer tracking parameters added by the referring site', () => {
+    const link = buildSyncnosLink({ source: 'chatgpt', conversationKey: 'session-42', messageKey: 'message-2' });
+    const tracked = link.replace('/SyncNos/#', '/SyncNos/?utm_source=chatgpt.com&ref=share#');
+    expect(parseSyncnosLink(tracked)).toEqual(parseSyncnosLink(link));
+  });
+
   it('rejects malformed, conflicting, and off-origin deep links', () => {
     const good = buildSyncnosLink({ source: 'chatgpt', conversationKey: 'session-1', messageKey: 'msg' });
     for (const bad of [
