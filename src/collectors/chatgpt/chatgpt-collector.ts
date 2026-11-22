@@ -16,7 +16,6 @@ import { composeThinkingMarkdown } from '@services/shared/thinking-block';
 import {
   addPreparedReason,
   createPreparedAccumulator,
-  createScrollRootRestorer,
   finishPreparedCapture,
   mergePreparedRecords,
   createPreparedCaptureConsumer,
@@ -852,8 +851,8 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     };
   }
 
-  // Manual-only dynamic sweep. The provider re-queries after every wait; no turn/message node
-  // survives across an await. The original scroll root is restored in finally.
+  // Manual-only upward sweep. The provider re-queries after every wait; no turn/message node
+  // survives across an await. Leave the user's viewport at the oldest reached position.
   async function prepareManualCapture(options: any = {}): Promise<any | null> {
     if (!matches({ hostname: env.location.hostname })) return null;
     const root = manualAdapter.readRoot();
@@ -862,11 +861,6 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     const scrollRuntime = { document: env.document, window: env.window };
     const initialIdentityGuard = manualAdapter.readIdentity();
     const sampleIdentity = createIdentitySampler(initialIdentityGuard);
-    const scrollRestorer = createScrollRootRestorer({
-      ...scrollRuntime,
-      getSeed: manualAdapter.readScrollSeed,
-      sampleIdentity,
-    });
     const durableConversationKey = initialIdentityGuard.durableId ? identityConversationKey(initialIdentityGuard) : '';
     const accumulator = createPreparedAccumulator<any>({
       source: 'chatgpt',
@@ -896,34 +890,25 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       },
       harvest: (target: PreparedAccumulator<any>) => harvestRenderedInto(target, null, { newestFirst: true }),
     };
-    try {
-      const sweep = await runVirtualizedSweep(scrollRuntime, adapter, accumulator, {
-        totalDeadlineMs: options.totalDeadlineMs,
-        maxSteps: options.maxSteps,
-        stableSamples: options.stableSamples,
-        pollMs: options.pollMs,
-        stepTimeoutMs: options.stepTimeoutMs,
-        boundaryTimeoutMs: options.boundaryTimeoutMs ?? 45_000,
-        overlapRatio: options.overlapRatio,
-        maxOverlapRecoveries: options.maxOverlapRecoveries,
-        sleep: options.sleep,
-        now: options.now,
-        startAtBottom: true,
-        holdAtTop: true,
-        ...(savedTailMessageKey ? { stopAtKey: savedTailMessageKey } : null),
-      });
-      if (sweep.stoppedAtKey) {
-        const index = accumulator.records.findIndex((record) => record.key === savedTailMessageKey);
-        accumulator.records = accumulator.records.slice(index);
-      }
-      accumulator.completeness = sweep.completeness;
-    } finally {
-      const restoreResult = scrollRestorer.restore();
-      if (!restoreResult.restored) {
-        accumulator.completeness = 'partial';
-        addPreparedReason(accumulator, 'restore_failed');
-      }
+    const sweep = await runVirtualizedSweep(scrollRuntime, adapter, accumulator, {
+      totalDeadlineMs: options.totalDeadlineMs,
+      maxSteps: options.maxSteps,
+      stableSamples: options.stableSamples,
+      pollMs: options.pollMs,
+      stepTimeoutMs: options.stepTimeoutMs,
+      boundaryTimeoutMs: options.boundaryTimeoutMs ?? 45_000,
+      overlapRatio: options.overlapRatio,
+      sleep: options.sleep,
+      now: options.now,
+      scanUpwards: true,
+      holdAtTop: true,
+      ...(savedTailMessageKey ? { stopAtKey: savedTailMessageKey } : null),
+    });
+    if (sweep.stoppedAtKey) {
+      const index = accumulator.records.findIndex((record) => record.key === savedTailMessageKey);
+      accumulator.records = accumulator.records.slice(index);
     }
+    accumulator.completeness = sweep.completeness;
 
     if (!accumulator.conversationKey) addPreparedReason(accumulator, 'unstable_identity');
     const finalGuard = manualAdapter.readIdentity();

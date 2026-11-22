@@ -447,12 +447,12 @@ async function capturePrepared(def: any, options: any = {}) {
 }
 
 describe('chatgpt current DOM', () => {
-  it('scans newest-to-oldest only until the last saved message, and restores the original scroll', async () => {
-    const test = simulatedVirtualHistory(0);
+  it('scans upward to the saved key without restoring the initial scroll position', async () => {
+    const test = simulatedVirtualHistory(200);
     const def = currentDef(test.dom);
     const prepared = await prepare(def, { savedTailMessageKey: 'message-5' });
     expect(prepared.metrics).toMatchObject({ stoppedAtKey: true, reachedBottom: true, reachedTop: false });
-    expect(test.getTop()).toBe(0);
+    expect(test.getTop()).toBeLessThan(200);
     expect(prepared.records.map((record: any) => record.key)).toEqual(['message-5', 'message-6', 'message-7']);
     const snapshot = await def.collector.capture({ manual: true, preparedCapture: prepared });
     expect(snapshot.messages.map((row: any) => row.messageKey)).toEqual(['message-5', 'message-6', 'message-7']);
@@ -478,7 +478,7 @@ describe('chatgpt current DOM', () => {
     expect(prepared.completeness).toBe('partial');
     expect(prepared.metrics.steps).toBeLessThan(8);
     expect(test.getWrites()).toBeLessThan(10);
-    expect(test.atBottom()).toBe(true);
+    expect(test.atBottom()).toBe(false);
   });
 
   it('harvests delayed lazy batches in one upward sweep without returning to the bottom', async () => {
@@ -491,9 +491,9 @@ describe('chatgpt current DOM', () => {
     });
     expect(test.getLoaded()).toBe(27);
     expect(test.getTopArrivals()).toBeGreaterThan(3);
-    expect(test.getBottomReturns()).toBe(1);
+    expect(test.getBottomReturns()).toBe(0);
     expect(test.getMovesDuringLoad()).toBe(0);
-    expect(test.atBottom()).toBe(true);
+    expect(test.atBottom()).toBe(false);
     expect(prepared.records).toHaveLength(54);
     expect(prepared.records.map((record: any) => record.key)).toEqual(
       Array.from({ length: 27 }, (_, index) => [`user-${index}`, `assistant-${index}`]).flat(),
@@ -507,9 +507,9 @@ describe('chatgpt current DOM', () => {
     expect(test.getScrollWrites()).toBeGreaterThan(0);
     expect(test.getLoaded()).toBe(27);
     expect(test.getTopArrivals()).toBe(5);
-    expect(test.getBottomReturns()).toBe(1);
+    expect(test.getBottomReturns()).toBe(0);
     expect(test.getMovesDuringLoad()).toBe(0);
-    expect(test.atBottom()).toBe(true);
+    expect(test.atBottom()).toBe(false);
     expect(prepared.records.map((record: any) => record.key)).toEqual(
       Array.from({ length: 27 }, (_, index) => [`user-${index}`, `assistant-${index}`]).flat(),
     );
@@ -526,7 +526,7 @@ describe('chatgpt current DOM', () => {
     expect(test.getScrollWrites()).toBeGreaterThan(0);
     expect(test.getLoaded()).toBe(250);
     expect(test.getMovesDuringLoad()).toBe(0);
-    expect(test.getBottomReturns()).toBe(1);
+    expect(test.getBottomReturns()).toBe(0);
     expect(prepared.records).toHaveLength(500);
     expect(new Set(prepared.records.map((row: any) => row.key)).size).toBe(500);
     expect(prepared.records[0]?.key).toBe('user-0');
@@ -534,7 +534,7 @@ describe('chatgpt current DOM', () => {
     expect(prepared.metrics).toMatchObject({ reachedTop: true, reachedBottom: true });
   }, 30_000);
 
-  it('restores the initial scroll offset after collecting older history from the middle', async () => {
+  it('starts at the current viewport and leaves it at the oldest reached position', async () => {
     const test = simulatedLazyChatgptHistory(27, 5, true, 5, false, 0, true);
     test.setTop(200);
     const prepared = await prepare(currentDef(test.dom), {
@@ -543,10 +543,11 @@ describe('chatgpt current DOM', () => {
       pollMs: 1,
     });
     expect(test.getLoaded()).toBe(27);
-    expect(prepared.records).toHaveLength(54);
-    expect(test.getTop()).toBe(200);
+    expect(prepared.records.length).toBeLessThan(54);
+    expect(test.getTop()).toBe(0);
     expect(test.atBottom()).toBe(false);
-    expect(prepared.metrics.reachedTop).toBe(true);
+    expect(prepared.metrics).toMatchObject({ reachedTop: true, reachedBottom: false });
+    expect(prepared.completeness).toBe('partial');
   });
 
   it('invalidates stored history proof when a partial sweep cannot reach its old anchor', async () => {
@@ -664,7 +665,7 @@ describe('chatgpt current DOM', () => {
     expect(prepared.metrics).toMatchObject({ reachedTop: true, reachedBottom: true });
     expect(test.now()).toBeLessThan(200);
     expect(test.getEdgeReentries()).toBe(0);
-    expect(test.getBottomReturns()).toBe(1);
+    expect(test.getBottomReturns()).toBe(0);
   });
 
   it('returns partial immediately when the visible top is not the first turn and has no loader', async () => {
@@ -680,7 +681,7 @@ describe('chatgpt current DOM', () => {
     expect(prepared.reasons).toContain('top_not_reached');
     expect(prepared.reasons).not.toContain('boundary_stalled');
     expect(test.now()).toBeLessThan(200);
-    expect(test.getBottomReturns()).toBe(1);
+    expect(test.getBottomReturns()).toBe(0);
   });
 
   it('does not certify incomplete history after a single sweep hits its step budget', async () => {
@@ -694,7 +695,7 @@ describe('chatgpt current DOM', () => {
     expect(prepared.metrics.reachedTop).toBe(false);
     expect(prepared.reasons).toContain('step_budget_exhausted');
     expect(prepared.records.length).toBeLessThan(54);
-    expect(test.atBottom()).toBe(true);
+    expect(test.atBottom()).toBe(false);
   });
 
   it('does not fabricate a complete history or re-enter the top when loading has no signal', async () => {
@@ -706,7 +707,7 @@ describe('chatgpt current DOM', () => {
     });
     expect(test.getLoaded()).toBe(5);
     expect(test.getEdgeReentries()).toBe(0);
-    expect(test.getBottomReturns()).toBe(1);
+    expect(test.getBottomReturns()).toBe(0);
     expect(prepared.records).toHaveLength(10);
     expect(prepared.metrics.reachedTop).toBe(false);
     expect(prepared.reasons).toContain('top_not_reached');
@@ -723,7 +724,7 @@ describe('chatgpt current DOM', () => {
     });
     expect(test.getLoaded()).toBe(5);
     expect(test.getMovesDuringLoad()).toBe(0);
-    expect(test.getBottomReturns()).toBe(1);
+    expect(test.getBottomReturns()).toBe(0);
     expect(prepared.metrics.reachedTop).toBe(false);
     expect(prepared.reasons).toContain('boundary_stalled');
   });
@@ -739,7 +740,7 @@ describe('chatgpt current DOM', () => {
     });
     expect(test.getLoaded()).toBe(10);
     expect(test.getMovesDuringLoad()).toBe(0);
-    expect(test.getBottomReturns()).toBe(1);
+    expect(test.getBottomReturns()).toBe(0);
     expect(prepared.records).toHaveLength(20);
     expect(prepared.metrics.reachedTop).toBe(true);
   });
@@ -775,7 +776,7 @@ describe('chatgpt current DOM', () => {
     });
     expect(test.getLoaded()).toBe(120);
     expect(test.getTopArrivals()).toBeGreaterThanOrEqual(20);
-    expect(test.getBottomReturns()).toBe(1);
+    expect(test.getBottomReturns()).toBe(0);
     expect(test.getMovesDuringLoad()).toBe(0);
     expect(prepared.records).toHaveLength(240);
     expect(prepared.records.at(0)?.key).toBe('user-0');
@@ -805,7 +806,7 @@ describe('chatgpt current DOM', () => {
     expect(prepared.records.map((record: any) => record.key)).toEqual(
       Array.from({ length: 8 }, (_, index) => `message-${index}`),
     );
-    expect(test.getTop()).toBe(200);
+    expect(test.getTop()).toBe(0);
     expect(prepared.reasons).not.toContain('order_conflict');
   });
 

@@ -323,13 +323,13 @@ describe('virtualized chat overlapping window order', () => {
 describe('virtualized chat single pass', () => {
   function harness(
     windows: Array<{ top: number; keys: string[] }>,
-    options: { growAt?: number; initialScrollHeight?: number } = {},
+    options: { growAt?: number; initialScrollHeight?: number; initialTop?: number } = {},
   ) {
     const dom = new JSDOM('<body><div id="root"><div id="seed"></div></div></body>');
     const root = dom.window.document.querySelector('#root') as HTMLElement;
     const seed = dom.window.document.querySelector('#seed') as HTMLElement;
     root.style.overflowY = 'auto';
-    let top = 0;
+    let top = options.initialTop ?? 0;
     let scrollHeight = options.initialScrollHeight ?? 300;
     Object.defineProperty(root, 'clientHeight', { configurable: true, value: 100 });
     Object.defineProperty(root, 'scrollHeight', {
@@ -457,7 +457,7 @@ describe('virtualized chat single pass', () => {
       { document: dom.window.document, window: dom.window as any },
       adapter,
       reverseAccumulator,
-      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, startAtBottom: true },
+      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, scanUpwards: true },
     );
     expect(reverse).toMatchObject({ reachedTop: true, reachedBottom: true });
     expect(finishPreparedCapture(reverseAccumulator).records.map((record) => record.key)).toEqual([
@@ -469,13 +469,16 @@ describe('virtualized chat single pass', () => {
     ]);
   });
 
-  it('collects an unsaved conversation newest-first without relying on any local key', async () => {
-    const test = harness([
-      { top: 0, keys: ['a', 'b'] },
-      { top: 60, keys: ['b', 'c'] },
-      { top: 120, keys: ['c', 'd'] },
-      { top: 180, keys: ['d', 'e'] },
-    ]);
+  it('collects an unsaved conversation from the current newest viewport without relying on any local key', async () => {
+    const test = harness(
+      [
+        { top: 0, keys: ['a', 'b'] },
+        { top: 60, keys: ['b', 'c'] },
+        { top: 120, keys: ['c', 'd'] },
+        { top: 180, keys: ['d', 'e'] },
+      ],
+      { initialTop: 200 },
+    );
     const visited: string[] = [];
     const harvest = test.adapter.harvest;
     test.adapter.harvest = async (accumulator) => {
@@ -486,7 +489,7 @@ describe('virtualized chat single pass', () => {
       { document: test.dom.window.document, window: test.dom.window as any },
       test.adapter,
       test.accumulator,
-      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, startAtBottom: true },
+      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, scanUpwards: true },
     );
     expect(result).toMatchObject({
       stoppedAtKey: false,
@@ -504,13 +507,112 @@ describe('virtualized chat single pass', () => {
     ]);
   });
 
-  it('rechecks the logical top after older messages load during a newest-first sweep', async () => {
-    const test = harness([
-      { top: 0, keys: ['a', 'b'] },
-      { top: 60, keys: ['b', 'c'] },
-      { top: 120, keys: ['c', 'd'] },
-      { top: 180, keys: ['d', 'e'] },
-    ]);
+  it('does not jump to the latest message or restore the starting position when scanning from the middle', async () => {
+    const test = harness(
+      [
+        { top: 0, keys: ['a', 'b'] },
+        { top: 60, keys: ['b', 'c'] },
+        { top: 120, keys: ['c', 'd'] },
+        { top: 180, keys: ['d', 'e'] },
+      ],
+      { initialTop: 120 },
+    );
+    const original = Object.getOwnPropertyDescriptor(test.root, 'scrollTop')!;
+    const writes: number[] = [];
+    Object.defineProperty(test.root, 'scrollTop', {
+      configurable: true,
+      get: original.get,
+      set(value: number) {
+        writes.push(value);
+        original.set!.call(this, value);
+      },
+    });
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      { scanUpwards: true, stableSamples: 1, pollMs: 0, overlapRatio: 0.6 },
+    );
+    expect(writes.length).toBeGreaterThan(0);
+    expect(writes.every((position, index) => position <= (index ? writes[index - 1] : 120))).toBe(true);
+    expect(test.getTop()).toBe(0);
+    expect(result).toMatchObject({ reachedTop: true, reachedBottom: false, completeness: 'partial' });
+    expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  it('never scrolls downward to repair an unanchored gap during upward scanning', async () => {
+    const test = harness(
+      [
+        { top: 0, keys: ['old'] },
+        { top: 180, keys: ['new'] },
+      ],
+      { initialTop: 200 },
+    );
+    const original = Object.getOwnPropertyDescriptor(test.root, 'scrollTop')!;
+    const writes: number[] = [];
+    Object.defineProperty(test.root, 'scrollTop', {
+      configurable: true,
+      get: original.get,
+      set(value: number) {
+        writes.push(value);
+        original.set!.call(this, value);
+      },
+    });
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      { scanUpwards: true, stableSamples: 1, pollMs: 0, overlapRatio: 0.6, maxOverlapRecoveries: 4 },
+    );
+    expect(writes.every((position, index) => position <= (index ? writes[index - 1] : 200))).toBe(true);
+    expect(result.reasons).toContain('order_unanchored');
+    expect(result.completeness).toBe('partial');
+    expect(new Set(finishPreparedCapture(test.accumulator).records.map((record) => record.key))).toEqual(
+      new Set(['old', 'new']),
+    );
+  });
+
+  it('does not chase an automatic scroll rebase back to an already harvested window', async () => {
+    const test = harness(
+      [
+        { top: 0, keys: ['old'] },
+        { top: 180, keys: ['new'] },
+      ],
+      { initialTop: 200 },
+    );
+    const original = Object.getOwnPropertyDescriptor(test.root, 'scrollTop')!;
+    const writes: number[] = [];
+    Object.defineProperty(test.root, 'scrollTop', {
+      configurable: true,
+      get: original.get,
+      set(value: number) {
+        writes.push(value);
+        original.set!.call(this, 200);
+      },
+    });
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      { scanUpwards: true, stableSamples: 1, pollMs: 0, overlapRatio: 0.6 },
+    );
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toBeLessThan(200);
+    expect(result).toMatchObject({ completeness: 'partial', reachedBottom: true, reachedTop: false });
+    expect(result.reasons).toContain('scroll_stalled');
+    expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual(['new']);
+  });
+
+  it('rechecks the logical top after older messages load during an upward sweep', async () => {
+    const test = harness(
+      [
+        { top: 0, keys: ['a', 'b'] },
+        { top: 60, keys: ['b', 'c'] },
+        { top: 120, keys: ['c', 'd'] },
+        { top: 180, keys: ['d', 'e'] },
+      ],
+      { initialTop: 200 },
+    );
     let olderLoaded = false;
     const originalKeys = test.adapter.readDescriptorKeys;
     test.adapter.readDescriptorKeys = () =>
@@ -534,7 +636,7 @@ describe('virtualized chat single pass', () => {
       test.adapter,
       test.accumulator,
       {
-        startAtBottom: true,
+        scanUpwards: true,
         stableSamples: 1,
         pollMs: 0,
         overlapRatio: 0.6,
@@ -555,13 +657,16 @@ describe('virtualized chat single pass', () => {
     ]);
   });
 
-  it('starts from the latest window and stops at the saved tail key without visiting old history', async () => {
-    const test = harness([
-      { top: 0, keys: ['a', 'b'] },
-      { top: 60, keys: ['b', 'c'] },
-      { top: 120, keys: ['c', 'd'] },
-      { top: 180, keys: ['d', 'e'] },
-    ]);
+  it('stops at the saved tail key without visiting older history when already at the latest window', async () => {
+    const test = harness(
+      [
+        { top: 0, keys: ['a', 'b'] },
+        { top: 60, keys: ['b', 'c'] },
+        { top: 120, keys: ['c', 'd'] },
+        { top: 180, keys: ['d', 'e'] },
+      ],
+      { initialTop: 200 },
+    );
     const result = await runVirtualizedSweep(
       { document: test.dom.window.document, window: test.dom.window as any },
       test.adapter,
@@ -585,7 +690,10 @@ describe('virtualized chat single pass', () => {
       top: index * 60,
       keys: [`m${index}`, `m${index + 1}`],
     }));
-    const test = harness(windows, { initialScrollHeight: windows.at(-1)!.top + 100 });
+    const test = harness(windows, {
+      initialScrollHeight: windows.at(-1)!.top + 100,
+      initialTop: windows.at(-1)!.top,
+    });
     const result = await runVirtualizedSweep(
       { document: test.dom.window.document, window: test.dom.window as any },
       test.adapter,
@@ -601,10 +709,13 @@ describe('virtualized chat single pass', () => {
   });
 
   it('does not trust a saved key after an unanchored virtualized gap', async () => {
-    const test = harness([
-      { top: 0, keys: ['old', 'anchor'] },
-      { top: 180, keys: ['new-a', 'new-b'] },
-    ]);
+    const test = harness(
+      [
+        { top: 0, keys: ['old', 'anchor'] },
+        { top: 180, keys: ['new-a', 'new-b'] },
+      ],
+      { initialTop: 200 },
+    );
     test.adapter.harvest = async (target) =>
       mergePreparedRecords(
         target,
@@ -634,12 +745,15 @@ describe('virtualized chat single pass', () => {
   });
 
   it('does not accept a missing local tail as an incremental boundary', async () => {
-    const test = harness([
-      { top: 0, keys: ['a', 'b'] },
-      { top: 60, keys: ['b', 'c'] },
-      { top: 120, keys: ['c', 'd'] },
-      { top: 180, keys: ['d', 'e'] },
-    ]);
+    const test = harness(
+      [
+        { top: 0, keys: ['a', 'b'] },
+        { top: 60, keys: ['b', 'c'] },
+        { top: 120, keys: ['c', 'd'] },
+        { top: 180, keys: ['d', 'e'] },
+      ],
+      { initialTop: 200 },
+    );
     const result = await runVirtualizedSweep(
       { document: test.dom.window.document, window: test.dom.window as any },
       test.adapter,
@@ -726,7 +840,7 @@ describe('virtualized chat single pass', () => {
       },
       test.accumulator,
       {
-        startAtBottom: true,
+        scanUpwards: true,
         holdAtTop: true,
         stableSamples: 1,
         pollMs: 5,
@@ -768,7 +882,7 @@ describe('virtualized chat single pass', () => {
       },
       test.accumulator,
       {
-        startAtBottom: true,
+        scanUpwards: true,
         holdAtTop: true,
         stableSamples: 1,
         pollMs: 5,
@@ -1063,7 +1177,7 @@ describe('virtualized chat single pass', () => {
   });
 
   it('does not wait or invent completion when the provider cannot verify the actual top', async () => {
-    const test = harness([{ top: 0, keys: ['a'] }]);
+    const test = harness([{ top: 0, keys: ['a'] }], { initialTop: 200 });
     let waits = 0;
     const result = await runVirtualizedSweep(
       { document: test.dom.window.document, window: test.dom.window as any },
@@ -1073,7 +1187,7 @@ describe('virtualized chat single pass', () => {
       },
       test.accumulator,
       {
-        startAtBottom: true,
+        scanUpwards: true,
         holdAtTop: true,
         stableSamples: 1,
         pollMs: 0,
@@ -1099,7 +1213,7 @@ describe('virtualized chat single pass', () => {
       },
       test.accumulator,
       {
-        startAtBottom: true,
+        scanUpwards: true,
         holdAtTop: true,
         maxSteps: 1,
         stableSamples: 1,

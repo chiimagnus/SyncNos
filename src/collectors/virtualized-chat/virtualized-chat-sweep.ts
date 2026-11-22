@@ -450,7 +450,7 @@ export type VirtualizedPassOptions = {
   now?: () => number;
   deadline?: number;
   stopAtKey?: string;
-  startAtBottom?: boolean;
+  scanUpwards?: boolean;
   holdAtTop?: boolean;
 };
 
@@ -526,7 +526,7 @@ export async function runVirtualizedPass<T>(
   let reachedTop = false;
   let reachedBottom = false;
   let stoppedAtKey = false;
-  const backwards = options.startAtBottom === true || !!options.stopAtKey;
+  const upwards = options.scanUpwards === true || !!options.stopAtKey;
   let steps = 0;
   let maxScrollExtent = 0;
   let previousTop = 0;
@@ -718,21 +718,17 @@ export async function runVirtualizedPass<T>(
     return null;
   };
 
-  const waitForLogicalBottom = async (seek = false): Promise<{ stable: StableWindow | null; confirmed: boolean }> => {
+  const waitForLogicalBottom = async (): Promise<{ stable: StableWindow | null; confirmed: boolean }> => {
     let lastSignature = '';
     let progressDeadline = now() + boundaryTimeoutMs;
     while (!deadlineExceeded()) {
-      if (seek) {
-        const metrics = readScrollMetrics(runtime, root);
-        writeScrollPosition(runtime, root, metrics.left, metrics.scrollHeight - metrics.clientHeight);
-      }
       const stable = await stabilize();
       if (!stable) return { stable: null, confirmed: false };
       const previousExtent = maxScrollExtent;
       maxScrollExtent = Math.max(maxScrollExtent, stable.metrics.scrollHeight);
       if (stable.metrics.scrollHeight + 1 < previousExtent) {
         const recovered = await recoverRegressedBottom(stable.metrics);
-        if (!seek || !recovered) return { stable: recovered, confirmed: false };
+        return { stable: recovered, confirmed: false };
       } else {
         boundaryRecoveries = 0;
         if (isAtScrollBottom(stable.metrics)) {
@@ -740,7 +736,7 @@ export async function runVirtualizedPass<T>(
           if (!state) return { stable: null, confirmed: false };
           if (state === 'unverified') return { stable, confirmed: false };
           if (state === 'confirmed') return { stable, confirmed: true };
-        } else if (!seek) return { stable, confirmed: false };
+        } else return { stable, confirmed: false };
       }
       const signature = contentFreeWindowSignature(originalIdentity, stable.metrics, stable.keys);
       if (signature !== lastSignature) {
@@ -759,21 +755,17 @@ export async function runVirtualizedPass<T>(
 
   try {
     if (deadlineExceeded()) return result();
-    const bottom = backwards ? await waitForLogicalBottom(true) : null;
-    reachedBottom = bottom?.confirmed === true;
-    let stable = backwards ? (bottom?.stable ?? null) : await acquireLogicalTop();
-    if (!stable || !(backwards ? reachedBottom : reachedTop)) return result();
+    if (upwards && readBoundaryState('bottom') === 'unverified') return result();
+    let stable = upwards ? await stabilize() : await acquireLogicalTop();
+    if (!stable || (!upwards && !reachedTop)) return result();
+    if (upwards && isAtScrollBottom(stable.metrics)) reachedBottom = readBoundaryState('bottom') === 'confirmed';
     previousTop = stable.metrics.top;
 
     while (steps < maxSteps) {
       if (deadlineExceeded() || !validateAfterAwait()) break;
       const knownKeys = new Set(accumulator.records.map((record) => record.key));
       const hasOverlap = !knownKeys.size || stable.keys.some((key) => knownKeys.has(key));
-      if (
-        !hasOverlap &&
-        overlapRecoveries < maxOverlapRecoveries &&
-        (backwards ? stable.metrics.top < previousTop - 1 : stable.metrics.top > previousTop + 1)
-      ) {
+      if (!hasOverlap && overlapRecoveries < maxOverlapRecoveries && !upwards && stable.metrics.top > previousTop + 1) {
         overlapRecoveries += 1;
         const recoveryTop = Math.floor((previousTop + stable.metrics.top) / 2);
         writeScrollPosition(runtime, root, stable.metrics.left, recoveryTop);
@@ -810,7 +802,7 @@ export async function runVirtualizedPass<T>(
         stoppedAtKey = true;
         break;
       }
-      if (backwards) {
+      if (upwards) {
         const signature = contentFreeWindowSignature(originalIdentity, stable.metrics, stable.keys);
         const previousCount = visitedWindows.get(signature);
         if (previousCount !== undefined && previousCount === accumulator.records.length && !updated) {
@@ -820,7 +812,7 @@ export async function runVirtualizedPass<T>(
         visitedWindows.set(signature, accumulator.records.length);
       }
       const metrics = readScrollMetrics(runtime, root);
-      if (backwards) {
+      if (upwards) {
         maxScrollExtent = Math.max(maxScrollExtent, metrics.scrollHeight);
         if (isAtScrollTop(metrics)) {
           const topState = readBoundaryState('top');
@@ -858,9 +850,15 @@ export async function runVirtualizedPass<T>(
           addReason('scroll_stalled');
           break;
         }
+        const knownAfterHarvest = new Set(accumulator.records.map((record) => record.key));
         writeScrollPosition(runtime, root, metrics.left, nextTop);
-        stable = await stabilize();
-        if (!stable) break;
+        const nextWindow = await stabilize();
+        if (!nextWindow) break;
+        if (nextWindow.metrics.top > nextTop + 1 && nextWindow.keys.every((key) => knownAfterHarvest.has(key))) {
+          addReason('scroll_stalled');
+          break;
+        }
+        stable = nextWindow;
         continue;
       }
       const previousExtent = maxScrollExtent;
@@ -904,7 +902,7 @@ export async function runVirtualizedPass<T>(
       stable = await stabilize();
       if (!stable) break;
     }
-    if (steps >= maxSteps && !(backwards ? stoppedAtKey || reachedTop : reachedBottom))
+    if (steps >= maxSteps && !(upwards ? stoppedAtKey || reachedTop : reachedBottom))
       addReason('step_budget_exhausted');
   } catch (_error) {
     addReason('pass_failed');
