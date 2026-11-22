@@ -1060,6 +1060,162 @@ describe('virtualized chat single pass', () => {
     expect(scrollDownAfterTop).toBe(0);
   });
 
+  it('waits for genuinely older messages instead of treating a recycled height increase as progress', async () => {
+    const test = harness([{ top: 0, keys: ['known-message'] }], { initialTop: 0, initialScrollHeight: 500 });
+    let clock = 0;
+    let rebased = false;
+    let writes = 0;
+    const native = Object.getOwnPropertyDescriptor(test.root, 'scrollTop')!;
+    Object.defineProperty(test.root, 'scrollTop', {
+      configurable: true,
+      get: native.get,
+      set(value: number) {
+        writes += 1;
+        native.set!.call(this, value);
+      },
+    });
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      {
+        ...test.adapter,
+        readBoundaryState: (boundary) => (boundary === 'top' ? 'pending' : 'confirmed'),
+      },
+      test.accumulator,
+      {
+        scanUpwards: true,
+        holdAtTop: true,
+        stableSamples: 1,
+        pollMs: 2,
+        boundaryTimeoutMs: 40,
+        totalDeadlineMs: 100,
+        now: () => clock,
+        sleep: async (ms) => {
+          clock += Math.max(1, ms);
+          if (!rebased) {
+            rebased = true;
+            test.setScrollHeight(800);
+            native.set!.call(test.root, 400);
+          }
+        },
+      },
+    );
+    expect(rebased).toBe(true);
+    expect(writes).toBe(0);
+    expect(result.reasons).toContain('boundary_stalled');
+    expect(result.steps).toBe(1);
+    expect(finishPreparedCapture(test.accumulator).records.map((row) => row.key)).toEqual(['known-message']);
+  });
+
+  it('waits for native history loading after viewport relocation and resumes toward older messages', async () => {
+    const test = harness(
+      [
+        { top: 0, keys: ['old', 'new'] },
+        { top: 180, keys: ['new'] },
+      ],
+      {
+        initialTop: 200,
+      },
+    );
+    const original = Object.getOwnPropertyDescriptor(test.root, 'scrollTop')!;
+    let clock = 0;
+    let loading = true;
+    let snapCount = 0;
+    let finishAt = -1;
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      {
+        ...test.adapter,
+        readBoundaryState: (boundary) =>
+          boundary === 'bottom' ? 'confirmed' : loading ? 'pending' : test.getTop() <= 0 ? 'confirmed' : 'unverified',
+      },
+      test.accumulator,
+      {
+        scanUpwards: true,
+        holdAtTop: true,
+        stableSamples: 1,
+        pollMs: 5,
+        boundaryTimeoutMs: 80,
+        totalDeadlineMs: 300,
+        now: () => clock,
+        sleep: async (ms) => {
+          clock += Math.max(1, ms);
+          if (loading && finishAt < 0 && test.getTop() === 0) {
+            snapCount += 1;
+            original.set!.call(test.root, 200);
+            finishAt = clock + 20;
+          }
+          if (finishAt > 0 && clock >= finishAt) loading = false;
+        },
+      },
+    );
+    expect(snapCount).toBe(1);
+    expect(loading).toBe(false);
+    expect(result).toMatchObject({ reachedTop: true, reachedBottom: true, completeness: 'complete' });
+    expect(finishPreparedCapture(test.accumulator).records.map((row) => row.key)).toEqual(['old', 'new']);
+  });
+
+  it('harvests a replaced virtual window even when native loading keeps the viewport away from the top', async () => {
+    const test = harness(
+      [
+        { top: 0, keys: ['old', 'shared'] },
+        { top: 180, keys: ['shared', 'new'] },
+      ],
+      {
+        initialTop: 200,
+      },
+    );
+    const native = Object.getOwnPropertyDescriptor(test.root, 'scrollTop')!;
+    const readKeys = test.adapter.readDescriptorKeys;
+    let clock = 0;
+    let replaced = false;
+    let snaps = 0;
+    test.adapter.readDescriptorKeys = () =>
+      replaced && test.getTop() > 0 ? ['previous-batch-a', 'previous-batch-b'] : readKeys();
+    test.adapter.harvest = async (target) =>
+      mergePreparedRecords(
+        target,
+        test.adapter.readDescriptorKeys().map((key) => ({
+          key,
+          turnKey: key,
+          withinTurn: 0,
+          fingerprint: key,
+          payload: { text: key },
+        })),
+        { newestFirst: true },
+      );
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      {
+        ...test.adapter,
+        readBoundaryState: (boundary) => (boundary === 'top' ? 'pending' : 'confirmed'),
+      },
+      test.accumulator,
+      {
+        scanUpwards: true,
+        holdAtTop: true,
+        stableSamples: 1,
+        pollMs: 5,
+        boundaryTimeoutMs: 40,
+        totalDeadlineMs: 180,
+        now: () => clock,
+        sleep: async (ms) => {
+          clock += Math.max(1, ms);
+          if (!replaced && test.getTop() === 0) {
+            replaced = true;
+            snaps += 1;
+            native.set!.call(test.root, 200);
+          }
+        },
+      },
+    );
+    const keys = new Set(finishPreparedCapture(test.accumulator).records.map((record) => record.key));
+    expect(snaps).toBe(1);
+    expect(keys).toContain('previous-batch-a');
+    expect(keys).toContain('previous-batch-b');
+    expect(result.reasons).toContain('order_unanchored');
+    expect(result.completeness).toBe('partial');
+  });
+
   it('never fights a native virtualizer that snaps away from a pending old-history loader', async () => {
     const test = harness(
       [
@@ -1107,7 +1263,7 @@ describe('virtualized chat single pass', () => {
     expect(snaps).toBe(1);
     expect(topWrites).toBe(1);
     expect(test.getTop()).toBe(200);
-    expect(result.reasons).toContain('scroll_stalled');
+    expect(result.reasons).toContain('boundary_stalled');
     expect(result.completeness).toBe('partial');
     expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual(['old', 'new']);
   });
