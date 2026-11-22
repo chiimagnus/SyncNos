@@ -364,6 +364,63 @@ function simulatedLazyChatgptHistory(
   };
 }
 
+function simulatedRebasingChatgptHistory() {
+  const dom = setupChatgptDom('', 'https://chatgpt.com/c/rebasing-history');
+  (dom.window as any).scrollTo = vi.fn();
+  const scroller = dom.window.document.createElement('div');
+  scroller.style.overflowY = 'auto';
+  scroller.setAttribute('data-app-action-timeline-scroll', '');
+  scroller.innerHTML = `<div data-chatgpt-conversation-selection-target="rebasing-history" data-rail-chat-transcript="true">
+    <div role="status"><div data-loading-indicator></div></div>
+    <div data-virtualized-turn><div data-turn-key="turn-7">
+      <div data-content-search-turn-key="fallback-turn-7">
+        <div data-chatgpt-search-unit-key="turn-7:0:user" data-chatgpt-search-message-ids="user-7">
+          <div data-user-message-bubble><div class="whitespace-pre-wrap">Question</div></div>
+        </div>
+        <div data-chatgpt-search-unit-key="turn-7:1:assistant" data-chatgpt-search-message-ids="assistant-7">
+          <div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary">Answer</div>
+        </div>
+      </div>
+    </div></div>
+  </div>`;
+  dom.window.document.querySelector('main')!.appendChild(scroller);
+  const positions = [
+    { top: 3957, height: 5087 },
+    { top: 3223, height: 5087 },
+    { top: 2489, height: 5087 },
+    { top: 1755, height: 5087 },
+    { top: 1073, height: 4405 },
+    { top: 1755, height: 5087 },
+    { top: 286, height: 1416 },
+  ];
+  let index = 0;
+  let writes = 0;
+  let clock = 0;
+  Object.defineProperties(scroller, {
+    clientHeight: { value: 1130 },
+    scrollHeight: { get: () => positions[index].height },
+    clientWidth: { value: 500 },
+    scrollWidth: { value: 500 },
+    scrollTop: {
+      get: () => positions[index].top,
+      set(value: number) {
+        writes += 1;
+        if (Number(value) >= positions[index].height - 1130) index = 0;
+        else index = (index + 1) % positions.length;
+      },
+    },
+  });
+  return {
+    dom,
+    getWrites: () => writes,
+    atBottom: () => index === 0,
+    now: () => clock,
+    sleep: async (ms: number) => {
+      clock += Math.max(1, ms);
+    },
+  };
+}
+
 function currentDef(dom: JSDOM) {
   return createChatgptCollectorDef(
     createCollectorEnv({
@@ -406,6 +463,22 @@ describe('chatgpt current DOM', () => {
       integrity.snapshot.messages.every((row: any) => row.captureSequencePolicy === 'preserve-existing-tail'),
     ).toBe(true);
     expect(snapshot.captureMeta.metrics.stoppedAtKey).toBe(true);
+  });
+
+  it('stops a real-style scroll-height rebase cycle instead of repeatedly rescanning the same DOM turns', async () => {
+    const test = simulatedRebasingChatgptHistory();
+    const prepared = await prepare(currentDef(test.dom), {
+      now: test.now,
+      sleep: test.sleep,
+      pollMs: 1,
+      maxSteps: 200,
+    });
+    expect(prepared.records.map((record: any) => record.key)).toEqual(['user-7', 'assistant-7']);
+    expect(prepared.reasons).toContain('scroll_stalled');
+    expect(prepared.completeness).toBe('partial');
+    expect(prepared.metrics.steps).toBeLessThan(8);
+    expect(test.getWrites()).toBeLessThan(10);
+    expect(test.atBottom()).toBe(true);
   });
 
   it('harvests delayed lazy batches in one upward sweep without returning to the bottom', async () => {

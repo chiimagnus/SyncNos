@@ -532,6 +532,8 @@ export async function runVirtualizedPass<T>(
   let previousTop = 0;
   let overlapRecoveries = 0;
   let boundaryRecoveries = 0;
+  let departedBottom = false;
+  const visitedWindows = new Map<string, number>();
   const unresolvedKeys = new Set<string>();
   const result = (keys: string[] = []): VirtualizedPassResult => ({
     reachedTop,
@@ -784,8 +786,9 @@ export async function runVirtualizedPass<T>(
 
       if (deadlineExceeded()) break;
       const checkpoint = accumulator.records;
+      let updated = 0;
       try {
-        await adapter.harvest(accumulator);
+        updated = (await adapter.harvest(accumulator)).updated;
       } catch (_error) {
         accumulator.records = checkpoint;
         addReason('extraction_error');
@@ -806,6 +809,15 @@ export async function runVirtualizedPass<T>(
       ) {
         stoppedAtKey = true;
         break;
+      }
+      if (backwards) {
+        const signature = contentFreeWindowSignature(originalIdentity, stable.metrics, stable.keys);
+        const previousCount = visitedWindows.get(signature);
+        if (previousCount !== undefined && previousCount === accumulator.records.length && !updated) {
+          addReason('scroll_stalled');
+          break;
+        }
+        visitedWindows.set(signature, accumulator.records.length);
       }
       const metrics = readScrollMetrics(runtime, root);
       if (backwards) {
@@ -834,6 +846,11 @@ export async function runVirtualizedPass<T>(
           // Newly loaded turns at the logical top must be harvested before declaring success.
           continue;
         }
+        if (departedBottom && isAtScrollBottom(metrics)) {
+          addReason('scroll_stalled');
+          break;
+        }
+        if (!isAtScrollBottom(metrics)) departedBottom = true;
         previousTop = metrics.top;
         const stepSize = Math.max(1, Math.floor(metrics.clientHeight * overlapRatio));
         const nextTop = Math.max(0, metrics.top - stepSize);
