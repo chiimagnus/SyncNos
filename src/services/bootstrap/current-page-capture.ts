@@ -360,7 +360,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
         ? { chatgptApiCheckpoint: options.checkpoint }
         : null),
       ...(collectorId === 'chatgpt' &&
-      !options?.expectedChatgptConversationId &&
+      !options?.trustedChatgptApiPartial &&
       typeof normalizedSnapshot.domHistoryVerified === 'boolean'
         ? { chatgptDomHistoryVerified: normalizedSnapshot.domHistoryVerified }
         : null),
@@ -615,6 +615,28 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
           preparedCapture = await target.collector.prepareManualCapture({
             manual: true,
             ...(savedTailMessageKey ? { savedTailMessageKey } : null),
+            ...(target.collectorId === 'chatgpt' && !savedTailMessageKey
+              ? {
+                  onBatch: async (batchSnapshot: any) => {
+                    if (pageUrl !== currentUrl()) {
+                      throw Object.assign(new Error('Capture target changed'), { code: 'CAPTURE_TARGET_CHANGED' });
+                    }
+                    const staged = {
+                      ...batchSnapshot,
+                      domHistoryVerified: false,
+                      captureMeta: { ...batchSnapshot.captureMeta, completeness: 'partial' },
+                    };
+                    const saved = await saveSnapshot(staged, 'chatgpt', {
+                      expectedChatgptConversationId:
+                        parseChatgptDurableConversationRoute(pageUrl)?.conversationId || undefined,
+                      deferRemoteSync: true,
+                    });
+                    if (!saved) throw new Error('chatgpt_dom_no_safe_messages');
+                    savedPagedConversationId = saved.conversationId;
+                    firstPageIsNew ??= saved.isNew;
+                  },
+                }
+              : null),
           });
         }
         snapshot = await Promise.resolve(target.collector.capture({ manual: true, preparedCapture }));

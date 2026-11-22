@@ -57,7 +57,7 @@ function chatSnapshot(options?: {
 function createHarness(input: {
   collectorId: string;
   snapshot?: any;
-  prepare?: () => any;
+  prepare?: (options?: any) => any;
   article?: any;
   video?: any;
   url?: string;
@@ -139,6 +139,99 @@ afterEach(() => {
 });
 
 describe('current page capture integrity routing', () => {
+  it('persists ChatGPT DOM batches before the manual sweep finishes without replacing existing history', async () => {
+    const finishing = deferred<void>();
+    const prepare = vi.fn(async (options: any) => {
+      const batch = {
+        ...chatSnapshot({ completeness: 'partial' }),
+        messages: [
+          { messageKey: 'last-message', role: 'assistant', contentMarkdown: 'Newest', sequence: 0 },
+          { messageKey: 'older-message', role: 'user', contentMarkdown: 'Older', sequence: 1 },
+        ],
+      };
+      await options.onBatch(batch);
+      await finishing.promise;
+      return { prepared: true };
+    });
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      url: 'https://chatgpt.com/c/conversation-1',
+      snapshot: chatSnapshot({ completeness: 'partial' }),
+      prepare,
+    });
+    let settled = false;
+    const capture = harness.service.captureCurrentPage().finally(() => {
+      settled = true;
+    });
+    await vi.waitFor(() => {
+      expect(harness.calls.filter((call) => call.type === 'syncConversationMessages')).toHaveLength(1);
+    });
+    expect(settled).toBe(false);
+    const staged = harness.calls.find((call) => call.type === 'syncConversationMessages')!.payload;
+    expect(staged).toMatchObject({
+      mode: 'append',
+      deferRemoteSync: true,
+      chatgptDomHistoryVerified: false,
+      diff: { added: ['last-message', 'older-message'], updated: [], removed: [] },
+    });
+    finishing.resolve(undefined);
+    await capture;
+    expect(harness.calls.filter((call) => call.type === 'syncConversationMessages')).toHaveLength(2);
+  });
+
+  it('keeps a durable staged ChatGPT DOM batch when later extraction fails', async () => {
+    const prepare = vi.fn(async (options: any) => {
+      await options.onBatch(chatSnapshot({ completeness: 'partial' }));
+      throw new Error('simulated DOM extraction interruption');
+    });
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      url: 'https://chatgpt.com/c/conversation-1',
+      snapshot: chatSnapshot({ completeness: 'partial' }),
+      prepare,
+    });
+    await expect(harness.service.captureCurrentPage()).rejects.toThrow('simulated DOM extraction interruption');
+    const writes = harness.calls.filter((call) => call.type === 'syncConversationMessages');
+    expect(writes).toHaveLength(1);
+    expect(writes[0].payload).toMatchObject({
+      mode: 'append',
+      deferRemoteSync: true,
+      chatgptDomHistoryVerified: false,
+    });
+  });
+
+  it('rejects a staged DOM batch after navigation instead of saving it against another conversation', async () => {
+    const prepare = vi.fn(async (options: any) => {
+      vi.stubGlobal('location', { href: 'https://chatgpt.com/c/unrelated-conversation' });
+      await options.onBatch(chatSnapshot({ completeness: 'partial' }));
+      return { prepared: true };
+    });
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      url: 'https://chatgpt.com/c/conversation-1',
+      snapshot: chatSnapshot({ completeness: 'partial' }),
+      prepare,
+    });
+    await expect(harness.service.captureCurrentPage()).rejects.toThrow('Capture target changed');
+    expect(harness.calls.filter((call) => call.type === 'syncConversationMessages')).toHaveLength(0);
+  });
+
+  it('fails visibly when a DOM streaming transaction cannot be committed', async () => {
+    const prepare = vi.fn(async (options: any) => {
+      await options.onBatch(chatSnapshot({ completeness: 'partial' }));
+      return { prepared: true };
+    });
+    const harness = createHarness({
+      collectorId: 'chatgpt',
+      url: 'https://chatgpt.com/c/conversation-1',
+      snapshot: chatSnapshot({ completeness: 'partial' }),
+      prepare,
+      syncResponse: { ok: false, error: { message: 'disk write rejected' } },
+    });
+    await expect(harness.service.captureCurrentPage()).rejects.toThrow('disk write rejected');
+    expect(harness.calls.filter((call) => call.type === 'syncConversationMessages')).toHaveLength(1);
+  });
+
   it('passes the latest stable saved ChatGPT DOM key to the manual sweep', async () => {
     const prepare = vi.fn(async () => ({ prepared: true }));
     const harness = createHarness({
@@ -269,7 +362,7 @@ describe('current page capture integrity routing', () => {
       tailResponse: { messages: [], domHistoryVerified: false },
     });
     await harness.service.captureCurrentPage();
-    expect(prepare).toHaveBeenCalledWith({ manual: true });
+    expect(prepare).toHaveBeenCalledWith(expect.objectContaining({ manual: true, onBatch: expect.any(Function) }));
     expect(harness.calls.find((call) => call.type === 'syncConversationMessages')?.payload).toMatchObject({
       chatgptDomHistoryVerified: true,
       mode: 'append',
@@ -289,7 +382,7 @@ describe('current page capture integrity routing', () => {
       },
     });
     await harness.service.captureCurrentPage();
-    expect(prepare).toHaveBeenCalledWith({ manual: true });
+    expect(prepare).toHaveBeenCalledWith(expect.objectContaining({ manual: true, onBatch: expect.any(Function) }));
   });
 
   it('does not trust an unverified stable stored tail without complete history', async () => {
@@ -305,7 +398,7 @@ describe('current page capture integrity routing', () => {
       },
     });
     await harness.service.captureCurrentPage();
-    expect(prepare).toHaveBeenCalledWith({ manual: true });
+    expect(prepare).toHaveBeenCalledWith(expect.objectContaining({ manual: true, onBatch: expect.any(Function) }));
   });
 
   it('coalesces concurrent same-tab DOM captures and permits a later independent retry', async () => {
@@ -383,7 +476,7 @@ describe('current page capture integrity routing', () => {
       },
     });
     await harness.service.captureCurrentPage();
-    expect(prepare).toHaveBeenCalledWith({ manual: true });
+    expect(prepare).toHaveBeenCalledWith(expect.objectContaining({ manual: true, onBatch: expect.any(Function) }));
   });
 
   it('falls back to the usual manual sweep when no safe local DOM tail exists', async () => {
@@ -396,7 +489,7 @@ describe('current page capture integrity routing', () => {
       tailResponse: { messages: [{ messageKey: 'untrusted', role: 'user', sequence: null }] },
     });
     await harness.service.captureCurrentPage();
-    expect(prepare).toHaveBeenCalledWith({ manual: true });
+    expect(prepare).toHaveBeenCalledWith(expect.objectContaining({ manual: true, onBatch: expect.any(Function) }));
   });
 
   it('routes supported Bilibili and YouTube URLs through Video before the web fallback', async () => {

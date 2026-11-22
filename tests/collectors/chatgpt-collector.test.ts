@@ -433,11 +433,17 @@ function currentDef(dom: JSDOM) {
 }
 
 async function prepare(def: any, options: any = {}) {
+  let clock = 0;
+  const sleep = options.sleep;
   return def.collector.prepareManualCapture({
     stableSamples: 1,
     pollMs: 0,
-    sleep: async () => {},
     ...options,
+    now: options.now ?? (() => clock),
+    sleep: async (ms: number) => {
+      clock += Math.max(1, ms);
+      await sleep?.(ms);
+    },
   });
 }
 
@@ -518,7 +524,7 @@ describe('chatgpt current DOM', () => {
     expect(snaps).toBe(1);
     expect(top).toBe(200);
     expect(prepared.records.map((record: any) => record.key)).toEqual(['user-7', 'assistant-7']);
-    expect(prepared.reasons).toContain('scroll_stalled');
+    expect(prepared.reasons).toContain('boundary_stalled');
     expect(prepared.completeness).toBe('partial');
   });
 
@@ -529,9 +535,11 @@ describe('chatgpt current DOM', () => {
       sleep: test.sleep,
       pollMs: 1,
       maxSteps: 200,
+      boundaryTimeoutMs: 35,
+      totalDeadlineMs: 160,
     });
     expect(prepared.records.map((record: any) => record.key)).toEqual(['user-7', 'assistant-7']);
-    expect(prepared.reasons).toContain('scroll_stalled');
+    expect(prepared.reasons).toContain('boundary_stalled');
     expect(prepared.completeness).toBe('partial');
     expect(prepared.metrics.steps).toBeLessThan(8);
     expect(test.getWrites()).toBeLessThan(10);
@@ -593,7 +601,17 @@ describe('chatgpt current DOM', () => {
 
   it('scans 1000 lazy-loaded turns without duplicate message IDs, scroll reversal or missing boundaries', async () => {
     const test = simulatedLazyChatgptHistory(1000, 5, true, 5, false, 0, true);
-    const prepared = await prepare(currentDef(test.dom), { now: test.now, sleep: test.sleep, pollMs: 1 });
+    const stagedCounts: number[] = [];
+    const stagedKeys = new Set<string>();
+    const prepared = await prepare(currentDef(test.dom), {
+      now: test.now,
+      sleep: test.sleep,
+      pollMs: 1,
+      onBatch: async (snapshot: any) => {
+        stagedCounts.push(snapshot.messages.length);
+        for (const message of snapshot.messages) stagedKeys.add(message.messageKey);
+      },
+    });
     expect(test.getLoaded()).toBe(1000);
     expect(test.getBottomReturns()).toBe(0);
     expect(test.getMovesDuringLoad()).toBe(0);
@@ -601,8 +619,158 @@ describe('chatgpt current DOM', () => {
     expect(new Set(prepared.records.map((record: any) => record.key)).size).toBe(2000);
     expect(prepared.records.at(0)?.key).toBe('user-0');
     expect(prepared.records.at(-1)?.key).toBe('assistant-999');
+    expect(stagedCounts[0]).toBeLessThan(16);
+    expect(stagedKeys.size).toBeGreaterThan(1900);
+    expect(stagedCounts.length).toBeLessThan(200);
+    expect(stagedCounts.every((count) => count > 0 && count <= 24)).toBe(true);
     expect(prepared.metrics).toMatchObject({ reachedTop: true, reachedBottom: true });
+    expect(prepared.completeness).toBe('complete');
+    expect(prepared.reasons).not.toContain('order_unanchored');
   }, 60_000);
+
+  it('captures a briefly mounted virtualized turn before ChatGPT unmounts it', async () => {
+    const test = simulatedLazyChatgptHistory(10, 5, false, 5, false, 0, true);
+    const scroller = test.dom.window.document.querySelector('[data-app-action-timeline-scroll]')!;
+    let injected = false;
+    const staged = new Set<string>();
+    const prepared = await prepare(currentDef(test.dom), {
+      now: test.now,
+      stableSamples: 2,
+      pollMs: 1,
+      boundaryTimeoutMs: 35,
+      totalDeadlineMs: 160,
+      sleep: async (ms: number) => {
+        if (!injected) {
+          injected = true;
+          const fragment = test.dom.window.document.createElement('div');
+          fragment.setAttribute('data-turn-key', 'turn-4');
+          fragment.innerHTML = `<div data-content-search-turn-key="fallback-turn-4">
+            <div data-chatgpt-search-unit-key="turn-4:0:user" data-chatgpt-search-message-ids="user-4" data-message-author-role="user">
+              <div data-user-message-bubble><div class="whitespace-pre-wrap">Question 4</div></div>
+            </div>
+            <div data-chatgpt-search-unit-key="turn-4:1:assistant" data-chatgpt-search-message-ids="assistant-4" data-message-author-role="assistant">
+              <div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary">Answer 4</div>
+            </div>
+          </div>`;
+          scroller.appendChild(fragment);
+          scroller.removeChild(fragment);
+        }
+        await test.sleep(ms);
+      },
+      onBatch: async (snapshot: any) => {
+        for (const message of snapshot.messages) staged.add(message.messageKey);
+      },
+    });
+    expect(injected).toBe(true);
+    expect(prepared.records.map((record: any) => record.key)).toContain('user-4');
+    expect(prepared.records.map((record: any) => record.key)).toContain('assistant-4');
+    expect(staged.has('user-4')).toBe(true);
+    expect(staged.has('assistant-4')).toBe(true);
+    expect(prepared.completeness).toBe('partial');
+  });
+
+  it('ignores a hidden stale virtual turn even if React mounts it during the sweep', async () => {
+    const test = simulatedLazyChatgptHistory(10, 5, false, 5, false, 0, true);
+    const scroller = test.dom.window.document.querySelector('[data-app-action-timeline-scroll]')!;
+    let mounted = false;
+    const prepared = await prepare(currentDef(test.dom), {
+      now: test.now,
+      stableSamples: 2,
+      pollMs: 1,
+      boundaryTimeoutMs: 35,
+      totalDeadlineMs: 160,
+      sleep: async (ms: number) => {
+        if (!mounted) {
+          mounted = true;
+          const element = test.dom.window.document.createElement('div');
+          element.setAttribute('data-turn-key', 'stale-hidden-turn');
+          element.setAttribute('hidden', '');
+          element.innerHTML = `<div data-chatgpt-search-unit-key="stale-hidden-turn:0:user" data-chatgpt-search-message-ids="stale-hidden-key" data-message-author-role="user"><div data-user-message-bubble>Not active history</div></div>`;
+          scroller.appendChild(element);
+          scroller.removeChild(element);
+        }
+        await test.sleep(ms);
+      },
+    });
+    expect(mounted).toBe(true);
+    expect(prepared.records.map((record: any) => record.key)).not.toContain('stale-hidden-key');
+  });
+
+  it('disconnects the mount observer when staged IndexedDB persistence fails', async () => {
+    const test = simulatedLazyChatgptHistory(10, 5, true, 5, false, 0, true);
+    const disconnect = vi.spyOn(test.dom.window.MutationObserver.prototype, 'disconnect');
+    try {
+      await expect(
+        prepare(currentDef(test.dom), {
+          now: test.now,
+          sleep: test.sleep,
+          pollMs: 1,
+          onBatch: async () => {
+            throw new Error('disk unavailable');
+          },
+        }),
+      ).rejects.toThrow('disk unavailable');
+      expect(disconnect).toHaveBeenCalled();
+    } finally {
+      disconnect.mockRestore();
+    }
+  });
+
+  it('propagates a failed batch write without reporting the remaining scan as a successful capture', async () => {
+    const test = simulatedLazyChatgptHistory(47, 5, true, 5, false, 0, true);
+    let attempts = 0;
+    await expect(
+      prepare(currentDef(test.dom), {
+        now: test.now,
+        sleep: test.sleep,
+        pollMs: 1,
+        onBatch: async () => {
+          attempts += 1;
+          throw new Error('IndexedDB stage failed');
+        },
+      }),
+    ).rejects.toThrow('IndexedDB stage failed');
+    expect(attempts).toBe(1);
+    expect(test.getLoaded()).toBeLessThan(47);
+  });
+
+  it('publishes durable partial batches while older DOM turns are still loading', async () => {
+    const test = simulatedLazyChatgptHistory(47, 5, true, 5, false, 0, true);
+    const batches: Array<{ loaded: number; messages: any[]; completeness: string; domHistoryVerified: unknown }> = [];
+    const prepared = await prepare(currentDef(test.dom), {
+      now: test.now,
+      sleep: test.sleep,
+      pollMs: 1,
+      onBatch: async (snapshot: any) => {
+        batches.push({
+          loaded: test.getLoaded(),
+          messages: snapshot.messages,
+          completeness: snapshot.captureMeta.completeness,
+          domHistoryVerified: snapshot.domHistoryVerified,
+        });
+      },
+    });
+    expect(batches.length).toBeGreaterThan(1);
+    expect(batches[0].loaded).toBeLessThan(47);
+    expect(batches.every((batch) => batch.completeness === 'partial' && batch.domHistoryVerified === false)).toBe(true);
+    expect(batches.every((batch) => batch.messages.length <= 24)).toBe(true);
+    expect(
+      batches.every(
+        (batch, index) =>
+          !index ||
+          batch.messages.some((message) =>
+            batches[index - 1].messages.some((previous) => previous.messageKey === message.messageKey),
+          ),
+      ),
+    ).toBe(true);
+    expect(
+      batches.every((batch) => new Set(batch.messages.map((item) => item.messageKey)).size === batch.messages.length),
+    ).toBe(true);
+    expect(prepared.records).toHaveLength(94);
+    expect(
+      new Set(batches.flatMap((batch) => batch.messages.map((message) => message.messageKey))).size,
+    ).toBeGreaterThan(64);
+  });
 
   it('starts at the current viewport and leaves it at the oldest reached position', async () => {
     const test = simulatedLazyChatgptHistory(27, 5, true, 5, false, 0, true);
@@ -722,6 +890,39 @@ describe('chatgpt current DOM', () => {
     expect(navigated).toBe(true);
     expect(prepared.identityVerified).toBe(false);
     expect(prepared.records).toHaveLength(0);
+  });
+
+  it('does not certify complete history if a new turn mounts after the sweep has verified the boundary', async () => {
+    const test = simulatedLazyChatgptHistory(5, 5, false);
+    const root = test.dom.window.document.querySelector('[data-app-action-timeline-scroll]')!;
+    let inserted = false;
+    const nativeTakeRecords = test.dom.window.MutationObserver.prototype.takeRecords;
+    const takeRecords = vi.spyOn(test.dom.window.MutationObserver.prototype, 'takeRecords');
+    takeRecords.mockImplementation(function (this: MutationObserver) {
+      if (!inserted) {
+        inserted = true;
+        const turn = test.dom.window.document.createElement('div');
+        turn.setAttribute('data-turn-key', 'late-turn');
+        turn.innerHTML = `<div data-content-search-turn-key="fallback-turn-0">
+          <div data-chatgpt-search-unit-key="late-turn:0:user" data-chatgpt-search-message-ids="late-message" data-message-author-role="user">
+            <div data-user-message-bubble><div class="whitespace-pre-wrap">Late older question</div></div>
+          </div>
+        </div>`;
+        root.appendChild(turn);
+        root.removeChild(turn);
+      }
+      return nativeTakeRecords.call(this);
+    });
+    let prepared: any;
+    try {
+      prepared = await prepare(currentDef(test.dom), { now: test.now, sleep: test.sleep, pollMs: 1 });
+    } finally {
+      takeRecords.mockRestore();
+    }
+    expect(inserted).toBe(true);
+    expect(prepared.records.map((record: any) => record.key)).toContain('late-message');
+    expect(prepared.completeness).toBe('partial');
+    expect(prepared.reasons).toContain('final_live_changed');
   });
 
   it('confirms a real structural top immediately without waiting or probing', async () => {
