@@ -603,6 +603,209 @@ describe('virtualized chat single pass', () => {
     expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual(['new']);
   });
 
+  it('preserves semantic upward progress when prepending history rebases scroll height and top together', async () => {
+    const test = harness(
+      [
+        { top: 0, keys: ['a', 'b'] },
+        { top: 60, keys: ['b', 'c'] },
+        { top: 120, keys: ['c', 'd'] },
+        { top: 180, keys: ['d', 'e'] },
+      ],
+      { initialScrollHeight: 500, initialTop: 400 },
+    );
+    const native = Object.getOwnPropertyDescriptor(test.root, 'scrollTop')!;
+    let offset = 0;
+    let rebases = 0;
+    let writes = 0;
+    const rawKeys = test.adapter.readDescriptorKeys;
+    test.adapter.readDescriptorKeys = () => {
+      const logicalTop = test.getTop() - offset;
+      native.set!.call(test.root, logicalTop);
+      const keys = rawKeys();
+      native.set!.call(test.root, logicalTop + offset);
+      return keys;
+    };
+    test.adapter.harvest = async (target) =>
+      mergePreparedRecords(
+        target,
+        test.adapter.readDescriptorKeys().map((key) => ({
+          key,
+          turnKey: key,
+          withinTurn: 0,
+          fingerprint: key,
+          payload: { text: key },
+        })),
+        { newestFirst: true },
+      );
+    Object.defineProperty(test.root, 'scrollTop', {
+      configurable: true,
+      get: native.get,
+      set(value: number) {
+        writes += 1;
+        if (rebases === 0) {
+          rebases = 1;
+          offset = 300;
+          test.setScrollHeight(800);
+        }
+        native.set!.call(this, value + (rebases === 1 && writes === 1 ? 300 : 0));
+      },
+    });
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      { scanUpwards: true, stableSamples: 1, pollMs: 0, overlapRatio: 0.6, maxSteps: 20 },
+    );
+    expect(rebases).toBe(1);
+    expect(writes).toBeGreaterThan(1);
+    expect(result).toMatchObject({ reachedTop: true, reachedBottom: true, completeness: 'complete' });
+    expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual([
+      'a',
+      'b',
+      'c',
+      'd',
+      'e',
+    ]);
+  });
+
+  it('stops a height-and-position rebase that makes no progress toward older messages', async () => {
+    const test = harness(
+      [
+        { top: 0, keys: ['old'] },
+        { top: 180, keys: ['new'] },
+      ],
+      {
+        initialScrollHeight: 500,
+        initialTop: 200,
+      },
+    );
+    const native = Object.getOwnPropertyDescriptor(test.root, 'scrollTop')!;
+    let writes = 0;
+    Object.defineProperty(test.root, 'scrollTop', {
+      configurable: true,
+      get: native.get,
+      set(_value: number) {
+        writes += 1;
+        test.setScrollHeight(800);
+        native.set!.call(this, 500);
+      },
+    });
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      { scanUpwards: true, stableSamples: 1, pollMs: 0, overlapRatio: 0.6, maxSteps: 1000 },
+    );
+    expect(writes).toBe(1);
+    expect(result.reasons).toContain('scroll_stalled');
+    expect(result.completeness).toBe('partial');
+    expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual(['new']);
+  });
+
+  it('accepts newly prepended older keys even when React keeps the same distance from the bottom', async () => {
+    const test = harness(
+      [
+        { top: 0, keys: ['old', 'new'] },
+        { top: 180, keys: ['new'] },
+      ],
+      {
+        initialScrollHeight: 500,
+        initialTop: 400,
+      },
+    );
+    const native = Object.getOwnPropertyDescriptor(test.root, 'scrollTop')!;
+    let prepended = false;
+    Object.defineProperty(test.root, 'scrollTop', {
+      configurable: true,
+      get: native.get,
+      set(value: number) {
+        if (!prepended) {
+          prepended = true;
+          test.setScrollHeight(800);
+          native.set!.call(this, 700);
+          return;
+        }
+        native.set!.call(this, value);
+      },
+    });
+    test.adapter.readDescriptorKeys = () => (prepended ? ['old', 'new'] : ['new']);
+    test.adapter.harvest = async (target) =>
+      mergePreparedRecords(
+        target,
+        test.adapter.readDescriptorKeys().map((key) => ({
+          key,
+          turnKey: key,
+          withinTurn: 0,
+          fingerprint: key,
+          payload: { text: key },
+        })),
+        { newestFirst: true },
+      );
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      { scanUpwards: true, stableSamples: 1, pollMs: 0, overlapRatio: 0.6 },
+    );
+    expect(prepended).toBe(true);
+    expect(result).toMatchObject({ reachedTop: true, reachedBottom: true, completeness: 'complete' });
+    expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual(['old', 'new']);
+  });
+
+  it.each([-200, -100, 0, 100, 300])(
+    'halts on geometry rebasing by %d pixels with no new message identities',
+    async (shift) => {
+      const test = harness([{ top: 0, keys: ['same'] }], { initialScrollHeight: 500, initialTop: 300 });
+      const native = Object.getOwnPropertyDescriptor(test.root, 'scrollTop')!;
+      let writes = 0;
+      Object.defineProperty(test.root, 'scrollTop', {
+        configurable: true,
+        get: native.get,
+        set(_value: number) {
+          writes += 1;
+          test.setScrollHeight(500 + shift);
+          native.set!.call(this, 300 + shift);
+        },
+      });
+      const result = await runVirtualizedSweep(
+        { document: test.dom.window.document, window: test.dom.window as any },
+        test.adapter,
+        test.accumulator,
+        { scanUpwards: true, stableSamples: 1, pollMs: 0, overlapRatio: 0.6, maxSteps: 1000 },
+      );
+      expect(writes).toBe(1);
+      expect(result).toMatchObject({ completeness: 'partial', steps: 1 });
+      expect(result.reasons).toContain('scroll_stalled');
+      expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual(['same']);
+    },
+  );
+
+  it('does not mistake endless layout growth without older identities for upward progress', async () => {
+    const test = harness([{ top: 0, keys: ['same'] }], { initialScrollHeight: 400, initialTop: 200 });
+    const native = Object.getOwnPropertyDescriptor(test.root, 'scrollTop')!;
+    let writes = 0;
+    Object.defineProperty(test.root, 'scrollTop', {
+      configurable: true,
+      get: native.get,
+      set(_value: number) {
+        writes += 1;
+        test.setScrollHeight(400 + writes * 100);
+        native.set!.call(this, 200);
+      },
+    });
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      test.adapter,
+      test.accumulator,
+      { scanUpwards: true, stableSamples: 1, pollMs: 0, overlapRatio: 0.6, maxSteps: 1000 },
+    );
+    expect(writes).toBe(1);
+    expect(result.reasons).toContain('scroll_stalled');
+    expect(result.reasons).not.toContain('step_budget_exhausted');
+    expect(result.completeness).toBe('partial');
+    expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual(['same']);
+  });
+
   it('rechecks the logical top after older messages load during an upward sweep', async () => {
     const test = harness(
       [
@@ -855,6 +1058,103 @@ describe('virtualized chat single pass', () => {
     expect(result.reasons).toContain('boundary_stalled');
     expect(result.completeness).toBe('partial');
     expect(scrollDownAfterTop).toBe(0);
+  });
+
+  it('never fights a native virtualizer that snaps away from a pending old-history loader', async () => {
+    const test = harness(
+      [
+        { top: 0, keys: ['old', 'new'] },
+        { top: 60, keys: ['new'] },
+      ],
+      { initialTop: 200 },
+    );
+    const native = Object.getOwnPropertyDescriptor(test.root, 'scrollTop')!;
+    let topWrites = 0;
+    let snaps = 0;
+    let clock = 0;
+    Object.defineProperty(test.root, 'scrollTop', {
+      configurable: true,
+      get: native.get,
+      set(value: number) {
+        if (value <= 0) topWrites += 1;
+        native.set!.call(this, value);
+      },
+    });
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      {
+        ...test.adapter,
+        readBoundaryState: (boundary) => (boundary === 'top' ? 'pending' : 'confirmed'),
+      },
+      test.accumulator,
+      {
+        scanUpwards: true,
+        holdAtTop: true,
+        stableSamples: 1,
+        pollMs: 5,
+        boundaryTimeoutMs: 35,
+        totalDeadlineMs: 300,
+        now: () => clock,
+        sleep: async (ms) => {
+          clock += Math.max(1, ms);
+          if (test.getTop() <= 0) {
+            snaps += 1;
+            native.set!.call(test.root, 200);
+          }
+        },
+      },
+    );
+    expect(snaps).toBe(1);
+    expect(topWrites).toBe(1);
+    expect(test.getTop()).toBe(200);
+    expect(result.reasons).toContain('scroll_stalled');
+    expect(result.completeness).toBe('partial');
+    expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual(['old', 'new']);
+  });
+
+  it('does not restart top-loading probes when only trailing rendered nodes keep changing', async () => {
+    const test = harness(
+      [
+        { top: 0, keys: ['old'] },
+        { top: 60, keys: ['old', 'new'] },
+      ],
+      { initialTop: 200 },
+    );
+    const originalKeys = test.adapter.readDescriptorKeys;
+    let churns = 0;
+    test.adapter.readDescriptorKeys = () => {
+      const keys = originalKeys();
+      if (test.getTop() > 0) return keys;
+      churns += 1;
+      return ['old', churns % 2 ? 'widget-a' : 'widget-b'];
+    };
+    let clock = 0;
+    const result = await runVirtualizedSweep(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      {
+        ...test.adapter,
+        readBoundaryState: (boundary) => (boundary === 'top' ? 'pending' : 'confirmed'),
+      },
+      test.accumulator,
+      {
+        scanUpwards: true,
+        holdAtTop: true,
+        stableSamples: 1,
+        pollMs: 5,
+        maxSteps: 80,
+        boundaryTimeoutMs: 35,
+        totalDeadlineMs: 300,
+        now: () => clock,
+        sleep: async (ms) => {
+          clock += Math.max(1, ms);
+        },
+      },
+    );
+    expect(churns).toBeGreaterThan(5);
+    expect(result.completeness).toBe('partial');
+    expect(result.reasons).toContain('boundary_stalled');
+    expect(result.reasons).not.toContain('step_budget_exhausted');
+    expect(result.steps).toBeLessThan(8);
   });
 
   it('does not mistake a loader reflow for newly prepended history or reset the idle timeout', async () => {

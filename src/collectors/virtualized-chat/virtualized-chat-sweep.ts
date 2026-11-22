@@ -532,8 +532,6 @@ export async function runVirtualizedPass<T>(
   let previousTop = 0;
   let overlapRecoveries = 0;
   let boundaryRecoveries = 0;
-  let departedBottom = false;
-  const visitedWindows = new Map<string, number>();
   const unresolvedKeys = new Set<string>();
   const result = (keys: string[] = []): VirtualizedPassResult => ({
     reachedTop,
@@ -656,30 +654,34 @@ export async function runVirtualizedPass<T>(
     let lastSignature = '';
     let lastPendingSignature = '';
     let progressDeadline = now() + boundaryTimeoutMs;
-    const waitingKeys = previousWindow?.keys.join('\u001f');
+    const waitingKeys = previousWindow ? new Set(previousWindow.keys) : null;
     while (!deadlineExceeded()) {
       if (!options.holdAtTop || !previousWindow) writeScrollPosition(runtime, root, 0, 0);
       const stable = await stabilize();
       if (!stable) return null;
       maxScrollExtent = Math.max(maxScrollExtent, stable.metrics.scrollHeight);
       const keys = stable.keys.join('\u001f');
-      // A reflow is not history progress: only newly rendered keys or a scroll rebase justify resuming.
+      const firstKnown = waitingKeys ? stable.keys.findIndex((key) => waitingKeys.has(key)) : -1;
+      const hasOlderMessages = firstKnown > 0 && stable.keys.slice(0, firstKnown).some((key) => !waitingKeys!.has(key));
       if (
         options.holdAtTop &&
         previousWindow &&
-        (keys !== waitingKeys ||
+        (hasOlderMessages ||
           (stable.metrics.top > 0 && stable.metrics.scrollHeight > previousWindow.metrics.scrollHeight))
       )
         return stable;
       const signature = options.holdAtTop
         ? keys
         : contentFreeWindowSignature(originalIdentity, stable.metrics, stable.keys);
-      if (signature !== lastSignature) {
+      if ((!options.holdAtTop || !previousWindow) && signature !== lastSignature) {
         lastSignature = signature;
         progressDeadline = now() + boundaryTimeoutMs;
       }
       if (!isAtScrollTop(stable.metrics)) {
-        if (options.holdAtTop) writeScrollPosition(runtime, root, stable.metrics.left, 0);
+        if (options.holdAtTop) {
+          addReason('scroll_stalled');
+          return null;
+        }
         await sleep(Math.max(1, pollMs));
         if (!validateAfterAwait()) return null;
         continue;
@@ -778,9 +780,8 @@ export async function runVirtualizedPass<T>(
 
       if (deadlineExceeded()) break;
       const checkpoint = accumulator.records;
-      let updated = 0;
       try {
-        updated = (await adapter.harvest(accumulator)).updated;
+        await adapter.harvest(accumulator);
       } catch (_error) {
         accumulator.records = checkpoint;
         addReason('extraction_error');
@@ -801,15 +802,6 @@ export async function runVirtualizedPass<T>(
       ) {
         stoppedAtKey = true;
         break;
-      }
-      if (upwards) {
-        const signature = contentFreeWindowSignature(originalIdentity, stable.metrics, stable.keys);
-        const previousCount = visitedWindows.get(signature);
-        if (previousCount !== undefined && previousCount === accumulator.records.length && !updated) {
-          addReason('scroll_stalled');
-          break;
-        }
-        visitedWindows.set(signature, accumulator.records.length);
       }
       const metrics = readScrollMetrics(runtime, root);
       if (upwards) {
@@ -838,11 +830,6 @@ export async function runVirtualizedPass<T>(
           // Newly loaded turns at the logical top must be harvested before declaring success.
           continue;
         }
-        if (departedBottom && isAtScrollBottom(metrics)) {
-          addReason('scroll_stalled');
-          break;
-        }
-        if (!isAtScrollBottom(metrics)) departedBottom = true;
         previousTop = metrics.top;
         const stepSize = Math.max(1, Math.floor(metrics.clientHeight * overlapRatio));
         const nextTop = Math.max(0, metrics.top - stepSize);
@@ -851,10 +838,19 @@ export async function runVirtualizedPass<T>(
           break;
         }
         const knownAfterHarvest = new Set(accumulator.records.map((record) => record.key));
+        const beforeDistance = metrics.scrollHeight - metrics.clientHeight - metrics.top;
         writeScrollPosition(runtime, root, metrics.left, nextTop);
         const nextWindow = await stabilize();
         if (!nextWindow) break;
-        if (nextWindow.metrics.top > nextTop + 1 && nextWindow.keys.every((key) => knownAfterHarvest.has(key))) {
+        const afterDistance =
+          nextWindow.metrics.scrollHeight - nextWindow.metrics.clientHeight - nextWindow.metrics.top;
+        const firstKnown = nextWindow.keys.findIndex((key) => knownAfterHarvest.has(key));
+        const hasOlderMessages =
+          firstKnown > 0 && nextWindow.keys.slice(0, firstKnown).some((key) => !knownAfterHarvest.has(key));
+        const requestedAdvance = metrics.top - nextTop;
+        const observedAdvance = afterDistance - beforeDistance;
+        const movedTowardsOlder = observedAdvance > 1 && Math.abs(observedAdvance - requestedAdvance) <= 2;
+        if (!movedTowardsOlder && !hasOlderMessages) {
           addReason('scroll_stalled');
           break;
         }
