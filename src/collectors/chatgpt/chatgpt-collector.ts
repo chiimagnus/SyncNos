@@ -114,7 +114,9 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
   }
 
   function directMessageId(element: any): string {
-    const messageId = String(element?.getAttribute?.('data-message-id') || '').trim();
+    const messageId = String(
+      element?.getAttribute?.('data-message-id') || element?.getAttribute?.('data-chatgpt-selection-message-id') || '',
+    ).trim();
     if (messageId) return messageId;
     const ids = String(element?.getAttribute?.('data-chatgpt-search-message-ids') || '')
       .trim()
@@ -278,6 +280,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
   }
 
   function assistantContentNode(element: any): any {
+    if (element?.matches?.('[data-chatgpt-selection-message-id]')) return element;
     const selection = element?.querySelector?.('[data-chatgpt-selection-message-id]');
     if (selection) return selection;
     if (element?.matches?.('[data-message-author-role="assistant"]')) return element;
@@ -287,7 +290,8 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     );
     const aggregated = aggregateNodes(primary);
     if (aggregated) return aggregated;
-    if (element?.matches?.(CHATGPT_TURN_SELECTOR)) return null;
+    if (element?.matches?.(CHATGPT_TURN_SELECTOR))
+      return element.querySelector('[data-response-body]') || element.querySelector('[data-dil-response]');
     return element?.querySelector?.("[data-markdown-text-style='assistant-message']") || element;
   }
 
@@ -309,7 +313,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   function hasFallbackAssistantActivity(turn: any): boolean {
     if (!turn?.querySelector) return false;
-    if (turn.querySelector("[data-markdown-text-style='assistant-message']")) return true;
+    if (turn.querySelector("[data-markdown-text-style='assistant-message'], [data-dil-response]")) return true;
     if (findDeepResearchIframe(turn)) return true;
     if (hasActiveAssistantStatus(turn)) return true;
     return extractChatgptImageUrlsForRole(turn, 'assistant').length > 0;
@@ -350,9 +354,37 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       const units = (Array.from(turn.querySelectorAll(CHATGPT_MESSAGE_UNIT_SELECTOR)) as any[]).filter((unit) =>
         /:(?:user|assistant)$/.test(String(unit?.getAttribute?.('data-chatgpt-search-unit-key') || '')),
       );
-      wrappers.push(...units);
-      const hasAssistantUnit = units.some((unit) => roleFromWrapper(unit) === 'assistant');
-      if (!hasAssistantUnit && hasFallbackAssistantActivity(turn)) wrappers.push(turn);
+      const assistantUnits = units.filter((unit) => roleFromWrapper(unit) === 'assistant');
+      const coveredIds = new Set(
+        assistantUnits.flatMap((unit) =>
+          String(unit.getAttribute('data-chatgpt-search-message-ids') || '')
+            .split(/\s+/)
+            .filter(Boolean),
+        ),
+      );
+      const selectedIds = new Set<string>();
+      const selected = (
+        Array.from(turn.querySelectorAll('[data-response-body] [data-chatgpt-selection-message-id]')) as any[]
+      ).filter((node) => {
+        const id = directMessageId(node);
+        if (
+          !id ||
+          node.closest?.(CHATGPT_TURN_SELECTOR) !== turn ||
+          node.parentElement?.closest?.('[data-chatgpt-selection-message-id]') ||
+          isExplicitlyHiddenWithin(node, turn) ||
+          assistantUnits.some((unit) => unit.contains(node)) ||
+          coveredIds.has(id) ||
+          selectedIds.has(id)
+        )
+          return false;
+        selectedIds.add(id);
+        return true;
+      });
+      if (selected.length) wrappers.push(...[...units, ...selected].sort(compareDocumentOrder));
+      else {
+        wrappers.push(...units);
+        if (!assistantUnits.length && hasFallbackAssistantActivity(turn)) wrappers.push(turn);
+      }
     }
     return wrappers;
   }
@@ -452,11 +484,21 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   function buildCotAssociations(wrappers: any[], includeOuterHtml: boolean): Map<any, CotAssociation> {
     const result = new Map<any, CotAssociation>();
+    const lastAssistantByTurn = new Map<any, any>();
+    for (const owner of wrappers) {
+      if (roleFromWrapper(owner) === 'assistant') lastAssistantByTurn.set(owner.closest(CHATGPT_TURN_SELECTOR), owner);
+    }
     for (const owner of wrappers) {
       if (roleFromWrapper(owner) !== 'assistant') continue;
       const group = owner.closest(CHATGPT_TURN_SELECTOR);
       if (!group) continue;
-      const bodies = currentCotBodies(group);
+      const responseBody = owner.closest?.('[data-response-body]');
+      const bodies = [
+        ...(responseBody ? currentCotBodies(responseBody) : []),
+        ...(lastAssistantByTurn.get(group) === owner
+          ? currentCotBodies(group).filter((body) => !body.closest?.('[data-response-body]'))
+          : []),
+      ];
       if (!bodies.length) continue;
       const parts = bodies.map((body) => ({ content: extractCotContent(body), body }));
       result.set(owner, {

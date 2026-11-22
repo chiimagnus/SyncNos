@@ -1576,6 +1576,103 @@ A --> B</code></pre>
     expect(snapshot?.messages[0]?.contentMarkdown).toBe('new active message');
   });
 
+  it('captures every independently identified assistant response in the new DIL turn layout', async () => {
+    const dom = setupChatgptDom(
+      `<div data-turn-key="new-turn">
+        <div data-content-search-turn-key="67f75178-3267-4e8b-a164-69d6217ddc62">
+          <div data-chatgpt-search-unit-key="new-turn:0:user" data-chatgpt-search-message-ids="new-user">
+            <div data-user-message-bubble><div class="whitespace-pre-wrap">Question</div></div>
+          </div>
+          <div>
+            <span hidden data-chatgpt-agent-turn-start></span>
+            <div><button aria-expanded="true"></button></div>
+            <div><div data-markdown-text-style="assistant-message"><p>Shared reasoning</p></div></div>
+          </div>
+          <div data-response-body>
+            <div data-chatgpt-selection-message-id="new-assistant-1">
+              <div data-dil-response><p>First response</p><p>Second paragraph</p></div>
+            </div>
+          </div>
+          <div data-response-body>
+            <div data-chatgpt-selection-message-id="new-assistant-2">
+              <div data-dil-response><p>Second response</p></div>
+            </div>
+          </div>
+        </div>
+      </div>`,
+      'https://chatgpt.com/c/new-conversation',
+    );
+    (dom.window as any).scrollTo = vi.fn();
+    const def = currentDef(dom);
+    const snapshot = await capturePrepared(def);
+    expect(snapshot?.messages.map((message: any) => message.messageKey)).toEqual([
+      'new-user',
+      'new-assistant-1',
+      'new-assistant-2',
+    ]);
+    expect(snapshot?.messages[1].contentMarkdown).toContain('First response');
+    expect(snapshot?.messages[1].contentMarkdown).toContain('Second paragraph');
+    expect(snapshot?.messages[2].contentMarkdown).toContain('Second response');
+    expect(snapshot?.messages[2].contentMarkdown).toContain('Shared reasoning');
+    expect(snapshot?.messages[1].contentMarkdown).not.toContain('Shared reasoning');
+    expect(snapshot?.domHistoryVerified).toBe(false);
+    expect(snapshot?.captureMeta.completeness).toBe('partial');
+    expect(def.collector.__test.manualAdapter.readBoundaryState('top')).toBe('unverified');
+  });
+
+  it('captures a DIL-only assistant turn without an assistant unit or selection marker', async () => {
+    const dom = setupChatgptDom(
+      `<div data-turn-key="dil-only-turn">
+        <div data-content-search-turn-key="fallback-turn-1">
+          <div data-chatgpt-search-unit-key="fallback-turn-1:0:user" data-chatgpt-search-message-ids="dil-user">
+            <div data-user-message-bubble><div class="whitespace-pre-wrap">Question</div></div>
+          </div>
+          <div data-response-body><div data-dil-response><p>DIL-only answer</p></div></div>
+        </div>
+      </div>`,
+      'https://chatgpt.com/c/dil-only',
+    );
+    (dom.window as any).scrollTo = vi.fn();
+    const snapshot = await capturePrepared(currentDef(dom));
+    expect(snapshot?.messages.map((message: any) => [message.messageKey, message.contentMarkdown])).toEqual([
+      ['dil-user', 'Question'],
+      ['chatgpt_turn_dil-only-turn_assistant', 'DIL-only answer'],
+    ]);
+  });
+
+  it('retains DOM order when new selected responses are interleaved with older assistant units', async () => {
+    const dom = setupChatgptDom(
+      `<div data-turn-key="mixed-turn">
+        <div data-content-search-turn-key="1faee17c-3c5e-46b6-a61e-f31e8ff40129">
+          <div data-chatgpt-search-unit-key="mixed:0:user" data-chatgpt-search-message-ids="mixed-user">
+            <div data-user-message-bubble><div class="whitespace-pre-wrap">Question</div></div>
+          </div>
+          <div data-response-body><div data-chatgpt-selection-message-id="mixed-assistant-1">
+            <div data-dil-response><p>First</p></div>
+          </div></div>
+          <div data-chatgpt-search-unit-key="mixed:1:assistant" data-chatgpt-search-message-ids="mixed-assistant-2">
+            <div data-markdown-text-style="assistant-message" data-markdown-text-tone="primary"><p>Second</p></div>
+          </div>
+          <div data-response-body><div data-chatgpt-selection-message-id="mixed-assistant-3">
+            <div data-dil-response><p>Third</p></div>
+          </div></div>
+          <div data-response-body hidden><div data-chatgpt-selection-message-id="mixed-assistant-3">
+            <div data-dil-response><p>Stale duplicate</p></div>
+          </div></div>
+        </div>
+      </div>`,
+      'https://chatgpt.com/c/mixed-turn',
+    );
+    (dom.window as any).scrollTo = vi.fn();
+    const snapshot = await capturePrepared(currentDef(dom));
+    expect(snapshot?.messages.map((message: any) => [message.messageKey, message.contentMarkdown])).toEqual([
+      ['mixed-user', 'Question'],
+      ['mixed-assistant-1', 'First'],
+      ['mixed-assistant-2', 'Second'],
+      ['mixed-assistant-3', 'Third'],
+    ]);
+  });
+
   it('uses the current inner timeline scroller as the manual sweep seed', () => {
     const dom = currentDom();
     const main = dom.window.document.querySelector('main') as HTMLElement;
