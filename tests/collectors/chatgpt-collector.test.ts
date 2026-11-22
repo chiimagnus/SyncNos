@@ -306,6 +306,7 @@ function simulatedLazyChatgptHistory(
     clientWidth: { value: 100 },
     scrollWidth: { value: 100 },
     scrollTop: {
+      configurable: true,
       get: () => top,
       set(value: number) {
         scrollWrites += 1;
@@ -732,6 +733,51 @@ describe('chatgpt current DOM', () => {
     ).rejects.toThrow('IndexedDB stage failed');
     expect(attempts).toBe(1);
     expect(test.getLoaded()).toBeLessThan(47);
+  });
+
+  it('recovers a native virtual list that rejects upward DOM scrolling without wheel intent', async () => {
+    const test = simulatedLazyChatgptHistory(27, 5, true, 5, false, 0, true);
+    const root = test.dom.window.document.querySelector('[data-app-action-timeline-scroll]')!;
+    const native = Object.getOwnPropertyDescriptor(root, 'scrollTop')!;
+    let wheelPending = false;
+    let rejectedMoves = 0;
+    root.addEventListener('wheel', () => {
+      wheelPending = true;
+    });
+    Object.defineProperty(root, 'scrollTop', {
+      configurable: true,
+      get: native.get,
+      set(value: number) {
+        if (value < native.get!.call(this) && !wheelPending) {
+          rejectedMoves += 1;
+          return;
+        }
+        wheelPending = false;
+        native.set!.call(this, value);
+      },
+    });
+    root.scrollTop = (root as HTMLElement).scrollTop - 100;
+    expect(rejectedMoves).toBe(1);
+    const prepared = await prepare(currentDef(test.dom), { now: test.now, sleep: test.sleep, pollMs: 1 });
+    expect(prepared.records).toHaveLength(54);
+    expect(prepared.completeness).toBe('complete');
+    expect(test.getLoaded()).toBe(27);
+    expect(prepared.reasons).not.toContain('scroll_stalled');
+  });
+
+  it('signals upward wheel intent before programmatic scrolling to avoid native bottom-following', async () => {
+    const test = simulatedLazyChatgptHistory(27, 5, true, 5, false, 0, true);
+    const root = test.dom.window.document.querySelector('[data-app-action-timeline-scroll]')!;
+    const wheelPositions: number[] = [];
+    root.addEventListener('wheel', (event: any) => {
+      expect(event.deltaY).toBeLessThan(0);
+      expect(event.bubbles).toBe(true);
+      wheelPositions.push((root as HTMLElement).scrollTop);
+    });
+    const prepared = await prepare(currentDef(test.dom), { now: test.now, sleep: test.sleep, pollMs: 1 });
+    expect(wheelPositions.length).toBeGreaterThan(0);
+    expect(prepared.records).toHaveLength(54);
+    expect(prepared.reasons).not.toContain('scroll_stalled');
   });
 
   it('publishes durable partial batches while older DOM turns are still loading', async () => {

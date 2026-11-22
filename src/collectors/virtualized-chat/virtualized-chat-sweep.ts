@@ -424,6 +424,7 @@ export type VirtualizedPassAdapter<T> = {
   readUnresolvedKeys?: () => string[];
   readPendingKeys?: () => string[];
   readBoundaryState?: (boundary: VirtualizedBoundary) => VirtualizedBoundaryState;
+  onUpwardScroll?: (root: Element) => void;
   onTopConfirmed?: (accumulator: PreparedAccumulator<T>) => void;
   harvest: (accumulator: PreparedAccumulator<T>) => Promise<{ added: number; updated: number }>;
 };
@@ -637,6 +638,11 @@ export async function runVirtualizedPass<T>(
     return latest;
   };
 
+  const scrollOlder = (left: number, top: number): void => {
+    adapter.onUpwardScroll?.(root);
+    writeScrollPosition(runtime, root, left, top);
+  };
+
   const recoverRegressedBottom = async (metrics: ScrollMetrics): Promise<StableWindow | null> => {
     if (boundaryRecoveries >= PASS_DEFAULTS.maxBoundaryRecoveries) {
       addReason('boundary_unstable');
@@ -659,7 +665,7 @@ export async function runVirtualizedPass<T>(
     let progressDeadline = now() + boundaryTimeoutMs;
     const waitingKeys = previousWindow ? new Set(previousWindow.keys) : null;
     while (!deadlineExceeded()) {
-      if (!options.holdAtTop || !previousWindow) writeScrollPosition(runtime, root, 0, 0);
+      if (!options.holdAtTop || !previousWindow) scrollOlder(0, 0);
       const stable = await stabilize();
       if (!stable) return null;
       maxScrollExtent = Math.max(maxScrollExtent, stable.metrics.scrollHeight);
@@ -862,7 +868,7 @@ export async function runVirtualizedPass<T>(
         }
         const knownAfterHarvest = new Set(accumulator.records.map((record) => record.key));
         const beforeDistance = metrics.scrollHeight - metrics.clientHeight - metrics.top;
-        writeScrollPosition(runtime, root, metrics.left, nextTop);
+        scrollOlder(metrics.left, nextTop);
         const nextWindow = await stabilize();
         if (!nextWindow) break;
         const afterDistance =

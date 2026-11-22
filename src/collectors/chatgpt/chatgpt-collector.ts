@@ -929,6 +929,13 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       getScrollSeed: manualAdapter.readScrollSeed,
       sampleIdentity,
       readDescriptorKeys: manualAdapter.readDescriptorKeys,
+      onUpwardScroll: (scrollRoot: Element) => {
+        if (typeof env.window.WheelEvent === 'function') {
+          scrollRoot.dispatchEvent(
+            new env.window.WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -500, deltaMode: 0 }),
+          );
+        }
+      },
       readUnresolvedKeys: manualAdapter.readUnresolvedKeys,
       readBoundaryState: manualAdapter.readBoundaryState,
       onTopConfirmed: (target: PreparedAccumulator<any>) => {

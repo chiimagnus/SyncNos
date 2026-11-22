@@ -245,6 +245,7 @@ SYNCNOS-STREAM-END
   richer API 正文不被覆盖，且分批提交不提前触发远端同步或错误声明历史完整。
 - 只有真正证明完整历史时才能产生 complete / destructive snapshot。
 - ChatGPT DOM 从当前阅读位置向更早的消息单向扫描，不预先跳到底部，结束后也不恢复滚动位置；
+  真实浏览器检查无滚轮方向事件时程序滚动自动弹回底部，以及有标准向上 `wheel` 事件后正常触发旧历史加载。
   验证起点在顶部、中部、底部以及滚动中途插入旧页的情况。
   起点不在底部时，无法确认包含最新回复，只能返回 partial 并安全追加。
   不通过 `IntersectionObserver` 加载节点位移预加载，不调用 React 私有函数或 Advanced API。
