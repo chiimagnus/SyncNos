@@ -33,6 +33,7 @@
 2. 记录 provider、日期、当前 commit、浏览器、扩展构建来源，以及 manual / auto-save 路径。不要记录账号、cookie、token 或完整私人 URL。
 3. 本地开发扩展必须来自准备验证的当前代码；重载后确认页面已重新连接扩展。
 4. 虚拟列表、懒加载或后台 tab 必须先进入一次前台并确认正文已 hydrate。空壳 DOM 只能记 INCONCLUSIVE，不能记 FAIL。
+   ChatGPT 还需覆盖同一回合含多条独立 assistant 回复、UUID 回合标记，及工具节点已完成但最终回复未完成的情况。
 5. 除 streaming / editing 专项用例外，采集前必须确认回复已完成、页面不处于编辑态。
 6. 先检查 Source，再触发 capture。站点本身没有生成出目标结构时，重新取样，不把错误源数据当回归样本。
 7. 修改 Markdown、公式或视觉样式时，最终必须检查 App 和 popup；只验证 capture 文本不够。

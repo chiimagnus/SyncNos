@@ -148,6 +148,8 @@ GitHub 内容哈希变化会产生更新；Notion 增量同步仅为新消息生
 - **Advanced API**：用户显式开启后，从当前已登录的正式会话分页读取。
   首次使用 `conversations/{id}`，之后按 `messages?before=` 获取旧页；
   Token 只在原标签页执行请求时使用，不穿过 Content Script 或持久化。
+  最新节点即使标为 `finished_successfully`，若它仍是 `end_turn: false` 的工具调用，
+  也不表示整个用户回合已完成；不得据此认证完整快照或替换旧历史。
   后台对发送文档校验来源，对当前标签页及 MAIN world 校验会话身份；
   `MessageSender.url` 可能保留 SPA 导航前的文档路径，不能据此判断当前会话。
 - **首次和回退**：没有可信完整历史，或无法验证交界点时，继续从最新页向旧页读取；

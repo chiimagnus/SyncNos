@@ -2,7 +2,11 @@ import { parseChatgptDurableConversationRoute } from '@services/shared/chatgpt-r
 import { chatgptFileIdFromAssetPointer } from '@services/shared/chatgpt-image-identity';
 import { CHATGPT_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import { sendMessage } from '@platform/runtime/runtime';
-import { buildChatgptApiSnapshot, type ChatgptApiSnapshotResult } from '@services/integrations/chatgpt/api-snapshot';
+import {
+  buildChatgptApiSnapshot,
+  hasUnfinishedChatgptApiExecution,
+  type ChatgptApiSnapshotResult,
+} from '@services/integrations/chatgpt/api-snapshot';
 import type { ChatgptApiCheckpoint } from '@services/conversations/domain/models';
 
 type CaptureResult = ChatgptApiSnapshotResult & {
@@ -222,7 +226,10 @@ export async function captureCurrentChatgptConversationViaApi(input?: {
       const latest = messages.at(-1);
       capturedNodeSignature = currentNodeSignature(latest);
       currentNodeInProgress =
-        latest?.status === 'in_progress' || latest?.status === 'streaming' || latest?.metadata?.is_complete === false;
+        latest?.status === 'in_progress' ||
+        latest?.status === 'streaming' ||
+        latest?.metadata?.is_complete === false ||
+        hasUnfinishedChatgptApiExecution(messages);
     }
 
     const firstId = messages[0]?.id;

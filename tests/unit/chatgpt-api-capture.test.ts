@@ -94,6 +94,116 @@ beforeEach(() => {
 });
 
 describe('ChatGPT API snapshot', () => {
+  it('keeps a completed final answer valid after earlier tool calls with end_turn false', () => {
+    const snapshot = build(
+      pagedFrom([
+        message({ id: 'question', role: 'user', parts: ['Question'], turnId: 'turn-1' }),
+        {
+          ...message({
+            id: 'tool-call',
+            role: 'assistant',
+            recipient: 'api_tool.call_tool',
+            contentType: 'code',
+            parts: ['call_tool()'],
+            turnId: 'turn-1',
+            status: 'finished_successfully',
+          }),
+          end_turn: false,
+        },
+        {
+          ...message({
+            id: 'final-answer',
+            role: 'assistant',
+            channel: 'final',
+            parts: ['Answer'],
+            turnId: 'turn-1',
+            status: 'finished_successfully',
+          }),
+          end_turn: true,
+        },
+      ]),
+    ).snapshot;
+    expect(snapshot.messages.map((item: any) => item.messageKey)).toEqual(['question', 'final-answer']);
+    expect(snapshot.captureMeta.completeness).toBe('complete');
+  });
+
+  it('does not treat a final-shaped but nonterminal assistant node as completed', () => {
+    const snapshot = build(
+      pagedFrom([
+        message({ id: 'question', role: 'user', parts: ['Question'] }),
+        {
+          ...message({
+            id: 'nonterminal-final',
+            role: 'assistant',
+            channel: 'final',
+            parts: ['Answer in progress'],
+            status: 'finished_successfully',
+          }),
+          end_turn: false,
+        },
+      ]),
+    ).snapshot;
+    expect(snapshot.messages[1].contentMarkdown).toBe('Answer in progress');
+    expect(snapshot.captureMeta.completeness).toBe('partial');
+    expect(snapshot.captureMeta.reasons).toContain('chatgpt_api_unfinished_turn_partial');
+  });
+
+  it('does not allow an earlier final to hide a newer unfinished tool invocation', () => {
+    const snapshot = build(
+      pagedFrom([
+        message({ id: 'question', role: 'user', parts: ['Question'], turnId: 'turn-1' }),
+        message({
+          id: 'final-answer',
+          role: 'assistant',
+          channel: 'final',
+          parts: ['Answer'],
+          turnId: 'turn-1',
+          status: 'finished_successfully',
+        }),
+        {
+          ...message({
+            id: 'new-tool-call',
+            role: 'assistant',
+            recipient: 'api_tool.call_tool',
+            contentType: 'code',
+            parts: ['call_tool()'],
+            turnId: 'turn-1',
+            status: 'finished_successfully',
+          }),
+          end_turn: false,
+        },
+      ]),
+    ).snapshot;
+    expect(snapshot.messages.map((item: any) => item.messageKey)).toEqual(['question', 'final-answer']);
+    expect(snapshot.captureMeta.completeness).toBe('partial');
+    expect(snapshot.captureMeta.reasons).toContain('chatgpt_api_unfinished_turn_partial');
+  });
+
+  it('does not certify a finished tool invocation as a finished conversation turn', () => {
+    const snapshot = build(
+      pagedFrom([
+        message({ id: 'question', role: 'user', parts: ['Question'], turnId: 'turn-1' }),
+        {
+          ...message({
+            id: 'tool-call',
+            role: 'assistant',
+            recipient: 'api_tool.call_tool',
+            contentType: 'code',
+            parts: ['call_tool()'],
+            turnId: 'turn-1',
+            status: 'finished_successfully',
+          }),
+          end_turn: false,
+        },
+      ]),
+    ).snapshot;
+    expect(snapshot.messages.map((item: any) => item.messageKey)).toEqual(['question']);
+    expect(snapshot.captureMeta).toMatchObject({
+      completeness: 'partial',
+      reasons: ['chatgpt_api_unfinished_turn_partial'],
+    });
+  });
+
   it('preserves leading indentation and trailing whitespace from user and assistant text', () => {
     const question = '    indented code\n\n      more code\n';
     const answer = '    assistant code\n  last line  ';
@@ -1959,6 +2069,32 @@ describe('ChatGPT paged API transport', () => {
     );
     return { requestPage, calls };
   }
+
+  it('does not issue a verification HEAD or create a checkpoint for a still-running tool chain', async () => {
+    const call = {
+      ...message({
+        id: 'tool-call',
+        role: 'assistant',
+        recipient: 'api_tool.call_tool',
+        contentType: 'code',
+        parts: ['call_tool()'],
+        status: 'finished_successfully',
+        turnId: 'new-turn',
+      }),
+      end_turn: false,
+    };
+    const pages = requestPages([
+      responsePage([message({ id: 'question', role: 'user', parts: ['Question'] }), call], false, true),
+    ]);
+    const result = await captureCurrentChatgptConversationViaApi({
+      readCurrentUrl: () => base,
+      requestPage: pages.requestPage,
+    });
+    expect(result.snapshot.captureMeta.completeness).toBe('partial');
+    expect(result.snapshot.captureMeta.reasons).toContain('chatgpt_api_unfinished_turn_partial');
+    expect(result.checkpoint).toBeNull();
+    expect(pages.calls.map((item) => item.numTurns)).toEqual([10]);
+  });
 
   it('stops at a verified saved user even when older history remains available', async () => {
     const original = requestPages([responsePage([...older, ...newer], false, true)]);

@@ -567,6 +567,32 @@ function currentTurnInfo(branch: any[]): {
   return { state: 'unknown', turnId: executionTurnId };
 }
 
+export function hasUnfinishedChatgptApiExecution(branch: any[]): boolean {
+  const lastUserIndex = branch.findLastIndex((message) => messageRole(message) === 'user' && !isHidden(message));
+  const latestTurn = branch.slice(lastUserIndex + 1);
+  const lastFinalIndex = latestTurn.findLastIndex(
+    (message) =>
+      messageRole(message) === 'assistant' &&
+      message.recipient === 'all' &&
+      message.channel === 'final' &&
+      message.end_turn !== false &&
+      (message.status === 'finished_successfully' ||
+        message.metadata?.is_complete === true ||
+        message.end_turn === true),
+  );
+  return latestTurn
+    .slice(lastFinalIndex + 1)
+    .some(
+      (message) =>
+        !isHidden(message) &&
+        messageRole(message) === 'assistant' &&
+        ((message.end_turn === false && (message.recipient !== 'all' || message.channel === 'final')) ||
+          message.status === 'in_progress' ||
+          message.status === 'streaming' ||
+          message.metadata?.is_complete === false),
+    );
+}
+
 function appendBlocks(parts: string[]): string {
   return parts.filter((part) => part.trim().length > 0).join('\n\n');
 }
@@ -615,25 +641,7 @@ export function buildChatgptApiSnapshot(input: {
 
   const markSchemaDrift = () => partialReasons.add(SCHEMA_DRIFT_REASON);
   const markUnownedAuxiliary = () => partialReasons.add(UNOWNED_AUXILIARY_REASON);
-  const latestUserIndex = branch.findLastIndex((message) => messageRole(message) === 'user' && !isHidden(message));
-  const latestTurn = branch.slice(latestUserIndex + 1);
-  const hasFinal = latestTurn.some(
-    (message) =>
-      messageRole(message) === 'assistant' &&
-      message.recipient === 'all' &&
-      message.channel === 'final' &&
-      (message.status === 'finished_successfully' || message.metadata?.is_complete === true),
-  );
-  const isStreaming =
-    !hasFinal &&
-    latestTurn.some(
-      (message) =>
-        !isHidden(message) &&
-        messageRole(message) === 'assistant' &&
-        message.recipient === 'all' &&
-        (message.status === 'in_progress' || message.status === 'streaming' || message.metadata?.is_complete === false),
-    );
-  if (isStreaming) partialReasons.add(UNFINISHED_TURN_REASON);
+  if (hasUnfinishedChatgptApiExecution(branch)) partialReasons.add(UNFINISHED_TURN_REASON);
 
   const flushPendingImages = () => {
     if (!pendingImages.length) return;
