@@ -6,8 +6,8 @@ import { runTrackedTransaction } from '@services/data-revisions/transaction';
 import { getImageCacheAssetById } from '@services/conversations/data/image-cache-read';
 
 const codec = vi.hoisted(() => ({ render: vi.fn() }));
-vi.mock('@platform/image/canvas-codec', () => ({
-  renderPngCandidate: (...args: unknown[]) => codec.render(...args),
+vi.mock('@platform/image/png-lossless', () => ({
+  recompressPngLosslessly: (...args: unknown[]) => codec.render(...args),
 }));
 import { optimizeConversationImages } from '@services/conversations/data/conversation-image-optimization';
 
@@ -63,12 +63,6 @@ function png(payloadLength = 0, ancillary = false): Blob {
 
 const source = png(600);
 const smaller = png(16);
-const pixels = new Uint8ClampedArray([44, 66, 88, 255]);
-const output = (blob = smaller, after = pixels) => ({
-  blob,
-  originalPixels: pixels,
-  optimizedPixels: after,
-});
 
 async function addOwner(key: string) {
   const db = await openDb();
@@ -150,7 +144,7 @@ describe('image optimization scoped to one detail item', () => {
     );
     await completed;
     const revision = await readDataRevision('image_cache');
-    codec.render.mockResolvedValueOnce(output());
+    codec.render.mockResolvedValueOnce(smaller);
     const progress = vi.fn();
     const result = await optimizeConversationImages({ conversationId: owner, ids: [id, id], onProgress: progress });
 
@@ -184,7 +178,7 @@ describe('image optimization scoped to one detail item', () => {
     expect(convo.lastActivityAt).toBe(8);
   });
 
-  it('excludes foreign owner, animated PNG, PNG metadata, wrong MIME, and JPEG without codec invocation', async () => {
+  it('does not touch foreign ownership, animation, or MIME mismatches when no safe PNG candidate exists', async () => {
     const owner = await addOwner('owner');
     const foreignOwner = await addOwner('other');
     const foreign = await addAsset(foreignOwner);
@@ -214,18 +208,19 @@ describe('image optimization scoped to one detail item', () => {
       await addAsset(owner, source, 'image/jpeg'),
       await addAsset(owner, new Blob(['JPEG'], { type: 'image/jpeg' })),
     ];
+    codec.render.mockResolvedValue(null);
     const result = await optimizeConversationImages({ conversationId: owner, ids });
     expect(result).toMatchObject({ processed: ids.length, optimized: 0, bytesSaved: 0 });
-    expect(codec.render).not.toHaveBeenCalled();
+    expect(codec.render).toHaveBeenCalledTimes(2);
     expect(await readDataRevision('image_cache')).toBe(0);
     expect((await row(foreign)).blob).toBeInstanceOf(Blob);
   });
 
-  it('rejects changed pixels or non-saving outputs without replacing the image', async () => {
+  it('does not save an image when the lossless recompressor finds no reduction', async () => {
     const owner = await addOwner('pixel');
     const id = await addAsset(owner);
-    codec.render.mockResolvedValueOnce(output(smaller, new Uint8ClampedArray([44, 66, 89, 255])));
-    codec.render.mockResolvedValueOnce(output(png(900)));
+    codec.render.mockResolvedValueOnce(null);
+    codec.render.mockResolvedValueOnce(null);
     const first = await optimizeConversationImages({ conversationId: owner, ids: [id] });
     const second = await optimizeConversationImages({ conversationId: owner, ids: [id] });
     expect(first.optimized).toBe(0);
@@ -247,7 +242,7 @@ describe('image optimization scoped to one detail item', () => {
           markChanged('image_cache');
         },
       );
-      return output();
+      return smaller;
     });
     const result = await optimizeConversationImages({ conversationId: owner, ids: [id] });
     expect(result.optimized).toBe(0);
@@ -260,7 +255,7 @@ describe('image optimization scoped to one detail item', () => {
     const owner = await addOwner('abort');
     const first = await addAsset(owner);
     const second = await addAsset(owner);
-    codec.render.mockResolvedValue(output());
+    codec.render.mockResolvedValue(smaller);
     const abort = new AbortController();
     const result = await optimizeConversationImages({
       conversationId: owner,
@@ -276,7 +271,7 @@ describe('image optimization scoped to one detail item', () => {
   it('does not report storage write failures as a successful skip', async () => {
     const owner = await addOwner('write-fail');
     const id = await addAsset(owner);
-    codec.render.mockResolvedValueOnce(output());
+    codec.render.mockResolvedValueOnce(smaller);
     const previous = IDBObjectStore.prototype.put;
     const spy = vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (...args) {
       if (this.name === 'image_cache') throw new DOMException('Quota exceeded', 'QuotaExceededError');
