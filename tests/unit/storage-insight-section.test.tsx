@@ -6,6 +6,14 @@ import { MemoryRouter } from 'react-router-dom';
 import { encodeConversationLoc } from '@services/shared/conversation-loc';
 
 const storage = vi.hoisted(() => ({ snapshot: {} as any, startScan: vi.fn(), cancelScan: vi.fn() }));
+const duplicate = vi.hoisted(() => ({
+  current: {} as any,
+  find: vi.fn(),
+  cancel: vi.fn(),
+}));
+vi.mock('@viewmodels/settings/useStorageDuplicates', () => ({
+  useStorageDuplicates: () => duplicate.current,
+}));
 const conversation = vi.hoisted(() => ({
   openScope: vi.fn(),
   openId: vi.fn(),
@@ -46,6 +54,14 @@ beforeEach(() => {
     scanError: '',
     startScan: storage.startScan,
     cancelScan: storage.cancelScan,
+  };
+  duplicate.current = {
+    status: 'idle',
+    report: null,
+    progress: null,
+    error: '',
+    start: duplicate.find,
+    cancel: duplicate.cancel,
   };
   vi.clearAllMocks();
 });
@@ -94,6 +110,71 @@ describe('InsightSection storage overview', () => {
     });
     expect(document.body.textContent).toContain('3');
     expect(document.body.textContent).toContain('clip DB failed');
+  });
+
+  it('makes duplicate detection explicitly opt-in and renders read-only potential savings', () => {
+    duplicate.current = {
+      ...duplicate.current,
+      status: 'ready',
+      report: {
+        candidates: 2,
+        hashed: 2,
+        hashErrors: 0,
+        duplicateGroups: 1,
+        potentialRedundantBytes: 1024,
+        groups: [
+          {
+            sha256: 'a'.repeat(64),
+            bytes: 1024,
+            assets: [
+              { id: 1, conversationId: 4, url: 'one.png', title: 'One', loc: '' },
+              { id: 2, conversationId: 5, url: 'two.png', title: 'Two', loc: '' },
+            ],
+          },
+        ],
+      },
+    };
+    storage.snapshot = {
+      ...storage.snapshot,
+      overview: { imageCacheRecords: 2, originUsageBytes: null, originQuotaBytes: null },
+      status: 'ready',
+      scanStatus: 'ready',
+      scanData: {
+        readableCount: 2,
+        bytes: 2048,
+        animatedCount: 0,
+        unknownAnimationCount: 0,
+        unreadableCount: 0,
+        orphanCount: 0,
+        legacyCount: 0,
+        metadataMismatchCount: 0,
+        formatMismatchCount: 0,
+        formats: [],
+        topImages: [],
+        assetsById: new Map(),
+      },
+    };
+    act(() =>
+      root.render(
+        createElement(InsightSection, {
+          status: 'idle',
+          error: '',
+          stats: null,
+          range: 'all',
+          onChangeRange: () => {},
+        }),
+      ),
+    );
+    expect(document.body.textContent).toContain('Potential duplicate bytes');
+    expect(document.body.textContent).toContain('1 KiB');
+    expect(document.body.textContent).toContain('#1');
+    const find = Array.from(document.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Find duplicate images',
+    )!;
+    expect(find).toBeTruthy();
+    act(() => find.click());
+    expect(duplicate.find).toHaveBeenCalledOnce();
+    expect(document.body.textContent).not.toContain('Delete duplicate');
   });
 
   it('offers an explicit scan and renders measured resource details', () => {

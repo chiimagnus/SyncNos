@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { t } from '@i18n';
 import { buildConversationRouteFromLoc, decodeConversationLoc } from '@services/shared/conversation-loc';
@@ -7,7 +7,9 @@ import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
 import { openConversation as openConversationInApp } from '@ui/conversations/open-conversation';
 import { setPendingOpenConversationId } from '@ui/conversations/pending-open';
 import { useStorageInsight } from '@viewmodels/settings/useStorageInsight';
+import type { StorageAssetInfo } from '@services/insight/storage-insight-source';
 import { ImageOptimizationPanel } from '@ui/settings/sections/ImageOptimizationPanel';
+import { useStorageDuplicates } from '@viewmodels/settings/useStorageDuplicates';
 import { buttonClassName, cardClassName, conversationJumpLinkClassName } from '@ui/settings/ui';
 
 function formatBytes(value: number | null): string {
@@ -44,6 +46,82 @@ function StorageConversationLink(props: { conversationId: number; title: string;
     >
       {title}
     </Link>
+  );
+}
+
+function DuplicateImagesPanel({ assets, scanValid }: { assets: StorageAssetInfo[]; scanValid: boolean }) {
+  const { status, report, progress, error, start, cancel } = useStorageDuplicates(assets, scanValid);
+  const [visibleGroups, setVisibleGroups] = useState(10);
+  return (
+    <section className="tw-mt-4 tw-border-t tw-border-[var(--border)] tw-pt-3" aria-label={t('storageDuplicatesTitle')}>
+      <div className="tw-flex tw-flex-wrap tw-items-center tw-justify-between tw-gap-2">
+        <h3 className="tw-m-0 tw-text-sm tw-font-extrabold">{t('storageDuplicatesTitle')}</h3>
+        <button
+          type="button"
+          className={buttonClassName}
+          disabled={status !== 'running' && !scanValid}
+          onClick={status === 'running' ? cancel : start}
+        >
+          {t(status === 'running' ? 'storageDuplicatesCancel' : 'storageDuplicatesFind')}
+        </button>
+      </div>
+      <p className="tw-mt-1 tw-text-xs tw-text-[var(--text-secondary)]">{t('storageDuplicatesExplanation')}</p>
+      {status === 'running' ? (
+        <p role="status" className="tw-mt-2 tw-text-xs">
+          {t('storageDuplicatesProgress')}: {progress?.processed ?? 0} / {progress?.total ?? '…'}
+        </p>
+      ) : null}
+      {status === 'stale' ? (
+        <p role="status" className="tw-mt-2 tw-text-xs">
+          {t('storageInsightStale')}
+        </p>
+      ) : null}
+      {status === 'error' ? (
+        <p role="alert" className="tw-mt-2 tw-text-xs tw-text-[var(--error)]">
+          {error}
+        </p>
+      ) : null}
+      {report ? (
+        <div className="tw-mt-3">
+          <p className="tw-text-xs tw-font-semibold">
+            {t('storageDuplicatesGroups')}: {report.duplicateGroups} · {t('storageDuplicatesPotential')}:{' '}
+            {formatBytes(report.potentialRedundantBytes)}
+            {report.hashErrors ? ` · ${t('storageDuplicatesUnreadable')}: ${report.hashErrors}` : ''}
+          </p>
+          <ol className="tw-mt-2 tw-grid tw-gap-3">
+            {report.groups.slice(0, visibleGroups).map((group) => (
+              <li key={group.sha256} className="tw-text-xs">
+                <div className="tw-font-semibold">
+                  {group.assets.length} × {formatBytes(group.bytes)}
+                </div>
+                <ul className="tw-ml-3 tw-mt-1 tw-grid tw-gap-1">
+                  {group.assets.map((asset) => (
+                    <li key={asset.id}>
+                      #{asset.id} ·{' '}
+                      {asset.loc ? (
+                        <StorageConversationLink
+                          conversationId={asset.conversationId}
+                          title={asset.title || asset.url || String(asset.id)}
+                          source={asset.source}
+                          loc={asset.loc}
+                        />
+                      ) : (
+                        asset.url || String(asset.id)
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ol>
+          {visibleGroups < report.groups.length ? (
+            <button type="button" className={buttonClassName} onClick={() => setVisibleGroups((value) => value + 10)}>
+              {t('storageImageShowMore')}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -228,6 +306,7 @@ export function StorageInsightPanel() {
               </li>
             ))}
           </ol>
+          <DuplicateImagesPanel assets={resourceList} scanValid={scanStatus === 'ready'} />
           <ImageOptimizationPanel assets={resourceList} scanValid={scanStatus === 'ready'} />
         </div>
       ) : null}

@@ -43,4 +43,9 @@ original bytes later. You can select eligible images for a separately confirmed,
 batch optimization. It processes one image at a time, can be stopped after the current item,
 and reports successful saves, no savings, skipped images, conflicts, failures, and only verified
 bytes saved. Batch mode never silently applies lossy encoding.
+
+Use **Find duplicate images** to explicitly inspect same-size cached files with chunked SHA-256.
+The result lists byte-identical files across conversations and their potential duplicate bytes;
+it never merges assets, rewrites IDs, deletes content, or triggers synchronization. You can cancel
+or rerun after changes to the local library.
 Existing remote copies are not updated automatically; rescan before further changes.
