@@ -39,4 +39,8 @@ Compare the original with the proposed result and the measured byte savings.
 Animated and unsupported formats are excluded. A preview never changes saved data;
 explicitly saving an eligible result replaces only the selected local Blob while preserving its asset ID.
 Lossy results require an additional acknowledgement. Export a Backup before saving if you need
-original bytes later. Existing remote copies are not updated automatically; rescan before further changes.
+original bytes later. You can select eligible images for a separately confirmed, pixel-identical
+batch optimization. It processes one image at a time, can be stopped after the current item,
+and reports successful saves, no savings, skipped images, conflicts, failures, and only verified
+bytes saved. Batch mode never silently applies lossy encoding.
+Existing remote copies are not updated automatically; rescan before further changes.

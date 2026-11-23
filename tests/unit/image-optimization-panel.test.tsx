@@ -12,6 +12,10 @@ const state = vi.hoisted(() => ({
 vi.mock('@viewmodels/settings/useStorageImageOptimization', () => ({
   useStorageImageOptimization: () => state.current,
 }));
+const batch = vi.hoisted(() => ({ current: {} as any, start: vi.fn(), cancel: vi.fn() }));
+vi.mock('@viewmodels/settings/useStorageImageBatch', () => ({
+  useStorageImageBatch: () => batch.current,
+}));
 import { ImageOptimizationPanel } from '@ui/settings/sections/ImageOptimizationPanel';
 
 let root: ReactDOM.Root;
@@ -52,6 +56,9 @@ beforeEach(() => {
   state.prepare.mockReset();
   state.cancel.mockReset();
   state.save.mockReset();
+  batch.start.mockReset();
+  batch.cancel.mockReset();
+  batch.current = { start: batch.start, cancel: batch.cancel, status: 'idle', result: null, error: '' };
   createUrl.mockReset().mockReturnValueOnce('blob:old').mockReturnValueOnce('blob:new');
   revokeUrl.mockReset();
   Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createUrl });
@@ -139,7 +146,7 @@ describe('image preview UI', () => {
       (button) => button.textContent === 'Save optimized image',
     )!;
     expect(save.disabled).toBe(true);
-    const acceptance = document.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    const acceptance = Array.from(document.querySelectorAll('input[type="checkbox"]')).at(-1)!;
     expect(acceptance).toBeTruthy();
     act(() => acceptance.click());
     expect(save.disabled).toBe(false);
@@ -147,11 +154,66 @@ describe('image preview UI', () => {
     expect(state.save).toHaveBeenCalledWith(true);
   });
 
+  it('selects eligible images, requires batch confirmation and submits only selected owner IDs', () => {
+    act(() => root.render(createElement(ImageOptimizationPanel, { assets, scanValid: true })));
+    const selectAll = Array.from(document.querySelectorAll('button')).find((node) =>
+      node.textContent?.includes('Select eligible'),
+    )!;
+    act(() => selectAll.click());
+    expect(document.body.textContent).toContain('Selected: 2');
+    const review = Array.from(document.querySelectorAll('button')).find((node) =>
+      node.textContent?.includes('Review batch'),
+    )!;
+    act(() => review.click());
+    expect(document.body.textContent).toContain('processes one image at a time');
+    const confirm = Array.from(document.querySelectorAll('button')).find((node) =>
+      node.textContent?.includes('Confirm batch optimization'),
+    )!;
+    act(() => confirm.click());
+    expect(batch.start).toHaveBeenCalledOnce();
+    expect(batch.start).toHaveBeenCalledWith([
+      { id: 1, conversationId: 1 },
+      { id: 2, conversationId: 1 },
+    ]);
+    expect(state.cancel).toHaveBeenCalledOnce();
+  });
+
+  it('keeps cancellation and committed savings visible when the audit becomes stale', () => {
+    batch.current = {
+      ...batch.current,
+      status: 'running',
+      result: {
+        processed: 1,
+        total: 2,
+        bytesSaved: 30,
+        savedCount: 1,
+        noSavingsCount: 0,
+        skippedCount: 0,
+        conflictCount: 0,
+        failedCount: 0,
+        entries: [{ id: 1, conversationId: 1, status: 'saved', bytesSaved: 30 }],
+      },
+    };
+    act(() => root.render(createElement(ImageOptimizationPanel, { assets, scanValid: false })));
+    const cancel = Array.from(document.querySelectorAll('button')).find((node) =>
+      node.textContent?.includes('Stop after current image'),
+    )!;
+    expect(cancel.disabled).toBe(false);
+    expect(document.body.textContent).toContain('Verified bytes saved');
+    expect(document.body.textContent).toContain('30 B');
+    act(() => cancel.click());
+    expect(batch.cancel).toHaveBeenCalledOnce();
+  });
+
   it('disables actions when the audit is stale or a candidate is still processing', () => {
     act(() => root.render(createElement(ImageOptimizationPanel, { assets, scanValid: false })));
     expect(Array.from(document.querySelectorAll('button')).every((button) => button.disabled)).toBe(true);
     state.current = { ...state.current, previewStatus: 'loading' };
     act(() => root.render(createElement(ImageOptimizationPanel, { assets, scanValid: true })));
-    expect(Array.from(document.querySelectorAll('button')).every((button) => button.disabled)).toBe(true);
+    expect(
+      Array.from(document.querySelectorAll('button'))
+        .filter((button) => button.textContent?.includes('Preview'))
+        .every((button) => button.disabled),
+    ).toBe(true);
   });
 });

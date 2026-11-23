@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { t } from '@i18n';
 import { buildConversationRouteFromLoc, decodeConversationLoc } from '@services/shared/conversation-loc';
@@ -49,6 +50,7 @@ function StorageConversationLink(props: { conversationId: number; title: string;
 export function StorageInsightPanel() {
   const { overview, status, error, scanData, scanStatus, scanProgress, scanError, startScan, cancelScan } =
     useStorageInsight();
+  const resourceList = useMemo(() => (scanData ? [...scanData.assetsById.values()] : []), [scanData]);
 
   return (
     <section className={cardClassName} aria-label={t('storageInsightHeading')}>
@@ -226,7 +228,7 @@ export function StorageInsightPanel() {
               </li>
             ))}
           </ol>
-          <ImageOptimizationPanel assets={scanData.topImages} scanValid={scanStatus === 'ready'} />
+          <ImageOptimizationPanel assets={resourceList} scanValid={scanStatus === 'ready'} />
         </div>
       ) : null}
     </section>

@@ -138,6 +138,7 @@ describe('InsightSection storage overview', () => {
         formatMismatchCount: 0,
         formats: [{ format: 'gif', count: 1, bytes: 1024 }],
         topImages: [{ id: 3, url: 'https://example.com/a.gif', bytes: 1024, format: 'gif' }],
+        assetsById: new Map(),
       },
     };
     act(() => {
@@ -176,6 +177,7 @@ describe('InsightSection storage overview', () => {
         formatMismatchCount: 0,
         formats: [{ format: 'png', count: 1, bytes: 25 }],
         topImages: [{ id: 1, conversationId: 4, title: 'My chat', source: 'chatgpt', loc, bytes: 25, format: 'png' }],
+        assetsById: new Map(),
         content: {
           logicalTextBytes: 12,
           commentBytes: 6,
