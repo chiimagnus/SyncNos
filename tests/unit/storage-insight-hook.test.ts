@@ -5,11 +5,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { StorageOverview } from '@services/insight/storage-insight-source';
 
-const source = vi.hoisted(() => ({ get: vi.fn() }));
+const source = vi.hoisted(() => ({ get: vi.fn(), scan: vi.fn() }));
 const revision = vi.hoisted(() => ({ listen: vi.fn(), ready: vi.fn(), retry: vi.fn() }));
 
 vi.mock('@services/insight/storage-insight-source', () => ({
   getStorageOverview: () => source.get(),
+  scanStorageAssets: (options: unknown) => source.scan(options),
 }));
 vi.mock('@services/data-revisions/observer', () => ({
   subscribeDataRevisionChanges: (fn: (scopes: string[]) => void) => revision.listen(fn),
@@ -63,6 +64,7 @@ beforeEach(() => {
   });
   revision.ready.mockResolvedValue({ baselineAvailable: true });
   source.get.mockResolvedValue({ imageCacheRecords: 1, originUsageBytes: 10, originQuotaBytes: 20 });
+  source.scan.mockResolvedValue({ records: 1, readableCount: 1, bytes: 2 });
 });
 afterEach(async () => {
   await act(async () => {
@@ -117,6 +119,60 @@ describe('storage insights revision lifecycle', () => {
     expect(last.status).toBe('error');
     expect(last.error).toContain('IDB offline');
     expect(revision.retry).toHaveBeenCalledWith(['image_cache']);
+  });
+
+  it('only scans on request, retains last good data after a revision and ignores stale scan completion', async () => {
+    await act(async () => {
+      root!.render(createElement(Harness));
+    });
+    expect(source.scan).not.toHaveBeenCalled();
+    await act(async () => {
+      last.startScan();
+    });
+    await flush();
+    expect(last.scanStatus).toBe('ready');
+    expect(last.scanData?.readableCount).toBe(1);
+
+    const pending = deferred<any>();
+    source.scan.mockReturnValueOnce(pending.promise);
+    await act(async () => {
+      last.startScan();
+    });
+    expect(last.scanStatus).toBe('running');
+    const signal = source.scan.mock.calls.at(-1)?.[0].signal as AbortSignal;
+    await act(async () => {
+      onRevision(['image_cache']);
+    });
+    expect(signal.aborted).toBe(true);
+    expect(last.scanStatus).toBe('stale');
+
+    await act(async () => {
+      pending.resolve({ records: 99, readableCount: 99 });
+    });
+    await flush();
+    expect(last.scanData?.readableCount).toBe(1);
+    expect(last.scanStatus).toBe('stale');
+  });
+
+  it('cancels a user scan and does not report partial results as complete', async () => {
+    const pending = deferred<any>();
+    source.scan.mockReturnValue(pending.promise);
+    await act(async () => {
+      root!.render(createElement(Harness));
+    });
+    await act(async () => {
+      last.startScan();
+    });
+    const signal = source.scan.mock.calls[0]?.[0].signal as AbortSignal;
+    await act(async () => {
+      last.cancelScan();
+    });
+    expect(signal.aborted).toBe(true);
+    expect(last.scanStatus).toBe('cancelled');
+    await act(async () => {
+      pending.resolve({ records: 99 });
+    });
+    expect(last.scanData).toBeNull();
   });
 
   it('does not apply late results after unmount', async () => {

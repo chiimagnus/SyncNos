@@ -1,6 +1,6 @@
 import { openDb } from '@platform/idb/schema';
 
-type ImageCacheRow = {
+export type ImageCacheRow = {
   id?: number;
   conversationId: number;
   url: string;
@@ -122,7 +122,7 @@ function txDone(t: IDBTransaction): Promise<true> {
   });
 }
 
-function normalizeImageCacheAsset(input: {
+export function normalizeImageCacheAsset(input: {
   id: number;
   row: ImageCacheRow | undefined;
   expectedConversationId?: number | null;
