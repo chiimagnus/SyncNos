@@ -33,9 +33,12 @@ describe('image format inspection', () => {
     expect(
       await inspectImageBlob(bytes(...head, ...pngChunk('acTL', [0, 0, 0, 2, 0, 0, 0, 1]), ...pngChunk('IDAT'))),
     ).toEqual({
-      format: 'png',
+      format: 'apng',
       animation: 'animated',
     });
+    expect(
+      await inspectImageBlob(bytes(...head, ...pngChunk('acTL', [0, 0, 0, 1, 0, 0, 0, 1]), ...pngChunk('IDAT'))),
+    ).toEqual({ format: 'apng', animation: 'static' });
   });
 
   it('does not call a single GIF frame animated or assume a truncated stream is static', async () => {

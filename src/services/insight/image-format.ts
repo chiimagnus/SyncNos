@@ -1,4 +1,4 @@
-export type ImageFormat = 'png' | 'jpeg' | 'gif' | 'webp' | 'svg' | 'avif' | 'unknown';
+export type ImageFormat = 'png' | 'apng' | 'jpeg' | 'gif' | 'webp' | 'svg' | 'avif' | 'unknown';
 export type AnimationState = 'animated' | 'static' | 'unknown';
 export type ImageFormatInspection = { format: ImageFormat; animation: AnimationState };
 
@@ -16,17 +16,21 @@ function ascii(bytes: Uint8Array, at: number, length: number): string {
   return String.fromCharCode(...bytes.subarray(at, at + length));
 }
 
-function inspectPng(bytes: Uint8Array): AnimationState {
+function inspectPng(bytes: Uint8Array): ImageFormatInspection {
   let cursor = 8;
   while (cursor + 12 <= bytes.length) {
     const length = u32be(bytes, cursor);
     const kind = ascii(bytes, cursor + 4, 4);
-    if (length > bytes.length - cursor - 12) return 'unknown';
-    if (kind === 'acTL' && length >= 8 && u32be(bytes, cursor + 8) > 1) return 'animated';
-    if (kind === 'IDAT' || kind === 'IEND') return 'static';
+    if (length > bytes.length - cursor - 12) return { format: 'png', animation: 'unknown' };
+    if (kind === 'acTL') {
+      if (length !== 8) return { format: 'apng', animation: 'unknown' };
+      const frames = u32be(bytes, cursor + 8);
+      return { format: 'apng', animation: frames > 1 ? 'animated' : frames === 1 ? 'static' : 'unknown' };
+    }
+    if (kind === 'IDAT' || kind === 'IEND') return { format: 'png', animation: 'static' };
     cursor += length + 12;
   }
-  return 'unknown';
+  return { format: 'png', animation: 'unknown' };
 }
 
 function skipGifSubBlocks(bytes: Uint8Array, start: number): number {
@@ -92,7 +96,7 @@ export async function inspectImageBlob(blob: Blob): Promise<ImageFormatInspectio
   const bytes = new Uint8Array(await blob.slice(0, HEADER_LIMIT).arrayBuffer());
 
   if (bytes.length >= 8 && [137, 80, 78, 71, 13, 10, 26, 10].every((value, index) => bytes[index] === value)) {
-    return { format: 'png', animation: inspectPng(bytes) };
+    return inspectPng(bytes);
   }
   if (bytes.length >= 6 && ['GIF87a', 'GIF89a'].includes(ascii(bytes, 0, 6))) {
     return { format: 'gif', animation: inspectGif(bytes) };

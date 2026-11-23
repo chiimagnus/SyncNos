@@ -6,6 +6,7 @@ import { inspectImageBlob, type AnimationState, type ImageFormat } from '@servic
 import { collectMarkdownImageReferences } from '@services/shared/markdown-image-references';
 import { isSyncnosAssetUrl, parseSyncnosAssetId } from '@services/shared/syncnos-asset-uri';
 import { encodeConversationLoc } from '@services/shared/conversation-loc';
+import { IncrementalSha256 } from '@services/shared/incremental-sha256';
 
 export type StorageOverview = {
   imageCacheRecords: number;
@@ -145,7 +146,7 @@ async function listConversationOwners(db: IDBDatabase): Promise<Map<number, Stor
         owners.set(id, {
           source: String(row.source || ''),
           conversationKey: String(row.conversationKey || ''),
-          sourceType: String(row.sourceType || 'chat').toLowerCase(),
+          sourceType: String(row.sourceType || 'unknown').toLowerCase(),
           title: String(row.title || '').trim(),
         });
       }
@@ -169,7 +170,8 @@ async function nextAssetBatch(db: IDBDatabase, after: number | null): Promise<Im
 function isFormatMismatch(contentType: string, format: ImageFormat): boolean {
   const claimed = contentType.split(';')[0]?.trim().toLowerCase();
   if (!claimed?.startsWith('image/') || format === 'unknown') return false;
-  const normalized = claimed === 'image/jpg' ? 'image/jpeg' : claimed === 'image/apng' ? 'image/png' : claimed;
+  if (format === 'apng' && (claimed === 'image/apng' || claimed === 'image/png')) return false;
+  const normalized = claimed === 'image/jpg' ? 'image/jpeg' : claimed;
   return normalized !== `image/${format === 'svg' ? 'svg+xml' : format}`;
 }
 
@@ -236,6 +238,24 @@ async function nextContentBatch<T>(
   return rows as T[];
 }
 
+/** Key large embedded image data without keeping the entire Base64 URL in an audit Set. */
+export function storageImageTargetKey(target: string): string {
+  if (!/^data:/i.test(target)) return target;
+  const encoder = new TextEncoder();
+  const hasher = new IncrementalSha256();
+  const chunkSize = 16 * 1024;
+  for (let offset = 0; offset < target.length; ) {
+    let end = Math.min(offset + chunkSize, target.length);
+    if (end < target.length) {
+      const last = target.charCodeAt(end - 1);
+      if (last >= 0xd800 && last <= 0xdbff) end -= 1;
+    }
+    hasher.update(encoder.encode(target.slice(offset, end)));
+    offset = end;
+  }
+  return `data:${target.length}:${hasher.digestHex()}`;
+}
+
 async function scanStoredContent(
   db: IDBDatabase,
   owners: ReadonlyMap<number, StorageOwner>,
@@ -287,7 +307,7 @@ async function scanStoredContent(
 
       for (const reference of collectMarkdownImageReferences(markdown)) {
         imageOccurrences++;
-        imageTargets.add(reference.target);
+        imageTargets.add(storageImageTargetKey(reference.target));
         const assetId = parseSyncnosAssetId(reference.target);
         if (assetId != null || isSyncnosAssetUrl(reference.target)) {
           if (assetId != null) referencedAssetIds.add(assetId);

@@ -1,4 +1,4 @@
-import { IncrementalSha256 } from '@services/cli/sha256';
+import { IncrementalSha256 } from '@services/shared/incremental-sha256';
 
 export class CliFileTransferError extends Error {
   code: string;

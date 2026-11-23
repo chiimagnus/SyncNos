@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IDBObjectStore, IDBKeyRange, indexedDB } from 'fake-indexeddb';
 
 import { openDb, closeDbForTests } from '@platform/idb/schema';
-import { getStorageOverview, scanStorageAssets } from '@services/insight/storage-insight-source';
+import { getStorageOverview, scanStorageAssets, storageImageTargetKey } from '@services/insight/storage-insight-source';
 import { runTrackedTransaction } from '@services/data-revisions/transaction';
 
 function requestDone<T>(request: IDBRequest<T>): Promise<T> {
@@ -72,6 +72,30 @@ async function addRecord(storeName: 'messages' | 'article_comments' | 'conversat
   const db = await openDb();
   return await requestDone(db.transaction(storeName, 'readwrite').objectStore(storeName).add(row));
 }
+
+describe('content audit resource budget', () => {
+  it('keeps large inline Data URL identity keys bounded and stable without retaining Base64 in a Set', () => {
+    const dataUrl = 'data:image/png;base64,' + 'A'.repeat(1_000_000);
+    const key = storageImageTargetKey(dataUrl);
+    expect(key).toMatch(/^data:[0-9]+:[a-f0-9]{64}$/);
+    expect(key.length).toBeLessThan(96);
+    expect(storageImageTargetKey(dataUrl)).toBe(key);
+    expect(storageImageTargetKey(dataUrl.slice(0, -1) + 'B')).not.toBe(key);
+    expect(storageImageTargetKey('https://example.com/a.png')).toBe('https://example.com/a.png');
+  });
+
+  it('does not invent a chat sourceType for a legacy untyped article', async () => {
+    await addRecord('conversations', { source: 'web', conversationKey: 'legacy', lastActivityAt: 1 });
+    await addRecord('messages', {
+      conversationId: 1,
+      messageKey: 'article_body',
+      role: 'article',
+      contentMarkdown: 'history',
+    });
+    const content = (await scanStorageAssets()).content;
+    expect(content.byKind).toEqual([{ kind: 'unknown', bytes: 7 }]);
+  });
+});
 
 describe('storage content and reference audit', () => {
   it('distinguishes repeated occurrences, unique targets, valid ownership, broken local refs and logical UTF-8 bytes', async () => {

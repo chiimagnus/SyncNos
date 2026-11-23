@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createExtensionFileTransferController } from '@services/cli/file-transfer';
-import { IncrementalSha256 } from '@services/cli/sha256';
+import { IncrementalSha256 } from '@services/shared/incremental-sha256';
 
 const frames = {
   fileBegin: 'file-begin',
