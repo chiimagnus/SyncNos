@@ -1642,6 +1642,51 @@ describe('conversations storage-idb', () => {
     ]);
   });
 
+  it('keeps reverse-loaded ChatGPT DOM batches in chronological order without deleting richer existing history', async () => {
+    const conversation = await upsertConversation({
+      sourceType: 'chat',
+      source: 'chatgpt',
+      conversationKey: 'dom-stream-order',
+      title: 'Streaming history',
+      lastActivityAt: 1,
+    });
+    const id = Number(conversation.id);
+    await syncConversationMessages(id, [
+      { messageKey: 'm5', role: 'assistant', contentMarkdown: 'Complete existing answer with images', sequence: 0 },
+    ]);
+    const persist = async (keys: string[]) => {
+      const integrity = resolveCaptureIntegrity('chatgpt', {
+        conversation: { source: 'chatgpt', conversationKey: 'dom-stream-order' },
+        messages: keys.map((messageKey, sequence) => ({
+          messageKey,
+          role: Number(messageKey.slice(1)) % 2 ? 'assistant' : 'user',
+          contentMarkdown: messageKey === 'm5' ? 'Short visible excerpt' : `Message ${messageKey}`,
+          sequence,
+        })),
+        captureMeta: { completeness: 'partial', identityVerified: true },
+      });
+      if (!integrity.ok) throw new Error(integrity.code);
+      await syncConversationMessages(id, integrity.snapshot.messages, {
+        mode: integrity.persistence.mode,
+        diff: integrity.persistence.diff,
+        domHistoryVerified: false,
+      });
+    };
+    await persist(['m3', 'm4', 'm5']);
+    expect((await getMessagesByConversationId(id)).map((message) => message.messageKey)).toEqual(['m3', 'm4', 'm5']);
+    await persist(['m1', 'm2', 'm3']);
+    await persist(['m1', 'm2', 'm3']);
+    const stored = await getMessagesByConversationId(id);
+    expect(stored.map(({ messageKey, sequence }) => [messageKey, sequence])).toEqual([
+      ['m1', 0],
+      ['m2', 1],
+      ['m3', 2],
+      ['m4', 3],
+      ['m5', 4],
+    ]);
+    expect(stored.at(-1)?.contentMarkdown).toBe('Complete existing answer with images');
+  });
+
   it('reuses the append reconciliation working set without redundant per-key reads', async () => {
     const convo = await upsertConversation({
       sourceType: 'chat',

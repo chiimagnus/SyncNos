@@ -16,7 +16,6 @@ import { composeThinkingMarkdown } from '@services/shared/thinking-block';
 import {
   addPreparedReason,
   createPreparedAccumulator,
-  createScrollRootRestorer,
   finishPreparedCapture,
   mergePreparedRecords,
   createPreparedCaptureConsumer,
@@ -114,7 +113,9 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
   }
 
   function directMessageId(element: any): string {
-    const messageId = String(element?.getAttribute?.('data-message-id') || '').trim();
+    const messageId = String(
+      element?.getAttribute?.('data-message-id') || element?.getAttribute?.('data-chatgpt-selection-message-id') || '',
+    ).trim();
     if (messageId) return messageId;
     const ids = String(element?.getAttribute?.('data-chatgpt-search-message-ids') || '')
       .trim()
@@ -278,6 +279,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
   }
 
   function assistantContentNode(element: any): any {
+    if (element?.matches?.('[data-chatgpt-selection-message-id]')) return element;
     const selection = element?.querySelector?.('[data-chatgpt-selection-message-id]');
     if (selection) return selection;
     if (element?.matches?.('[data-message-author-role="assistant"]')) return element;
@@ -287,7 +289,8 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     );
     const aggregated = aggregateNodes(primary);
     if (aggregated) return aggregated;
-    if (element?.matches?.(CHATGPT_TURN_SELECTOR)) return null;
+    if (element?.matches?.(CHATGPT_TURN_SELECTOR))
+      return element.querySelector('[data-response-body]') || element.querySelector('[data-dil-response]');
     return element?.querySelector?.("[data-markdown-text-style='assistant-message']") || element;
   }
 
@@ -309,7 +312,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   function hasFallbackAssistantActivity(turn: any): boolean {
     if (!turn?.querySelector) return false;
-    if (turn.querySelector("[data-markdown-text-style='assistant-message']")) return true;
+    if (turn.querySelector("[data-markdown-text-style='assistant-message'], [data-dil-response]")) return true;
     if (findDeepResearchIframe(turn)) return true;
     if (hasActiveAssistantStatus(turn)) return true;
     return extractChatgptImageUrlsForRole(turn, 'assistant').length > 0;
@@ -350,9 +353,37 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       const units = (Array.from(turn.querySelectorAll(CHATGPT_MESSAGE_UNIT_SELECTOR)) as any[]).filter((unit) =>
         /:(?:user|assistant)$/.test(String(unit?.getAttribute?.('data-chatgpt-search-unit-key') || '')),
       );
-      wrappers.push(...units);
-      const hasAssistantUnit = units.some((unit) => roleFromWrapper(unit) === 'assistant');
-      if (!hasAssistantUnit && hasFallbackAssistantActivity(turn)) wrappers.push(turn);
+      const assistantUnits = units.filter((unit) => roleFromWrapper(unit) === 'assistant');
+      const coveredIds = new Set(
+        assistantUnits.flatMap((unit) =>
+          String(unit.getAttribute('data-chatgpt-search-message-ids') || '')
+            .split(/\s+/)
+            .filter(Boolean),
+        ),
+      );
+      const selectedIds = new Set<string>();
+      const selected = (
+        Array.from(turn.querySelectorAll('[data-response-body] [data-chatgpt-selection-message-id]')) as any[]
+      ).filter((node) => {
+        const id = directMessageId(node);
+        if (
+          !id ||
+          node.closest?.(CHATGPT_TURN_SELECTOR) !== turn ||
+          node.parentElement?.closest?.('[data-chatgpt-selection-message-id]') ||
+          isExplicitlyHiddenWithin(node, turn) ||
+          assistantUnits.some((unit) => unit.contains(node)) ||
+          coveredIds.has(id) ||
+          selectedIds.has(id)
+        )
+          return false;
+        selectedIds.add(id);
+        return true;
+      });
+      if (selected.length) wrappers.push(...[...units, ...selected].sort(compareDocumentOrder));
+      else {
+        wrappers.push(...units);
+        if (!assistantUnits.length && hasFallbackAssistantActivity(turn)) wrappers.push(turn);
+      }
     }
     return wrappers;
   }
@@ -452,11 +483,21 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   function buildCotAssociations(wrappers: any[], includeOuterHtml: boolean): Map<any, CotAssociation> {
     const result = new Map<any, CotAssociation>();
+    const lastAssistantByTurn = new Map<any, any>();
+    for (const owner of wrappers) {
+      if (roleFromWrapper(owner) === 'assistant') lastAssistantByTurn.set(owner.closest(CHATGPT_TURN_SELECTOR), owner);
+    }
     for (const owner of wrappers) {
       if (roleFromWrapper(owner) !== 'assistant') continue;
       const group = owner.closest(CHATGPT_TURN_SELECTOR);
       if (!group) continue;
-      const bodies = currentCotBodies(group);
+      const responseBody = owner.closest?.('[data-response-body]');
+      const bodies = [
+        ...(responseBody ? currentCotBodies(responseBody) : []),
+        ...(lastAssistantByTurn.get(group) === owner
+          ? currentCotBodies(group).filter((body) => !body.closest?.('[data-response-body]'))
+          : []),
+      ];
       if (!bodies.length) continue;
       const parts = bodies.map((body) => ({ content: extractCotContent(body), body }));
       result.set(owner, {
@@ -580,12 +621,15 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     };
   }
 
-  function readCurrentManualWindow(includeInputs = false): {
+  function readCurrentManualWindow(
+    includeInputs = false,
+    sourceRoot?: any,
+  ): {
     descriptors: ChatgptDescriptor[];
     inputsByKey: Map<string, ChatgptExtractionInput>;
     unresolvedIdentity: boolean;
   } {
-    const root = getConversationRoot();
+    const root = sourceRoot ?? getConversationRoot();
     const descriptors: ChatgptDescriptor[] = [];
     const inputsByKey = new Map<string, ChatgptExtractionInput>();
     if (!root) return { descriptors, inputsByKey, unresolvedIdentity: false };
@@ -733,16 +777,20 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   async function harvestRenderedInto(
     accumulator: PreparedAccumulator<any>,
-    _root: any,
+    sourceRoot: any,
     options: { newestFirst?: boolean } = {},
   ): Promise<{ added: number; updated: number }> {
     mergeIdentityAnchors(accumulator.identityGuard, manualAdapter.readIdentity());
-    const { descriptors, inputsByKey, unresolvedIdentity } = manualAdapter.readWindow();
+    const detachedSnapshot = !!sourceRoot && sourceRoot !== getConversationRoot();
+    const { descriptors, inputsByKey, unresolvedIdentity } = sourceRoot
+      ? readCurrentManualWindow(true, sourceRoot)
+      : manualAdapter.readWindow();
     if (unresolvedIdentity) addPreparedReason(accumulator, 'unstable_identity');
     const existingByKey = new Map(accumulator.records.map((record) => [record.key, record]));
     const records: PreparedMessageRecord<any>[] = [];
     for (let i = 0; i < descriptors.length; i += 1) {
       const descriptor = descriptors[i];
+      if (detachedSnapshot && !descriptor.rendered) continue;
       const existing = existingByKey.get(descriptor.key);
       if (existing && existing.fingerprint === descriptor.fingerprint) {
         records.push({
@@ -756,7 +804,12 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       }
       const input = inputsByKey.get(descriptor.key);
       if (!input) continue;
-      if (input.role === 'assistant' && input.liveRoot && chatgptMarkdown.hasRichGraphic(input.liveRoot)) {
+      if (
+        input.role === 'assistant' &&
+        input.liveRoot &&
+        !detachedSnapshot &&
+        chatgptMarkdown.hasRichGraphic(input.liveRoot)
+      ) {
         input.outerHtml = (await chatgptMarkdown.snapshotRichGraphics(input.liveRoot, env.window)) || input.outerHtml;
       }
       const message = extractManualMessage(input, i);
@@ -810,8 +863,8 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     };
   }
 
-  // Manual-only dynamic sweep. The provider re-queries after every wait; no turn/message node
-  // survives across an await. The original scroll root is restored in finally.
+  // Manual-only upward sweep. The provider re-queries after every wait; no turn/message node
+  // survives across an await. Leave the user's viewport at the oldest reached position.
   async function prepareManualCapture(options: any = {}): Promise<any | null> {
     if (!matches({ hostname: env.location.hostname })) return null;
     const root = manualAdapter.readRoot();
@@ -820,11 +873,6 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     const scrollRuntime = { document: env.document, window: env.window };
     const initialIdentityGuard = manualAdapter.readIdentity();
     const sampleIdentity = createIdentitySampler(initialIdentityGuard);
-    const scrollRestorer = createScrollRootRestorer({
-      ...scrollRuntime,
-      getSeed: manualAdapter.readScrollSeed,
-      sampleIdentity,
-    });
     const durableConversationKey = initialIdentityGuard.durableId ? identityConversationKey(initialIdentityGuard) : '';
     const accumulator = createPreparedAccumulator<any>({
       source: 'chatgpt',
@@ -837,10 +885,57 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         ? options.savedTailMessageKey.trim()
         : '';
 
+    const mountedWindows: Element[] = [];
+    const seenTurnKeys = new Set(readTurnShells(root).map(turnKeyOf));
+    const collectMounted = (records: MutationRecord[]) => {
+      const detached: Element[] = [];
+      let discovered = false;
+      for (const record of records) {
+        for (const added of Array.from(record.addedNodes)) {
+          if (added.nodeType !== 1 && added.nodeType !== 11) continue;
+          const element = added as Element;
+          const turns = [
+            ...(element.matches?.(CHATGPT_TURN_SELECTOR) ? [element] : []),
+            ...Array.from(element.querySelectorAll?.(CHATGPT_TURN_SELECTOR) || []),
+          ] as Element[];
+          for (const turn of turns) {
+            if (turn.parentElement?.closest(CHATGPT_TURN_SELECTOR) || isExplicitlyHiddenWithin(turn, root)) continue;
+            const key = turnKeyOf(turn);
+            if (!key || seenTurnKeys.has(key)) continue;
+            seenTurnKeys.add(key);
+            discovered = true;
+            if (!turn.isConnected) detached.push(turn);
+          }
+        }
+      }
+      if (!discovered) return;
+      const snapshot = env.document.createElement('div');
+      const capturedKeys = new Set<string>();
+      for (const turn of [...readTurnShells(root), ...detached]) {
+        if (isExplicitlyHiddenWithin(turn, root)) continue;
+        const key = turnKeyOf(turn);
+        if (!key || capturedKeys.has(key)) continue;
+        capturedKeys.add(key);
+        snapshot.appendChild(chatgptMarkdown.cloneWithControlState(turn, true));
+      }
+      if (snapshot.childElementCount) mountedWindows.push(snapshot);
+    };
+    const Observer = env.window?.MutationObserver;
+    const observer = typeof Observer === 'function' ? new Observer(collectMounted) : null;
+    let unstagedChanges = 0;
+    const stagedFingerprints = new Map<string, string>();
+    let stagingFailure: unknown;
     const adapter = {
       getScrollSeed: manualAdapter.readScrollSeed,
       sampleIdentity,
       readDescriptorKeys: manualAdapter.readDescriptorKeys,
+      onUpwardScroll: (scrollRoot: Element) => {
+        if (typeof env.window.WheelEvent === 'function') {
+          scrollRoot.dispatchEvent(
+            new env.window.WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -500, deltaMode: 0 }),
+          );
+        }
+      },
       readUnresolvedKeys: manualAdapter.readUnresolvedKeys,
       readBoundaryState: manualAdapter.readBoundaryState,
       onTopConfirmed: (target: PreparedAccumulator<any>) => {
@@ -852,10 +947,49 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         }
         if (!target.conversationKey) addPreparedReason(target, 'unstable_identity');
       },
-      harvest: (target: PreparedAccumulator<any>) => harvestRenderedInto(target, null, { newestFirst: true }),
+      harvest: async (target: PreparedAccumulator<any>) => {
+        let changed = 0;
+        for (const snapshot of mountedWindows.splice(0)) {
+          const changes = await harvestRenderedInto(target, snapshot, { newestFirst: true });
+          changed += changes.added + changes.updated;
+        }
+        const changes = await harvestRenderedInto(target, null, { newestFirst: true });
+        changed += changes.added + changes.updated;
+        unstagedChanges += changed;
+        if (
+          unstagedChanges > 0 &&
+          (!stagedFingerprints.size || unstagedChanges >= 16) &&
+          typeof options.onBatch === 'function'
+        ) {
+          const guard = manualAdapter.readIdentity();
+          if (!identityGuardsMatch(target.identityGuard, guard)) throw new Error('identity_changed');
+          const first = target.records.findIndex((record) => stagedFingerprints.get(record.key) !== record.fingerprint);
+          const last = target.records.findLastIndex(
+            (record) => stagedFingerprints.get(record.key) !== record.fingerprint,
+          );
+          if (first >= 0) {
+            const stagedRecords = target.records.slice(first, Math.min(target.records.length, last + 2));
+            const snapshot = domSnapshotFromPrepared(finishPreparedCapture(target), stagedRecords);
+            if (snapshot) {
+              try {
+                await options.onBatch(snapshot);
+              } catch (error) {
+                stagingFailure = error;
+                throw error;
+              }
+              for (const record of stagedRecords) stagedFingerprints.set(record.key, record.fingerprint);
+            }
+          }
+          unstagedChanges = 0;
+        }
+        return { added: changed, updated: 0 };
+      },
     };
+    observer?.observe(root, { subtree: true, childList: true });
+    let sweep;
+    let lateWindowChanged = false;
     try {
-      const sweep = await runVirtualizedSweep(scrollRuntime, adapter, accumulator, {
+      sweep = await runVirtualizedSweep(scrollRuntime, adapter, accumulator, {
         totalDeadlineMs: options.totalDeadlineMs,
         maxSteps: options.maxSteps,
         stableSamples: options.stableSamples,
@@ -863,24 +997,29 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         stepTimeoutMs: options.stepTimeoutMs,
         boundaryTimeoutMs: options.boundaryTimeoutMs ?? 45_000,
         overlapRatio: options.overlapRatio,
-        maxOverlapRecoveries: options.maxOverlapRecoveries,
         sleep: options.sleep,
         now: options.now,
-        startAtBottom: true,
+        scanUpwards: true,
         holdAtTop: true,
         ...(savedTailMessageKey ? { stopAtKey: savedTailMessageKey } : null),
       });
-      if (sweep.stoppedAtKey) {
-        const index = accumulator.records.findIndex((record) => record.key === savedTailMessageKey);
-        accumulator.records = accumulator.records.slice(index);
+      if (observer) collectMounted(observer.takeRecords());
+      if (mountedWindows.length && !stagingFailure && sampleIdentity()) {
+        const changes = await adapter.harvest(accumulator);
+        lateWindowChanged = changes.added > 0 || changes.updated > 0;
       }
-      accumulator.completeness = sweep.completeness;
     } finally {
-      const restoreResult = scrollRestorer.restore();
-      if (!restoreResult.restored) {
-        accumulator.completeness = 'partial';
-        addPreparedReason(accumulator, 'restore_failed');
-      }
+      observer?.disconnect();
+    }
+    if (stagingFailure) throw stagingFailure;
+    if (sweep.stoppedAtKey) {
+      const index = accumulator.records.findIndex((record) => record.key === savedTailMessageKey);
+      accumulator.records = accumulator.records.slice(index);
+    }
+    accumulator.completeness = sweep.completeness;
+    if (lateWindowChanged && sweep.completeness === 'complete') {
+      accumulator.completeness = 'partial';
+      addPreparedReason(accumulator, 'final_live_changed');
     }
 
     if (!accumulator.conversationKey) addPreparedReason(accumulator, 'unstable_identity');
@@ -893,6 +1032,35 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       addPreparedReason(accumulator, 'identity_changed');
     }
     return finishPreparedCapture(accumulator);
+  }
+
+  function domSnapshotFromPrepared(prepared: any, batchRecords = prepared.records): any | null {
+    const messages = batchRecords.map((record: any, index: number) => ({ ...record.payload, sequence: index }));
+    if (!messages.length || !prepared.identityVerified || !prepared.conversationKey) return null;
+    return {
+      conversation: {
+        sourceType: 'chat',
+        source: 'chatgpt',
+        conversationKey: prepared.conversationKey,
+        title: findTitle(
+          batchRecords === prepared.records ? messages : prepared.records.map((record: any) => record.payload),
+        ),
+        url: env.location.href,
+        warningFlags: [],
+      },
+      messages,
+      ...(prepared.completeness === 'complete' && !prepared.reasons.length
+        ? { domHistoryVerified: true }
+        : prepared.metrics.stoppedAtKey && prepared.metrics.reachedBottom && !prepared.reasons.length
+          ? null
+          : { domHistoryVerified: false }),
+      captureMeta: {
+        completeness: 'partial',
+        identityVerified: true,
+        reasons: Array.from(new Set([...prepared.reasons, 'chatgpt_dom_history_unverified'])),
+        metrics: prepared.metrics,
+      },
+    };
   }
 
   async function capture(options: any): Promise<any | null> {
@@ -924,31 +1092,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     const finalGuard = manualAdapter.readIdentity();
     if (!identityGuardsMatch(accumulator.identityGuard, finalGuard)) return null;
 
-    const finalPrepared = finishPreparedCapture(accumulator);
-    const messages = finalPrepared.records.map((record, index) => ({ ...record.payload, sequence: index }));
-    if (!messages.length || !finalPrepared.identityVerified || !finalPrepared.conversationKey) return null;
-    return {
-      conversation: {
-        sourceType: 'chat',
-        source: 'chatgpt',
-        conversationKey: finalPrepared.conversationKey,
-        title: findTitle(messages),
-        url: env.location.href,
-        warningFlags: [],
-      },
-      messages,
-      ...(finalPrepared.completeness === 'complete' && !finalPrepared.reasons.length
-        ? { domHistoryVerified: true }
-        : finalPrepared.metrics.stoppedAtKey && finalPrepared.metrics.reachedBottom && !finalPrepared.reasons.length
-          ? null
-          : { domHistoryVerified: false }),
-      captureMeta: {
-        completeness: 'partial',
-        identityVerified: true,
-        reasons: Array.from(new Set([...finalPrepared.reasons, 'chatgpt_dom_history_unverified'])),
-        metrics: finalPrepared.metrics,
-      },
-    };
+    return domSnapshotFromPrepared(finishPreparedCapture(accumulator));
   }
 
   const collector = {
