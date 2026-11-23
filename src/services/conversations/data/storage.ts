@@ -30,6 +30,13 @@ export function findConversationBySourceAndKey(
   return idb.findConversationBySourceAndKey(source, conversationKey);
 }
 
+export function findSavedConversationForPage(
+  source: string,
+  pageUrl: string,
+): Promise<ConversationListOpenTarget | null> {
+  return idb.findSavedConversationForPage(source, pageUrl);
+}
+
 export function listOrphanMessageGroups(): Promise<idb.OrphanMessageGroup[]> {
   return idb.listOrphanMessageGroups();
 }

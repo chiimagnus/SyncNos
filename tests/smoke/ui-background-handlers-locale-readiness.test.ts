@@ -21,6 +21,8 @@ import { tabsQuery, tabsSendMessage } from '../../src/platform/webext/tabs';
 import { registerUiMessageHandlers } from '../../src/platform/messaging/ui-background-handlers';
 import { refreshContentScriptsAfterExtensionUpdate } from '../../src/platform/messaging/content-script-recovery';
 
+const findSavedConversationForPage = vi.fn(async () => null);
+
 function deferred<T = void>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
   let reject!: (reason?: unknown) => void;
@@ -59,7 +61,10 @@ afterEach(() => {
 describe('UI background handler locale readiness', () => {
   it('opens only verified SyncNos website links in the extension app', async () => {
     const { router, handlers } = createRouter();
-    registerUiMessageHandlers(router, { ensureLocaleReady: vi.fn(async () => undefined) });
+    registerUiMessageHandlers(router, {
+      ensureLocaleReady: vi.fn(async () => undefined),
+      findSavedConversationForPage,
+    });
     const link = buildSyncnosLink({ source: 'chatgpt', conversationKey: 'conversation-a', messageKey: 'msg-b' });
     const sender = { url: link, tab: { id: 8, url: link } };
     vi.mocked(openOrFocusExtensionAppTab).mockResolvedValue({ id: 19 } as any);
@@ -96,7 +101,7 @@ describe('UI background handler locale readiness', () => {
     vi.mocked(tabsQuery).mockResolvedValue([{ id: 7, url: 'https://example.com/' }] as any);
     vi.mocked(tabsSendMessage).mockResolvedValue({ ok: true, data: { kind: 'chat' }, error: null } as any);
 
-    registerUiMessageHandlers(router, { ensureLocaleReady });
+    registerUiMessageHandlers(router, { ensureLocaleReady, findSavedConversationForPage });
 
     expect([...handlers.keys()].sort()).toEqual(Object.values(UI_MESSAGE_TYPES).sort());
 
@@ -120,7 +125,7 @@ describe('UI background handler locale readiness', () => {
       .mockResolvedValueOnce({ ok: true, data: { kind: 'chat' }, error: null } as any);
     vi.mocked(scriptingExecuteScript).mockResolvedValue([]);
 
-    registerUiMessageHandlers(router, { ensureLocaleReady });
+    registerUiMessageHandlers(router, { ensureLocaleReady, findSavedConversationForPage });
 
     await expect(handlers.get(UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE)?.()).resolves.toEqual({
       ok: true,
@@ -169,7 +174,7 @@ describe('UI background handler locale readiness', () => {
       .mockResolvedValueOnce({ ok: true });
     vi.mocked(scriptingExecuteScript).mockResolvedValue([]);
 
-    registerUiMessageHandlers(router, { ensureLocaleReady });
+    registerUiMessageHandlers(router, { ensureLocaleReady, findSavedConversationForPage });
 
     await expect(
       handlers.get(UI_MESSAGE_TYPES.OPEN_CURRENT_TAB_INPAGE_COMMENTS_PANEL)?.({ tabId: 9 }, null),
@@ -187,7 +192,7 @@ describe('UI background handler locale readiness', () => {
     vi.mocked(tabsQuery).mockResolvedValue([{ id: 7, url: 'https://example.com/' }] as any);
     vi.mocked(tabsSendMessage).mockRejectedValue(new Error('message port closed unexpectedly'));
 
-    registerUiMessageHandlers(router, { ensureLocaleReady });
+    registerUiMessageHandlers(router, { ensureLocaleReady, findSavedConversationForPage });
 
     await expect(handlers.get(UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE)?.()).resolves.toMatchObject({
       ok: false,
@@ -207,7 +212,7 @@ describe('UI background handler locale readiness', () => {
       error: { message: 'content capture failed', extra: null },
     } as any);
 
-    registerUiMessageHandlers(router, { ensureLocaleReady });
+    registerUiMessageHandlers(router, { ensureLocaleReady, findSavedConversationForPage });
 
     await expect(handlers.get(UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE)?.()).resolves.toEqual({
       ok: false,
@@ -223,7 +228,7 @@ describe('UI background handler locale readiness', () => {
     const { router, handlers } = createRouter();
     vi.mocked(tabsQuery).mockResolvedValue([] as any);
 
-    registerUiMessageHandlers(router, { ensureLocaleReady });
+    registerUiMessageHandlers(router, { ensureLocaleReady, findSavedConversationForPage });
     const responsePromise = handlers.get(UI_MESSAGE_TYPES.GET_ACTIVE_TAB_CAPTURE_STATE)?.();
     let settled = false;
     void responsePromise?.then(() => {
@@ -251,7 +256,7 @@ describe('UI background handler locale readiness', () => {
     const { router, handlers } = createRouter();
     vi.mocked(tabsQuery).mockResolvedValue([{ id: 7, url: 'chrome://extensions/' }] as any);
 
-    registerUiMessageHandlers(router, { ensureLocaleReady });
+    registerUiMessageHandlers(router, { ensureLocaleReady, findSavedConversationForPage });
 
     await expect(handlers.get(UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE)?.()).resolves.toMatchObject({
       ok: false,
@@ -270,7 +275,7 @@ describe('UI background handler locale readiness', () => {
     globalThis.chrome = { action: { openPopup } };
     vi.mocked(tabsSendMessage).mockResolvedValue(null as any);
 
-    registerUiMessageHandlers(router, { ensureLocaleReady });
+    registerUiMessageHandlers(router, { ensureLocaleReady, findSavedConversationForPage });
 
     await expect(handlers.get(UI_MESSAGE_TYPES.OPEN_EXTENSION_POPUP)?.()).resolves.toEqual({
       ok: true,

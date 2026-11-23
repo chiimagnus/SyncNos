@@ -361,6 +361,8 @@ export const zh: { [K in TranslationKey]: string } = {
   fetchArticle: '抓取文章',
   fetchAiChat: '抓取 AI 对话',
   fetchVideoTranscript: '保存视频',
+  openSavedCurrentPage: '已抓取 · 查看',
+  savedCurrentPageHint: '本地已有记录，可能不是最新或完整内容。点击查看。',
   captureFailedFallback: '获取失败',
   chatgptApiCaptureTemporarilyUnavailable: 'ChatGPT 高级采集暂时不可用，请稍后重试。',
   chatgptApiCaptureRateLimited: 'ChatGPT 请求过于频繁，请稍后重试。',

@@ -308,6 +308,69 @@ describe('PopupShell header actions', () => {
     expect(document.querySelector('[aria-label="More actions coming soon"]')).toBeFalsy();
   });
 
+  it('shows a saved-item shortcut without replacing capture, and opens the persisted item locator', async () => {
+    const capture = vi.fn();
+    popupCaptureHookMock.mockReturnValue({
+      buttonDisabled: false,
+      buttonLabel: 'Fetch AI Chat',
+      capture,
+      captureState: {
+        kind: 'chat',
+        label: 'Fetch AI Chat',
+        collectorId: 'chatgpt',
+        savedConversation: { id: 92, source: 'chatgpt', conversationKey: 'migrated-stored-key' },
+      },
+      checking: false,
+      status: null,
+    });
+    openOrFocusExtensionAppTabMock.mockResolvedValue({ id: 9 });
+    (window as any).close = vi.fn();
+    await renderPopupShell(root!);
+
+    const saved = document.querySelector('[aria-label="Saved · Open"]') as HTMLButtonElement | null;
+    expect(saved).toBeTruthy();
+    expect(saved?.getAttribute('data-tooltip-content')).toContain('incomplete');
+    expect(document.querySelector('[aria-label="Fetch AI Chat"]')).toBeTruthy();
+    await act(async () => {
+      saved!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    const { buildConversationRouteFromLoc, encodeConversationLoc } =
+      await import('../../src/services/shared/conversation-loc');
+    expect(openOrFocusExtensionAppTabMock).toHaveBeenCalledWith({
+      route: buildConversationRouteFromLoc(
+        encodeConversationLoc({ source: 'chatgpt', conversationKey: 'migrated-stored-key' }),
+      ),
+    });
+    expect((window as any).close).toHaveBeenCalledTimes(1);
+    expect(capture).not.toHaveBeenCalled();
+  });
+
+  it('offers the saved item even when current-page capture is temporarily unavailable', async () => {
+    popupCaptureHookMock.mockReturnValue({
+      buttonDisabled: true,
+      buttonLabel: 'Unavailable',
+      capture: vi.fn(),
+      captureState: {
+        kind: 'unsupported',
+        label: 'Unavailable',
+        collectorId: 'web',
+        savedConversation: { id: 12, source: 'web', conversationKey: 'article:https://example.com/a' },
+      },
+      checking: false,
+      status: null,
+    });
+    await renderPopupShell(root!);
+    expect((document.querySelector('[aria-label="Unavailable"]') as HTMLButtonElement).disabled).toBe(true);
+    expect(document.querySelector('[aria-label="Saved · Open"]')).toBeTruthy();
+  });
+
+  it('does not show a saved-item shortcut on pages without a persisted match', async () => {
+    await renderPopupShell(root!);
+    expect(document.querySelector('[aria-label="Saved · Open"]')).toBeFalsy();
+  });
+
   it('keeps capture controls independent of retired in-app shortcut bindings', async () => {
     storageGetMock.mockResolvedValue({
       in_app_shortcuts_v3: {

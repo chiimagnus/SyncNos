@@ -365,6 +365,8 @@ export const en = {
   fetchArticle: 'Fetch Article',
   fetchAiChat: 'Fetch AI Chat',
   fetchVideoTranscript: 'Save Video',
+  openSavedCurrentPage: 'Saved · Open',
+  savedCurrentPageHint: 'A local record exists. It may be outdated or incomplete. Open saved item.',
   captureFailedFallback: 'Capture failed',
   chatgptApiCaptureTemporarilyUnavailable: 'ChatGPT Advanced capture is temporarily unavailable. Please try again shortly.',
   chatgptApiCaptureRateLimited: 'ChatGPT is receiving too many requests. Please try again later.',

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { UI_MESSAGE_TYPES } from '@services/protocols/message-contracts';
 import { send } from '@services/shared/runtime';
 import { t } from '@i18n';
+import { subscribeDataRevisionChanges } from '@services/data-revisions/observer';
 import type { CurrentPageCaptureState } from '@services/bootstrap/current-page-capture';
 
 type ApiResponse<T> = {
@@ -101,6 +102,14 @@ export function usePopupCurrentPageCapture(input: { onCaptured?: () => void | Pr
   useEffect(() => {
     void refreshState();
   }, [refreshState]);
+
+  useEffect(
+    () =>
+      subscribeDataRevisionChanges((scopes) => {
+        if (scopes.includes('conversations')) void refreshState({ silent: true });
+      }),
+    [refreshState],
+  );
 
   useEffect(() => {
     const onFocus = () => {

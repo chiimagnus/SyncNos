@@ -17,6 +17,10 @@ type AnyRouter = {
 
 type UiMessageHandlersOptions = {
   ensureLocaleReady: () => Promise<unknown>;
+  findSavedConversationForPage: (
+    source: string,
+    pageUrl: string,
+  ) => Promise<{ id: number; source: string; conversationKey: string } | null>;
 };
 
 export function registerUiMessageHandlers(router: AnyRouter, options: UiMessageHandlersOptions) {
@@ -113,7 +117,23 @@ export function registerUiMessageHandlers(router: AnyRouter, options: UiMessageH
       return router.err(t('currentPageCannotBeCaptured'), { code: relayed.code });
     }
 
-    return router.ok(relayed.data);
+    const state = relayed.data;
+    if (!state || typeof state !== 'object') return router.ok(state);
+    const { pageUrl, ...visibleState } = state as Record<string, any>;
+    if (!pageUrl || !visibleState.collectorId) return router.ok(visibleState);
+    const saved = await options.findSavedConversationForPage(visibleState.collectorId, pageUrl);
+    return router.ok(
+      saved
+        ? {
+            ...visibleState,
+            savedConversation: {
+              id: saved.id,
+              source: saved.source,
+              conversationKey: saved.conversationKey,
+            },
+          }
+        : visibleState,
+    );
   });
 
   router.register(UI_MESSAGE_TYPES.CAPTURE_ACTIVE_TAB_CURRENT_PAGE, async (msg: any) => {

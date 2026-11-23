@@ -146,19 +146,23 @@ function PopupShellFrame() {
     status,
   });
 
-  const onOpenSelectedConversationComments = useCallback(() => {
-    void (async () => {
-      const convo: any = selectedConversation;
-      const source = String(convo?.source || '').trim();
-      const conversationKey = String(convo?.conversationKey || '').trim();
-      if (!source || !conversationKey) return;
+  const openSavedConversation = useCallback(async (source: string, conversationKey: string) => {
+    if (!source || !conversationKey) return;
+    const route = buildConversationRouteFromLoc(encodeConversationLoc({ source, conversationKey }));
+    const opened = await openOrFocusExtensionAppTab({ route });
+    if (opened) window.close();
+  }, []);
 
-      const loc = encodeConversationLoc({ source, conversationKey });
-      const route = buildConversationRouteFromLoc(loc);
-      const opened = await openOrFocusExtensionAppTab({ route });
-      if (opened) window.close();
-    })();
-  }, [selectedConversation]);
+  const onOpenSelectedConversationComments = useCallback(() => {
+    const convo: any = selectedConversation;
+    void openSavedConversation(String(convo?.source || '').trim(), String(convo?.conversationKey || '').trim());
+  }, [openSavedConversation, selectedConversation]);
+
+  const savedCurrentPage = captureState?.savedConversation;
+  const onOpenSavedCurrentPage = useCallback(() => {
+    if (!savedCurrentPage) return;
+    void openSavedConversation(savedCurrentPage.source, savedCurrentPage.conversationKey);
+  }, [openSavedConversation, savedCurrentPage]);
 
   const onOpenSettings = useCallback(async () => {
     await openOrFocusExtensionAppTab({ route: '/settings' });
@@ -240,20 +244,33 @@ function PopupShellFrame() {
               listShell={{
                 rightSlot: (
                   <>
-                    <span
-                      className="tw-inline-flex"
-                      {...tooltipAttrsWithShortcut(buttonDisabled ? status?.message || buttonLabel : buttonLabel, '')}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => capture().catch(() => {})}
-                        disabled={buttonDisabled}
-                        className={[buttonTintClassName(), 'tw-max-w-[168px]'].join(' ')}
-                        aria-label={buttonLabel}
+                    <div className="tw-flex tw-max-w-[168px] tw-min-w-0 tw-flex-col tw-items-end tw-gap-0.5">
+                      <span
+                        className="tw-inline-flex tw-max-w-full"
+                        {...tooltipAttrsWithShortcut(buttonDisabled ? status?.message || buttonLabel : buttonLabel, '')}
                       >
-                        <span className="tw-truncate">{buttonLabel}</span>
-                      </button>
-                    </span>
+                        <button
+                          type="button"
+                          onClick={() => capture().catch(() => {})}
+                          disabled={buttonDisabled}
+                          className={[buttonTintClassName(), 'tw-max-w-full'].join(' ')}
+                          aria-label={buttonLabel}
+                        >
+                          <span className="tw-truncate">{buttonLabel}</span>
+                        </button>
+                      </span>
+                      {savedCurrentPage && !checking ? (
+                        <button
+                          type="button"
+                          onClick={onOpenSavedCurrentPage}
+                          className="tw-max-w-full tw-truncate tw-rounded-[var(--radius-inline)] tw-border-0 tw-bg-transparent tw-px-1 tw-py-0 tw-text-[11px] tw-font-semibold tw-text-[var(--accent)] hover:tw-underline focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+                          aria-label={t('openSavedCurrentPage')}
+                          {...tooltipAttrsWithShortcut(t('savedCurrentPageHint'), '')}
+                        >
+                          {t('openSavedCurrentPage')}
+                        </button>
+                      ) : null}
+                    </div>
 
                     <span className="tw-inline-flex" {...tooltipAttrsWithShortcut(commentsButton.tooltip, '')}>
                       <button
