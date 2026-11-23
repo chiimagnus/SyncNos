@@ -165,7 +165,7 @@ describe('image preview UI', () => {
       node.textContent?.includes('Review batch'),
     )!;
     act(() => review.click());
-    expect(document.body.textContent).toContain('processes one image at a time');
+    expect(document.body.textContent).toContain('one by one');
     const confirm = Array.from(document.querySelectorAll('button')).find((node) =>
       node.textContent?.includes('Confirm batch optimization'),
     )!;

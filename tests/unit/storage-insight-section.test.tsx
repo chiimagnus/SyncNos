@@ -166,7 +166,7 @@ describe('InsightSection storage overview', () => {
       ),
     );
     expect(document.body.textContent).toContain('Potential duplicate bytes');
-    expect(document.body.textContent).toContain('1 KiB');
+    expect(document.body.textContent).toContain('1 KB');
     expect(document.body.textContent).toContain('#1');
     const find = Array.from(document.querySelectorAll('button')).find(
       (button) => button.textContent === 'Find duplicate images',
@@ -233,9 +233,17 @@ describe('InsightSection storage overview', () => {
         }),
       );
     });
-    expect(document.body.textContent).toContain('1 KiB');
+    expect(document.body.textContent).toContain('1 KB');
     expect(document.body.textContent).toContain('GIF');
     expect(document.body.textContent).toContain('#3');
+    const sections = Array.from(document.querySelectorAll('details'));
+    expect(sections).toHaveLength(3);
+    expect(sections.every((section) => !section.open)).toBe(true);
+    expect(sections.map((section) => section.querySelector('summary')?.textContent?.trim())).toEqual([
+      'Image resource details',
+      'Duplicate image report',
+      'Image compression preview',
+    ]);
   });
 
   it('shows content diagnostics and opens the owning saved conversation from its ranking', () => {

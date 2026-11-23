@@ -18,7 +18,8 @@ directly.
 
 The **Local storage** section shows the number of image cache records and browser-estimated origin
 usage and quota. Storage totals cover all local data, independent of the clip date filter.
-These estimates are not exact disk usage. Unsupported browser estimates are shown as unavailable;
+Sizes use decimal KB, MB, and GB (1 KB = 1,000 bytes).
+These estimates are not exact disk usage. Unsupported browser estimates are shown as —;
 a cache record does not necessarily mean its image data is readable.
 
 Use **Scan resources** to inspect actual image Blob bytes, formats, animation status, and records

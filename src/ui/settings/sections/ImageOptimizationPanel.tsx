@@ -6,7 +6,38 @@ import {
   type PreparedImageOptimization,
 } from '@viewmodels/settings/useStorageImageOptimization';
 import { buttonClassName } from '@ui/settings/ui';
+import { formatStorageSize } from '@ui/settings/format-storage-size';
 import { useStorageImageBatch } from '@viewmodels/settings/useStorageImageBatch';
+
+const batchLabels = {
+  saved: 'storageImageBatchSucceeded',
+  'no-savings': 'storageImageBatchNoSavings',
+  skipped: 'storageImageBatchSkipped',
+  conflict: 'storageImageBatchConflicts',
+  failed: 'storageImageBatchFailed',
+} as const;
+
+const issueLabels = {
+  'no-savings': 'storageImageIssueNoSavings',
+  'unsupported-format': 'storageImageIssueUnsupported',
+  'metadata-unsafe': 'storageImageIssueMetadata',
+  'mime-mismatch': 'storageImageIssueUnsupported',
+  'invalid-source': 'storageImageIssueUnsupported',
+  'invalid-image': 'storageImageIssueUnsupported',
+  'pixels-changed': 'storageImageIssuePixels',
+  'codec-unavailable': 'storageImageIssueBrowser',
+  'decode-failed': 'storageImageIssueBrowser',
+  'too-large': 'storageImageIssueTooLarge',
+  image_optimization_conflict: 'storageImageIssueChanged',
+  storage_insight_stale: 'storageImageIssueChanged',
+  QuotaExceededError: 'storageImageIssueStorageFull',
+  image_optimization_readback_failed: 'storageImageIssueVerify',
+} as const;
+
+function imageIssue(reason: string): string {
+  const key = issueLabels[reason as keyof typeof issueLabels];
+  return key ? t(key) : t('storageImageIssueGeneric');
+}
 
 function PreviewImages({ prepared }: { prepared: PreparedImageOptimization }) {
   const [src, setSrc] = useState<{ original: string; optimized: string } | null>(null);
@@ -50,7 +81,7 @@ export function ImageOptimizationPanel({ assets, scanValid }: { assets: StorageA
   const [acceptLossy, setAcceptLossy] = useState(false);
   const batch = useStorageImageBatch();
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
-  const [showCount, setShowCount] = useState(24);
+  const [showCount, setShowCount] = useState(8);
   const [showResultCount, setShowResultCount] = useState(30);
   const [confirmBatch, setConfirmBatch] = useState(false);
   const batchBusy = batch.status === 'running' || batch.status === 'cancelling';
@@ -70,7 +101,7 @@ export function ImageOptimizationPanel({ assets, scanValid }: { assets: StorageA
   const selectedAssets = eligible.filter((asset) => selected.has(asset.id));
   useEffect(() => {
     setSelected(new Set());
-    setShowCount(24);
+    setShowCount(8);
     setShowResultCount(30);
     setConfirmBatch(false);
   }, [assets]);
@@ -92,7 +123,6 @@ export function ImageOptimizationPanel({ assets, scanValid }: { assets: StorageA
       className="tw-mt-4 tw-border-t tw-border-[var(--border)] tw-pt-3"
       aria-label={t('storageImageOptimizeTitle')}
     >
-      <h3 className="tw-m-0 tw-text-sm tw-font-extrabold">{t('storageImageOptimizeTitle')}</h3>
       <p className="tw-mt-1 tw-text-xs tw-text-[var(--text-secondary)]">{t('storageImageOptimizeDescription')}</p>
       <div className="tw-mt-3 tw-flex tw-flex-wrap tw-items-center tw-gap-2">
         <button
@@ -131,8 +161,13 @@ export function ImageOptimizationPanel({ assets, scanValid }: { assets: StorageA
                 disabled={!scanValid || batchBusy}
                 onChange={() => toggleSelection(asset.id)}
               />
-              <span className="tw-min-w-0 tw-truncate tw-text-xs">
-                #{asset.id} · {asset.format.toUpperCase()} · {asset.bytes.toLocaleString()} B
+              <span className="tw-min-w-0 tw-text-xs" title={asset.url}>
+                <span className="tw-block tw-truncate tw-font-semibold">
+                  {asset.title || asset.url || `#${asset.id}`}
+                </span>
+                <span className="tw-block tw-text-[var(--text-secondary)]">
+                  #{asset.id} · {asset.format.toUpperCase()} · {formatStorageSize(asset.bytes)}
+                </span>
               </span>
             </label>
             <span className="tw-flex tw-flex-wrap tw-gap-2">
@@ -163,7 +198,7 @@ export function ImageOptimizationPanel({ assets, scanValid }: { assets: StorageA
         ))}
       </ul>
       {showCount < eligible.length ? (
-        <button type="button" className={buttonClassName} onClick={() => setShowCount((count) => count + 24)}>
+        <button type="button" className={buttonClassName} onClick={() => setShowCount((count) => count + 16)}>
           {t('storageImageShowMore')}
         </button>
       ) : null}
@@ -218,7 +253,7 @@ export function ImageOptimizationPanel({ assets, scanValid }: { assets: StorageA
         <div className="tw-mt-3 tw-border-t tw-border-[var(--border)] tw-pt-3">
           <p className="tw-m-0 tw-text-xs tw-font-semibold" role="status">
             {t('storageImageBatchProcessed')}: {batch.result.processed} / {batch.result.total} ·{' '}
-            {t('storageImageBatchActualSavings')}: {batch.result.bytesSaved.toLocaleString()} B
+            {t('storageImageBatchActualSavings')}: {formatStorageSize(batch.result.bytesSaved)}
           </p>
           <p className="tw-mt-1 tw-text-xs tw-text-[var(--text-secondary)]">
             {t('storageImageBatchSucceeded')}: {batch.result.savedCount} · {t('storageImageBatchNoSavings')}:{' '}
@@ -226,21 +261,32 @@ export function ImageOptimizationPanel({ assets, scanValid }: { assets: StorageA
             {t('storageImageBatchConflicts')}: {batch.result.conflictCount} · {t('storageImageBatchFailed')}:{' '}
             {batch.result.failedCount}
           </p>
-          <ol className="tw-mt-2 tw-grid tw-gap-1 tw-text-xs">
-            {batch.result.entries.slice(0, showResultCount).map((entry) => (
-              <li key={entry.id} className="tw-flex tw-justify-between tw-gap-2">
-                <span>
-                  #{entry.id} · {entry.status}
-                  {entry.reason ? ` (${entry.reason})` : ''}
-                </span>
-                <span>{entry.bytesSaved.toLocaleString()} B</span>
-              </li>
-            ))}
-          </ol>
-          {showResultCount < batch.result.entries.length ? (
-            <button type="button" className={buttonClassName} onClick={() => setShowResultCount((value) => value + 30)}>
-              {t('storageImageShowMore')}
-            </button>
+          {batch.result.entries.length > 0 ? (
+            <details className="tw-mt-3">
+              <summary className="tw-cursor-pointer tw-text-xs tw-font-semibold">
+                {t('storageImageBatchDetails')} ({batch.result.entries.length})
+              </summary>
+              <ol className="tw-mt-2 tw-grid tw-gap-2 tw-text-xs">
+                {batch.result.entries.slice(0, showResultCount).map((entry) => (
+                  <li key={entry.id} className="tw-flex tw-justify-between tw-gap-2">
+                    <span title={entry.reason}>
+                      #{entry.id} · {t(batchLabels[entry.status])}
+                      {entry.reason ? ` · ${imageIssue(entry.reason)}` : ''}
+                    </span>
+                    <span>{formatStorageSize(entry.bytesSaved)}</span>
+                  </li>
+                ))}
+              </ol>
+              {showResultCount < batch.result.entries.length ? (
+                <button
+                  type="button"
+                  className={buttonClassName}
+                  onClick={() => setShowResultCount((value) => value + 30)}
+                >
+                  {t('storageImageShowMore')}
+                </button>
+              ) : null}
+            </details>
           ) : null}
           {batch.status === 'completed' || batch.status === 'cancelled' ? (
             <p className="tw-mt-2 tw-text-xs tw-text-[var(--text-secondary)]">{t('storageImageRescanNeeded')}</p>
@@ -249,7 +295,7 @@ export function ImageOptimizationPanel({ assets, scanValid }: { assets: StorageA
       ) : null}
       {batch.status === 'error' ? (
         <p role="alert" className="tw-mt-2 tw-text-xs tw-text-[var(--error)]">
-          {batch.error}
+          {imageIssue(batch.error)}
         </p>
       ) : null}
       {previewStatus === 'loading' ? (
@@ -259,17 +305,17 @@ export function ImageOptimizationPanel({ assets, scanValid }: { assets: StorageA
       ) : null}
       {previewStatus === 'unavailable' || previewStatus === 'error' ? (
         <p className="tw-mt-3 tw-text-xs tw-text-[var(--error)]" role="status">
-          {t('storageImagePreviewUnavailable')} ({previewError})
+          {imageIssue(previewError)}
         </p>
       ) : null}
       {saveStatus === 'saved' ? (
         <p className="tw-mt-3 tw-text-xs" role="status">
-          {t('storageImageSaved')}: {savedBytes.toLocaleString()} B · {t('storageImageRescanNeeded')}
+          {t('storageImageSaved')}: {formatStorageSize(savedBytes)} · {t('storageImageRescanNeeded')}
         </p>
       ) : null}
       {saveStatus === 'error' ? (
         <p className="tw-mt-3 tw-text-xs tw-text-[var(--error)]" role="alert">
-          {t('storageImageSaveFailed')} ({saveError}). {t('storageImageRescanNeeded')}
+          {t('storageImageSaveFailed')}: {imageIssue(saveError)} · {t('storageImageRescanNeeded')}
         </p>
       ) : null}
       {preview ? (
@@ -288,8 +334,8 @@ export function ImageOptimizationPanel({ assets, scanValid }: { assets: StorageA
             </button>
           </div>
           <p className="tw-mt-2 tw-text-xs">
-            {preview.result.originalBytes.toLocaleString()} B → {preview.result.optimizedBytes.toLocaleString()} B ·{' '}
-            {t('storageImageSavings')}: {preview.result.savedBytes.toLocaleString()} B · {preview.result.width}×
+            {formatStorageSize(preview.result.originalBytes)} → {formatStorageSize(preview.result.optimizedBytes)} ·{' '}
+            {t('storageImageSavings')}: {formatStorageSize(preview.result.savedBytes)} · {preview.result.width}×
             {preview.result.height}
           </p>
           <p className="tw-mt-1 tw-text-xs tw-text-[var(--text-secondary)]">
