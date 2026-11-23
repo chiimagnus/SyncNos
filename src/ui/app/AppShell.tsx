@@ -485,7 +485,7 @@ export default function AppShell() {
                               onClick={openSettings}
                               className={headerButtonClassName()}
                               aria-label={t('openSettingsAria')}
-                              {...tooltipAttrsWithShortcut(t('openSettings'), shortcut('open-settings'))}
+                              {...tooltipAttrsWithShortcut(t('openSettings'), shortcut('open-settings'), 'bottom-end')}
                             >
                               <span className="tw-sr-only">{t('settingsLabel')}</span>
                               <SettingsIcon size={16} strokeWidth={1.6} aria-hidden="true" />
@@ -547,7 +547,11 @@ export default function AppShell() {
                                 onClick={openSettings}
                                 className={headerButtonClassName()}
                                 aria-label={t('openSettingsAria')}
-                                {...tooltipAttrsWithShortcut(t('openSettings'), shortcut('open-settings'))}
+                                {...tooltipAttrsWithShortcut(
+                                  t('openSettings'),
+                                  shortcut('open-settings'),
+                                  'bottom-end',
+                                )}
                               >
                                 <span className="tw-sr-only">{t('settingsLabel')}</span>
                                 <SettingsIcon size={16} strokeWidth={1.6} aria-hidden="true" />
@@ -558,7 +562,11 @@ export default function AppShell() {
                                 onClick={() => setCollapsed(true)}
                                 className={headerButtonClassName()}
                                 aria-label={t('collapseSidebar')}
-                                {...tooltipAttrsWithShortcut(t('collapseSidebar'), shortcut('toggle-sidebar'))}
+                                {...tooltipAttrsWithShortcut(
+                                  t('collapseSidebar'),
+                                  shortcut('toggle-sidebar'),
+                                  'bottom-end',
+                                )}
                               >
                                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                                   <path

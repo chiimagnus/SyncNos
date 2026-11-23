@@ -117,7 +117,7 @@ export function DetailHeaderActionBar({
     return id ? getShortcut?.(id) || '' : '';
   };
   const resolveActionTooltipAttrs = (action: DetailHeaderAction) =>
-    tooltipAttrsWithShortcut(action.label, actionShortcut(action));
+    tooltipAttrsWithShortcut(action.label, actionShortcut(action), 'bottom-end');
 
   const resolveActionIcon = (action: DetailHeaderAction) => {
     if (action.kind === 'copy-text' && (copiedActionId === action.id || shortcutCopiedActionId === action.id)) {
@@ -250,7 +250,7 @@ export function DetailHeaderActionBar({
           trigger={(triggerProps) => (
             <button
               {...triggerProps}
-              {...tooltipAttrs(resolvedMenuTriggerLabel)}
+              {...tooltipAttrs(resolvedMenuTriggerLabel, 'bottom-end')}
               aria-label={resolvedMenuTriggerAriaLabel}
               className={buttonClassName}
             >

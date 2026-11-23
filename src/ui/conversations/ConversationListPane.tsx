@@ -831,7 +831,7 @@ export function ConversationListPane({
             <label
               className="tw-inline-flex tw-items-center tw-justify-center tw-text-[var(--text-secondary)]"
               aria-label={t('selectAll')}
-              {...tooltipAttrs(hasSelection ? loadedSelectionTooltip : '')}
+              {...tooltipAttrs(hasSelection ? loadedSelectionTooltip : '', 'top-start')}
             >
               <input
                 ref={selectAllRef}
@@ -949,7 +949,7 @@ export function ConversationListPane({
                 align="end"
                 panelMinWidth={150}
                 trigger={(triggerProps) => (
-                  <span className="tw-inline-flex" {...tooltipAttrs(hasSelection ? exportTooltip : '')}>
+                  <span className="tw-inline-flex" {...tooltipAttrs(hasSelection ? exportTooltip : '', 'top-end')}>
                     <button {...triggerProps} id="btnExport" className={actionButton}>
                       <span className="tw-leading-none">{t('exportButton')}</span>
                       <span
@@ -1010,7 +1010,7 @@ export function ConversationListPane({
                   align="end"
                   panelMinWidth={170}
                   trigger={(triggerProps) => (
-                    <span className="tw-inline-flex" {...tooltipAttrs(hasSelection ? syncMenuTooltip : '')}>
+                    <span className="tw-inline-flex" {...tooltipAttrs(hasSelection ? syncMenuTooltip : '', 'top-end')}>
                       <button {...triggerProps} id="btnSyncTo" className={actionButton}>
                         <span className="tw-leading-none">{syncMenuButtonLabel}</span>
                         <span

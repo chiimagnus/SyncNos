@@ -179,7 +179,9 @@ describe('AppShell narrow list header actions', () => {
       root!.render(createElement(AppShell));
     });
 
-    expect(document.querySelector('[aria-label="Open Settings"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Open Settings"]')?.getAttribute('data-tooltip-place')).toBe(
+      'bottom-end',
+    );
     const detailButton = Array.from(document.querySelectorAll('button')).find(
       (el) => el.textContent === 'show-detail',
     ) as HTMLButtonElement | undefined;
