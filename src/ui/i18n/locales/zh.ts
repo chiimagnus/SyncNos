@@ -474,6 +474,13 @@ export const zh: { [K in TranslationKey]: string } = {
   aboutYouUserNamePlaceholder: '用于同步评论元信息，例如：ChiiMagnus | 2026-03-23 11:07',
   aboutYouUserNameHint: '仅对新评论和聊天消息生效。',
   aboutYouInsightSectionTitle: '统计',
+  storageInsightHeading: '本地存储',
+  storageInsightEstimateDisclaimer: '浏览器占用与配额为估算值，并非实际磁盘大小。缓存记录可能包含无法读取的图片。存储总量不受剪藏日期筛选影响。',
+  storageInsightCacheRecords: '图片缓存记录',
+  storageInsightOriginUsage: '浏览器存储估算占用',
+  storageInsightQuota: '浏览器存储估算配额',
+  storageInsightUnavailable: '不可用',
+  storageInsightLoading: '正在读取本地存储…',
 
   // DetailHeaderActionBar
   detailHeaderOpenInNotion: '在 Notion 中打开',

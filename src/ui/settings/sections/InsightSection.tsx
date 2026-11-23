@@ -3,6 +3,7 @@ import type { InsightStats, InsightTimeRange } from '@viewmodels/settings/insigh
 import type { InsightLoadStatus } from '@viewmodels/settings/useSettingsSceneController';
 import { hasInsightData } from '@viewmodels/settings/insight-stats';
 import { InsightPanel } from '@ui/settings/sections/InsightPanel';
+import { StorageInsightPanel } from '@ui/settings/sections/StorageInsightPanel';
 import { cardClassName } from '@ui/settings/ui';
 
 function InsightStateCard(props: { title: string; detail?: string; tone?: 'default' | 'error' }) {
@@ -45,38 +46,25 @@ export function InsightSection(props: {
 }) {
   const { status, error, stats, range, onChangeRange } = props;
 
-  if ((status === 'idle' || status === 'loading') && !stats) {
-    return (
-      <div className="tw-grid tw-gap-4">
-        <InsightStateCard title={t('insightLoadingTitle')} />
-      </div>
-    );
-  }
-
-  if (status === 'error' && !stats) {
-    return (
-      <div className="tw-grid tw-gap-4">
-        <InsightStateCard title={t('insightErrorTitle')} detail={error} tone="error" />
-      </div>
-    );
-  }
-
-  if (!stats || !hasInsightData(stats)) {
-    return (
-      <div className="tw-grid tw-gap-4">
-        <InsightStateCard title={t('insightEmptyTitle')} />
-      </div>
-    );
-  }
-
   return (
     <div className="tw-grid tw-gap-4">
-      {status === 'error' && error ? (
-        <div className="tw-text-xs tw-font-semibold tw-text-[var(--error)]" role="alert">
-          {error}
-        </div>
-      ) : null}
-      <InsightPanel stats={stats} range={range} onChangeRange={onChangeRange} />
+      <StorageInsightPanel />
+      {(status === 'idle' || status === 'loading') && !stats ? (
+        <InsightStateCard title={t('insightLoadingTitle')} />
+      ) : status === 'error' && !stats ? (
+        <InsightStateCard title={t('insightErrorTitle')} detail={error} tone="error" />
+      ) : !stats || !hasInsightData(stats) ? (
+        <InsightStateCard title={t('insightEmptyTitle')} />
+      ) : (
+        <>
+          {status === 'error' && error ? (
+            <div className="tw-text-xs tw-font-semibold tw-text-[var(--error)]" role="alert">
+              {error}
+            </div>
+          ) : null}
+          <InsightPanel stats={stats} range={range} onChangeRange={onChangeRange} />
+        </>
+      )}
     </div>
   );
 }

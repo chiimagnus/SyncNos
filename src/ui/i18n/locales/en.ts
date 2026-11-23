@@ -480,6 +480,13 @@ export const en = {
   aboutYouUserNamePlaceholder: 'Used in synced comments meta, e.g. ChiiMagnus | 2026-03-23 11:07',
   aboutYouUserNameHint: 'Applies to new comments and chat messages only.',
   aboutYouInsightSectionTitle: 'Insight',
+  storageInsightHeading: 'Local storage',
+  storageInsightEstimateDisclaimer: 'Browser origin usage and quota are estimates, not exact disk usage. Cache records may include unreadable images. All-time storage is independent of the clip date filter.',
+  storageInsightCacheRecords: 'Image cache records',
+  storageInsightOriginUsage: 'Estimated origin usage',
+  storageInsightQuota: 'Estimated origin quota',
+  storageInsightUnavailable: 'Unavailable',
+  storageInsightLoading: 'Reading local storage…',
 
   // DetailHeaderActionBar
   detailHeaderOpenInNotion: 'Open in Notion',
