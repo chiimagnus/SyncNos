@@ -364,7 +364,7 @@ export const zh: { [K in TranslationKey]: string } = {
   savedCurrentPageLabel: '当前页面已抓取',
   openSavedCurrentPage: '查看',
   retryOpenSavedCurrentPage: '重试',
-  savedCurrentPageHint: '本地已有记录，可能不是最新或完整内容。点击查看。',
+  savedCurrentPageHint: '已抓取 · 点击定位查看',
   captureFailedFallback: '获取失败',
   chatgptApiCaptureTemporarilyUnavailable: 'ChatGPT 高级采集暂时不可用，请稍后重试。',
   chatgptApiCaptureRateLimited: 'ChatGPT 请求过于频繁，请稍后重试。',

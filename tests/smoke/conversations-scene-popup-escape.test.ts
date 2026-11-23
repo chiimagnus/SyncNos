@@ -136,6 +136,27 @@ function flushImmediate(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve));
 }
 
+function savedPageToolbar({
+  onOpenSavedPage,
+  openingSavedPage,
+  savedPageOpenFailed,
+}: {
+  onOpenSavedPage: () => void;
+  openingSavedPage: boolean;
+  savedPageOpenFailed: boolean;
+}) {
+  return createElement(
+    'span',
+    { 'data-toolbar-actions': 'true' },
+    createElement('span', null, 'Capture'),
+    createElement(
+      'button',
+      { type: 'button', 'data-current-page-saved': 'true', onClick: onOpenSavedPage, disabled: openingSavedPage },
+      savedPageOpenFailed ? 'Retry' : 'View',
+    ),
+  );
+}
+
 describe('ConversationsScene popup Escape behavior', () => {
   let root: ReactDOM.Root | null = null;
 
@@ -188,6 +209,12 @@ describe('ConversationsScene popup Escape behavior', () => {
 
     expect(activateLoadedConversation).toHaveBeenCalledWith(11);
     expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
+    expect(document.querySelector('[data-detail-nav-island] button')?.getAttribute('data-tooltip-place')).toBe(
+      'bottom-start',
+    );
+    expect(document.querySelector('[data-detail-header-more-trigger]')?.getAttribute('data-tooltip-place')).toBe(
+      'bottom-end',
+    );
 
     const event = new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
     await act(async () => {
@@ -255,7 +282,7 @@ describe('ConversationsScene popup Escape behavior', () => {
       root!.render(
         createElement(ConversationsScene, {
           listShell: {
-            rightSlot: createElement('span', { 'data-toolbar-actions': 'true' }, 'Capture'),
+            rightSlot: savedPageToolbar,
             savedPage: { source: 'chatgpt', conversationKey: 'persisted-key' },
           },
         }),
@@ -265,10 +292,9 @@ describe('ConversationsScene popup Escape behavior', () => {
 
     const savedRow = document.querySelector('[data-current-page-saved]') as HTMLButtonElement | null;
     expect(savedRow).toBeTruthy();
-    expect(savedRow?.textContent).toContain('Current page saved');
-    expect(savedRow?.textContent).toContain('View');
-    expect(savedRow?.getAttribute('data-tooltip-content')).toContain('local record');
-    expect(savedRow?.previousElementSibling?.querySelector('[data-toolbar-actions]')).toBeTruthy();
+    expect(savedRow?.textContent).toBe('View');
+    expect(savedRow?.closest('[data-toolbar-actions]')).toBeTruthy();
+    expect(document.querySelectorAll('[data-current-page-saved]')).toHaveLength(1);
 
     await act(async () => {
       savedRow!.click();
@@ -296,7 +322,7 @@ describe('ConversationsScene popup Escape behavior', () => {
       root!.render(
         createElement(ConversationsScene, {
           listShell: {
-            rightSlot: createElement('span', null, 'Capture'),
+            rightSlot: savedPageToolbar,
             savedPage: { source: 'web', conversationKey: 'article:https://example.com/a' },
           },
         }),
@@ -333,7 +359,7 @@ describe('ConversationsScene popup Escape behavior', () => {
       root!.render(
         createElement(ConversationsScene, {
           listShell: {
-            rightSlot: null,
+            rightSlot: savedPageToolbar,
             savedPage: { source: 'chatgpt', conversationKey: 'current' },
           },
         }),

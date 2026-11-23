@@ -1,5 +1,4 @@
 import { Suspense, useEffect, useLayoutEffect, useState } from 'react';
-import { CheckCircle2, ChevronRight } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
@@ -14,15 +13,15 @@ import { useConversationsApp } from '@viewmodels/conversations/conversations-con
 import { useInAppShortcuts } from '@viewmodels/shortcuts/useInAppShortcuts';
 import { consumePendingOpenConversation } from '@ui/conversations/pending-open';
 import { CapturedListPaneShell } from '@ui/shared/CapturedListPaneShell';
-import { tooltipAttrs } from '@ui/shared/AppTooltip';
-import { t } from '@i18n';
 import { conversationKinds } from '@services/protocols/conversation-kinds';
 import type { SyncProvider } from '@services/sync/models';
 
 type NarrowRoute = 'list' | 'detail' | 'comments';
 
 type ConversationsSceneListShellConfig = {
-  rightSlot: ReactNode;
+  rightSlot:
+    | ReactNode
+    | ((action: { onOpenSavedPage: () => void; openingSavedPage: boolean; savedPageOpenFailed: boolean }) => ReactNode);
   savedPage?: { source: string; conversationKey: string };
 };
 
@@ -190,34 +189,18 @@ export function ConversationsScene({
     }
   };
 
-  const savedPageNotice = savedPage ? (
-    <button
-      type="button"
-      data-current-page-saved="true"
-      disabled={openingSavedPage}
-      onClick={() => void openSavedPage()}
-      className="tw-group tw-flex tw-min-h-10 tw-w-full tw-items-center tw-gap-2.5 tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-3 tw-py-2 tw-text-left tw-text-xs tw-transition-colors hover:tw-bg-[var(--bg-card)] focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-[-2px] focus-visible:tw-outline-[var(--focus-ring)] disabled:tw-cursor-progress"
-      aria-label={`${t('savedCurrentPageLabel')} · ${savedPageOpenFailed ? t('retryOpenSavedCurrentPage') : t('openSavedCurrentPage')}`}
-      {...tooltipAttrs(t('savedCurrentPageHint'))}
-    >
-      <CheckCircle2 size={15} strokeWidth={1.8} className="tw-shrink-0 tw-text-[var(--success)]" aria-hidden="true" />
-      <span className="tw-min-w-0 tw-flex-1 tw-truncate tw-font-semibold tw-text-[var(--text-primary)]">
-        {t('savedCurrentPageLabel')}
-      </span>
-      <span className="tw-shrink-0 tw-font-semibold tw-text-[var(--text-primary)] group-hover:tw-underline">
-        {savedPageOpenFailed ? t('retryOpenSavedCurrentPage') : t('openSavedCurrentPage')}
-      </span>
-      <ChevronRight
-        size={15}
-        strokeWidth={1.8}
-        className="tw-shrink-0 tw-text-[var(--text-secondary)]"
-        aria-hidden="true"
-      />
-    </button>
-  ) : null;
-
   const list = listShell ? (
-    <CapturedListPaneShell rightSlot={listShell.rightSlot} notice={savedPageNotice}>
+    <CapturedListPaneShell
+      rightSlot={
+        typeof listShell.rightSlot === 'function'
+          ? listShell.rightSlot({
+              onOpenSavedPage: () => void openSavedPage(),
+              openingSavedPage,
+              savedPageOpenFailed,
+            })
+          : listShell.rightSlot
+      }
+    >
       {listPane}
     </CapturedListPaneShell>
   ) : (

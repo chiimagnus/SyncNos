@@ -3,7 +3,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 const WEBCLIPPER_TOOLTIP_ID = 'webclipper-tooltip';
 const LazyAppTooltipImpl = lazy(() => import('./AppTooltipImpl'));
 
-type TooltipPlace = 'top' | 'right' | 'bottom' | 'left';
+type TooltipPlace = 'top' | 'top-start' | 'top-end' | 'right' | 'bottom' | 'bottom-start' | 'bottom-end' | 'left';
 
 type TooltipAnchorAttrs = {
   'data-tooltip-id'?: string;

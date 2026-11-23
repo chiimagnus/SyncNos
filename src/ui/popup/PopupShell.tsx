@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { MessageSquareText, Settings as SettingsIcon } from 'lucide-react';
+import { LocateFixed, MessageSquareText, Settings as SettingsIcon } from 'lucide-react';
 
 import { ensureExtensionAppTab, openOrFocusExtensionAppTab } from '@services/shared/webext';
 import { storageGet, storageSet } from '@services/shared/storage';
@@ -241,24 +241,54 @@ function PopupShellFrame() {
             <ConversationsScene
               listShell={{
                 savedPage: savedCurrentPage ?? undefined,
-                rightSlot: (
+                rightSlot: ({ onOpenSavedPage, openingSavedPage, savedPageOpenFailed }) => (
                   <>
-                    <span
-                      className="tw-inline-flex"
-                      {...tooltipAttrsWithShortcut(buttonDisabled ? status?.message || buttonLabel : buttonLabel, '')}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => capture().catch(() => {})}
-                        disabled={buttonDisabled}
-                        className={[buttonTintClassName(), 'tw-max-w-[168px]'].join(' ')}
-                        aria-label={buttonLabel}
+                    <span className="tw-inline-flex tw-max-w-[168px] tw-min-w-0 tw-items-stretch">
+                      <span
+                        className="tw-inline-flex tw-min-w-0"
+                        {...tooltipAttrsWithShortcut(
+                          buttonDisabled ? status?.message || buttonLabel : buttonLabel,
+                          '',
+                          'bottom-end',
+                        )}
                       >
-                        <span className="tw-truncate">{buttonLabel}</span>
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => capture().catch(() => {})}
+                          disabled={buttonDisabled}
+                          className={[
+                            buttonTintClassName(),
+                            'tw-min-w-0 tw-max-w-full',
+                            savedCurrentPage ? 'tw-rounded-r-none' : '',
+                          ].join(' ')}
+                          aria-label={buttonLabel}
+                        >
+                          <span className="tw-truncate">{buttonLabel}</span>
+                        </button>
+                      </span>
+                      {savedCurrentPage ? (
+                        <span
+                          className="tw-ml-[-1px] tw-inline-flex tw-shrink-0"
+                          {...tooltipAttrsWithShortcut(t('savedCurrentPageHint'), '', 'bottom-end')}
+                        >
+                          <button
+                            type="button"
+                            data-current-page-saved="true"
+                            onClick={onOpenSavedPage}
+                            disabled={openingSavedPage}
+                            className={[buttonTintClassName(), 'tw-w-9 tw-rounded-l-none tw-p-0'].join(' ')}
+                            aria-label={`${t('savedCurrentPageLabel')} · ${savedPageOpenFailed ? t('retryOpenSavedCurrentPage') : t('openSavedCurrentPage')}`}
+                          >
+                            <LocateFixed size={16} strokeWidth={1.8} aria-hidden="true" />
+                          </button>
+                        </span>
+                      ) : null}
                     </span>
 
-                    <span className="tw-inline-flex" {...tooltipAttrsWithShortcut(commentsButton.tooltip, '')}>
+                    <span
+                      className="tw-inline-flex"
+                      {...tooltipAttrsWithShortcut(commentsButton.tooltip, '', 'bottom-end')}
+                    >
                       <button
                         type="button"
                         onClick={() => {
@@ -276,7 +306,7 @@ function PopupShellFrame() {
 
                     <button
                       type="button"
-                      {...tooltipAttrsWithShortcut(t('openSettings'), shortcut('open-settings'))}
+                      {...tooltipAttrsWithShortcut(t('openSettings'), shortcut('open-settings'), 'bottom-end')}
                       onClick={() => onOpenSettings().catch(() => {})}
                       className={headerButtonClassName()}
                       aria-label={t('openSettingsAria')}

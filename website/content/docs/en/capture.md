@@ -13,7 +13,7 @@ SyncNos saves content to the [local library](/docs/en/library/) first.
 - [Web articles](/docs/en/capture-articles/)
 - [Videos](/docs/en/capture-videos/)
 
-When you reopen a previously captured page, the popup shows **Current page saved** below its toolbar. Select **View** to read the item inside the popup and return to the list when done. You can still capture again to refresh the content. This only means a local record exists, not that it is complete or current.
+When you reopen a previously captured page, a **locate icon** appears beside the popup's capture button. Select it to view the saved item in the popup and return to the list when done. The capture button remains available to refresh the content. The icon only means a local record exists, not that it is complete or current.
 
 Image download failures do not affect saved text. Retry from **More → Cache images** in the detail view.
 
