@@ -6,6 +6,7 @@ import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
 import { openConversation as openConversationInApp } from '@ui/conversations/open-conversation';
 import { setPendingOpenConversationId } from '@ui/conversations/pending-open';
 import { useStorageInsight } from '@viewmodels/settings/useStorageInsight';
+import { ImageOptimizationPanel } from '@ui/settings/sections/ImageOptimizationPanel';
 import { buttonClassName, cardClassName, conversationJumpLinkClassName } from '@ui/settings/ui';
 
 function formatBytes(value: number | null): string {
@@ -225,6 +226,7 @@ export function StorageInsightPanel() {
               </li>
             ))}
           </ol>
+          <ImageOptimizationPanel assets={scanData.topImages} scanValid={scanStatus === 'ready'} />
         </div>
       ) : null}
     </section>

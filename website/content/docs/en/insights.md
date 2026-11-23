@@ -32,3 +32,8 @@ Image totals count cache records only once, even when many messages point to the
 You can navigate from the largest-image and per-conversation rankings to the saved conversation.
 The ordinary conversation detail menu counts **local image references**, not verified cached images;
 only the on-demand resource audit verifies local ownership and readable bytes.
+
+After scanning, eligible static PNG/JPEG resources can be previewed in pixel-identical mode,
+or in an explicitly selected high-quality lossy mode for JPEG.
+Compare the original with the proposed result and the measured byte savings.
+Animated and unsupported formats are excluded. The preview does not change saved data.
