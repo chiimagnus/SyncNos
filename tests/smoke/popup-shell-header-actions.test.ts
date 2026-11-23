@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 
 const sendMock = vi.fn();
 const popupCaptureHookMock = vi.hoisted(() => vi.fn());
+const openSavedPageInPopupMock = vi.fn();
 const ensureExtensionAppTabMock = vi.fn();
 const openOrFocusExtensionAppTabMock = vi.fn();
 const publishPopupSyncSelectionHandoffMock = vi.fn();
@@ -99,17 +100,47 @@ vi.mock('../../src/viewmodels/popup/usePopupCurrentPageCapture', () => ({
 
 vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
   ConversationsScene: (props: {
-    listShell?: { rightSlot: ReactNode };
+    listShell?: {
+      rightSlot:
+        | ReactNode
+        | ((args: {
+            onOpenSavedPage: () => void;
+            openingSavedPage: boolean;
+            savedPageOpenFailed: boolean;
+          }) => ReactNode);
+      savedPage?: { source: string; conversationKey: string };
+    };
     onPopupSyncPreparing?: (provider: 'notion' | 'obsidian' | 'feishu' | 'github') => void | Promise<void>;
   }) => {
     const [mode, setMode] = useState<'list' | 'detail' | 'detail-empty' | 'detail-menu'>('list');
     const toList = () => {
       setMode('list');
     };
+    const rightSlot =
+      typeof props.listShell?.rightSlot === 'function'
+        ? props.listShell.rightSlot({
+            onOpenSavedPage: () => {
+              openSavedPageInPopupMock();
+              setMode('detail');
+            },
+            openingSavedPage: false,
+            savedPageOpenFailed: false,
+          })
+        : props.listShell?.rightSlot;
     return createElement(
       'div',
       null,
-      mode === 'list' ? createElement('div', { 'data-list-shell': '1' }, props.listShell?.rightSlot ?? null) : null,
+      mode === 'list'
+        ? createElement(
+            'div',
+            {
+              'data-list-shell': '1',
+              'data-saved-page-source': props.listShell?.savedPage?.source ?? '',
+              'data-saved-page-key': props.listShell?.savedPage?.conversationKey ?? '',
+            },
+            rightSlot ?? null,
+          )
+        : null,
       createElement(
         'button',
         {
@@ -249,6 +280,7 @@ describe('PopupShell header actions', () => {
     setupDom();
     sendMock.mockReset();
     popupCaptureHookMock.mockReset();
+    openSavedPageInPopupMock.mockReset();
     popupCaptureHookMock.mockReturnValue({
       buttonDisabled: false,
       buttonLabel: 'Fetch AI Chat',
@@ -291,6 +323,15 @@ describe('PopupShell header actions', () => {
     const settings = document.querySelector('[aria-label="Open Settings"]');
     expect(settings).toBeTruthy();
     expect(settings?.getAttribute('data-tooltip-content')).toBe('Open Settings\nCtrl + Shift + ,');
+    expect(settings?.getAttribute('data-tooltip-place')).toBe('bottom-end');
+    expect(
+      document.querySelector('[aria-label="Fetch AI Chat"]')?.parentElement?.getAttribute('data-tooltip-place'),
+    ).toBe('bottom-end');
+    expect(
+      document
+        .querySelector('[aria-label="Open in-page comments sidebar"]')
+        ?.parentElement?.getAttribute('data-tooltip-place'),
+    ).toBe('bottom-end');
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeFalsy();
 
     const detailButton = Array.from(document.querySelectorAll('button')).find(
@@ -306,6 +347,76 @@ describe('PopupShell header actions', () => {
     expect(document.querySelector('[aria-label="Open Settings"]')).toBeFalsy();
     expect(document.querySelector('[aria-label="Open in Notion"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="More actions coming soon"]')).toBeFalsy();
+  });
+
+  it('shows a split capture/locate button in the same toolbar row and opens the saved page in the popup', async () => {
+    const capture = vi.fn();
+    popupCaptureHookMock.mockReturnValue({
+      buttonDisabled: false,
+      buttonLabel: 'Fetch AI Chat',
+      capture,
+      captureState: {
+        kind: 'chat',
+        label: 'Fetch AI Chat',
+        collectorId: 'chatgpt',
+        savedConversation: { id: 92, source: 'chatgpt', conversationKey: 'migrated-stored-key' },
+      },
+      checking: false,
+      status: null,
+    });
+    (window as any).close = vi.fn();
+    await renderPopupShell(root!);
+
+    const listShell = document.querySelector('[data-list-shell="1"]') as HTMLElement;
+    expect(listShell.dataset.savedPageSource).toBe('chatgpt');
+    expect(listShell.dataset.savedPageKey).toBe('migrated-stored-key');
+    const captureButton = document.querySelector('[aria-label="Fetch AI Chat"]') as HTMLButtonElement;
+    const locateButton = document.querySelector('[data-current-page-saved]') as HTMLButtonElement;
+    expect(captureButton).toBeTruthy();
+    expect(locateButton).toBeTruthy();
+    expect(locateButton.getAttribute('aria-label')).toBe('Current page saved · View');
+    expect(locateButton.parentElement?.getAttribute('data-tooltip-content')).toBe('Saved · Click to view');
+    expect(locateButton.parentElement?.getAttribute('data-tooltip-place')).toBe('bottom-end');
+    expect(locateButton.parentElement?.parentElement).toBe(captureButton.parentElement?.parentElement);
+    expect(locateButton.getAttribute('aria-haspopup')).toBeNull();
+    expect(document.querySelectorAll('[data-current-page-saved]')).toHaveLength(1);
+    expect(capture).not.toHaveBeenCalled();
+    await act(async () => {
+      locateButton.click();
+      await Promise.resolve();
+    });
+    expect(openSavedPageInPopupMock).toHaveBeenCalledOnce();
+    expect(capture).not.toHaveBeenCalled();
+    expect(openOrFocusExtensionAppTabMock).not.toHaveBeenCalled();
+    expect((window as any).close).not.toHaveBeenCalled();
+  });
+
+  it('offers the saved item even when current-page capture is temporarily unavailable', async () => {
+    popupCaptureHookMock.mockReturnValue({
+      buttonDisabled: true,
+      buttonLabel: 'Unavailable',
+      capture: vi.fn(),
+      captureState: {
+        kind: 'unsupported',
+        label: 'Unavailable',
+        collectorId: 'web',
+        savedConversation: { id: 12, source: 'web', conversationKey: 'article:https://example.com/a' },
+      },
+      checking: false,
+      status: null,
+    });
+    await renderPopupShell(root!);
+    expect((document.querySelector('[aria-label="Unavailable"]') as HTMLButtonElement).disabled).toBe(true);
+    expect(document.querySelector('[data-list-shell]')?.getAttribute('data-saved-page-key')).toBe(
+      'article:https://example.com/a',
+    );
+    expect((document.querySelector('[data-current-page-saved]') as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('does not pass a saved item when no local match exists', async () => {
+    await renderPopupShell(root!);
+    expect(document.querySelector('[data-list-shell]')?.getAttribute('data-saved-page-key')).toBe('');
+    expect(document.querySelector('[data-current-page-saved]')).toBeNull();
   });
 
   it('keeps capture controls independent of retired in-app shortcut bindings', async () => {

@@ -1,4 +1,5 @@
 import { registerConversationHandlers } from '@services/conversations/background/handlers';
+import { findSavedConversationForPage } from '@services/conversations/data/storage';
 import { conversationKinds } from '@services/protocols/conversation-kinds';
 import { registerSyncHandlers } from '@services/sync/background-handlers';
 import { registerWebArticleHandlers } from '../../src/collectors/web/article-fetch-background-handlers';
@@ -55,7 +56,7 @@ export function createTestBackgroundRouter(
     runExclusiveMaintenance: notionSyncOrchestrator.runExclusiveMaintenance,
   });
   registerObsidianSettingsHandlers(router, { getInstanceId: () => instanceId, testObsidianConnection });
-  registerUiMessageHandlers(router, { ensureLocaleReady: async () => undefined });
+  registerUiMessageHandlers(router, { ensureLocaleReady: async () => undefined, findSavedConversationForPage });
   registerSyncHandlers(router, {
     getInstanceId: () => instanceId,
     notionSyncOrchestrator,

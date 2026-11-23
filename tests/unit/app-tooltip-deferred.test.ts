@@ -69,6 +69,9 @@ describe('AppTooltip deferred implementation', () => {
       'data-tooltip-place': 'right',
     });
     expect(tooltipAttrs('')).toEqual({});
+    expect(tooltipAttrs('Open saved item', 'bottom-end')['data-tooltip-place']).toBe('bottom-end');
+    expect(tooltipAttrsWithShortcut('Back', '', 'bottom-start')['data-tooltip-place']).toBe('bottom-start');
+    expect(tooltipAttrs('Source filter', 'top-start')['data-tooltip-place']).toBe('top-start');
     expect(tooltipAttrsWithShortcut('Copy Notion link', 'Alt+Shift+C')).toMatchObject({
       'data-tooltip-id': 'webclipper-tooltip',
       'data-tooltip-content': 'Copy Notion link\nAlt+Shift+C',

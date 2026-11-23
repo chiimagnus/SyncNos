@@ -45,6 +45,8 @@ export type CurrentPageCaptureState = {
   collectorId: string | null;
   reason?: string;
   activity?: CurrentPageCaptureActivity;
+  pageUrl?: string;
+  savedConversation?: { id: number; source: string; conversationKey: string };
 };
 
 type CurrentPageSavedResult = {
@@ -730,6 +732,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
   }
 
   async function getCurrentPageCaptureState(): Promise<CurrentPageCaptureState> {
+    const pageUrl = currentUrl();
     const target = await resolveCaptureTarget();
     const activity = readCaptureActivity();
     return {
@@ -738,6 +741,7 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
       collectorId: target.collectorId,
       reason: target.reason,
       ...(activity ? { activity } : null),
+      ...(pageUrl === currentUrl() ? { pageUrl } : null),
     };
   }
 

@@ -503,7 +503,7 @@ export function ConversationDetailPane({
                   onClick={onExpandSidebar}
                   className={headerIconButtonClass}
                   aria-label={expandSidebarLabel}
-                  {...tooltipAttrsWithShortcut(expandSidebarLabel, shortcut('toggle-sidebar'))}
+                  {...tooltipAttrsWithShortcut(expandSidebarLabel, shortcut('toggle-sidebar'), 'bottom-start')}
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                     <path
@@ -525,7 +525,7 @@ export function ConversationDetailPane({
                   onClick={onBack}
                   className={headerIconButtonClass}
                   aria-label={t('backButton')}
-                  {...tooltipAttrsWithShortcut(t('backButton'), '')}
+                  {...tooltipAttrsWithShortcut(t('backButton'), '', 'bottom-start')}
                 >
                   <ChevronLeft size={14} strokeWidth={2} aria-hidden="true" />
                   <span className="tw-sr-only">{t('backButton')}</span>
@@ -562,7 +562,7 @@ export function ConversationDetailPane({
                   }}
                   className={[headerButtonClassName(), 'tw-order-2'].join(' ')}
                   aria-label={commentsSidebarLabel}
-                  {...tooltipAttrsWithShortcut(commentsSidebarLabel, shortcut('detail-comments'))}
+                  {...tooltipAttrsWithShortcut(commentsSidebarLabel, shortcut('detail-comments'), 'bottom-end')}
                   aria-pressed={commentsSidebarOpen ? 'true' : 'false'}
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -595,7 +595,7 @@ export function ConversationDetailPane({
                       {...triggerProps}
                       data-detail-header-more-trigger="true"
                       aria-label={t('moreButton')}
-                      {...tooltipAttrsWithShortcut(t('moreButton'), '')}
+                      {...tooltipAttrsWithShortcut(t('moreButton'), '', 'bottom-end')}
                       className={headerIconButtonClass}
                     >
                       <MoreHorizontal size={14} strokeWidth={2} aria-hidden="true" />

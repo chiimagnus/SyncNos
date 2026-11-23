@@ -1,5 +1,6 @@
 import { createBackgroundServices } from '@services/bootstrap/background-services.ts';
 import { registerConversationHandlers } from '@services/conversations/background/handlers';
+import { findSavedConversationForPage } from '@services/conversations/data/storage';
 import { registerDataRevisionHandlers } from '@services/data-revisions/background-handlers';
 import { registerSyncHandlers } from '@services/sync/background-handlers';
 import { createBackgroundRouter } from '@platform/messaging/background-router';
@@ -97,7 +98,10 @@ export default defineBackground(() => {
   registerGithubSettingsHandlers(router, {
     runExclusiveMaintenance: services.githubSyncOrchestrator.runExclusiveMaintenance,
   });
-  registerUiMessageHandlers(router, { ensureLocaleReady: ensureBackgroundLocaleReady });
+  registerUiMessageHandlers(router, {
+    ensureLocaleReady: ensureBackgroundLocaleReady,
+    findSavedConversationForPage,
+  });
   registerPublicSettingsHandlers(router);
   registerOpenTargetHandlers(router);
   registerSyncHandlers(router, {

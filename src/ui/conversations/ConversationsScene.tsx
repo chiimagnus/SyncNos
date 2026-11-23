@@ -19,7 +19,10 @@ import type { SyncProvider } from '@services/sync/models';
 type NarrowRoute = 'list' | 'detail' | 'comments';
 
 type ConversationsSceneListShellConfig = {
-  rightSlot: ReactNode;
+  rightSlot:
+    | ReactNode
+    | ((action: { onOpenSavedPage: () => void; openingSavedPage: boolean; savedPageOpenFailed: boolean }) => ReactNode);
+  savedPage?: { source: string; conversationKey: string };
 };
 
 type ConversationsSceneWideChrome = 'card' | 'none';
@@ -69,6 +72,13 @@ export function ConversationsScene({
     setDetailSurfaceActive,
   } = useConversationsApp();
   const [listScrollTop, setListScrollTop] = useState(0);
+  const [openingSavedPage, setOpeningSavedPage] = useState(false);
+  const [savedPageOpenFailed, setSavedPageOpenFailed] = useState(false);
+  const savedPage = listShell?.savedPage;
+
+  useEffect(() => {
+    setSavedPageOpenFailed(false);
+  }, [savedPage?.source, savedPage?.conversationKey]);
   const {
     route: narrowRoute,
     openDetail,
@@ -164,8 +174,35 @@ export function ConversationsScene({
       onOpenSettingsSection={onOpenSettingsSection}
     />
   );
+  const openSavedPage = async () => {
+    if (!savedPage || openingSavedPage) return;
+    setOpeningSavedPage(true);
+    setSavedPageOpenFailed(false);
+    try {
+      const found = await openConversationExternalBySourceKey(savedPage.source, savedPage.conversationKey);
+      if (found) openDetail();
+      else setSavedPageOpenFailed(true);
+    } catch {
+      setSavedPageOpenFailed(true);
+    } finally {
+      setOpeningSavedPage(false);
+    }
+  };
+
   const list = listShell ? (
-    <CapturedListPaneShell rightSlot={listShell.rightSlot}>{listPane}</CapturedListPaneShell>
+    <CapturedListPaneShell
+      rightSlot={
+        typeof listShell.rightSlot === 'function'
+          ? listShell.rightSlot({
+              onOpenSavedPage: () => void openSavedPage(),
+              openingSavedPage,
+              savedPageOpenFailed,
+            })
+          : listShell.rightSlot
+      }
+    >
+      {listPane}
+    </CapturedListPaneShell>
   ) : (
     listPane
   );

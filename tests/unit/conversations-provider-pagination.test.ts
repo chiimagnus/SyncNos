@@ -510,17 +510,67 @@ describe('ConversationsProvider pagination state', () => {
       await flushMicrotasks();
     });
 
+    let opened: boolean | undefined;
     await act(async () => {
-      await latestState.openConversationExternalBySourceKey('chatgpt', 'conv-999');
+      opened = await latestState.openConversationExternalBySourceKey('chatgpt', 'conv-999');
       await flushMicrotasks();
       await flushMicrotasks();
     });
 
+    expect(opened).toBe(true);
     expect(findConversationBySourceAndKey).toHaveBeenCalledWith('chatgpt', 'conv-999');
     expect(Number(latestState.activeId)).toBe(999);
     expect(latestState.selectedConversation).toBeTruthy();
     expect(String(latestState.selectedConversation?.conversationKey || '')).toBe('conv-999');
     expect((latestState.items as any[]).some((item) => Number(item.id) === 999)).toBe(false);
+  });
+
+  it('reports a missing or failed source/key lookup without activating unrelated details', async () => {
+    getConversationListBootstrap.mockResolvedValue(makePage([]));
+    findConversationBySourceAndKey.mockResolvedValueOnce(null).mockRejectedValueOnce(new Error('storage unavailable'));
+    await renderProvider();
+
+    let missing!: boolean;
+    let failed!: boolean;
+    await act(async () => {
+      missing = await latestState.openConversationExternalBySourceKey('chatgpt', 'deleted-record');
+      failed = await latestState.openConversationExternalBySourceKey('chatgpt', 'read-error');
+      await flushMicrotasks();
+    });
+
+    expect(missing).toBe(false);
+    expect(failed).toBe(false);
+    expect(latestState.activeId).toBeNull();
+    expect(latestState.selectedConversation).toBeNull();
+    expect(requestDataRevisionRetry).toHaveBeenCalledWith(['conversations']);
+  });
+
+  it('rejects stale source/key opens when a newer target wins', async () => {
+    getConversationListBootstrap.mockResolvedValue(makePage([]));
+    const firstLookup = deferred<any>();
+    const latest = makeConversation(52, 'chatgpt', 'new-key');
+    findConversationBySourceAndKey.mockReturnValueOnce(firstLookup.promise).mockResolvedValueOnce(latest);
+    await renderProvider();
+
+    let olderOpen!: Promise<boolean>;
+    let newerResult!: boolean;
+    await act(async () => {
+      olderOpen = latestState.openConversationExternalBySourceKey('chatgpt', 'old-key');
+      await flushMicrotasks();
+      newerResult = await latestState.openConversationExternalBySourceKey('chatgpt', 'new-key');
+      await flushMicrotasks();
+    });
+    let olderResult!: boolean;
+    await act(async () => {
+      firstLookup.resolve(makeConversation(51, 'chatgpt', 'old-key'));
+      olderResult = await olderOpen;
+      await flushMicrotasks();
+    });
+
+    expect(olderResult).toBe(false);
+    expect(newerResult).toBe(true);
+    expect(latestState.activeId).toBe(52);
+    expect(latestState.selectedConversation?.conversationKey).toBe('new-key');
   });
 
   it('preserves requested activeId across bootstrap even when target is not in loaded items', async () => {

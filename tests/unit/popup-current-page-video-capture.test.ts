@@ -4,6 +4,13 @@ import * as ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 
 const sendMock = vi.hoisted(() => vi.fn());
+const revisionListeners = vi.hoisted(() => new Set<(scopes: readonly string[]) => void>());
+vi.mock('@services/data-revisions/observer', () => ({
+  subscribeDataRevisionChanges: (listener: (scopes: readonly string[]) => void) => {
+    revisionListeners.add(listener);
+    return () => revisionListeners.delete(listener);
+  },
+}));
 
 vi.mock('@services/shared/runtime', () => ({ send: sendMock }));
 vi.mock('@i18n', () => ({
@@ -47,6 +54,7 @@ async function flushEffects() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  revisionListeners.clear();
   latest = null;
   dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
     url: 'chrome-extension://syncnos/popup.html',
@@ -73,6 +81,49 @@ afterEach(async () => {
 });
 
 describe('popup current-page video capture', () => {
+  it('shows the persisted saved item after a capture and clears it after deletion in another view', async () => {
+    let saved = false;
+    sendMock.mockImplementation(async (type: string) => {
+      if (type === 'getActiveTabCaptureState') {
+        return apiOk({
+          kind: 'article',
+          label: 'Fetch Article',
+          collectorId: 'web',
+          ...(saved
+            ? {
+                savedConversation: {
+                  id: 51,
+                  source: 'web',
+                  conversationKey: 'article:https://example.com/story',
+                },
+              }
+            : null),
+        });
+      }
+      if (type === 'captureActiveTabCurrentPage') {
+        saved = true;
+        return apiOk({ conversationId: 51, isNew: true });
+      }
+      throw new Error(`Unexpected message: ${type}`);
+    });
+    const onCaptured = vi.fn();
+    root = ReactDOM.createRoot(document.getElementById('root')!);
+    await act(async () => root!.render(React.createElement(Probe, { onCaptured })));
+    await flushEffects();
+    expect(latest?.captureState?.savedConversation).toBeUndefined();
+
+    await act(async () => latest!.capture());
+    expect(latest?.captureState?.savedConversation).toMatchObject({ id: 51 });
+    expect(onCaptured).toHaveBeenCalledTimes(1);
+
+    saved = false;
+    await act(async () => {
+      for (const listener of revisionListeners) listener(['conversations']);
+      for (let index = 0; index < 10; index += 1) await Promise.resolve();
+    });
+    expect(latest?.captureState?.savedConversation).toBeUndefined();
+  });
+
   it('shows video state and treats empty subtitles as a saved metadata-only video', async () => {
     const onCaptured = vi.fn();
     let stateCalls = 0;

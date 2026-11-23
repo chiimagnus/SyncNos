@@ -15,6 +15,7 @@ import {
 import { canonicalChatIdentityFromUrl, canonicalChatUrlFromUrl } from '@services/conversations/domain/chat-identity';
 import { normalizeNotionId } from '@services/shared/notion-id';
 import { canonicalizeArticleUrl, normalizeHttpUrl } from '@services/url-cleaning/http-url';
+import { canonicalizeVideoUrl, detectSupportedVideoPagePlatform } from '@services/url-cleaning/video-url';
 import {
   LIST_SITE_KEY_ALL,
   LIST_SOURCE_KEY_ALL,
@@ -395,6 +396,7 @@ async function findCanonicalChatConversationCandidates(
   conversationsStore: IDBObjectStore,
   payload: any,
   identity: string,
+  firstOnly = false,
 ): Promise<any[]> {
   if (payload && Object.prototype.hasOwnProperty.call(payload, 'id')) return [];
   if (safeString(payload?.sourceType).toLowerCase() !== 'chat') return [];
@@ -408,6 +410,22 @@ async function findCanonicalChatConversationCandidates(
     [listSourceKey, -Infinity, -Infinity] as any,
     [listSourceKey, Infinity, Infinity] as any,
   );
+  if (firstOnly) {
+    const match = await new Promise<any | null>((resolve, reject) => {
+      const request = index.openCursor(range, 'prev');
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) return resolve(null);
+        if (canonicalChatIdentityFromUrl(cursor.value?.source, cursor.value?.url) === identity) {
+          return resolve(cursor.value);
+        }
+        cursor.continue();
+      };
+      request.onerror = () => reject(request.error || new Error('conversation cursor failed'));
+    });
+    return match ? [match] : [];
+  }
+
   const rows = (await reqToPromise(index.getAll(range) as any)) as any[];
   const currentKey = safeString(payload?.conversationKey);
 
@@ -2449,6 +2467,36 @@ export async function findConversationBySourceAndKey(
   conversationKey: string,
 ): Promise<ConversationListOpenTarget | null> {
   const row = await getConversationBySourceConversationKey(source, conversationKey);
+  return toConversationListOpenTarget(row);
+}
+
+export async function findSavedConversationForPage(
+  source: string,
+  pageUrl: string,
+): Promise<ConversationListOpenTarget | null> {
+  const normalizedSource = safeString(source).toLowerCase();
+  const article = normalizedSource === WEB_ARTICLE_SOURCE ? buildCanonicalWebArticleIdentity(pageUrl) : null;
+  const videoUrl =
+    normalizedSource === 'video' && detectSupportedVideoPagePlatform(pageUrl) ? canonicalizeVideoUrl(pageUrl) : '';
+  const chatIdentity = !article && !videoUrl ? canonicalChatIdentityFromUrl(normalizedSource, pageUrl) : '';
+  if (!article && !videoUrl && !chatIdentity) return null;
+
+  const db = await openDb();
+  const { t, stores } = tx(db, ['conversations'], 'readonly');
+  let row: any = null;
+  if (article || videoUrl) {
+    const key = article?.conversationKey || `video:${videoUrl}`;
+    row = await reqToPromise(stores.conversations.index('by_source_conversationKey').get([normalizedSource, key]));
+  } else {
+    const candidates = await findCanonicalChatConversationCandidates(
+      stores.conversations,
+      { sourceType: 'chat', source: normalizedSource },
+      chatIdentity,
+      true,
+    );
+    row = candidates[0] || null;
+  }
+  await txDone(t);
   return toConversationListOpenTarget(row);
 }
 

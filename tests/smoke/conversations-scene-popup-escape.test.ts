@@ -136,6 +136,27 @@ function flushImmediate(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve));
 }
 
+function savedPageToolbar({
+  onOpenSavedPage,
+  openingSavedPage,
+  savedPageOpenFailed,
+}: {
+  onOpenSavedPage: () => void;
+  openingSavedPage: boolean;
+  savedPageOpenFailed: boolean;
+}) {
+  return createElement(
+    'span',
+    { 'data-toolbar-actions': 'true' },
+    createElement('span', null, 'Capture'),
+    createElement(
+      'button',
+      { type: 'button', 'data-current-page-saved': 'true', onClick: onOpenSavedPage, disabled: openingSavedPage },
+      savedPageOpenFailed ? 'Retry' : 'View',
+    ),
+  );
+}
+
 describe('ConversationsScene popup Escape behavior', () => {
   let root: ReactDOM.Root | null = null;
 
@@ -188,6 +209,12 @@ describe('ConversationsScene popup Escape behavior', () => {
 
     expect(activateLoadedConversation).toHaveBeenCalledWith(11);
     expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
+    expect(document.querySelector('[data-detail-nav-island] button')?.getAttribute('data-tooltip-place')).toBe(
+      'bottom-start',
+    );
+    expect(document.querySelector('[data-detail-header-more-trigger]')?.getAttribute('data-tooltip-place')).toBe(
+      'bottom-end',
+    );
 
     const event = new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
     await act(async () => {
@@ -247,6 +274,112 @@ describe('ConversationsScene popup Escape behavior', () => {
     });
     expect(routeEscape.defaultPrevented).toBe(true);
     expect(document.querySelector('[data-conversation-id="11"]')).toBeTruthy();
+  });
+
+  it('opens a saved current page inside the same popup, then returns to its list', async () => {
+    openConversationExternalBySourceKey.mockResolvedValue(true);
+    await act(async () => {
+      root!.render(
+        createElement(ConversationsScene, {
+          listShell: {
+            rightSlot: savedPageToolbar,
+            savedPage: { source: 'chatgpt', conversationKey: 'persisted-key' },
+          },
+        }),
+      );
+      await flushImmediate();
+    });
+
+    const savedRow = document.querySelector('[data-current-page-saved]') as HTMLButtonElement | null;
+    expect(savedRow).toBeTruthy();
+    expect(savedRow?.textContent).toBe('View');
+    expect(savedRow?.closest('[data-toolbar-actions]')).toBeTruthy();
+    expect(document.querySelectorAll('[data-current-page-saved]')).toHaveLength(1);
+
+    await act(async () => {
+      savedRow!.click();
+      await import('../../src/ui/conversations/ConversationDetailPane');
+      await flushImmediate();
+    });
+
+    expect(openConversationExternalBySourceKey).toHaveBeenCalledOnce();
+    expect(openConversationExternalBySourceKey).toHaveBeenCalledWith('chatgpt', 'persisted-key');
+    expect(openConversationExternalById).not.toHaveBeenCalled();
+    expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
+    expect(document.querySelector('[data-current-page-saved]')).toBeNull();
+
+    await act(async () => {
+      document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      await flushImmediate();
+    });
+    expect(document.querySelector('[data-current-page-saved]')).toBeTruthy();
+    expect(document.querySelector('[data-toolbar-actions]')).toBeTruthy();
+  });
+
+  it('keeps the list visible when a saved record no longer exists and offers retry', async () => {
+    openConversationExternalBySourceKey.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    await act(async () => {
+      root!.render(
+        createElement(ConversationsScene, {
+          listShell: {
+            rightSlot: savedPageToolbar,
+            savedPage: { source: 'web', conversationKey: 'article:https://example.com/a' },
+          },
+        }),
+      );
+      await flushImmediate();
+    });
+
+    const savedRow = document.querySelector('[data-current-page-saved]') as HTMLButtonElement;
+    await act(async () => {
+      savedRow.click();
+      await flushImmediate();
+    });
+    expect(document.querySelector('[aria-label="Conversation detail"]')).toBeNull();
+    expect(savedRow.textContent).toContain('Retry');
+    expect(savedRow.disabled).toBe(false);
+
+    await act(async () => {
+      savedRow.click();
+      await import('../../src/ui/conversations/ConversationDetailPane');
+      await flushImmediate();
+    });
+    expect(openConversationExternalBySourceKey).toHaveBeenCalledTimes(2);
+    expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
+  });
+
+  it('avoids duplicate saved-page opens while the first lookup is pending', async () => {
+    let resolveOpen!: (value: boolean) => void;
+    openConversationExternalBySourceKey.mockReturnValue(
+      new Promise<boolean>((resolve) => {
+        resolveOpen = resolve;
+      }),
+    );
+    await act(async () => {
+      root!.render(
+        createElement(ConversationsScene, {
+          listShell: {
+            rightSlot: savedPageToolbar,
+            savedPage: { source: 'chatgpt', conversationKey: 'current' },
+          },
+        }),
+      );
+      await flushImmediate();
+    });
+    const savedRow = document.querySelector('[data-current-page-saved]') as HTMLButtonElement;
+    act(() => {
+      savedRow.click();
+    });
+    expect(savedRow.disabled).toBe(true);
+    savedRow.click();
+    expect(openConversationExternalBySourceKey).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveOpen(true);
+      await import('../../src/ui/conversations/ConversationDetailPane');
+      await flushImmediate();
+    });
+    expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
   });
 
   it('consumes pending-open source/key target and opens detail via precise API', async () => {
