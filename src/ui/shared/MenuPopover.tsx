@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { useEffect, useMemo, useRef } from 'react';
 
 import { menuPopoverPanelClassName } from '@ui/shared/button-styles';
@@ -26,6 +26,7 @@ export type MenuPopoverProps = {
   panelMaxHeight?: number;
   panelClassName?: string;
   className?: string;
+  insideRef?: RefObject<HTMLElement | null>;
   trigger: (props: MenuPopoverTriggerProps) => ReactNode;
   children: ReactNode;
 };
@@ -42,6 +43,7 @@ export function MenuPopover(props: MenuPopoverProps) {
     panelMaxHeight,
     panelClassName,
     className,
+    insideRef,
     trigger,
     children,
   } = props;
@@ -57,6 +59,7 @@ export function MenuPopover(props: MenuPopoverProps) {
   useDismissableLayer({
     open,
     containerRef,
+    insideRef,
     onDismiss: () => onOpenChange(false),
   });
 

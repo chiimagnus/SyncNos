@@ -1,13 +1,14 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 
 export type UseDismissableLayerOptions = {
   open: boolean;
-  containerRef: React.RefObject<HTMLElement | null>;
+  containerRef: RefObject<HTMLElement | null>;
+  insideRef?: RefObject<HTMLElement | null>;
   onDismiss: () => void;
 };
 
 export function useDismissableLayer(options: UseDismissableLayerOptions) {
-  const { open, containerRef, onDismiss } = options;
+  const { open, containerRef, insideRef, onDismiss } = options;
   const onDismissRef = useRef(onDismiss);
 
   useEffect(() => {
@@ -24,7 +25,7 @@ export function useDismissableLayer(options: UseDismissableLayerOptions) {
         onDismissRef.current();
         return;
       }
-      if (!container.contains(target)) onDismissRef.current();
+      if (!container.contains(target) && !insideRef?.current?.contains(target)) onDismissRef.current();
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -40,5 +41,5 @@ export function useDismissableLayer(options: UseDismissableLayerOptions) {
       document.removeEventListener('pointerdown', onPointerDown, true);
       document.removeEventListener('keydown', onKeyDown, false);
     };
-  }, [open, containerRef]);
+  }, [open, containerRef, insideRef]);
 }

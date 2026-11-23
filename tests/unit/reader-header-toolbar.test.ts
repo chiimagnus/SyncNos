@@ -1,9 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, createElement } from 'react';
+import { act, createElement, createRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 
 import { DEFAULT_READER_PREFS } from '../../src/services/protocols/reader-prefs';
+
+vi.mock('@floating-ui/dom', () => ({
+  autoUpdate: (_anchor: Element, _floating: Element, update: () => void) => {
+    update();
+    return () => {};
+  },
+  computePosition: vi.fn().mockResolvedValue({ x: 24, y: 40 }),
+  flip: () => ({ name: 'flip' }),
+  offset: () => ({ name: 'offset' }),
+  shift: () => ({ name: 'shift' }),
+  size: () => ({ name: 'size' }),
+}));
 
 const mocks = vi.hoisted(() => ({
   update: vi.fn(),
@@ -98,6 +110,7 @@ vi.mock('../../src/ui/reader/NarrationPanel', () => ({
 }));
 
 import { ReaderHeaderToolbar } from '../../src/ui/reader/ReaderHeaderToolbar';
+import { MenuPopover } from '../../src/ui/shared/MenuPopover';
 
 function setupDom() {
   const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
@@ -124,16 +137,8 @@ function setupDom() {
 }
 
 function cleanupDom() {
-  delete (globalThis as any).window;
-  delete (globalThis as any).document;
-  delete (globalThis as any).navigator;
-  delete (globalThis as any).HTMLElement;
-  delete (globalThis as any).Element;
-  delete (globalThis as any).Node;
-  delete (globalThis as any).PointerEvent;
-  delete (globalThis as any).MouseEvent;
-  delete (globalThis as any).KeyboardEvent;
-  delete (globalThis as any).IS_REACT_ACT_ENVIRONMENT;
+  // React and floating-position promises can finish after an act scope.
+  // The next setup replaces JSDOM globals; don't revoke them under pending React work.
 }
 
 describe('ReaderHeaderToolbar', () => {
@@ -150,15 +155,17 @@ describe('ReaderHeaderToolbar', () => {
     root = ReactDOM.createRoot(document.getElementById('root')!);
   });
 
-  afterEach(() => {
-    act(() => {
-      root?.unmount();
+  afterEach(async () => {
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
     });
+    act(() => root?.unmount());
     root = null;
     cleanupDom();
   });
 
-  it('renders the reader controls as vertical menu items and keeps panel buttons clickable', async () => {
+  it('opens only one side submenu on hover and keeps panel buttons clickable', async () => {
     act(() => {
       root!.render(
         createElement(ReaderHeaderToolbar, {
@@ -187,6 +194,7 @@ describe('ReaderHeaderToolbar', () => {
     expect(toolbar).toBeTruthy();
     expect(toolbar?.getAttribute('role')).toBe('group');
     expect(toolbar?.className).toContain('tw-flex-col');
+    expect(document.querySelector('[data-reader-submenu]')).toBeNull();
     expect(document.querySelector('[data-reader-header-trigger="text"] svg')).toBeTruthy();
     expect(document.querySelector('[data-reader-header-trigger="theme"] svg')).toBeTruthy();
     expect(document.querySelector('[data-reader-header-trigger="narration"] svg')).toBeTruthy();
@@ -195,14 +203,18 @@ describe('ReaderHeaderToolbar', () => {
     );
 
     act(() => {
-      (document.querySelector('[data-reader-header-trigger="text"]') as HTMLButtonElement).click();
+      (document.querySelector('[data-reader-header-trigger="text"]') as HTMLButtonElement).dispatchEvent(
+        new window.MouseEvent('mouseover', { bubbles: true }),
+      );
     });
     const textPanel = document.querySelector(
-      '[role="menu"][aria-label="readerTextLayoutButton"]',
+      '[role="dialog"][aria-label="readerTextLayoutButton"]',
     ) as HTMLElement | null;
     expect(textPanel).toBeTruthy();
     expect(textPanel?.className.includes('menu-panel')).toBe(true);
-    expect(textPanel?.className.includes('tw-p-3')).toBe(false);
+    expect(textPanel?.className.includes('tw-fixed')).toBe(true);
+    expect(textPanel?.parentElement).toBe(document.body);
+    expect(document.querySelectorAll('[data-reader-submenu]')).toHaveLength(1);
     expect(document.querySelector('[data-testid="text-layout-action"]')).toBeTruthy();
     act(() => {
       (document.querySelector('[data-testid="text-layout-action"]') as HTMLButtonElement).click();
@@ -210,7 +222,9 @@ describe('ReaderHeaderToolbar', () => {
     expect(mocks.update).toHaveBeenCalledWith({ fontSize: 24 });
 
     act(() => {
-      (document.querySelector('[data-reader-header-trigger="theme"]') as HTMLButtonElement).click();
+      (document.querySelector('[data-reader-header-trigger="theme"]') as HTMLButtonElement).dispatchEvent(
+        new window.MouseEvent('mouseover', { bubbles: true }),
+      );
     });
     expect(document.querySelector('[data-testid="theme-action"]')).toBeTruthy();
     act(() => {
@@ -220,7 +234,9 @@ describe('ReaderHeaderToolbar', () => {
     expect(mocks.commitPreview).toHaveBeenCalledTimes(1);
 
     act(() => {
-      (document.querySelector('[data-reader-header-trigger="narration"]') as HTMLButtonElement).click();
+      (document.querySelector('[data-reader-header-trigger="narration"]') as HTMLButtonElement).dispatchEvent(
+        new window.MouseEvent('mouseover', { bubbles: true }),
+      );
     });
     expect(document.querySelector('[data-testid="narration-action"]')).toBeTruthy();
     expect(mocks.commitPreview).toHaveBeenCalledTimes(1);
@@ -237,6 +253,128 @@ describe('ReaderHeaderToolbar', () => {
     const playPause = document.querySelector('[data-reader-narration-play-pause="true"]');
     expect(playPause?.getAttribute('data-tooltip-content')).toBe('readerNarrationPlay\n⌥ + ⇧ + R');
     expect(playPause?.getAttribute('data-tooltip-shortcut')).toBe('⌥ + ⇧ + R');
+  });
+
+  it('keeps the parent menu open for portal clicks and dismisses one level at a time', async () => {
+    const insideRef = createRef<HTMLDivElement>();
+    const onMainOpenChange = vi.fn();
+    await act(async () => {
+      root!.render(
+        createElement(
+          MenuPopover,
+          {
+            open: true,
+            onOpenChange: onMainOpenChange,
+            ariaLabel: 'More',
+            insideRef,
+            trigger: (props) => createElement('button', { ...props, 'data-main-menu-trigger': true }, 'More'),
+          },
+          createElement(ReaderHeaderToolbar, {
+            features: { textLayout: true, theme: true, narration: false },
+            prefs: DEFAULT_READER_PREFS,
+            update: mocks.update,
+            preview: mocks.preview,
+            commitPreview: mocks.commitPreview,
+            themeMode: 'system',
+            updateThemeMode: mocks.updateThemeMode,
+            narration: {
+              state: 'idle',
+              isPlaying: false,
+              error: null,
+              webSpeechAvailable: true,
+              pause: vi.fn(),
+              stop: mocks.stop,
+              toggle: mocks.toggle,
+            },
+            submenuRef: insideRef,
+          }),
+        ),
+      );
+      await Promise.resolve();
+    });
+
+    const trigger = document.querySelector('[data-reader-header-trigger="theme"]') as HTMLButtonElement;
+    await act(async () => {
+      trigger.dispatchEvent(
+        new window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }),
+      );
+      await Promise.resolve();
+    });
+    expect(document.querySelector('[data-reader-submenu="theme"]')).toBeTruthy();
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(insideRef.current?.parentElement).toBe(document.body);
+    expect(document.querySelectorAll('[role="menu"]')).toHaveLength(1);
+
+    await act(async () => {
+      (document.querySelector('[data-testid="theme-action"]') as HTMLElement).dispatchEvent(
+        new window.Event('pointerdown', { bubbles: true }),
+      );
+      (document.querySelector('[data-testid="theme-action"]') as HTMLElement).click();
+      await Promise.resolve();
+    });
+    expect(mocks.updateThemeMode).toHaveBeenCalledWith('black');
+    expect(onMainOpenChange).not.toHaveBeenCalled();
+
+    await act(async () => {
+      insideRef.current?.dispatchEvent(
+        new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+      );
+      await Promise.resolve();
+    });
+    expect(insideRef.current).toBeNull();
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(trigger);
+    expect(onMainOpenChange).not.toHaveBeenCalled();
+
+    await act(async () => {
+      document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    });
+    expect(onMainOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('retains hover-open submenu while the pointer moves from its trigger into the floating panel', async () => {
+    await act(async () => {
+      root!.render(
+        createElement(ReaderHeaderToolbar, {
+          features: { textLayout: true, theme: true, narration: false },
+          prefs: DEFAULT_READER_PREFS,
+          update: mocks.update,
+          preview: mocks.preview,
+          commitPreview: mocks.commitPreview,
+          themeMode: 'system',
+          updateThemeMode: mocks.updateThemeMode,
+          narration: {
+            state: 'idle',
+            isPlaying: false,
+            error: null,
+            webSpeechAvailable: true,
+            pause: vi.fn(),
+            stop: mocks.stop,
+            toggle: mocks.toggle,
+          },
+        }),
+      );
+      await Promise.resolve();
+    });
+    const trigger = document.querySelector('[data-reader-header-trigger="theme"]') as HTMLButtonElement;
+    await act(async () => {
+      trigger.dispatchEvent(new window.MouseEvent('mouseover', { bubbles: true }));
+      await Promise.resolve();
+    });
+    const panel = document.querySelector('[data-reader-submenu="theme"]') as HTMLElement;
+    expect(panel).toBeTruthy();
+    await act(async () => {
+      trigger.dispatchEvent(new window.MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }));
+      panel.dispatchEvent(new window.MouseEvent('mouseover', { bubbles: true }));
+      await new Promise<void>((resolve) => setTimeout(resolve, 230));
+    });
+    expect(document.querySelector('[data-reader-submenu="theme"]')).toBeTruthy();
+
+    await act(async () => {
+      panel.dispatchEvent(new window.MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }));
+      await new Promise<void>((resolve) => setTimeout(resolve, 230));
+    });
+    expect(document.querySelector('[data-reader-submenu]')).toBeNull();
   });
 
   it('commits dirty-capable panels on every exit and skips theme-only transitions', () => {
@@ -266,7 +404,9 @@ describe('ReaderHeaderToolbar', () => {
 
     const clickTrigger = (panel: 'text' | 'theme' | 'narration') => {
       act(() => {
-        (document.querySelector(`[data-reader-header-trigger="${panel}"]`) as HTMLButtonElement).click();
+        (document.querySelector(`[data-reader-header-trigger="${panel}"]`) as HTMLButtonElement).dispatchEvent(
+          new window.MouseEvent('mouseover', { bubbles: true }),
+        );
       });
     };
 
@@ -280,7 +420,9 @@ describe('ReaderHeaderToolbar', () => {
     clickTrigger('text');
     expect(mocks.commitPreview).toHaveBeenCalledTimes(2);
 
-    clickTrigger('text');
+    act(() => {
+      (document.querySelector('[data-reader-submenu-back]') as HTMLButtonElement).click();
+    });
     expect(mocks.commitPreview).toHaveBeenCalledTimes(3);
 
     clickTrigger('narration');

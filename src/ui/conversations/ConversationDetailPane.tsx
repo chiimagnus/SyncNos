@@ -114,6 +114,7 @@ export function ConversationDetailPane({
   const [outlineScrollRoot, setOutlineScrollRoot] = useState<Element | null>(null);
   const [optimisticActiveIndex, setOptimisticActiveIndex] = useState<number | null>(null);
   const [readerToolbarPortalTarget, setReaderToolbarPortalTarget] = useState<HTMLDivElement | null>(null);
+  const readerSubmenuRef = useRef<HTMLDivElement | null>(null);
   const outlineEntries = useMemo(
     () => (isChatRenderer && Array.isArray(detail?.messages) ? buildChatOutlineEntries(detail.messages) : []),
     [isChatRenderer, detail?.messages],
@@ -589,6 +590,7 @@ export function ConversationDetailPane({
                   align="end"
                   panelMinWidth={260}
                   panelClassName={moreMenuPanelClassName}
+                  insideRef={readerSubmenuRef}
                   className="tw-order-3"
                   trigger={(triggerProps) => (
                     <button
@@ -710,6 +712,7 @@ export function ConversationDetailPane({
               metadata={detailMetadata}
               readerFeatures={readerFeatures}
               readerToolbarPortalTarget={readerToolbarPortalTarget}
+              readerSubmenuRef={readerSubmenuRef}
               outlineScrollRoot={outlineScrollRoot}
             />
           ) : (
