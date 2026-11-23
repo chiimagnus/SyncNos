@@ -62,7 +62,7 @@ function isAlreadyRunningError(error: unknown): boolean {
 
 export function createAutoSyncSchedulerCore(config: {
   queueStorageKey: string;
-  enabledStorageKey: string;
+  enabledStorageKey?: string;
   alarmName: string;
   debounceMs: number;
   maxItems: number;
@@ -106,12 +106,17 @@ export function createAutoSyncSchedulerCore(config: {
     infra.alarms.create(alarmName, { when: earliestDueAt });
   };
 
+  const isEnabled = async (): Promise<boolean> => {
+    if (!enabledStorageKey) return true;
+    const local: Record<string, unknown> = await infra.storage.get([enabledStorageKey]).catch(() => ({}));
+    return local[enabledStorageKey] === true;
+  };
+
   const enqueue = async (conversationId: number, _reason: string) => {
     const id = normalizeSyncConversationId(conversationId);
     if (id == null) return;
 
-    const local = await infra.storage.get([enabledStorageKey]).catch(() => ({}) as any);
-    const autoSyncEnabled = (local as any)?.[enabledStorageKey] === true;
+    const autoSyncEnabled = await isEnabled();
     if (!autoSyncEnabled) return;
 
     const providerEnabled = await isProviderEnabled().catch(() => false);
@@ -154,8 +159,7 @@ export function createAutoSyncSchedulerCore(config: {
       return;
     }
 
-    const local = await infra.storage.get([enabledStorageKey]).catch(() => ({}) as any);
-    const autoSyncEnabled = (local as any)?.[enabledStorageKey] === true;
+    const autoSyncEnabled = await isEnabled();
     const providerEnabled = await isProviderEnabled().catch(() => false);
 
     const restQueue: QueueMap = { ...queue };

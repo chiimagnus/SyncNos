@@ -681,6 +681,21 @@ describe('image-inline', () => {
     expect(messages[0].contentMarkdown).toBe('![](chatgpt-file://file_1)');
   });
 
+  it('marks temporary offline HTTP images for durable retry while keeping Markdown unchanged', async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new TypeError('offline');
+    });
+    // @ts-expect-error test global
+    globalThis.fetch = fetchMock;
+    const original = '![offline](https://example.com/offline.png)';
+    const messages = [{ messageKey: 'm1', contentMarkdown: original }];
+    const result = await inlineChatImagesInMessages({ conversationId: 76, messages });
+    expect(result.warningFlags).toContain('inline_images_download_failed');
+    expect(result.warningFlags).toContain('inline_images_cache_incomplete');
+    expect(messages[0]?.contentMarkdown).toBe(original);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('does not retry a failed smart HTTP image download through a second plain fetch', async () => {
     const fetchMock = vi.fn(async () => new Response('', { status: 403 }));
     // @ts-expect-error test global
@@ -693,6 +708,7 @@ describe('image-inline', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(result.warningFlags).toContain('inline_images_download_failed');
+    expect(result.warningFlags).not.toContain('inline_images_cache_incomplete');
     expect(messages[0].contentMarkdown).toBe('![](https://example.com/forbidden.png)');
   });
 });

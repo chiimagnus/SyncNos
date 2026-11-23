@@ -16,7 +16,7 @@ import {
   updateConversationUrlById,
   upsertConversation,
 } from '@services/conversations/data/storage';
-import { hasCacheableChatImageReference, inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
+import { hasCacheableChatImageReference } from '@services/conversations/data/image-inline';
 import { backfillConversationImages } from '@services/conversations/background/image-backfill-job';
 import {
   ABOUT_YOU_USER_NAME_STORAGE_KEY,
@@ -371,84 +371,29 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
         // ignore: authorName is optional and will fallback during rendering
       }
     }
-    let imageWarningFlags: string[] = [];
-    let shouldScheduleChatImageBackfill = false;
-    let chatImageMessageKeys: string[] = [];
-    if (sourceType === 'article') {
-      try {
-        const local = await storageGet(['web_article_cache_images_enabled']);
-        const keys =
-          (mode === 'incremental' || mode === 'append') && diff
-            ? new Set(
-                [...(Array.isArray(diff.added) ? diff.added : []), ...(Array.isArray(diff.updated) ? diff.updated : [])]
-                  .map((x) => String(x || '').trim())
-                  .filter(Boolean),
-              )
-            : null;
-        const inlined = await inlineChatImagesInMessages({
-          conversationId,
-          messages,
-          onlyMessageKeys: keys,
-          enableHttpImages: local?.web_article_cache_images_enabled === true,
-        });
-        messages = inlined.messages;
-        imageWarningFlags = Array.isArray(inlined.warningFlags) ? inlined.warningFlags.slice() : [];
-        if (
-          inlined.inlinedCount > 0 ||
-          inlined.downloadedCount > 0 ||
-          inlined.fromCacheCount > 0 ||
-          imageWarningFlags.length
-        ) {
-          console.info('[ImageInline]', {
-            conversationId,
-            mode,
-            inlinedCount: inlined.inlinedCount,
-            downloadedCount: inlined.downloadedCount,
-            fromCacheCount: inlined.fromCacheCount,
-            inlinedBytes: inlined.inlinedBytes,
-            warningFlags: imageWarningFlags,
-          });
-        }
-      } catch (error) {
-        console.warn('[ImageInline] failed but capture continues', {
-          conversationId,
-          mode,
-          error: error instanceof Error ? error.message : String(error || ''),
-        });
-      }
-    } else if (sourceType === 'chat') {
-      const restoreCachedChatgptImages = msg.deferRemoteSync !== true;
-      const inlineKeys = new Set<string>();
-      for (const message of messages) {
-        const markdown = String(message?.contentMarkdown || '');
-        if (
-          message?.messageKey &&
-          (/\]\(data:image\//i.test(markdown) || (restoreCachedChatgptImages && markdown.includes('chatgpt-file://')))
-        ) {
-          inlineKeys.add(String(message.messageKey));
-        }
-      }
-      if (inlineKeys.size) {
-        try {
-          // Rasterized UI graphics are local data URLs; cache them even when remote image downloads are disabled.
-          const inlined = await inlineChatImagesInMessages({
-            conversationId,
-            messages,
-            onlyMessageKeys: inlineKeys,
-            enableHttpImages: false,
-            enableChatgptImages: restoreCachedChatgptImages,
-          });
-          messages = inlined.messages;
-          imageWarningFlags = inlined.warningFlags.filter((flag) => flag !== 'chatgpt_images_cache_incomplete');
-        } catch (_error) {
-          // Keep the original image data in the message if local caching fails.
-        }
-      }
-      chatImageMessageKeys = messages
-        .filter((message: any) => message?.messageKey && hasCacheableChatImageReference(message.contentMarkdown))
-        .map((message: any) => String(message.messageKey));
-      shouldScheduleChatImageBackfill = msg.deferRemoteSync !== true && chatImageMessageKeys.length > 0;
-    }
+    // Make the original Markdown durable before any image fetch or transcode.
+    // Source-specific image settings and anti-hotlink rules are applied by the background backfill job.
+    const imageWarningFlags: string[] = [];
+    const changedKeys =
+      (mode === 'incremental' || mode === 'append') && diff
+        ? new Set(
+            [...(Array.isArray(diff.added) ? diff.added : []), ...(Array.isArray(diff.updated) ? diff.updated : [])]
+              .map((key) => String(key || '').trim())
+              .filter(Boolean),
+          )
+        : null;
+    const chatImageMessageKeys =
+      sourceType === 'article' || sourceType === 'chat'
+        ? messages
+            .filter((message: any) => {
+              const key = String(message?.messageKey || '').trim();
+              return (
+                key && (!changedKeys || changedKeys.has(key)) && hasCacheableChatImageReference(message.contentMarkdown)
+              );
+            })
+            .map((message: any) => String(message.messageKey))
+        : [];
+    const shouldScheduleChatImageBackfill = msg.deferRemoteSync !== true && chatImageMessageKeys.length > 0;
 
     const res = await syncConversationMessages(conversationId, messages, {
       mode,
@@ -498,7 +443,7 @@ export function registerConversationHandlers(router: AnyRouter, deps: Conversati
   router.register(CORE_MESSAGE_TYPES.BACKFILL_CONVERSATION_IMAGES, async (msg) => {
     const conversationId = Number(msg.conversationId);
     if (!Number.isFinite(conversationId) || conversationId <= 0) return router.err('invalid conversationId');
-    const res = await backfillConversationImages({ conversationId });
+    const res = await backfillConversationImages({ conversationId, force: true });
     if (Number(res?.updatedMessages) > 0) {
       fireAndForget(deps.onConversationChanged(conversationId, AUTO_SYNC_CONVERSATION_CHANGED_REASONS.backfillImages));
     }

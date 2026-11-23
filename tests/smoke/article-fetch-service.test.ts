@@ -146,18 +146,13 @@ describe('article-fetch-service', () => {
     expect(syncConversationMessages).toHaveBeenCalledTimes(1);
     const [conversationId, messages] = syncConversationMessages.mock.calls[0];
     expect(conversationId).toBe(11);
-    expect(imageInlineMocks.inlineChatImagesInMessages).toHaveBeenCalledTimes(1);
-    expect(imageInlineMocks.inlineChatImagesInMessages.mock.calls[0][0]).toMatchObject({
-      conversationId: 11,
-      enableHttpImages: true,
-    });
-    expect(imageInlineMocks.inlineChatImagesInMessages.mock.calls[0][0]).not.toHaveProperty('conversationUrl');
+    expect(imageInlineMocks.inlineChatImagesInMessages).not.toHaveBeenCalled();
     expect(Array.isArray(messages)).toBe(true);
     expect(messages[0]).toMatchObject({
       messageKey: 'article_body',
       role: 'article',
       sequence: 1,
-      contentMarkdown: '## Heading\n\n![img](syncnos-asset://conversation/11/a.png)\n\nHello world article text.',
+      contentMarkdown: '## Heading\n\n![img](https://example.com/a.png)\n\nHello world article text.',
     });
   });
 
@@ -581,8 +576,8 @@ describe('article-fetch-service', () => {
     const data = await service.fetchActiveTabArticle();
 
     expect(data.conversationId).toBe(71);
-    expect(imageInlineMocks.inlineChatImagesInMessages).toHaveBeenCalledTimes(1);
-    expect(settingsMocks.storageSet).toHaveBeenCalledWith(
+    expect(imageInlineMocks.inlineChatImagesInMessages).not.toHaveBeenCalled();
+    expect(settingsMocks.storageSet).not.toHaveBeenCalledWith(
       expect.objectContaining({
         anti_hotlink_rules_v1: expect.arrayContaining([
           expect.objectContaining({ domain: 'cdnfile.sspai.com', referer: 'https://sspai.com/' }),

@@ -78,6 +78,16 @@ describe('background-router article fetch', () => {
     expect(String(res.error?.message || '')).toContain('Discourse OP not found');
   });
 
+  it('queues article images only after fetch completes with durable text', async () => {
+    const scheduleArticleImageBackfill = vi.fn(async () => {});
+    articleFetchMocks.fetchActiveTabArticle.mockResolvedValue({ conversationId: 123 });
+    const router = createTestBackgroundRouter({ scheduleArticleImageBackfill });
+    const response = await router.dispatch({ type: 'fetchActiveTabArticle', tabId: 42 });
+    await Promise.resolve();
+    expect(response.ok).toBe(true);
+    expect(scheduleArticleImageBackfill).toHaveBeenCalledWith(123, ['article_body']);
+  });
+
   it('schedules auto-sync after a successful fetch with a conversation id', async () => {
     const onArticleConversationChanged = vi.fn(async () => {});
     articleFetchMocks.fetchActiveTabArticle.mockResolvedValue({

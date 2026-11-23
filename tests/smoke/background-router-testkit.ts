@@ -21,8 +21,12 @@ import {
 import { registerObsidianSettingsHandlers } from '@services/sync/obsidian/settings-background-handlers';
 
 export function createTestBackgroundRouter(
-  options: { onArticleConversationChanged?: (conversationId: number, reason: string) => void | Promise<void> } = {},
+  options: {
+    scheduleArticleImageBackfill?: (conversationId: number, messageKeys?: string[]) => void | Promise<void>;
+    onArticleConversationChanged?: (conversationId: number, reason: string) => void | Promise<void>;
+  } = {},
 ) {
+  const articleBackfillScheduler = options.scheduleArticleImageBackfill ?? (async () => {});
   const instanceId = `test_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
   const router = createBackgroundRouter({
@@ -49,6 +53,8 @@ export function createTestBackgroundRouter(
     scheduleImageBackfill: async () => {},
   });
   registerWebArticleHandlers(router, {
+    scheduleImageBackfill: (conversationId: number, keys?: string[]) =>
+      Promise.resolve(articleBackfillScheduler(conversationId, keys)),
     onConversationChanged: options.onArticleConversationChanged ?? (async () => {}),
   });
   registerNotionSettingsHandlers(router, {

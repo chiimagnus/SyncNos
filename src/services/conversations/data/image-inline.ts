@@ -531,12 +531,14 @@ export async function inlineChatImagesInMessages(input: {
           });
         } catch (_error) {
           warningFlags.add('inline_images_download_failed');
+          warningFlags.add('inline_images_cache_incomplete');
           continue;
         }
       } else {
         const downloaded = await downloadImageAsBlob({ url, maxBytes: NO_IMAGE_SIZE_LIMIT });
         if (!downloaded.ok) {
           warningFlags.add('inline_images_download_failed');
+          if (downloaded.reason === 'fetch') warningFlags.add('inline_images_cache_incomplete');
           continue;
         }
         try {
@@ -549,6 +551,7 @@ export async function inlineChatImagesInMessages(input: {
           });
         } catch (_error) {
           warningFlags.add('inline_images_download_failed');
+          warningFlags.add('inline_images_cache_incomplete');
           continue;
         }
       }

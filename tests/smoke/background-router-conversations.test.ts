@@ -19,10 +19,6 @@ const localStorageMocks = vi.hoisted(() => ({
   storageGet: vi.fn(),
 }));
 
-const imageInlineMocks = vi.hoisted(() => ({
-  inlineChatImagesInMessages: vi.fn(),
-}));
-
 const backfillJobMocks = vi.hoisted(() => ({
   backfillConversationImages: vi.fn(),
 }));
@@ -45,7 +41,6 @@ vi.mock('@platform/storage/local', () => ({
 }));
 
 vi.mock('@services/conversations/data/image-inline', () => ({
-  inlineChatImagesInMessages: imageInlineMocks.inlineChatImagesInMessages,
   hasCacheableChatImageReference: (markdown: unknown) => {
     const value = String(markdown || '');
     return /!\[[^\]]*\]\((?:https?:\/\/|data:image\/|chatgpt-file:\/\/)/i.test(value);
@@ -55,17 +50,6 @@ vi.mock('@services/conversations/data/image-inline', () => ({
 vi.mock('@services/conversations/background/image-backfill-job', () => ({
   backfillConversationImages: backfillJobMocks.backfillConversationImages,
 }));
-
-function makeInlineResult(messages: any[]) {
-  return {
-    messages,
-    inlinedCount: 0,
-    fromCacheCount: 0,
-    downloadedCount: 0,
-    inlinedBytes: 0,
-    warningFlags: [],
-  };
-}
 
 function createRouter(deps?: {
   onConversationChanged?: ReturnType<typeof vi.fn>;
@@ -89,10 +73,6 @@ function createRouter(deps?: {
 
 beforeEach(() => {
   localStorageMocks.storageGet.mockResolvedValue({});
-  imageInlineMocks.inlineChatImagesInMessages.mockImplementation(async (input: any) => {
-    const messages = Array.isArray(input?.messages) ? input.messages : [];
-    return makeInlineResult(messages);
-  });
   backfillJobMocks.backfillConversationImages.mockResolvedValue({
     scannedMessages: 0,
     updatedMessages: 0,
@@ -117,7 +97,6 @@ afterEach(() => {
   storageMocks.getConversationTailWindowBySourceAndKey.mockReset();
   storageMocks.mergeConversationsByIds.mockReset();
   localStorageMocks.storageGet.mockReset();
-  imageInlineMocks.inlineChatImagesInMessages.mockReset();
   backfillJobMocks.backfillConversationImages.mockReset();
 });
 
@@ -298,7 +277,6 @@ describe('background-router conversations', () => {
     });
 
     expect(res).toMatchObject({ ok: false, error: { message: 'invalid mode' } });
-    expect(imageInlineMocks.inlineChatImagesInMessages).not.toHaveBeenCalled();
     expect(storageMocks.syncConversationMessages).not.toHaveBeenCalled();
   });
 
@@ -317,7 +295,6 @@ describe('background-router conversations', () => {
 
     expect(res.ok).toBe(true);
     expect(scheduleImageBackfill).not.toHaveBeenCalled();
-    expect(imageInlineMocks.inlineChatImagesInMessages).not.toHaveBeenCalled();
     expect(storageMocks.syncConversationMessages).toHaveBeenCalledWith(2001, messages, {
       mode: 'snapshot',
       diff: null,
@@ -375,22 +352,11 @@ describe('background-router conversations', () => {
     expect(scheduleImageBackfill).toHaveBeenCalledWith(2002, ['m1']);
   });
 
-  it('reuses cached ChatGPT images during the final snapshot without downloading or changing cache settings', async () => {
+  it('stores the original ChatGPT reference and queues asynchronous cache reuse', async () => {
     storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
     const original = [{ messageKey: 'm1', role: 'user', contentMarkdown: '![](chatgpt-file://file_1)' }];
-    imageInlineMocks.inlineChatImagesInMessages.mockImplementation(async (input: any) => {
-      expect(input.enableChatgptImages).toBe(true);
-      expect(input.downloadChatgptImages).toBeUndefined();
-      return {
-        messages: [{ ...input.messages[0], contentMarkdown: '![](syncnos-asset://7)' }],
-        inlinedCount: 1,
-        fromCacheCount: 1,
-        downloadedCount: 0,
-        inlinedBytes: 12,
-        warningFlags: [],
-      };
-    });
-    const router = createRouter();
+    const scheduleImageBackfill = vi.fn(async () => {});
+    const router = createRouter({ scheduleImageBackfill });
     const response = await router.dispatch({
       type: 'syncConversationMessages',
       conversationId: 123,
@@ -401,9 +367,11 @@ describe('background-router conversations', () => {
     expect(response.ok).toBe(true);
     expect(storageMocks.syncConversationMessages).toHaveBeenCalledWith(
       123,
-      [expect.objectContaining({ contentMarkdown: '![](syncnos-asset://7)' })],
+      [expect.objectContaining({ contentMarkdown: '![](chatgpt-file://file_1)' })],
       { mode: 'snapshot', diff: null },
     );
+    expect(scheduleImageBackfill).toHaveBeenCalledWith(123, ['m1']);
+    expect(localStorageMocks.storageGet).not.toHaveBeenCalledWith(['ai_chat_cache_images_enabled']);
   });
 
   it('persists AI chat messages before durably enqueueing image backfill and never downloads in the save request', async () => {
@@ -435,13 +403,6 @@ describe('background-router conversations', () => {
     expect(storageMocks.syncConversationMessages.mock.invocationCallOrder[0]).toBeLessThan(
       scheduleImageBackfill.mock.invocationCallOrder[0]!,
     );
-    expect(imageInlineMocks.inlineChatImagesInMessages).toHaveBeenCalledWith(
-      expect.objectContaining({
-        conversationId: 2002,
-        enableChatgptImages: true,
-      }),
-    );
-    expect(imageInlineMocks.inlineChatImagesInMessages.mock.calls[0]?.[0]).not.toHaveProperty('downloadChatgptImages');
     expect(backfillJobMocks.backfillConversationImages).not.toHaveBeenCalled();
 
     releaseSchedule?.();
@@ -491,7 +452,6 @@ describe('background-router conversations', () => {
 
     expect(res.ok).toBe(true);
     expect(localStorageMocks.storageGet).not.toHaveBeenCalled();
-    expect(imageInlineMocks.inlineChatImagesInMessages).not.toHaveBeenCalled();
     expect(storageMocks.syncConversationMessages).toHaveBeenCalledWith(2004, messages, {
       mode: 'snapshot',
       diff: null,
@@ -534,37 +494,26 @@ describe('background-router conversations', () => {
       ],
       { mode: 'append', diff: { added: [], updated: ['m1'], removed: [] } },
     );
-    expect(imageInlineMocks.inlineChatImagesInMessages).toHaveBeenCalledWith(
-      expect.objectContaining({
-        conversationId: 2003,
-        onlyMessageKeys: new Set(['m1']),
-        enableHttpImages: false,
-        enableChatgptImages: true,
-      }),
-    );
   });
 
-  it('uses web_article_cache_images_enabled for article source auto-save', async () => {
+  it('does not read image settings or fetch image URLs before saving article messages', async () => {
     storageMocks.syncConversationMessages.mockResolvedValue({ upserted: 1, deleted: 0 });
-    localStorageMocks.storageGet.mockResolvedValue({ web_article_cache_images_enabled: true });
-
-    const router = createRouter();
-
+    const scheduleImageBackfill = vi.fn(async () => {});
+    const router = createRouter({ scheduleImageBackfill });
+    const messages = [{ messageKey: 'm-1', contentMarkdown: '![img](https://example.com/b.png)' }];
     const res = await router.dispatch({
       type: 'syncConversationMessages',
       conversationId: 2002,
       conversationSourceType: 'article',
-      messages: [{ messageKey: 'm-1', contentMarkdown: '![img](https://example.com/b.png)' }],
+      messages,
     });
-
     expect(res.ok).toBe(true);
-    expect(localStorageMocks.storageGet).toHaveBeenCalledWith(['web_article_cache_images_enabled']);
-    expect(imageInlineMocks.inlineChatImagesInMessages).toHaveBeenCalledWith(
-      expect.objectContaining({
-        conversationId: 2002,
-        enableHttpImages: true,
-      }),
-    );
+    expect(storageMocks.syncConversationMessages).toHaveBeenCalledWith(2002, messages, {
+      mode: 'snapshot',
+      diff: null,
+    });
+    expect(scheduleImageBackfill).toHaveBeenCalledWith(2002, ['m-1']);
+    expect(localStorageMocks.storageGet).not.toHaveBeenCalledWith(['web_article_cache_images_enabled']);
   });
 
   it('emits exactly one backfillImages signal after durable backfill changes', async () => {
@@ -586,7 +535,7 @@ describe('background-router conversations', () => {
     });
 
     expect(res.ok).toBe(true);
-    expect(backfillJobMocks.backfillConversationImages).toHaveBeenCalledWith({ conversationId: 888 });
+    expect(backfillJobMocks.backfillConversationImages).toHaveBeenCalledWith({ conversationId: 888, force: true });
     await Promise.resolve();
     expect(onConversationChanged).toHaveBeenCalledTimes(1);
     expect(onConversationChanged).toHaveBeenCalledWith(888, 'backfillImages');

@@ -79,6 +79,10 @@ export default defineBackground(() => {
     onConversationChanged: (conversationId, reason) => services.autoSync.onConversationChanged(conversationId, reason),
   });
   registerWebArticleHandlers(router, {
+    scheduleImageBackfill: (conversationId: number, messageKeys?: string[]) =>
+      messageKeys?.length
+        ? services.autoSync.imageBackfillScheduler.enqueueWithKeys(conversationId, messageKeys)
+        : services.autoSync.imageBackfillScheduler.enqueue(conversationId, 'chat_image'),
     onConversationChanged: (conversationId, reason) => services.autoSync.onConversationChanged(conversationId, reason),
   });
   registerChatgptDeepResearchHandlers(router);

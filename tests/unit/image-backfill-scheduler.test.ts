@@ -49,10 +49,11 @@ function makeInfra(startNow = 1_000_000, alarmsAvailable = true) {
   };
 }
 
-function result(input: Partial<{ updatedMessages: number; warningFlags: string[] }> = {}) {
+function result(input: Partial<{ updatedMessages: number; conflicts: number; warningFlags: string[] }> = {}) {
   return {
     scannedMessages: 1,
     updatedMessages: input.updatedMessages ?? 0,
+    conflicts: input.conflicts ?? 0,
     inlinedCount: 0,
     fromCacheCount: 0,
     downloadedCount: 0,
@@ -67,16 +68,17 @@ describe('image backfill scheduler', () => {
     backfillMocks.backfillConversationImages.mockResolvedValue(result());
   });
 
-  it('does not enqueue when AI chat image caching is disabled', async () => {
+  it('persists and processes article work even when AI chat image caching is disabled', async () => {
     const pack = makeInfra();
     pack.storage[AI_CHAT_IMAGE_CACHE_ENABLED_STORAGE_KEY] = false;
     const scheduler = createImageBackfillScheduler({ onConversationChanged: vi.fn() }, pack.infra);
 
     await scheduler.enqueue(7, 'chat_image');
 
-    expect(pack.storage[AI_CHAT_IMAGE_BACKFILL_QUEUE_STORAGE_KEY]).toBeUndefined();
-    expect(pack.alarm.name).toBe('');
-    expect(backfillMocks.backfillConversationImages).not.toHaveBeenCalled();
+    expect(pack.storage[AI_CHAT_IMAGE_BACKFILL_QUEUE_STORAGE_KEY]).toEqual({ '7': pack.infra.now() });
+    expect(pack.alarm.name).toBe(AI_CHAT_IMAGE_BACKFILL_ALARM_NAME);
+    await scheduler.flush();
+    expect(backfillMocks.backfillConversationImages).toHaveBeenCalledWith({ conversationId: 7 });
   });
 
   it('durably enqueues and schedules an alarm without downloading in the enqueue request', async () => {
@@ -197,6 +199,23 @@ describe('image backfill scheduler', () => {
     });
     expect(backfillMocks.backfillConversationImages).toHaveBeenNthCalledWith(2, { conversationId: 7 });
     expect(pack.storage[AI_CHAT_IMAGE_BACKFILL_QUEUE_STORAGE_KEY]).toEqual({});
+  });
+
+  it('retries transient HTTP failures and concurrent Markdown edits, not permanent HTTP rejections', async () => {
+    const pack = makeInfra();
+    const now = pack.infra.now();
+    pack.storage[AI_CHAT_IMAGE_BACKFILL_QUEUE_STORAGE_KEY] = { '21': now, '22': now, '23': now };
+    backfillMocks.backfillConversationImages.mockImplementation(async ({ conversationId }: any) => {
+      if (conversationId === 21) return result({ warningFlags: ['inline_images_cache_incomplete'] });
+      if (conversationId === 22) return result({ conflicts: 1 });
+      return result({ warningFlags: ['inline_images_download_failed'] });
+    });
+    const scheduler = createImageBackfillScheduler({ onConversationChanged: vi.fn() }, pack.infra);
+    await scheduler.flush();
+    expect(pack.storage[AI_CHAT_IMAGE_BACKFILL_QUEUE_STORAGE_KEY]).toEqual({
+      '21': now + 60_000,
+      '22': now + 60_000,
+    });
   });
 
   it('keeps durable work queued without falling back to synchronous downloads when alarms are unavailable', async () => {

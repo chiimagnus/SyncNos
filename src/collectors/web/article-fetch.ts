@@ -4,14 +4,12 @@ import {
   upsertConversation,
 } from '@services/conversations/data/storage';
 import { buildCanonicalWebArticleIdentity, WEB_ARTICLE_SOURCE } from '@services/conversations/domain/article-identity';
-import { inlineChatImagesInMessages } from '@services/conversations/data/image-inline';
 import { DISCOURSE_OP_MISSING_WARNING_FLAG, DISCOURSE_OP_NOT_FOUND_ERROR } from '@collectors/web/article-fetch-errors';
 import { normalizeHttpUrl } from '@services/url-cleaning/http-url';
 import { detectSupportedVideoPagePlatform } from '@services/url-cleaning/video-url';
 import { scriptingExecuteScript } from '@platform/webext/scripting';
 import { tabsGet, tabsQuery, tabsSendMessage, tabsUpdate } from '@platform/webext/tabs';
 import { storageGet } from '@platform/storage/local';
-import { getAntiHotlinkRulesSnapshot, includesAnyAntiHotlinkDomain } from '@platform/webext/anti-hotlink-rules-store';
 import { CONTENT_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
 import {
   collectDedaoCourseArticleAnnotationsInMainWorld,
@@ -24,18 +22,6 @@ import {
   isSameDiscourseTopicFloorUrl,
   parseDiscourseTopicUrl,
 } from '@collectors/web/article-fetch-discourse';
-
-async function hasAntiHotlinkImages(markdown: string): Promise<boolean> {
-  try {
-    const rules = await getAntiHotlinkRulesSnapshot();
-    return includesAnyAntiHotlinkDomain(markdown, rules);
-  } catch (error) {
-    console.warn('[ArticleFetch] anti-hotlink rules unavailable, skip forced image cache', {
-      error: error instanceof Error ? error.message : String(error || ''),
-    });
-    return false;
-  }
-}
 
 const ARTICLE_SOURCE_TYPE = 'article';
 const READABILITY_FILE = 'src/vendor/readability.js';
@@ -306,60 +292,19 @@ export async function fetchActiveTabArticle({ tabId }: { tabId?: number } = {}) 
     }
   }
 
-  let messagesToSave = [
-    {
-      messageKey: 'article_body',
-      role: 'article',
-      contentMarkdown: markdown,
-      sequence: 1,
-      updatedAt: activityAt,
-    },
-  ];
-
-  try {
-    const local = await storageGet(['web_article_cache_images_enabled']);
-    const hasAntiHotlink = await hasAntiHotlinkImages(markdown);
-    const shouldCacheImages = local?.web_article_cache_images_enabled === true || hasAntiHotlink;
-
-    if (shouldCacheImages) {
-      const inlined = await inlineChatImagesInMessages({
-        conversationId,
-        messages: messagesToSave,
-        enableHttpImages: true,
-      });
-      messagesToSave = inlined.messages;
-
-      if (hasAntiHotlink && !local?.web_article_cache_images_enabled) {
-        console.info('[ArticleFetch] auto-caching anti-hotlink images (user setting is off)', {
-          conversationId,
-          url: canonicalUrl,
-        });
-      }
-
-      if (
-        inlined.inlinedCount > 0 ||
-        inlined.downloadedCount > 0 ||
-        inlined.fromCacheCount > 0 ||
-        (Array.isArray(inlined.warningFlags) && inlined.warningFlags.length)
-      ) {
-        console.info('[ImageInline][ArticleFetch]', {
-          conversationId,
-          inlinedCount: inlined.inlinedCount,
-          downloadedCount: inlined.downloadedCount,
-          fromCacheCount: inlined.fromCacheCount,
-          inlinedBytes: inlined.inlinedBytes,
-          warningFlags: inlined.warningFlags,
-        });
-      }
-    }
-  } catch (error) {
-    console.warn('[ImageInline][ArticleFetch] failed but capture continues', {
-      conversationId,
-      error: error instanceof Error ? error.message : String(error || ''),
-    });
-  }
-
-  await syncConversationMessages(conversationId, messagesToSave, { activityAt });
+  await syncConversationMessages(
+    conversationId,
+    [
+      {
+        messageKey: 'article_body',
+        role: 'article',
+        contentMarkdown: markdown,
+        sequence: 1,
+        updatedAt: activityAt,
+      },
+    ],
+    { activityAt },
+  );
 
   return {
     isNew: conversation.__isNew,

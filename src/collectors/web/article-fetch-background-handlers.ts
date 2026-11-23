@@ -14,6 +14,7 @@ type AnyRouter = {
 
 type WebArticleHandlersDeps = {
   onConversationChanged: (conversationId: number, reason: AutoSyncConversationChangedReason) => void | Promise<void>;
+  scheduleImageBackfill?: (conversationId: number, messageKeys?: string[]) => void | Promise<void>;
 };
 
 function normalizeArticleFetchError(error: unknown, fallback: string): string {
@@ -37,6 +38,13 @@ export function registerWebArticleHandlers(router: AnyRouter, deps: WebArticleHa
   router.register(ARTICLE_MESSAGE_TYPES.FETCH_ACTIVE_TAB, async (msg, sender) => {
     try {
       const data = await fetchActiveTabArticle({ tabId: articleTabId(msg, sender) });
+      if (Number(data?.conversationId) > 0) {
+        try {
+          await deps.scheduleImageBackfill?.(Number(data.conversationId), ['article_body']);
+        } catch (error) {
+          console.warn('[ArticleFetch] saved article but could not queue image backfill', error);
+        }
+      }
 
       fireAndForget(
         deps.onConversationChanged(
@@ -54,6 +62,13 @@ export function registerWebArticleHandlers(router: AnyRouter, deps: WebArticleHa
   router.register(ARTICLE_MESSAGE_TYPES.RESOLVE_OR_CAPTURE_ACTIVE_TAB, async (msg, sender) => {
     try {
       const data = await resolveOrCaptureActiveTabArticle({ tabId: articleTabId(msg, sender) });
+      if (data?.isNew && Number(data?.conversationId) > 0) {
+        try {
+          await deps.scheduleImageBackfill?.(Number(data.conversationId), ['article_body']);
+        } catch (error) {
+          console.warn('[ArticleFetch] saved article but could not queue image backfill', error);
+        }
+      }
 
       if (data.isNew) {
         fireAndForget(
