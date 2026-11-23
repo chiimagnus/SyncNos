@@ -10,7 +10,7 @@ Sync is optional; SyncNos works without any external service.
 | Destination | Best for |
 | --- | --- |
 | [Notion](/docs/en/sync/notion/) | Databases and pages |
-| [Obsidian](/docs/en/sync/obsidian/) | Local Markdown vaults |
+| [Obsidian](/docs/en/sync/obsidian/) | Local Markdown notes with configurable image folders |
 | [Feishu](/docs/en/sync/feishu/) | Feishu cloud documents |
 | [GitHub](/docs/en/sync/github/) | Markdown repositories |
 
