@@ -92,6 +92,8 @@ let feishuGetQueue: Array<ApiResponse | Promise<ApiResponse>> = [];
 let notionStartQueue: Array<ApiResponse | Promise<ApiResponse>> = [];
 let feishuStartQueue: Array<ApiResponse | Promise<ApiResponse>> = [];
 let displaySetQueue: Array<Promise<void> | Error> = [];
+let obsidianStoredAttachmentFolder = '.';
+let obsidianSaveMode: 'normal' | 'failed' = 'normal';
 
 function ControllerHarness() {
   const snapshot = useSettingsSceneController({ activeSection: 'notion' });
@@ -170,6 +172,8 @@ beforeEach(() => {
   notionStartQueue = [];
   feishuStartQueue = [];
   displaySetQueue = [];
+  obsidianStoredAttachmentFolder = '.';
+  obsidianSaveMode = 'normal';
 
   antiHotlinkMocks.load.mockResolvedValue([{ domain: 'initial.example', referer: 'https://initial.example/' }]);
   feishuSettingsMocks.getPathConfig.mockResolvedValue({
@@ -232,8 +236,12 @@ beforeEach(() => {
     if (type === FEISHU_MESSAGE_TYPES.SAVE_AUTH_CONFIG) {
       return ok({ clientId: 'feishu-app', clientSecretPresent: true, tokenExchangeProxyUrl: '' });
     }
-    if (type === 'obsidianGetSettings') {
-      return ok({
+    if (type === 'obsidianGetSettings' || type === 'obsidianSaveSettings') {
+      if (type === 'obsidianSaveSettings') {
+        if (obsidianSaveMode === 'failed') return { ok: false, data: null, error: { message: 'storage write failed' } };
+        if (obsidianSaveMode === 'normal') obsidianStoredAttachmentFolder = String(_payload?.attachmentFolder || '.');
+      }
+      const snapshot = {
         apiBaseUrl: 'http://127.0.0.1:27123',
         authHeaderName: 'Authorization',
         apiKeyPresent: false,
@@ -241,7 +249,9 @@ beforeEach(() => {
         chatFolder: 'Chats',
         articleFolder: 'Articles',
         videoFolder: 'Videos',
-      });
+        attachmentFolder: obsidianStoredAttachmentFolder,
+      };
+      return ok(snapshot);
     }
     if (type === 'githubGetSettings') {
       return ok({
@@ -272,6 +282,25 @@ afterEach(() => {
 });
 
 describe('Settings scoped refresh', () => {
+  it('shows success only after a new background confirms the persisted attachment folder', async () => {
+    await renderController();
+    await invoke(() => latestSnapshot!.setObsidianAttachmentFolder('../images'));
+    await invoke(() => latestSnapshot!.onSaveObsidianSettings());
+    expect(latestSnapshot!.obsidianStatus).toBe('statusSaved');
+    expect(latestSnapshot!.obsidianAttachmentFolder).toBe('../images');
+    expect(obsidianStoredAttachmentFolder).toBe('../images');
+  });
+
+  it('does not report success when Obsidian settings storage fails', async () => {
+    await renderController();
+    obsidianSaveMode = 'failed';
+    await invoke(() => latestSnapshot!.setObsidianAttachmentFolder('images'));
+    await invoke(() => latestSnapshot!.onSaveObsidianSettings());
+    expect(latestSnapshot!.obsidianAttachmentFolder).toBe('images');
+    expect(latestSnapshot!.obsidianStatus).toBe('statusError');
+    expect(latestSnapshot!.error).toBe('storage write failed');
+  });
+
   it('mount performs one full hydrate without duplicating the anti-hotlink storage read', async () => {
     await renderController();
 

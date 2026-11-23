@@ -376,68 +376,78 @@ describe('obsidian-sync-orchestrator', () => {
     expect(chatgptImageMocks.downloadChatgptImagesForStoredConversation).not.toHaveBeenCalled();
   });
 
-  it('keeps existing attachments when the folder setting changes and rewrites the note reference', async () => {
-    setupChromeStorage();
-    const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
-    const naming = await loadModule('@services/conversations/domain/file-naming.ts');
-    const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
-    const convo = {
-      id: 1,
-      sourceType: 'article',
-      source: 'web',
-      conversationKey: 'moving-assets',
-      title: 'Move assets',
-    };
-    const basename = naming.buildConversationBasename(convo);
-    backgroundStorageMocks.getConversationById.mockResolvedValue(convo);
-    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
-      { messageKey: 'article_body', sequence: 1, contentMarkdown: '![image](syncnos-asset://7)', updatedAt: 1 },
-    ]);
-    imageCacheMocks.getImageCacheAssetsByIds.mockResolvedValue(
-      new Map([
-        [
-          7,
-          {
-            id: 7,
-            conversationId: 1,
-            blob: new Blob([Uint8Array.from([5])], { type: 'image/png' }),
-            contentType: 'image/png',
-          },
-        ],
-      ]),
-    );
-    const vault = new Map<string, unknown>();
-    const methods: string[] = [];
-    // @ts-expect-error test global
-    globalThis.fetch = async (url: string, init: RequestInit) => {
-      const method = String(init?.method || 'GET').toUpperCase();
-      const path = decodeURIComponent(new URL(url).pathname.slice('/vault/'.length));
-      methods.push(method);
-      if (method === 'GET') {
-        if (vault.has(path))
-          return new Response(JSON.stringify({ frontmatter: {} }), {
-            status: 200,
-            headers: { 'content-type': 'application/json' },
-          });
-        return new Response('missing', { status: 404 });
-      }
-      if (method === 'PUT') {
-        vault.set(path, init?.body);
-        return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
-      }
-      throw new Error(`unexpected ${method}`);
-    };
-    await settingsStore.saveObsidianSettings({ apiKey: 'k' });
-    expect((await orch.syncConversations({ conversationIds: [1] })).okCount).toBe(1);
-    expect(vault.has(`SyncNos-WebArticles/${basename}-1.png`)).toBe(true);
+  it.each([false, true])(
+    'keeps existing attachments and updates references after a folder change (valid remote metadata: %s)',
+    async (validMetadata) => {
+      setupChromeStorage();
+      const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
+      const naming = await loadModule('@services/conversations/domain/file-naming.ts');
+      const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
+      const convo = {
+        id: 1,
+        sourceType: 'article',
+        source: 'web',
+        conversationKey: 'moving-assets',
+        title: 'Move assets',
+      };
+      const basename = naming.buildConversationBasename(convo);
+      backgroundStorageMocks.getConversationById.mockResolvedValue(convo);
+      backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+        { messageKey: 'article_body', sequence: 1, contentMarkdown: '![image](syncnos-asset://7)', updatedAt: 1 },
+      ]);
+      imageCacheMocks.getImageCacheAssetsByIds.mockResolvedValue(
+        new Map([
+          [
+            7,
+            {
+              id: 7,
+              conversationId: 1,
+              blob: new Blob([Uint8Array.from([5])], { type: 'image/png' }),
+              contentType: 'image/png',
+            },
+          ],
+        ]),
+      );
+      const vault = new Map<string, unknown>();
+      const methods: string[] = [];
+      // @ts-expect-error test global
+      globalThis.fetch = async (url: string, init: RequestInit) => {
+        const method = String(init?.method || 'GET').toUpperCase();
+        const path = decodeURIComponent(new URL(url).pathname.slice('/vault/'.length));
+        methods.push(method);
+        if (method === 'GET') {
+          if (vault.has(path))
+            return new Response(
+              JSON.stringify({
+                frontmatter: validMetadata
+                  ? { syncnos: { schemaVersion: 1, source: convo.source, conversationKey: convo.conversationKey } }
+                  : {},
+              }),
+              {
+                status: 200,
+                headers: { 'content-type': 'application/json' },
+              },
+            );
+          return new Response('missing', { status: 404 });
+        }
+        if (method === 'PUT') {
+          vault.set(path, init?.body);
+          return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+        }
+        throw new Error(`unexpected ${method}`);
+      };
+      await settingsStore.saveObsidianSettings({ apiKey: 'k' });
+      expect((await orch.syncConversations({ conversationIds: [1] })).okCount).toBe(1);
+      expect(vault.has(`SyncNos-WebArticles/${basename}-1.png`)).toBe(true);
 
-    await settingsStore.saveObsidianSettings({ attachmentFolder: '../images' });
-    expect((await orch.syncConversations({ conversationIds: [1] })).okCount).toBe(1);
-    expect(vault.has(`images/${basename}-1.png`)).toBe(true);
-    expect(vault.has(`SyncNos-WebArticles/${basename}-1.png`)).toBe(true);
-    expect(vault.get(`SyncNos-WebArticles/${basename}.md`)).toContain(`![image](../images/${basename}-1.png)`);
-    expect(methods).not.toContain('DELETE');
-  });
+      await settingsStore.saveObsidianSettings({ attachmentFolder: '../images' });
+      expect((await orch.syncConversations({ conversationIds: [1] })).okCount).toBe(1);
+      expect(vault.has(`images/${basename}-1.png`)).toBe(true);
+      expect(vault.has(`SyncNos-WebArticles/${basename}-1.png`)).toBe(true);
+      expect(vault.get(`SyncNos-WebArticles/${basename}.md`)).toContain(`![image](../images/${basename}-1.png)`);
+      expect(methods).not.toContain('DELETE');
+    },
+  );
 
   it('materializes SyncNos image refs through the shared Markdown helper without changing Obsidian naming', async () => {
     setupChromeStorage();

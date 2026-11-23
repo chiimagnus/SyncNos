@@ -337,10 +337,6 @@ async function decideSyncModeForConversation({
   const client = clientRes.client;
   const accept = clientRes.noteJsonAccept || client.NOTE_JSON_ACCEPT || NOTE_JSON_ACCEPT;
 
-  let existingRemote: any = null;
-  let existingPath = '';
-  let deleteAfterFilePath = '';
-
   const pathResolution = await resolveDefaultExistingNotePath({
     conversation: convo,
     client,
@@ -368,98 +364,25 @@ async function decideSyncModeForConversation({
     safeString(pathResolution?.desiredFilePath) || buildDefaultStableNotePath(convo, { folderByKindId });
   // Validate per-note vault containment before any image or Markdown write (including optional ChatGPT images).
   resolveAttachmentTarget(desiredFilePath, pathConfig.attachmentFolder, 'attachment');
-  existingPath = safeString(pathResolution?.resolvedFilePath);
 
-  if (pathResolution?.found && existingPath) {
-    existingRemote = {
-      ok: true,
-      data: pathResolution.note || null,
-    };
-  }
-
-  if (!existingRemote) {
-    return {
-      isFinal: false,
-      conversationId,
-      convo,
-      filePath: desiredFilePath,
-      messages,
-      comments: articleComments,
-      attachmentFolder: pathConfig.attachmentFolder,
-      mode: forceFull ? 'full_rebuild_forced' : 'full_rebuild',
-    };
-  }
-
-  if (existingPath && existingPath !== desiredFilePath) {
-    deleteAfterFilePath = existingPath;
-    return {
-      isFinal: false,
-      conversationId,
-      convo,
-      filePath: desiredFilePath,
-      deleteAfterFilePath,
-      messages,
-      comments: articleComments,
-      attachmentFolder: pathConfig.attachmentFolder,
-      mode: forceFull ? 'full_rebuild_forced' : 'full_rebuild_rename',
-    };
-  }
-
-  if (forceFull) {
-    return {
-      isFinal: false,
-      conversationId,
-      convo,
-      filePath: desiredFilePath,
-      messages,
-      comments: articleComments,
-      attachmentFolder: pathConfig.attachmentFolder,
-      mode: 'full_rebuild_forced',
-    };
-  }
-
-  const note = existingRemote.data && typeof existingRemote.data === 'object' ? existingRemote.data : null;
-  const frontmatter = note && note.frontmatter && typeof note.frontmatter === 'object' ? note.frontmatter : null;
-
-  const parsed = readDefaultSyncnosObject(frontmatter);
-  const parsedData = parsed && parsed.ok && parsed.data ? parsed.data : null;
-  if (!parsedData) {
-    return {
-      isFinal: false,
-      conversationId,
-      convo,
-      filePath: desiredFilePath,
-      messages,
-      comments: articleComments,
-      attachmentFolder: pathConfig.attachmentFolder,
-      mode: 'full_rebuild',
-    };
-  }
-  if (
-    safeString(parsedData.source) !== safeString(convo.source) ||
-    safeString(parsedData.conversationKey) !== safeString(convo.conversationKey)
-  ) {
-    return {
-      isFinal: false,
-      conversationId,
-      convo,
-      filePath: desiredFilePath,
-      messages,
-      comments: articleComments,
-      attachmentFolder: pathConfig.attachmentFolder,
-      mode: 'full_rebuild',
-    };
-  }
-
-  return {
+  const rebuild = {
     isFinal: false,
     conversationId,
     convo,
     filePath: desiredFilePath,
     messages,
     comments: articleComments,
-    mode: 'full_rebuild',
+    attachmentFolder: pathConfig.attachmentFolder,
   };
+  const existingPath = pathResolution?.found ? safeString(pathResolution.resolvedFilePath) : '';
+  if (existingPath && existingPath !== desiredFilePath) {
+    return {
+      ...rebuild,
+      deleteAfterFilePath: existingPath,
+      mode: forceFull ? 'full_rebuild_forced' : 'full_rebuild_rename',
+    };
+  }
+  return { ...rebuild, mode: forceFull ? 'full_rebuild_forced' : 'full_rebuild' };
 }
 
 async function testConnection({ instanceId }: { instanceId?: string } = {}) {
