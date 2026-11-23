@@ -67,7 +67,7 @@ afterEach(() => {
 });
 
 describe('storage details for one saved item', () => {
-  it('counts logical text and unique readable local blobs, not other items or remote references', async () => {
+  it('lists only readable, owned local blobs once, hiding missing and remote images', async () => {
     const owner = await write('conversations', { source: 'web', conversationKey: 'a', lastActivityAt: 1 });
     const unrelated = await write('conversations', { source: 'chatgpt', conversationKey: 'b', lastActivityAt: 1 });
     const original = png();
@@ -78,6 +78,13 @@ describe('storage details for one saved item', () => {
       byteSize: 1,
       contentType: 'image/png',
     });
+    const emptyId = await write('image_cache', {
+      conversationId: owner,
+      url: 'https://example.com/empty.png',
+      blob: new Blob([], { type: 'image/png' }),
+      byteSize: 120,
+      contentType: 'image/png',
+    });
     const foreignId = await write('image_cache', {
       conversationId: unrelated,
       url: 'https://example.com/foreign.png',
@@ -85,28 +92,23 @@ describe('storage details for one saved item', () => {
       byteSize: original.size,
       contentType: 'image/png',
     });
-    const markdown = `图像 ![文章配图](syncnos-asset://${id}) 和 ![再次引用](syncnos-asset://${id})。\n![远程](https://example.com/remote.png)\n![失效](syncnos-asset://9999)\n![不属于这篇文章](syncnos-asset://${foreignId})`;
+    const markdown = `图像 ![文章配图](syncnos-asset://${id}) 和 ![再次引用](syncnos-asset://${id})。\n![远程](https://example.com/remote.png)\n![失效](syncnos-asset://9999)\n![空文件](syncnos-asset://${emptyId})\n![不属于这篇文章](syncnos-asset://${foreignId})`;
     const result = await getConversationStorageDetails({
       conversationId: owner,
       messages: [{ id: 1, conversationId: owner, role: 'article', messageKey: 'body', contentMarkdown: markdown }],
     });
-    expect(result.localReferences).toBe(4);
-    expect(result.otherReferences).toBe(1);
-    expect(result.missingReferences).toBe(2);
-    expect(result.images).toHaveLength(3);
-    expect(result.images[0]).toMatchObject({
-      id,
-      label: '文章配图',
-      format: 'PNG',
-      bytes: original.size,
-      state: 'ready',
-      optimizable: true,
+    expect(result).toEqual({
+      imageBytes: original.size,
+      images: [
+        {
+          id,
+          label: '文章配图',
+          format: 'PNG',
+          bytes: original.size,
+          optimizable: true,
+        },
+      ],
     });
-    expect(result.images[1]).toMatchObject({ id: 9999, state: 'missing', bytes: 0, optimizable: false });
-    expect(result.images[2]).toMatchObject({ id: foreignId, state: 'missing', bytes: 0, optimizable: false });
-    expect(result.imageBytes).toBe(original.size);
-    expect(result.textBytes).toBe(new TextEncoder().encode(markdown).length);
-    expect(result.totalBytes).toBe(result.textBytes + original.size);
   });
 
   it('shows subtitles, unsupported animation and a pure-text item without a phantom optimization action', async () => {
@@ -124,9 +126,7 @@ describe('storage details for one saved item', () => {
         },
       ],
     });
-    expect(video.textBytes).toBe(new TextEncoder().encode('字幕内容章节一').byteLength);
-    expect(video.images).toEqual([]);
-    expect(video.totalBytes).toBe(video.textBytes);
+    expect(video).toEqual({ imageBytes: 0, images: [] });
 
     const animated = png(pngChunk('acTL', [0, 0, 0, 2, 0, 0, 0, 1]));
     const id = await write('image_cache', {
@@ -149,6 +149,7 @@ describe('storage details for one saved item', () => {
       ],
     });
     expect(withAnimation.images[0]).toMatchObject({ format: 'APNG', optimizable: false });
+    expect(withAnimation.imageBytes).toBe(animated.size);
   });
 
   it('does not resolve an invalid owner or a cancelled request', async () => {

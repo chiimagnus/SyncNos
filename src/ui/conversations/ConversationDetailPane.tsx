@@ -224,14 +224,12 @@ export function ConversationDetailPane({
     textCount != null && Number.isFinite(textCount)
       ? `${textCountLabel} ${Math.max(0, Math.floor(textCount)).toLocaleString()}`
       : '';
-  const imageCountText = imageCount
-    ? `${t('detailImageCountLabel')} ${imageCount.total.toLocaleString()} · ${t('detailImageCachedLabel')} ${imageCount.cached.toLocaleString()} · ${t('detailImageUncachedLabel')} ${imageCount.uncached.toLocaleString()}`
-    : '';
+  const imageCountText = imageCount ? `${t('detailImageCountLabel')} ${imageCount.total.toLocaleString()}` : '';
   const hasReaderMoreMenuContent = readerFeatures.textLayout || readerFeatures.theme || readerFeatures.narration;
   const hasMoreMenuContent =
     Boolean(textCountText || imageCountText) || moreActions.length > 0 || hasReaderMoreMenuContent;
   const moreMenuPanelClassName = [
-    'tw-w-[308px] tw-max-w-[calc(100vw-28px)] tw-max-h-[min(640px,calc(100dvh-76px))]',
+    'tw-w-[260px] tw-max-w-[calc(100vw-28px)] tw-max-h-[min(640px,calc(100dvh-76px))]',
     'tw-overflow-y-auto tw-overscroll-contain !tw-bg-[var(--bg-card)] tw-text-[var(--text-primary)]',
   ].join(' ');
   const floatingIslandClassName = [
@@ -649,7 +647,11 @@ export function ConversationDetailPane({
                         >
                           {textCountText ? <div data-detail-text-count-row="true">{textCountText}</div> : null}
                           {imageCountText ? <div data-detail-image-count-row="true">{imageCountText}</div> : null}
-                          {selected && detail?.messages && Number(detail.conversationId) === Number(selected.id) ? (
+                          {imageCount &&
+                          imageCount.cached > 0 &&
+                          selected &&
+                          detail?.messages &&
+                          Number(detail.conversationId) === Number(selected.id) ? (
                             <DetailStorageSection
                               key={selected.id}
                               conversationId={Number(selected.id)}

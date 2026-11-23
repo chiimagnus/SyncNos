@@ -70,8 +70,6 @@ vi.mock('../../src/ui/i18n', () => ({
       cancelButton: 'Cancel',
       detailTextCountLabel: 'Words',
       detailImageCountLabel: 'Images',
-      detailImageCachedLabel: 'Cached',
-      detailImageUncachedLabel: 'Uncached',
       videoDescriptionLabel: 'Description',
       videoChaptersLabel: 'Chapters',
     };
@@ -1389,11 +1387,12 @@ describe('ConversationDetailPane header actions', () => {
     expect(cacheButton).toBeTruthy();
     const moreMenu = document.querySelector('[role="menu"][aria-label="moreButton"]') as HTMLElement | null;
     expect(moreMenu).toBeTruthy();
-    expect(moreMenu?.className || '').toContain('tw-w-[308px]');
+    expect(moreMenu?.className || '').toContain('tw-w-[260px]');
     const textCountRow = document.querySelector('[data-detail-text-count-row="true"]') as HTMLElement | null;
     const imageCountRow = document.querySelector('[data-detail-image-count-row="true"]') as HTMLElement | null;
     expect(textCountRow).toBeTruthy();
-    expect(imageCountRow?.textContent).toBe('Images 0 · Cached 0 · Uncached 0');
+    expect(imageCountRow?.textContent).toBe('Images 0');
+    expect(document.querySelector('[data-detail-storage]')).toBeNull();
     expect(textCountRow?.getAttribute('data-tooltip-id')).toBeNull();
     expect(imageCountRow?.getAttribute('data-tooltip-id')).toBeNull();
 
@@ -1461,7 +1460,37 @@ describe('ConversationDetailPane header actions', () => {
     expect(await openMoreAndReadTextCount()).toBe('Words 2');
   });
 
-  it('shows image totals and cached/uncached state for a pure-image Article', async () => {
+  it('does not show storage controls for remote-only images while keeping the image count', async () => {
+    currentState.detailHeaderActions = [];
+    currentState.activeId = 30;
+    currentState.selectedConversation = {
+      id: 30,
+      title: 'Remote article',
+      source: 'web',
+      sourceType: 'article',
+      conversationKey: 'article-30',
+    } as any;
+    currentState.detail = {
+      conversationId: 30,
+      messages: [
+        {
+          id: 3001,
+          conversationId: 30,
+          messageKey: 'article_body',
+          role: 'article',
+          contentMarkdown: '![在线](https://example.com/image.png)\n![临时](chatgpt-file://file_abc123)',
+        },
+      ],
+    } as any;
+    await act(async () => {
+      root!.render(createElement(ConversationDetailPane));
+    });
+    expect(await openMoreAndReadStatRow('[data-detail-image-count-row="true"]')).toBe('Images 2');
+    expect(document.querySelector('[data-detail-storage]')).toBeNull();
+    expect(document.querySelector('[data-detail-stats]')?.textContent).not.toContain('Local refs');
+  });
+
+  it('shows one human-readable image count without technical reference types', async () => {
     currentState.detailHeaderActions = [];
     currentState.selectedConversation = {
       id: 31,
@@ -1497,9 +1526,7 @@ describe('ConversationDetailPane header actions', () => {
       moreButton.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
       await Promise.resolve();
     });
-    expect(await openMoreAndReadStatRow('[data-detail-image-count-row="true"]')).toBe(
-      'Images 3 · Cached 1 · Uncached 2',
-    );
+    expect(await openMoreAndReadStatRow('[data-detail-image-count-row="true"]')).toBe('Images 3');
   });
 
   it('counts the saved Video transcript Markdown on demand', async () => {

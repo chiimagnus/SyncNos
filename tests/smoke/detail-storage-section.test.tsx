@@ -15,48 +15,31 @@ vi.mock('@viewmodels/conversations/useConversationStorage', () => ({
 vi.mock('@i18n', () => ({
   t: (key: string) =>
     ({
-      detailStorageTotal: '本条内容占用',
-      detailStorageShow: '查看明细',
+      detailStorageLocalImages: '本地图片',
+      detailStorageShow: '查看',
       detailStorageHide: '收起',
-      detailStorageHeading: '当前内容的本地存储',
-      detailStorageText: '正文',
-      detailStorageImages: '图片',
-      detailStorageResources: '该内容的图片资源',
-      detailStorageNoImages: '该内容没有本地图片资源',
-      detailStorageMissing: '引用失效',
-      detailStorageRemoteRefs: '其他／远程引用',
-      detailStorageBrokenRefs: '失效的本地资源引用',
-      detailStorageEstimateHint: '按正文 UTF-8 字节与可读的本地图片计算',
-      detailStorageOptimize: '优化本条图片',
-      detailStorageCandidates: '张可尝试',
-      detailStorageNoneOptimizable: '没有可优化的图片',
-      detailStorageConfirmHint: '仅尝试当前内容的静态 PNG',
+      detailStorageMore: '显示更多',
+      detailStorageOptimize: '优化图片',
+      detailStorageConfirmHint: '仅优化本条内容的 PNG 图片',
       detailStorageConfirm: '确认优化',
       detailStorageOptimizing: '正在优化',
-      detailStorageFinished: '优化完成',
-      detailStorageSaved: '成功优化',
-      detailStorageChecked: '已检查',
+      detailStorageStop: '停止',
+      detailStorageFinished: '完成',
+      detailStorageSaved: '已优化',
       detailStorageFreed: '节省',
-      detailStorageLoadFailed: '存储信息读取失败',
-      detailStorageLoading: '计算中',
+      detailStorageLoadFailed: '本地图片读取失败',
       detailStorageRetry: '重试',
       cancelButton: '取消',
-    })[key as 'detailStorageTotal'] || key,
+    })[key as 'detailStorageLocalImages'] || key,
 }));
 
 import { DetailStorageSection } from '@ui/conversations/DetailStorageSection';
 
 const details = {
-  textBytes: 28_000,
   imageBytes: 2_420_000,
-  totalBytes: 2_448_000,
-  localReferences: 5,
-  otherReferences: 1,
-  missingReferences: 1,
   images: [
-    { id: 12, label: '文章插图.png', bytes: 1_600_000, format: 'PNG', state: 'ready', optimizable: true },
-    { id: 13, label: '文章封面.jpg', bytes: 820_000, format: 'JPEG', state: 'ready', optimizable: false },
-    { id: 14, label: '丢失的图片', bytes: 0, format: '', state: 'missing', optimizable: false },
+    { id: 12, label: '文章插图.png', bytes: 1_600_000, format: 'PNG', optimizable: true },
+    { id: 13, label: '文章封面.jpg', bytes: 820_000, format: 'JPEG', optimizable: false },
   ],
 };
 const messages = [{ id: 1, conversationId: 11, messageKey: 'body', role: 'article', contentMarkdown: '正文' }];
@@ -73,7 +56,7 @@ function setModel(next: Record<string, unknown>) {
   };
 }
 
-describe('DetailView inline storage disclosure', () => {
+describe('DetailView compact image storage', () => {
   let root: ReactDOM.Root;
   beforeEach(() => {
     const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
@@ -101,64 +84,67 @@ describe('DetailView inline storage disclosure', () => {
     const trigger = document.querySelector('[data-detail-storage] button[aria-controls]') as HTMLButtonElement;
     expect(trigger).toBeTruthy();
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
-    await act(async () => {
-      trigger.click();
-    });
+    await act(async () => trigger.click());
     expect(trigger.getAttribute('aria-expanded')).toBe('true');
     return document.querySelector('#detail-storage-breakdown')!;
   }
 
-  it('keeps the existing menu compact, expands the current item and explicitly confirms PNG optimization', async () => {
+  it('shows one image-size row and only downloaded images, with explicit confirmation before optimization', async () => {
     await act(async () => root.render(createElement(DetailStorageSection, { conversationId: 11, messages })));
-    expect(document.body.innerText || document.body.textContent).toContain('2.4 MB');
+    expect(document.body.textContent).toContain('本地图片 2.4 MB');
+    expect(document.body.textContent).toContain('查看');
     expect(document.querySelector('#detail-storage-breakdown')).toBeNull();
     const expanded = await open();
-    expect(expanded.textContent).toContain('正文');
-    expect(expanded.textContent).toContain('28 KB');
-    expect(expanded.textContent).toContain('图片');
-    expect(expanded.textContent).toContain('2.4 MB');
     expect(expanded.textContent).toContain('文章插图.png');
     expect(expanded.textContent).toContain('PNG · 1.6 MB');
     expect(expanded.textContent).toContain('文章封面.jpg');
     expect(expanded.textContent).toContain('JPEG · 820 KB');
-    expect(expanded.textContent).toContain('丢失的图片');
-    expect(expanded.textContent).toContain('引用失效');
-    expect(expanded.textContent).toContain('其他／远程引用 1');
+    expect(expanded.textContent).not.toContain('远程');
+    expect(expanded.textContent).not.toContain('引用失效');
+    expect(expanded.textContent).not.toContain('正文');
+    expect(expanded.textContent).not.toContain('28 KB');
 
-    const optimizeButton = [...expanded.querySelectorAll('button')].find((b) =>
-      b.textContent?.includes('优化本条图片'),
-    )!;
-    expect(optimizeButton.textContent).toContain('1 张可尝试');
+    const optimizeButton = [...expanded.querySelectorAll('button')].find((b) => b.textContent?.includes('优化图片'))!;
+    expect(optimizeButton.textContent).toContain('优化图片 (1)');
     await act(async () => optimizeButton.click());
-    expect(expanded.textContent).toContain('仅尝试当前内容的静态 PNG');
+    expect(expanded.textContent).toContain('仅优化本条内容的 PNG 图片');
     expect(fixture.optimize).not.toHaveBeenCalled();
     const confirm = [...expanded.querySelectorAll('button')].find((b) => b.textContent?.includes('确认优化'))!;
     await act(async () => confirm.click());
     expect(fixture.optimize).toHaveBeenCalledOnce();
   });
 
-  it('does not display a useless optimization control for pure text or video subtitles', async () => {
-    setModel({
-      details: { ...details, images: [], imageBytes: 0, totalBytes: 44_000, localReferences: 0, otherReferences: 0 },
-    });
+  it('renders nothing for text-only, remote-only or missing-image items, including while loading', async () => {
+    setModel({ details: { imageBytes: 0, images: [] } });
+    await act(async () => root.render(createElement(DetailStorageSection, { conversationId: 11, messages })));
+    expect(document.querySelector('[data-detail-storage]')).toBeNull();
+    expect(document.body.textContent).toBe('');
+
+    setModel({ status: 'loading', details: null });
+    await act(async () => root.render(createElement(DetailStorageSection, { conversationId: 11, messages })));
+    expect(document.querySelector('[data-detail-storage]')).toBeNull();
+  });
+
+  it('does not offer optimization for an existing local JPEG or GIF without eligible PNGs', async () => {
+    setModel({ details: { imageBytes: 820_000, images: [details.images[1]] } });
     await act(async () => root.render(createElement(DetailStorageSection, { conversationId: 11, messages })));
     const expanded = await open();
-    expect(expanded.textContent).toContain('该内容没有本地图片资源');
+    expect(expanded.textContent).toContain('文章封面.jpg');
+    expect(expanded.textContent).not.toContain('优化图片');
     expect(expanded.querySelector('button')).toBeNull();
   });
 
-  it('offers retry when inspection fails without claiming a fabricated size', async () => {
+  it('shows a small retry action when a real local image cannot be inspected', async () => {
     setModel({ details: null, status: 'error', error: 'IndexedDB unavailable' });
     await act(async () => root.render(createElement(DetailStorageSection, { conversationId: 11, messages })));
-    expect(document.body.textContent).toContain('—');
-    const expanded = await open();
-    const button = expanded.querySelector('button')!;
-    expect(button.textContent).toContain('重试');
-    await act(async () => button.click());
+    expect(document.body.textContent).not.toContain('B ·');
+    expect(document.body.textContent).toContain('本地图片读取失败');
+    const retry = document.querySelector('[data-detail-storage] button') as HTMLButtonElement;
+    await act(async () => retry.click());
     expect(fixture.refresh).toHaveBeenCalledOnce();
   });
 
-  it('supports cancellation and a truthful completed result', async () => {
+  it('supports cancellation and reports actual savings without adding duplicate totals', async () => {
     setModel({
       optimization: {
         status: 'running',
@@ -169,9 +155,7 @@ describe('DetailView inline storage disclosure', () => {
     await act(async () => root.render(createElement(DetailStorageSection, { conversationId: 11, messages })));
     let expanded = await open();
     expect(expanded.textContent).toContain('正在优化 1/3');
-    const stop = [...expanded.querySelectorAll('button')].find(
-      (b) => b.textContent?.includes('Stop') || b.textContent?.includes('detailStorageStop'),
-    )!;
+    const stop = [...expanded.querySelectorAll('button')].find((b) => b.textContent?.includes('停止'))!;
     await act(async () => stop.click());
     expect(fixture.cancel).toHaveBeenCalledOnce();
 
@@ -185,6 +169,7 @@ describe('DetailView inline storage disclosure', () => {
     await act(async () => root.render(createElement(DetailStorageSection, { conversationId: 11, messages })));
     expanded = document.querySelector('#detail-storage-breakdown')!;
     expect(expanded.textContent).toContain('120 KB');
-    expect(expanded.textContent).toContain('成功优化 1');
+    expect(expanded.textContent).toContain('已优化 1');
+    expect(document.body.textContent).not.toContain('本条内容占用');
   });
 });
