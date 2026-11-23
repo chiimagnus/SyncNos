@@ -11,6 +11,7 @@ import { useConversationsApp } from '@viewmodels/conversations/conversations-con
 import { useInAppShortcuts } from '@viewmodels/shortcuts/useInAppShortcuts';
 import { DETAIL_ACTION_SHORTCUTS, type InAppShortcutAction } from '@services/shortcuts/in-app-shortcuts';
 import { DetailHeaderActionBar } from '@ui/conversations/DetailHeaderActionBar';
+import { DetailStorageSection } from '@ui/conversations/DetailStorageSection';
 import {
   buttonFilledClassName,
   buttonMenuItemClassName,
@@ -223,13 +224,14 @@ export function ConversationDetailPane({
     textCount != null && Number.isFinite(textCount)
       ? `${textCountLabel} ${Math.max(0, Math.floor(textCount)).toLocaleString()}`
       : '';
-  const imageCountText = imageCount
-    ? `${t('detailImageCountLabel')} ${imageCount.total.toLocaleString()} · ${t('detailImageCachedLabel')} ${imageCount.cached.toLocaleString()} · ${t('detailImageUncachedLabel')} ${imageCount.uncached.toLocaleString()}`
-    : '';
+  const imageCountText = imageCount ? `${t('detailImageCountLabel')} ${imageCount.total.toLocaleString()}` : '';
   const hasReaderMoreMenuContent = readerFeatures.textLayout || readerFeatures.theme || readerFeatures.narration;
   const hasMoreMenuContent =
     Boolean(textCountText || imageCountText) || moreActions.length > 0 || hasReaderMoreMenuContent;
-  const moreMenuPanelClassName = 'tw-w-[260px] tw-max-w-[min(260px,calc(100vw-28px))] tw-text-[var(--text-primary)]';
+  const moreMenuPanelClassName = [
+    'tw-w-[260px] tw-max-w-[calc(100vw-28px)] tw-max-h-[min(640px,calc(100dvh-76px))]',
+    'tw-overflow-y-auto tw-overscroll-contain !tw-bg-[var(--bg-card)] tw-text-[var(--text-primary)]',
+  ].join(' ');
   const floatingIslandClassName = [
     'tw-pointer-events-auto tw-flex tw-w-fit tw-items-center tw-gap-1 tw-rounded-[var(--radius-inline)] tw-border tw-border-[var(--border)] tw-p-1',
     'tw-bg-[color-mix(in_srgb,var(--bg-card)_88%,transparent)] tw-backdrop-blur-[10px] tw-backdrop-saturate-150',
@@ -645,6 +647,17 @@ export function ConversationDetailPane({
                         >
                           {textCountText ? <div data-detail-text-count-row="true">{textCountText}</div> : null}
                           {imageCountText ? <div data-detail-image-count-row="true">{imageCountText}</div> : null}
+                          {imageCount &&
+                          imageCount.cached > 0 &&
+                          selected &&
+                          detail?.messages &&
+                          Number(detail.conversationId) === Number(selected.id) ? (
+                            <DetailStorageSection
+                              key={selected.id}
+                              conversationId={Number(selected.id)}
+                              messages={detail.messages}
+                            />
+                          ) : null}
                         </div>
                       ) : null}
                     </div>
