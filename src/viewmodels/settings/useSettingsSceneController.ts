@@ -299,6 +299,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [obsidianChatFolder, setObsidianChatFolder] = useState<string>('');
   const [obsidianArticleFolder, setObsidianArticleFolder] = useState<string>('');
   const [obsidianVideoFolder, setObsidianVideoFolder] = useState<string>('');
+  const [obsidianAttachmentFolder, setObsidianAttachmentFolder] = useState<string>('.');
   const [obsidianStatus, setObsidianStatus] = useState<string>(t('statusIdle'));
   const [obsidianSyncEnabled, setObsidianSyncEnabled] = useState(true);
   const [obsidianAutoSyncEnabled, setObsidianAutoSyncEnabled] = useState(false);
@@ -823,6 +824,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setObsidianChatFolder(String(obsidianSettings?.chatFolder || ''));
     setObsidianArticleFolder(String(obsidianSettings?.articleFolder || ''));
     setObsidianVideoFolder(String(obsidianSettings?.videoFolder || ''));
+    setObsidianAttachmentFolder(String(obsidianSettings?.attachmentFolder || '.'));
     setObsidianApiKeyDraft('');
     setObsidianStatus(t('statusIdle'));
 
@@ -1624,6 +1626,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
             chatFolder: obsidianChatFolder,
             articleFolder: obsidianArticleFolder,
             videoFolder: obsidianVideoFolder,
+            attachmentFolder: obsidianAttachmentFolder,
           };
 
           if (includeApiKey === true && String(obsidianApiKeyDraft || '').trim()) {
@@ -1640,6 +1643,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
           setObsidianChatFolder(String(data?.chatFolder || ''));
           setObsidianArticleFolder(String(data?.articleFolder || ''));
           setObsidianVideoFolder(String(data?.videoFolder || ''));
+          setObsidianAttachmentFolder(String(data?.attachmentFolder || '.'));
           setObsidianApiKeyDraft('');
         },
         {
@@ -1657,6 +1661,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       obsidianApiBaseUrl,
       obsidianApiKeyDraft,
       obsidianArticleFolder,
+      obsidianAttachmentFolder,
       obsidianAuthHeaderName,
       obsidianChatFolder,
       obsidianVideoFolder,
@@ -2285,6 +2290,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setObsidianArticleFolder,
     obsidianVideoFolder,
     setObsidianVideoFolder,
+    obsidianAttachmentFolder,
+    setObsidianAttachmentFolder,
     obsidianStatus,
     onSaveObsidianSettings,
     onTestObsidianConnection,

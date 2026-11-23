@@ -116,6 +116,8 @@ export function SettingsScene(props: SettingsSceneProps) {
     setObsidianArticleFolder,
     obsidianVideoFolder,
     setObsidianVideoFolder,
+    obsidianAttachmentFolder,
+    setObsidianAttachmentFolder,
     obsidianStatus,
     onSaveObsidianSettings,
     onTestObsidianConnection,
@@ -339,6 +341,7 @@ export function SettingsScene(props: SettingsSceneProps) {
           chatFolder={obsidianChatFolder}
           articleFolder={obsidianArticleFolder}
           videoFolder={obsidianVideoFolder}
+          attachmentFolder={obsidianAttachmentFolder}
           statusText={obsidianStatus}
           obsidianLogoUrl={getURL('icons/obsidian.svg' as any)}
           onChangeApiBaseUrl={setObsidianApiBaseUrl}
@@ -347,6 +350,7 @@ export function SettingsScene(props: SettingsSceneProps) {
           onChangeChatFolder={setObsidianChatFolder}
           onChangeArticleFolder={setObsidianArticleFolder}
           onChangeVideoFolder={setObsidianVideoFolder}
+          onChangeAttachmentFolder={setObsidianAttachmentFolder}
           onToggleSyncEnabled={(enabled) => {
             void onToggleObsidianSyncEnabled(enabled);
           }}

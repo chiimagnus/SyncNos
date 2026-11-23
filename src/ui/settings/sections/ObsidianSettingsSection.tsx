@@ -17,6 +17,7 @@ export function ObsidianSettingsSection(props: {
   chatFolder: string;
   articleFolder: string;
   videoFolder: string;
+  attachmentFolder: string;
   statusText: string;
   obsidianLogoUrl: string;
   onChangeApiBaseUrl: (v: string) => void;
@@ -25,6 +26,7 @@ export function ObsidianSettingsSection(props: {
   onChangeChatFolder: (v: string) => void;
   onChangeArticleFolder: (v: string) => void;
   onChangeVideoFolder: (v: string) => void;
+  onChangeAttachmentFolder: (v: string) => void;
   onToggleSyncEnabled: (enabled: boolean) => void;
   onToggleAutoSyncEnabled: (enabled: boolean) => void;
   onSave: () => void;
@@ -43,6 +45,7 @@ export function ObsidianSettingsSection(props: {
     chatFolder,
     articleFolder,
     videoFolder,
+    attachmentFolder,
     statusText,
     obsidianLogoUrl,
     onChangeApiBaseUrl,
@@ -51,6 +54,7 @@ export function ObsidianSettingsSection(props: {
     onChangeChatFolder,
     onChangeArticleFolder,
     onChangeVideoFolder,
+    onChangeAttachmentFolder,
     onToggleSyncEnabled,
     onToggleAutoSyncEnabled,
     onSave,
@@ -205,6 +209,20 @@ export function ObsidianSettingsSection(props: {
               aria-label={t('videoScriptsFolder')}
             />
           </SettingsFormRow>
+          <SettingsFormRow label={t('obsidianAttachmentFolder')}>
+            <input
+              value={attachmentFolder}
+              onChange={(e) => onChangeAttachmentFolder(e.target.value)}
+              onBlur={onSave}
+              onKeyDown={(e) => onEnterToSave(e)}
+              disabled={busy}
+              spellCheck={false}
+              placeholder="images"
+              className={settingsTextInputClassName}
+              aria-label={t('obsidianAttachmentFolder')}
+            />
+          </SettingsFormRow>
+          <p className="tw-m-0 tw-text-xs tw-text-[var(--text-secondary)]">{t('obsidianAttachmentFolderHelp')}</p>
         </div>
       </section>
     </>

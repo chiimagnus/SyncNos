@@ -26,6 +26,7 @@ describe('backup-utils', () => {
       feishu_article_folder: 'WebArticles',
       feishu_video_folder: 'Videos',
       obsidian_api_base_url: 'http://127.0.0.1:27123',
+      obsidian_attachment_folder: '../images',
       obsidian_api_key: 'obsidian-key',
       [DATA_REVISION_WAKE_STORAGE_KEY]: 'runtime-nonce',
     });
@@ -42,6 +43,7 @@ describe('backup-utils', () => {
       feishu_article_folder: 'WebArticles',
       feishu_video_folder: 'Videos',
       obsidian_api_base_url: 'http://127.0.0.1:27123',
+      obsidian_attachment_folder: '../images',
     });
   });
 

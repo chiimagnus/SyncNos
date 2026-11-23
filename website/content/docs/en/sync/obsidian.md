@@ -33,6 +33,17 @@ Copy the plugin **API Key**, then open **SyncNos → Settings → Obsidian**:
 
 Click **Test**. Once it succeeds, use manual sync or enable auto-sync.
 
+### Where to save attachments
+
+Under **Obsidian Paths → Attachment Folder**, enter a path relative to each Markdown note:
+
+- `.` (default): images alongside the note.
+- `images`: images in the note's `images/` subfolder.
+- `../images`: images in the parent directory's `images/` folder.
+
+SyncNos creates missing folders and updates Markdown image references. Paths cannot escape the Obsidian vault.
+Changing the setting writes images into the new folder on the next sync, but does not automatically delete old images that may still be linked from other notes.
+
 ![Configure the API key in SyncNos](/assets/docs/obsidian/obsidian-copy-api-key.png)
 
 ## Troubleshoot

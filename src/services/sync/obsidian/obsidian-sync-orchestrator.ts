@@ -10,6 +10,7 @@ import {
   buildStableNotePath as buildDefaultStableNotePath,
   resolveExistingNotePath as resolveDefaultExistingNotePath,
 } from '@services/sync/obsidian/obsidian-note-path.ts';
+import { resolveAttachmentTarget } from '@services/sync/obsidian/obsidian-attachment-path';
 import {
   buildSyncnosObject as buildDefaultSyncnosObject,
   readSyncnosObject as readDefaultSyncnosObject,
@@ -77,22 +78,18 @@ function buildNoteBasenameFromFilePath(filePath: unknown) {
   return dot > 0 ? filename.slice(0, dot) : filename;
 }
 
-function buildAttachmentPath(filePath: unknown, attachmentName: string) {
-  const raw = safeString(filePath);
-  const dir = raw.split('/').slice(0, -1).filter(Boolean).join('/');
-  return dir ? `${dir}/${attachmentName}` : attachmentName;
-}
-
 async function materializeMarkdownAssetsForObsidian({
   client,
   conversationId,
   filePath,
+  attachmentFolder,
   markdown,
   indexScopeMarkdown,
 }: {
   client: any;
   conversationId: number;
   filePath: string;
+  attachmentFolder: string;
   markdown: string;
   indexScopeMarkdown?: string;
 }): Promise<string> {
@@ -176,16 +173,15 @@ async function materializeMarkdownAssetsForObsidian({
     const index = indexByKey.get(key);
     if (!index) throw new Error(`missing asset index mapping: ${key}`);
     const attachmentName = `${noteBase}-${index}.${ext}`;
-    const putRes = await client.putVaultBinaryFile(
-      buildAttachmentPath(filePath, attachmentName),
-      new Uint8Array(await blob.arrayBuffer()),
-      { contentType },
-    );
+    const target = resolveAttachmentTarget(filePath, attachmentFolder, attachmentName);
+    const putRes = await client.putVaultBinaryFile(target.filePath, new Uint8Array(await blob.arrayBuffer()), {
+      contentType,
+    });
     if (!putRes || !putRes.ok) {
       const message = putRes && putRes.error && putRes.error.message ? putRes.error.message : 'attachment put failed';
       throw new Error(String(message || 'attachment put failed'));
     }
-    replacementByTarget.set(sourceTarget, attachmentName);
+    replacementByTarget.set(sourceTarget, target.markdownTarget);
   };
 
   for (const assetId of targetAssetIds) {
@@ -370,6 +366,8 @@ async function decideSyncModeForConversation({
 
   const desiredFilePath =
     safeString(pathResolution?.desiredFilePath) || buildDefaultStableNotePath(convo, { folderByKindId });
+  // Validate per-note vault containment before any image or Markdown write (including optional ChatGPT images).
+  resolveAttachmentTarget(desiredFilePath, pathConfig.attachmentFolder, 'attachment');
   existingPath = safeString(pathResolution?.resolvedFilePath);
 
   if (pathResolution?.found && existingPath) {
@@ -387,6 +385,7 @@ async function decideSyncModeForConversation({
       filePath: desiredFilePath,
       messages,
       comments: articleComments,
+      attachmentFolder: pathConfig.attachmentFolder,
       mode: forceFull ? 'full_rebuild_forced' : 'full_rebuild',
     };
   }
@@ -401,6 +400,7 @@ async function decideSyncModeForConversation({
       deleteAfterFilePath,
       messages,
       comments: articleComments,
+      attachmentFolder: pathConfig.attachmentFolder,
       mode: forceFull ? 'full_rebuild_forced' : 'full_rebuild_rename',
     };
   }
@@ -413,6 +413,7 @@ async function decideSyncModeForConversation({
       filePath: desiredFilePath,
       messages,
       comments: articleComments,
+      attachmentFolder: pathConfig.attachmentFolder,
       mode: 'full_rebuild_forced',
     };
   }
@@ -430,6 +431,7 @@ async function decideSyncModeForConversation({
       filePath: desiredFilePath,
       messages,
       comments: articleComments,
+      attachmentFolder: pathConfig.attachmentFolder,
       mode: 'full_rebuild',
     };
   }
@@ -444,6 +446,7 @@ async function decideSyncModeForConversation({
       filePath: desiredFilePath,
       messages,
       comments: articleComments,
+      attachmentFolder: pathConfig.attachmentFolder,
       mode: 'full_rebuild',
     };
   }
@@ -625,6 +628,7 @@ async function runSyncConversations({
             client,
             conversationId: decision.conversationId,
             filePath: decision.filePath,
+            attachmentFolder: decision.attachmentFolder,
             markdown: rawMarkdown,
             indexScopeMarkdown: rawMarkdown,
           });

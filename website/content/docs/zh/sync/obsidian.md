@@ -33,6 +33,17 @@ http://127.0.0.1:27123
 
 点击 **测试**。成功后即可手动同步或开启自动同步。
 
+### 附件保存位置
+
+在 **Obsidian 路径 → 附件文件夹** 中设置相对于每篇 Markdown 笔记的路径：
+
+- `.`（默认）：图片与笔记放在同一目录。
+- `images`：图片放在该笔记目录下的 `images/`。
+- `../images`：图片放在该笔记目录的上级 `images/`。
+
+SyncNos 自动创建目标目录并更新 Markdown 图片引用；路径不能超出 Obsidian vault。
+更改此设置后，下一次同步会在新目录写入图片，但不会自动删除旧图片，避免误删仍被其他笔记引用的附件。
+
 ![在 SyncNos 中配置 API Key](/assets/docs/obsidian/obsidian-copy-api-key.png)
 
 ## 遇到问题

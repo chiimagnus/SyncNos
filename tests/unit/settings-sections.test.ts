@@ -434,6 +434,7 @@ describe('settings section definitions', () => {
     setupDom();
     const root = ReactDOM.createRoot(document.getElementById('root')!);
     const onTest = vi.fn();
+    const onChangeAttachmentFolder = vi.fn();
 
     act(() => {
       root.render(
@@ -449,6 +450,7 @@ describe('settings section definitions', () => {
           chatFolder: 'SyncNos-AIChats',
           articleFolder: 'SyncNos-WebArticles',
           videoFolder: 'SyncNos-Videos',
+          attachmentFolder: '../images',
           statusText: '',
           obsidianLogoUrl: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>',
           onChangeApiBaseUrl: () => {},
@@ -457,6 +459,7 @@ describe('settings section definitions', () => {
           onChangeChatFolder: () => {},
           onChangeArticleFolder: () => {},
           onChangeVideoFolder: () => {},
+          onChangeAttachmentFolder,
           onToggleSyncEnabled: () => {},
           onToggleAutoSyncEnabled: () => {},
           onSave: () => {},
@@ -470,6 +473,9 @@ describe('settings section definitions', () => {
     expect(helpLink?.textContent).toContain('Help docs');
     const baseUrlInput = document.querySelector('input[aria-label="Base URL"]') as HTMLInputElement | null;
     expect(baseUrlInput?.className || '').toContain('tw-max-w-[180px]');
+    const attachmentInput = document.querySelector('input[aria-label="Attachment Folder"]') as HTMLInputElement | null;
+    expect(attachmentInput?.value).toBe('../images');
+    expect(attachmentInput?.closest('section')?.textContent).toContain('Relative to each note');
     const section = document.querySelector('section[aria-label="Obsidian"]');
     const header = section?.firstElementChild;
     const testButton = Array.from(header?.querySelectorAll('button') || []).find(

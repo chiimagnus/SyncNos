@@ -228,6 +228,8 @@ export const zh: { [K in TranslationKey]: string } = {
   aiChatsFolder: 'AI 对话文件夹',
   webClipperFolder: '网页剪藏文件夹',
   videoScriptsFolder: '视频脚本文件夹',
+  obsidianAttachmentFolder: '附件文件夹',
+  obsidianAttachmentFolderHelp: '相对于每篇笔记：. 为同目录，images 为子目录，../images 为上级目录。',
 
   // AboutSection
   sourceCode: '源代码',

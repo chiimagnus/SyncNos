@@ -231,6 +231,8 @@ export const en = {
   aiChatsFolder: 'AI Chats Folder',
   webClipperFolder: 'Web Clipper Folder',
   videoScriptsFolder: 'Video Scripts Folder',
+  obsidianAttachmentFolder: 'Attachment Folder',
+  obsidianAttachmentFolderHelp: 'Relative to each note: . = same folder, images = subfolder, ../images = parent folder.',
 
   // AboutSection
   sourceCode: 'Source Code',
