@@ -99,7 +99,7 @@ vi.mock('../../src/viewmodels/popup/usePopupCurrentPageCapture', () => ({
 
 vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
   ConversationsScene: (props: {
-    listShell?: { rightSlot: ReactNode };
+    listShell?: { rightSlot: ReactNode; savedPage?: { source: string; conversationKey: string } };
     onPopupSyncPreparing?: (provider: 'notion' | 'obsidian' | 'feishu' | 'github') => void | Promise<void>;
   }) => {
     const [mode, setMode] = useState<'list' | 'detail' | 'detail-empty' | 'detail-menu'>('list');
@@ -109,7 +109,17 @@ vi.mock('../../src/ui/conversations/ConversationsScene', () => ({
     return createElement(
       'div',
       null,
-      mode === 'list' ? createElement('div', { 'data-list-shell': '1' }, props.listShell?.rightSlot ?? null) : null,
+      mode === 'list'
+        ? createElement(
+            'div',
+            {
+              'data-list-shell': '1',
+              'data-saved-page-source': props.listShell?.savedPage?.source ?? '',
+              'data-saved-page-key': props.listShell?.savedPage?.conversationKey ?? '',
+            },
+            props.listShell?.rightSlot ?? null,
+          )
+        : null,
       createElement(
         'button',
         {
@@ -308,7 +318,7 @@ describe('PopupShell header actions', () => {
     expect(document.querySelector('[aria-label="More actions coming soon"]')).toBeFalsy();
   });
 
-  it('shows a saved-item shortcut without replacing capture, and opens the persisted item locator', async () => {
+  it('passes the saved-page identity to the list scene without crowding the capture button or opening a tab', async () => {
     const capture = vi.fn();
     popupCaptureHookMock.mockReturnValue({
       buttonDisabled: false,
@@ -323,27 +333,16 @@ describe('PopupShell header actions', () => {
       checking: false,
       status: null,
     });
-    openOrFocusExtensionAppTabMock.mockResolvedValue({ id: 9 });
     (window as any).close = vi.fn();
     await renderPopupShell(root!);
 
-    const saved = document.querySelector('[aria-label="Saved · Open"]') as HTMLButtonElement | null;
-    expect(saved).toBeTruthy();
-    expect(saved?.getAttribute('data-tooltip-content')).toContain('incomplete');
+    const listShell = document.querySelector('[data-list-shell="1"]') as HTMLElement;
+    expect(listShell.dataset.savedPageSource).toBe('chatgpt');
+    expect(listShell.dataset.savedPageKey).toBe('migrated-stored-key');
     expect(document.querySelector('[aria-label="Fetch AI Chat"]')).toBeTruthy();
-    await act(async () => {
-      saved!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-      await Promise.resolve();
-    });
-
-    const { buildConversationRouteFromLoc, encodeConversationLoc } =
-      await import('../../src/services/shared/conversation-loc');
-    expect(openOrFocusExtensionAppTabMock).toHaveBeenCalledWith({
-      route: buildConversationRouteFromLoc(
-        encodeConversationLoc({ source: 'chatgpt', conversationKey: 'migrated-stored-key' }),
-      ),
-    });
-    expect((window as any).close).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('[aria-label="Saved · Open"]')).toBeNull();
+    expect(openOrFocusExtensionAppTabMock).not.toHaveBeenCalled();
+    expect((window as any).close).not.toHaveBeenCalled();
     expect(capture).not.toHaveBeenCalled();
   });
 
@@ -363,12 +362,14 @@ describe('PopupShell header actions', () => {
     });
     await renderPopupShell(root!);
     expect((document.querySelector('[aria-label="Unavailable"]') as HTMLButtonElement).disabled).toBe(true);
-    expect(document.querySelector('[aria-label="Saved · Open"]')).toBeTruthy();
+    expect(document.querySelector('[data-list-shell]')?.getAttribute('data-saved-page-key')).toBe(
+      'article:https://example.com/a',
+    );
   });
 
-  it('does not show a saved-item shortcut on pages without a persisted match', async () => {
+  it('does not pass a saved item when no local match exists', async () => {
     await renderPopupShell(root!);
-    expect(document.querySelector('[aria-label="Saved · Open"]')).toBeFalsy();
+    expect(document.querySelector('[data-list-shell]')?.getAttribute('data-saved-page-key')).toBe('');
   });
 
   it('keeps capture controls independent of retired in-app shortcut bindings', async () => {

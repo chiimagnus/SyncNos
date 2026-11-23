@@ -249,6 +249,113 @@ describe('ConversationsScene popup Escape behavior', () => {
     expect(document.querySelector('[data-conversation-id="11"]')).toBeTruthy();
   });
 
+  it('opens a saved current page inside the same popup, then returns to its list', async () => {
+    openConversationExternalBySourceKey.mockResolvedValue(true);
+    await act(async () => {
+      root!.render(
+        createElement(ConversationsScene, {
+          listShell: {
+            rightSlot: createElement('span', { 'data-toolbar-actions': 'true' }, 'Capture'),
+            savedPage: { source: 'chatgpt', conversationKey: 'persisted-key' },
+          },
+        }),
+      );
+      await flushImmediate();
+    });
+
+    const savedRow = document.querySelector('[data-current-page-saved]') as HTMLButtonElement | null;
+    expect(savedRow).toBeTruthy();
+    expect(savedRow?.textContent).toContain('Current page saved');
+    expect(savedRow?.textContent).toContain('View');
+    expect(savedRow?.getAttribute('data-tooltip-content')).toContain('local record');
+    expect(savedRow?.previousElementSibling?.querySelector('[data-toolbar-actions]')).toBeTruthy();
+
+    await act(async () => {
+      savedRow!.click();
+      await import('../../src/ui/conversations/ConversationDetailPane');
+      await flushImmediate();
+    });
+
+    expect(openConversationExternalBySourceKey).toHaveBeenCalledOnce();
+    expect(openConversationExternalBySourceKey).toHaveBeenCalledWith('chatgpt', 'persisted-key');
+    expect(openConversationExternalById).not.toHaveBeenCalled();
+    expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
+    expect(document.querySelector('[data-current-page-saved]')).toBeNull();
+
+    await act(async () => {
+      document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      await flushImmediate();
+    });
+    expect(document.querySelector('[data-current-page-saved]')).toBeTruthy();
+    expect(document.querySelector('[data-toolbar-actions]')).toBeTruthy();
+  });
+
+  it('keeps the list visible when a saved record no longer exists and offers retry', async () => {
+    openConversationExternalBySourceKey.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    await act(async () => {
+      root!.render(
+        createElement(ConversationsScene, {
+          listShell: {
+            rightSlot: createElement('span', null, 'Capture'),
+            savedPage: { source: 'web', conversationKey: 'article:https://example.com/a' },
+          },
+        }),
+      );
+      await flushImmediate();
+    });
+
+    const savedRow = document.querySelector('[data-current-page-saved]') as HTMLButtonElement;
+    await act(async () => {
+      savedRow.click();
+      await flushImmediate();
+    });
+    expect(document.querySelector('[aria-label="Conversation detail"]')).toBeNull();
+    expect(savedRow.textContent).toContain('Retry');
+    expect(savedRow.disabled).toBe(false);
+
+    await act(async () => {
+      savedRow.click();
+      await import('../../src/ui/conversations/ConversationDetailPane');
+      await flushImmediate();
+    });
+    expect(openConversationExternalBySourceKey).toHaveBeenCalledTimes(2);
+    expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
+  });
+
+  it('avoids duplicate saved-page opens while the first lookup is pending', async () => {
+    let resolveOpen!: (value: boolean) => void;
+    openConversationExternalBySourceKey.mockReturnValue(
+      new Promise<boolean>((resolve) => {
+        resolveOpen = resolve;
+      }),
+    );
+    await act(async () => {
+      root!.render(
+        createElement(ConversationsScene, {
+          listShell: {
+            rightSlot: null,
+            savedPage: { source: 'chatgpt', conversationKey: 'current' },
+          },
+        }),
+      );
+      await flushImmediate();
+    });
+    const savedRow = document.querySelector('[data-current-page-saved]') as HTMLButtonElement;
+    act(() => {
+      savedRow.click();
+    });
+    expect(savedRow.disabled).toBe(true);
+    savedRow.click();
+    expect(openConversationExternalBySourceKey).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveOpen(true);
+      await import('../../src/ui/conversations/ConversationDetailPane');
+      await flushImmediate();
+    });
+    expect(document.querySelector('[aria-label="Conversation detail"]')).toBeTruthy();
+  });
+
   it('consumes pending-open source/key target and opens detail via precise API', async () => {
     consumePendingOpenConversation.mockReturnValueOnce({
       conversationId: 99,

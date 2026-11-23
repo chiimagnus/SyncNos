@@ -250,7 +250,7 @@ type ConversationsAppState = {
   pendingListLocateId: number | null;
   consumeListLocate: () => number | null;
   openConversationExternalByLoc: (input: { source: string; conversationKey: string }) => Promise<void>;
-  openConversationExternalBySourceKey: (source: string, conversationKey: string) => Promise<void>;
+  openConversationExternalBySourceKey: (source: string, conversationKey: string) => Promise<boolean>;
   openConversationExternalById: (conversationId: number) => Promise<void>;
   openConversationInListScopeByLoc: (input: { source: string; conversationKey: string }) => Promise<void>;
   openConversationInListScopeById: (conversationId: number) => Promise<void>;
@@ -598,13 +598,15 @@ export function ConversationsProvider({
                 target ? toConversationFromOpenTarget(target) : null,
               )
             : await getConversationById(intent.conversationId);
-        if (requestSeq !== openTargetRequestSeqRef.current || pendingOpenIntentRef.current !== intent) return;
+        if (requestSeq !== openTargetRequestSeqRef.current || pendingOpenIntentRef.current !== intent) return false;
         pendingOpenIntentRef.current = null;
-        if (!conversation) return;
+        if (!conversation) return false;
         applyActiveConversation(conversation, { preserveListScope: intent.preserveListScope });
+        return true;
       } catch (_error) {
-        if (requestSeq !== openTargetRequestSeqRef.current || pendingOpenIntentRef.current !== intent) return;
+        if (requestSeq !== openTargetRequestSeqRef.current || pendingOpenIntentRef.current !== intent) return false;
         requestDataRevisionRetry(['conversations']);
+        return false;
       }
     },
     [applyActiveConversation],
@@ -619,8 +621,8 @@ export function ConversationsProvider({
     async (source: string, conversationKey: string, options?: { preserveListScope?: boolean }) => {
       const safeSource = String(source || '').trim();
       const safeConversationKey = String(conversationKey || '').trim();
-      if (!safeSource || !safeConversationKey) return;
-      await openConversationIntent({
+      if (!safeSource || !safeConversationKey) return false;
+      return openConversationIntent({
         kind: 'source-key',
         source: safeSource,
         conversationKey: safeConversationKey,
@@ -631,9 +633,8 @@ export function ConversationsProvider({
   );
 
   const openConversationExternalBySourceKey = useCallback(
-    async (source: string, conversationKey: string) => {
-      await openConversationBySourceKey(source, conversationKey, { preserveListScope: false });
-    },
+    (source: string, conversationKey: string) =>
+      openConversationBySourceKey(source, conversationKey, { preserveListScope: false }),
     [openConversationBySourceKey],
   );
 

@@ -4,10 +4,11 @@ import { getURL as runtimeGetURL } from '@services/shared/runtime';
 
 type CapturedListPaneShellProps = {
   rightSlot: ReactNode;
+  notice?: ReactNode;
   children: ReactNode;
 };
 
-export function CapturedListPaneShell({ rightSlot, children }: CapturedListPaneShellProps) {
+export function CapturedListPaneShell({ rightSlot, notice, children }: CapturedListPaneShellProps) {
   const logoUrl = runtimeGetURL('icons/icon-128.png');
 
   return (
@@ -36,6 +37,7 @@ export function CapturedListPaneShell({ rightSlot, children }: CapturedListPaneS
         </div>
       </div>
 
+      {notice}
       {children}
     </div>
   );
