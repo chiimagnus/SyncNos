@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   read: vi.fn(),
   encode: vi.fn(),
   revision: vi.fn(),
+  commit: vi.fn(),
 }));
 vi.mock('@services/conversations/data/image-cache-read', () => ({
   getImageCacheAssetById: (args: unknown) => mocks.read(args),
@@ -16,6 +17,9 @@ vi.mock('@services/conversations/data/image-optimization', () => ({
 }));
 vi.mock('@services/data-revisions/storage-idb', () => ({
   readDataRevisionSnapshot: () => mocks.revision(),
+}));
+vi.mock('@services/conversations/data/image-optimization-commit', () => ({
+  commitImageOptimization: (args: unknown) => mocks.commit(args),
 }));
 
 import { useStorageImageOptimization } from '@viewmodels/settings/useStorageImageOptimization';
@@ -68,6 +72,7 @@ beforeEach(() => {
   });
   mocks.encode.mockResolvedValue(response);
   mocks.revision.mockResolvedValue({ image_cache: 7, conversations: 4 });
+  mocks.commit.mockResolvedValue({ id: 1, bytesSaved: 5, byteSize: 3, contentType: 'image/png' });
 });
 afterEach(() => {
   act(() => root.unmount());
@@ -103,6 +108,45 @@ describe('image optimization preview lifecycle', () => {
     expect(current.preview).toBeNull();
     expect(current.previewStatus).toBe('error');
     expect(current.previewError).toBe('storage_insight_stale');
+  });
+
+  it('persists the explicitly selected preview using the same ownership and expected revision', async () => {
+    await act(async () => {
+      root.render(createElement(Harness));
+    });
+    await act(async () => {
+      await current.preparePreview({ id: 1, conversationId: 12 }, 'pixel-exact');
+    });
+    await act(async () => {
+      await current.savePreview(false);
+    });
+    expect(mocks.commit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selection: { id: 1, conversationId: 12 },
+        preview: response,
+        expectedRevision: 7,
+        approveLossy: false,
+      }),
+    );
+    expect(current.saveStatus).toBe('saved');
+    expect(current.savedBytes).toBe(5);
+    expect(current.preview).toBeNull();
+  });
+
+  it('shows write conflicts without incorrectly claiming original bytes were preserved', async () => {
+    mocks.commit.mockRejectedValueOnce(new Error('image_optimization_conflict'));
+    await act(async () => {
+      root.render(createElement(Harness));
+    });
+    await act(async () => {
+      await current.preparePreview({ id: 1, conversationId: 12 }, 'pixel-exact');
+    });
+    await act(async () => {
+      await current.savePreview(false);
+    });
+    expect(current.saveStatus).toBe('error');
+    expect(current.saveError).toBe('image_optimization_conflict');
+    expect(current.preview).not.toBeNull();
   });
 
   it('cancels an in-flight preview when the resource audit turns stale', async () => {

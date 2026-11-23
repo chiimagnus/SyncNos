@@ -525,6 +525,13 @@ export const zh: { [K in TranslationKey]: string } = {
   storageImageOptimized: '优化后预览',
   storageImageSavings: '可能节省',
   storageImageClosePreview: '关闭预览',
+  storageImageSave: '保存优化图片',
+  storageImageSaving: '正在保存图片…',
+  storageImageSaved: '图片保存成功，实际节省',
+  storageImageSaveFailed: '无法确认图片保存成功',
+  storageImageRescanNeeded: '再次操作前请重新扫描。',
+  storageImageConfirmLossy: '我接受这张图片的像素变化和元数据损失。',
+  storageImageSaveWarning: '保存将覆盖本地原始字节。如需保留原图，请先导出 Backup；已有远端副本不会自动更新。',
   storageImagePixelExactWarning: '解码像素完全一致；后续如保存，图片元数据仍可能变化。',
   storageImageLossyWarning: '此预览会改变像素并可能丢失元数据，请先对比原图再决定是否保存。',
 

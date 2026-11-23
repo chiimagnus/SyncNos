@@ -12,6 +12,8 @@ import { conversationKinds } from '@services/protocols/conversation-kinds';
 import { backgroundStorage } from '@services/conversations/background/storage';
 import { __resetConversationStorageStateForTests } from '@services/conversations/data/storage-idb';
 import { exportBackupZip } from '@services/sync/backup/export';
+import { commitImageOptimization } from '@services/conversations/data/image-optimization-commit';
+import { readDataRevision } from '@services/data-revisions/storage-idb';
 import { importBackupZipMerge } from '@services/sync/backup/import';
 import { extractZipEntries } from '@services/sync/backup/zip-utils';
 import { createNotionSyncOrchestrator } from '@services/sync/notion/notion-sync-orchestrator';
@@ -136,6 +138,117 @@ afterEach(async () => {
   vi.unstubAllGlobals();
   await closeDbCaches();
   await deleteDb();
+});
+
+describe('compressed image Backup continuity', () => {
+  it('exports optimized bytes and restores renderable identity without touching the message or activity time', async () => {
+    const db = await openDb();
+    const source = new Blob(
+      [
+        Uint8Array.from([
+          137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 0, 0, 0,
+          0, 0, 0, 0, 0, 73, 68, 65, 84, 0, 0, 0, 0,
+        ]),
+        new Uint8Array(1000),
+      ],
+      { type: 'image/png' },
+    );
+    const output = source.slice(0, source.size - 1000, 'image/png');
+    const tx = db.transaction(['conversations', 'messages', 'image_cache'], 'readwrite');
+    const conversationId = Number(
+      await reqToPromise(
+        tx.objectStore('conversations').add({
+          sourceType: 'article',
+          source: 'web',
+          conversationKey: 'optimized-image',
+          title: 'Optimized article',
+          url: 'https://example.com/a',
+          lastActivityAt: 123,
+        }),
+      ),
+    );
+    const assetId = Number(
+      await reqToPromise(
+        tx.objectStore('image_cache').add({
+          conversationId,
+          url: 'https://example.com/1.png',
+          blob: source,
+          byteSize: source.size,
+          contentType: 'image/png',
+          createdAt: 1,
+          updatedAt: 2,
+        }),
+      ),
+    );
+    await reqToPromise(
+      tx.objectStore('messages').add({
+        conversationId,
+        messageKey: 'article_body',
+        role: 'article',
+        contentMarkdown: `![cached](syncnos-asset://${assetId})`,
+        sequence: 1,
+        updatedAt: 3,
+      }),
+    );
+    await txDone(tx);
+
+    await commitImageOptimization({
+      selection: { id: assetId, conversationId },
+      originalAsset: {
+        id: assetId,
+        conversationId,
+        url: 'https://example.com/1.png',
+        blob: source,
+        byteSize: source.size,
+        contentType: 'image/png',
+      },
+      preview: {
+        ok: true,
+        mode: 'pixel-exact',
+        pixelsEqual: true,
+        originalBlob: source,
+        optimizedBlob: output,
+        originalBytes: source.size,
+        optimizedBytes: output.size,
+        savedBytes: source.size - output.size,
+        contentType: 'image/png',
+        width: 1,
+        height: 1,
+      },
+      expectedRevision: await readDataRevision('image_cache'),
+    });
+
+    const backup = await exportBackupZip();
+    const files = await extractZipEntries(backup.blob);
+    const index = JSON.parse(new TextDecoder().decode(files.get('assets/image-cache/index.json')));
+    const asset = index.assets[0];
+    expect(asset.contentType).toBe('image/png');
+    expect(asset.byteSize).toBe(output.size);
+    expect(files.get(asset.blobPath)).toEqual(new Uint8Array(await output.arrayBuffer()));
+
+    await transferCurrentDbToEmptyDb();
+    const importedDb = await openDb();
+    const verifyTx = importedDb.transaction(['conversations', 'messages', 'image_cache'], 'readonly');
+    const [restoredConversations, restoredMessages, restoredAssets] = await Promise.all([
+      reqToPromise<any[]>(verifyTx.objectStore('conversations').getAll() as any),
+      reqToPromise<any[]>(verifyTx.objectStore('messages').getAll() as any),
+      reqToPromise<any[]>(verifyTx.objectStore('image_cache').getAll() as any),
+    ]);
+    await txDone(verifyTx);
+    expect(restoredConversations[0]?.lastActivityAt).toBe(123);
+    expect(restoredAssets).toHaveLength(1);
+    expect(restoredAssets[0].byteSize).toBe(output.size);
+    expect(restoredAssets[0].contentType).toBe('image/png');
+    expect(new Uint8Array(await restoredAssets[0].blob.arrayBuffer())).toEqual(
+      new Uint8Array(await output.arrayBuffer()),
+    );
+    expect(restoredMessages[0].contentMarkdown).toBe(`![cached](syncnos-asset://${restoredAssets[0].id})`);
+
+    await importBackupZipMerge(files);
+    const dedupeTx = importedDb.transaction('image_cache', 'readonly');
+    expect(await reqToPromise(dedupeTx.objectStore('image_cache').count())).toBe(1);
+    await txDone(dedupeTx);
+  });
 });
 
 describe('backup -> Notion sync continuity', () => {

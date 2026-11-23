@@ -7,6 +7,7 @@ const state = vi.hoisted(() => ({
   current: {} as any,
   prepare: vi.fn(),
   cancel: vi.fn(),
+  save: vi.fn(),
 }));
 vi.mock('@viewmodels/settings/useStorageImageOptimization', () => ({
   useStorageImageOptimization: () => state.current,
@@ -43,9 +44,14 @@ beforeEach(() => {
     previewError: '',
     preparePreview: state.prepare,
     cancelPreview: state.cancel,
+    savePreview: state.save,
+    saveStatus: 'idle',
+    saveError: '',
+    savedBytes: 0,
   };
   state.prepare.mockReset();
   state.cancel.mockReset();
+  state.save.mockReset();
   createUrl.mockReset().mockReturnValueOnce('blob:old').mockReturnValueOnce('blob:new');
   revokeUrl.mockReset();
   Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createUrl });
@@ -93,6 +99,11 @@ describe('image preview UI', () => {
     expect(images.map((image) => image.getAttribute('src'))).toEqual(['blob:old', 'blob:new']);
     expect(document.body.textContent).toContain('120 B');
     expect(document.body.textContent).toContain('80×60');
+    const save = Array.from(document.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Save optimized image',
+    )!;
+    act(() => save.click());
+    expect(state.save).toHaveBeenCalledWith(false);
     const close = Array.from(document.querySelectorAll('button')).find(
       (button) => button.textContent === 'Close preview',
     )!;
@@ -103,6 +114,37 @@ describe('image preview UI', () => {
     root = ReactDOM.createRoot(document.createElement('div'));
     expect(revokeUrl).toHaveBeenCalledWith('blob:old');
     expect(revokeUrl).toHaveBeenCalledWith('blob:new');
+  });
+
+  it('requires a second explicit acknowledgment before a lossy image can be saved', () => {
+    state.current = {
+      ...state.current,
+      previewStatus: 'ready',
+      preview: {
+        selection: { id: 2, conversationId: 1 },
+        result: {
+          mode: 'lossy-preview',
+          originalBlob: new Blob(['original']),
+          optimizedBlob: new Blob(['optimized']),
+          originalBytes: 200,
+          optimizedBytes: 50,
+          savedBytes: 150,
+          width: 80,
+          height: 60,
+        },
+      },
+    };
+    act(() => root.render(createElement(ImageOptimizationPanel, { assets, scanValid: true })));
+    const save = Array.from(document.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Save optimized image',
+    )!;
+    expect(save.disabled).toBe(true);
+    const acceptance = document.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    expect(acceptance).toBeTruthy();
+    act(() => acceptance.click());
+    expect(save.disabled).toBe(false);
+    act(() => save.click());
+    expect(state.save).toHaveBeenCalledWith(true);
   });
 
   it('disables actions when the audit is stale or a candidate is still processing', () => {

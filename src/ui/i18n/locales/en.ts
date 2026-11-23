@@ -531,6 +531,13 @@ export const en = {
   storageImageOptimized: 'Optimized preview',
   storageImageSavings: 'Possible savings',
   storageImageClosePreview: 'Close preview',
+  storageImageSave: 'Save optimized image',
+  storageImageSaving: 'Saving image…',
+  storageImageSaved: 'Image saved, measured savings',
+  storageImageSaveFailed: 'The image could not be confirmed saved',
+  storageImageRescanNeeded: 'Scan again before trying another change.',
+  storageImageConfirmLossy: 'I accept changed pixels and metadata loss for this specific image.',
+  storageImageSaveWarning: 'Saving replaces the local original bytes. Export a Backup first if you may need the source image. Existing remote copies are not updated automatically.',
   storageImagePixelExactWarning: 'Decoded pixels match. Image metadata may change if the candidate is saved later.',
   storageImageLossyWarning: 'This preview changes image pixels and may remove metadata. Check both images before deciding to save.',
 

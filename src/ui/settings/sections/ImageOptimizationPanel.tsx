@@ -35,8 +35,21 @@ function PreviewImages({ prepared }: { prepared: PreparedImageOptimization }) {
 }
 
 export function ImageOptimizationPanel({ assets, scanValid }: { assets: StorageAssetInfo[]; scanValid: boolean }) {
-  const { preview, previewStatus, previewError, preparePreview, cancelPreview } =
-    useStorageImageOptimization(scanValid);
+  const {
+    preview,
+    previewStatus,
+    previewError,
+    preparePreview,
+    cancelPreview,
+    savePreview,
+    saveStatus,
+    saveError,
+    savedBytes,
+  } = useStorageImageOptimization(scanValid);
+  const [acceptLossy, setAcceptLossy] = useState(false);
+  useEffect(() => {
+    setAcceptLossy(false);
+  }, [preview]);
 
   return (
     <section
@@ -63,7 +76,7 @@ export function ImageOptimizationPanel({ assets, scanValid }: { assets: StorageA
                 <button
                   type="button"
                   className={buttonClassName}
-                  disabled={!scanValid || previewStatus === 'loading'}
+                  disabled={!scanValid || previewStatus === 'loading' || saveStatus === 'saving'}
                   onClick={() =>
                     void preparePreview({ id: asset.id, conversationId: asset.conversationId }, 'pixel-exact')
                   }
@@ -74,7 +87,7 @@ export function ImageOptimizationPanel({ assets, scanValid }: { assets: StorageA
                   <button
                     type="button"
                     className={buttonClassName}
-                    disabled={!scanValid || previewStatus === 'loading'}
+                    disabled={!scanValid || previewStatus === 'loading' || saveStatus === 'saving'}
                     onClick={() =>
                       void preparePreview({ id: asset.id, conversationId: asset.conversationId }, 'lossy-preview')
                     }
@@ -96,13 +109,28 @@ export function ImageOptimizationPanel({ assets, scanValid }: { assets: StorageA
           {t('storageImagePreviewUnavailable')} ({previewError})
         </p>
       ) : null}
+      {saveStatus === 'saved' ? (
+        <p className="tw-mt-3 tw-text-xs" role="status">
+          {t('storageImageSaved')}: {savedBytes.toLocaleString()} B · {t('storageImageRescanNeeded')}
+        </p>
+      ) : null}
+      {saveStatus === 'error' ? (
+        <p className="tw-mt-3 tw-text-xs tw-text-[var(--error)]" role="alert">
+          {t('storageImageSaveFailed')} ({saveError}). {t('storageImageRescanNeeded')}
+        </p>
+      ) : null}
       {preview ? (
         <section className="tw-mt-3 tw-border-t tw-border-[var(--border)] tw-pt-3">
           <div className="tw-flex tw-justify-between tw-gap-2">
             <h4 className="tw-m-0 tw-text-sm tw-font-bold">
               #{preview.selection.id} · {t('storageImagePreviewResult')}
             </h4>
-            <button type="button" className={buttonClassName} onClick={cancelPreview}>
+            <button
+              type="button"
+              className={buttonClassName}
+              disabled={saveStatus === 'saving'}
+              onClick={cancelPreview}
+            >
               {t('storageImageClosePreview')}
             </button>
           </div>
@@ -115,6 +143,28 @@ export function ImageOptimizationPanel({ assets, scanValid }: { assets: StorageA
             {t(preview.result.mode === 'pixel-exact' ? 'storageImagePixelExactWarning' : 'storageImageLossyWarning')}
           </p>
           <PreviewImages prepared={preview} />
+          {preview.result.mode === 'lossy-preview' ? (
+            <label className="tw-mt-3 tw-flex tw-items-start tw-gap-2 tw-text-xs">
+              <input type="checkbox" checked={acceptLossy} onChange={(event) => setAcceptLossy(event.target.checked)} />
+              <span>{t('storageImageConfirmLossy')}</span>
+            </label>
+          ) : null}
+          <div className="tw-mt-3">
+            <button
+              type="button"
+              className={buttonClassName}
+              disabled={
+                !scanValid ||
+                saveStatus === 'saving' ||
+                saveStatus === 'error' ||
+                (preview.result.mode === 'lossy-preview' && !acceptLossy)
+              }
+              onClick={() => void savePreview(acceptLossy)}
+            >
+              {t(saveStatus === 'saving' ? 'storageImageSaving' : 'storageImageSave')}
+            </button>
+          </div>
+          <p className="tw-mt-2 tw-text-xs tw-text-[var(--text-secondary)]">{t('storageImageSaveWarning')}</p>
         </section>
       ) : null}
     </section>

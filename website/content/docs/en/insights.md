@@ -36,4 +36,7 @@ only the on-demand resource audit verifies local ownership and readable bytes.
 After scanning, eligible static PNG/JPEG resources can be previewed in pixel-identical mode,
 or in an explicitly selected high-quality lossy mode for JPEG.
 Compare the original with the proposed result and the measured byte savings.
-Animated and unsupported formats are excluded. The preview does not change saved data.
+Animated and unsupported formats are excluded. A preview never changes saved data;
+explicitly saving an eligible result replaces only the selected local Blob while preserving its asset ID.
+Lossy results require an additional acknowledgement. Export a Backup before saving if you need
+original bytes later. Existing remote copies are not updated automatically; rescan before further changes.

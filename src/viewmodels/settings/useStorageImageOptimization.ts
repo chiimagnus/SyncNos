@@ -7,6 +7,7 @@ import {
   type ImageOptimizationPreview,
 } from '@services/conversations/data/image-optimization';
 import { readDataRevisionSnapshot } from '@services/data-revisions/storage-idb';
+import { commitImageOptimization } from '@services/conversations/data/image-optimization-commit';
 
 export type ImageOptimizationSelection = { id: number; conversationId: number };
 export type PreparedImageOptimization = {
@@ -21,6 +22,10 @@ export function useStorageImageOptimization(scanValid: boolean) {
   const [preview, setPreview] = useState<PreparedImageOptimization | null>(null);
   const [previewStatus, setPreviewStatus] = useState<ImageOptimizationPreviewState>('idle');
   const [previewError, setPreviewError] = useState('');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveError, setSaveError] = useState('');
+  const [savedBytes, setSavedBytes] = useState(0);
+  const savingRef = useRef(false);
   const activeRef = useRef(true);
   const generationRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
@@ -42,6 +47,9 @@ export function useStorageImageOptimization(scanValid: boolean) {
     setPreview(null);
     setPreviewStatus('loading');
     setPreviewError('');
+    setSaveStatus('idle');
+    setSaveError('');
+    setSavedBytes(0);
 
     try {
       const before = await readDataRevisionSnapshot();
@@ -74,6 +82,36 @@ export function useStorageImageOptimization(scanValid: boolean) {
     }
   }, []);
 
+  const savePreview = useCallback(
+    async (approveLossy: boolean) => {
+      if (!preview || savingRef.current || !scanValid || !activeRef.current) return;
+      savingRef.current = true;
+      setSaveStatus('saving');
+      setSaveError('');
+      try {
+        const saved = await commitImageOptimization({
+          selection: preview.selection,
+          originalAsset: preview.asset,
+          preview: preview.result,
+          expectedRevision: preview.expectedImageRevision,
+          approveLossy,
+        });
+        if (!activeRef.current) return;
+        setSavedBytes(saved.bytesSaved);
+        setSaveStatus('saved');
+        setPreview(null);
+        setPreviewStatus('idle');
+      } catch (error) {
+        if (!activeRef.current) return;
+        setSaveError(error instanceof Error ? error.message : String(error));
+        setSaveStatus('error');
+      } finally {
+        savingRef.current = false;
+      }
+    },
+    [preview, scanValid],
+  );
+
   useEffect(() => {
     if (!scanValid) cancelPreview();
   }, [scanValid, cancelPreview]);
@@ -91,5 +129,15 @@ export function useStorageImageOptimization(scanValid: boolean) {
     };
   }, []);
 
-  return { preview, previewStatus, previewError, preparePreview, cancelPreview };
+  return {
+    preview,
+    previewStatus,
+    previewError,
+    preparePreview,
+    cancelPreview,
+    savePreview,
+    saveStatus,
+    saveError,
+    savedBytes,
+  };
 }
