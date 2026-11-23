@@ -25,3 +25,10 @@ Use **Scan resources** to inspect actual image Blob bytes, formats, animation st
 that are missing, legacy Data URLs, metadata mismatches, or no longer owned by a saved conversation.
 The scan does not download, remove, or modify images. Unconfirmed animation is labeled as unknown.
 You can cancel a scan; changes to the local library require rescanning.
+
+The resource audit also reports logical UTF-8 message and comment bytes, image occurrence and unique-target
+counts, readable versus broken local asset references, and cache records with no Markdown image references.
+Image totals count cache records only once, even when many messages point to the same asset.
+You can navigate from the largest-image and per-conversation rankings to the saved conversation.
+The ordinary conversation detail menu counts **local image references**, not verified cached images;
+only the on-demand resource audit verifies local ownership and readable bytes.

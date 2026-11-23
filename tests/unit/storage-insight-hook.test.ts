@@ -77,7 +77,7 @@ afterEach(async () => {
 });
 
 describe('storage insights revision lifecycle', () => {
-  it('subscribes before reading, ignores irrelevant revisions and responds to image_cache changes', async () => {
+  it('subscribes before reading, ignores unrelated revisions and responds to content and image cache changes', async () => {
     await act(async () => {
       root!.render(createElement(Harness));
     });
@@ -86,7 +86,7 @@ describe('storage insights revision lifecycle', () => {
     expect(source.get).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      onRevision(['messages']);
+      onRevision(['sync_mappings']);
     });
     expect(source.get).toHaveBeenCalledTimes(1);
 
@@ -96,6 +96,11 @@ describe('storage insights revision lifecycle', () => {
     });
     await flush();
     expect(last.overview?.imageCacheRecords).toBe(2);
+    await act(async () => {
+      onRevision(['messages', 'article_comments']);
+    });
+    await flush();
+    expect(source.get).toHaveBeenCalledTimes(3);
   });
 
   it('drops stale success and preserves last-good on a later read failure', async () => {

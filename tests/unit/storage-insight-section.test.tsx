@@ -2,11 +2,32 @@
 import { act, createElement } from 'react';
 import ReactDOM from 'react-dom/client';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
+import { encodeConversationLoc } from '@services/shared/conversation-loc';
 
 const storage = vi.hoisted(() => ({ snapshot: {} as any, startScan: vi.fn(), cancelScan: vi.fn() }));
+const conversation = vi.hoisted(() => ({
+  openScope: vi.fn(),
+  openId: vi.fn(),
+  open: vi.fn((id: number, input: any) => {
+    input.setActiveId(id);
+    return id;
+  }),
+}));
 vi.mock('@viewmodels/settings/useStorageInsight', () => ({
   useStorageInsight: () => storage.snapshot,
 }));
+
+vi.mock('@viewmodels/conversations/conversations-context', () => ({
+  useConversationsApp: () => ({
+    openConversationInListScopeByLoc: conversation.openScope,
+    openConversationInListScopeById: conversation.openId,
+  }),
+}));
+vi.mock('@ui/conversations/open-conversation', () => ({
+  openConversation: (...args: any[]) => conversation.open(...args),
+}));
+vi.mock('@ui/shared/hooks/useIsNarrowScreen', () => ({ useIsNarrowScreen: () => false }));
 
 import { InsightSection } from '@ui/settings/sections/InsightSection';
 
@@ -133,5 +154,68 @@ describe('InsightSection storage overview', () => {
     expect(document.body.textContent).toContain('1 KiB');
     expect(document.body.textContent).toContain('GIF');
     expect(document.body.textContent).toContain('#3');
+  });
+
+  it('shows content diagnostics and opens the owning saved conversation from its ranking', () => {
+    const loc = encodeConversationLoc({ source: 'chatgpt', conversationKey: 'c4' });
+    storage.snapshot = {
+      ...storage.snapshot,
+      overview: { imageCacheRecords: 1, originUsageBytes: null, originQuotaBytes: null },
+      status: 'ready',
+      scanStatus: 'ready',
+      scanData: {
+        records: 1,
+        readableCount: 1,
+        bytes: 25,
+        animatedCount: 0,
+        unknownAnimationCount: 0,
+        unreadableCount: 0,
+        orphanCount: 0,
+        legacyCount: 0,
+        metadataMismatchCount: 0,
+        formatMismatchCount: 0,
+        formats: [{ format: 'png', count: 1, bytes: 25 }],
+        topImages: [{ id: 1, conversationId: 4, title: 'My chat', source: 'chatgpt', loc, bytes: 25, format: 'png' }],
+        content: {
+          logicalTextBytes: 12,
+          commentBytes: 6,
+          orphanCommentBytes: 0,
+          byKind: [{ kind: 'chat', bytes: 6 }],
+          imageOccurrences: 3,
+          uniqueImageTargets: 2,
+          uniqueLocalAssetIds: 1,
+          availableLocalOccurrences: 2,
+          brokenLocalOccurrences: 0,
+          otherImageOccurrences: 1,
+          unreferencedCacheRecords: 0,
+          topSources: [{ source: 'chatgpt', bytes: 25 }],
+          topConversations: [{ conversationId: 4, title: 'My chat', source: 'chatgpt', loc, bytes: 25 }],
+        },
+      },
+    };
+    act(() => {
+      root.render(
+        createElement(
+          MemoryRouter,
+          null,
+          createElement(InsightSection, {
+            status: 'idle',
+            error: '',
+            stats: null,
+            range: 'all',
+            onChangeRange: () => {},
+          }),
+        ),
+      );
+    });
+    expect(document.body.textContent).toContain('Image occurrences');
+    expect(document.body.textContent).toContain('Broken local references');
+    const conversationLink = Array.from(document.querySelectorAll('a')).find((link) => link.textContent === 'My chat');
+    expect(conversationLink?.getAttribute('href')).toContain('loc=');
+    act(() => {
+      conversationLink!.click();
+    });
+    expect(conversation.open).toHaveBeenCalledWith(4, expect.objectContaining({ isNarrow: false }));
+    expect(conversation.openScope).toHaveBeenCalledWith({ source: 'chatgpt', conversationKey: 'c4' });
   });
 });

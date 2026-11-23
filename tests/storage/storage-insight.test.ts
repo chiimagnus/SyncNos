@@ -68,6 +68,169 @@ async function addAsset(row: Record<string, unknown>) {
   return await requestDone(db.transaction('image_cache', 'readwrite').objectStore('image_cache').add(row));
 }
 
+async function addRecord(storeName: 'messages' | 'article_comments' | 'conversations', row: Record<string, unknown>) {
+  const db = await openDb();
+  return await requestDone(db.transaction(storeName, 'readwrite').objectStore(storeName).add(row));
+}
+
+describe('storage content and reference audit', () => {
+  it('distinguishes repeated occurrences, unique targets, valid ownership, broken local refs and logical UTF-8 bytes', async () => {
+    await addRecord('conversations', {
+      source: 'chatgpt',
+      sourceType: 'chat',
+      conversationKey: 'c1',
+      title: '第一条',
+      lastActivityAt: 1,
+    });
+    await addRecord('conversations', {
+      source: 'web',
+      sourceType: 'article',
+      conversationKey: 'a2',
+      title: 'Article 2',
+      lastActivityAt: 2,
+    });
+    await addRecord('conversations', {
+      source: 'video',
+      sourceType: 'video',
+      conversationKey: 'v3',
+      title: 'Video 3',
+      lastActivityAt: 3,
+    });
+    await addAsset({
+      conversationId: 1,
+      url: 'https://ex.org/same.png',
+      blob: new Blob([pngHeader], { type: 'image/png' }),
+      contentType: 'image/png',
+    });
+    await addAsset({
+      conversationId: 2,
+      url: 'https://ex.org/same.png',
+      blob: new Blob([pngHeader], { type: 'image/png' }),
+      contentType: 'image/png',
+    });
+    await addAsset({
+      conversationId: 99,
+      url: 'orphan.png',
+      blob: new Blob([pngHeader], { type: 'image/png' }),
+      contentType: 'image/png',
+    });
+
+    const chat =
+      '你好🙂 ![1](syncnos-asset://1) ![again](syncnos-asset://1) ![missing](syncnos-asset://999) ![remote](https://ex.org/remote.png)\n\x60\x60\x60md\n![code](syncnos-asset://1)\n\x60\x60\x60';
+    const article = '![wrong owner](syncnos-asset://1) ![correct](syncnos-asset://2)';
+    await addRecord('messages', {
+      conversationId: 1,
+      messageKey: 'm1',
+      role: 'user',
+      sequence: 1,
+      contentMarkdown: chat,
+    });
+    await addRecord('messages', {
+      conversationId: 2,
+      messageKey: 'article_body',
+      role: 'article',
+      sequence: 1,
+      contentMarkdown: article,
+    });
+    await addRecord('messages', {
+      conversationId: 3,
+      messageKey: 'video_transcript',
+      role: 'video',
+      sequence: 1,
+      contentMarkdown: '',
+      transcriptCues: [{ startSeconds: 0, text: 'abc' }],
+      videoChapters: [{ title: 'C1' }],
+    });
+    await addRecord('article_comments', { conversationId: 2, commentText: 'X', quoteText: '评论' });
+    await addRecord('article_comments', { conversationId: null, commentText: 'abc', quoteText: '你好' });
+
+    const scan = await scanStorageAssets();
+    const content = scan.content;
+    expect(content.imageOccurrences).toBe(6);
+    expect(content.uniqueImageTargets).toBe(4);
+    expect(content.uniqueLocalAssetIds).toBe(3);
+    expect(content.availableLocalOccurrences).toBe(3);
+    expect(content.brokenLocalOccurrences).toBe(2);
+    expect(content.otherImageOccurrences).toBe(1);
+    expect(content.unreferencedCacheRecords).toBe(1);
+    expect(content.commentBytes).toBe(16);
+    expect(content.orphanCommentBytes).toBe(9);
+    expect(content.logicalTextBytes).toBe(
+      new TextEncoder().encode(chat + article + 'abc' + 'C1' + 'X评论' + 'abc你好').byteLength,
+    );
+    expect(content.byKind.map(({ kind }) => kind).sort()).toEqual(['article', 'chat', 'video']);
+    expect(content.topConversations.map(({ conversationId }) => conversationId)).toEqual([1, 2]);
+    expect(content.topConversations[0]?.loc).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(content.topSources.map(({ source, bytes }) => [source, bytes])).toEqual([
+      ['chatgpt', pngHeader.length],
+      ['web', pngHeader.length],
+    ]);
+    expect(scan.topImages[0]?.title).toBe('第一条');
+    expect(scan.assetsById.get(3)?.orphan).toBe(true);
+  });
+
+  it('invalidates the entire audit on concurrent message changes', async () => {
+    await addRecord('conversations', { source: 'web', sourceType: 'article', conversationKey: 'x', lastActivityAt: 1 });
+    const db = await openDb();
+    await addRecord('messages', {
+      conversationId: 1,
+      messageKey: 'initial',
+      role: 'article',
+      contentMarkdown: 'first',
+    });
+    let mutated = false;
+    await expect(
+      scanStorageAssets({
+        onProgress: async ({ phase }) => {
+          if (phase !== 'messages' || mutated) return;
+          mutated = true;
+          await runTrackedTransaction(
+            { db, stores: ['messages'], revisionScopes: ['messages'] },
+            async ({ stores, markChanged }) => {
+              await requestDone(
+                stores.messages.add({
+                  conversationId: 1,
+                  messageKey: 'late',
+                  role: 'article',
+                  contentMarkdown: 'late',
+                }),
+              );
+              markChanged('messages');
+            },
+          );
+        },
+      }),
+    ).rejects.toThrow('storage_insight_stale');
+    expect(mutated).toBe(true);
+
+    // A concurrent edit must also invalidate scans that contain image records.
+    await addAsset({ conversationId: 1, url: 'p', blob: new Blob([pngHeader]) });
+    mutated = false;
+    await expect(
+      scanStorageAssets({
+        onProgress: async ({ phase }) => {
+          if (phase !== 'images' || mutated) return;
+          mutated = true;
+          await runTrackedTransaction(
+            { db, stores: ['messages'], revisionScopes: ['messages'] },
+            async ({ stores, markChanged }) => {
+              await requestDone(
+                stores.messages.add({
+                  conversationId: 1,
+                  messageKey: 'later',
+                  role: 'article',
+                  contentMarkdown: 'later',
+                }),
+              );
+              markChanged('messages');
+            },
+          );
+        },
+      }),
+    ).rejects.toThrow('storage_insight_stale');
+  });
+});
+
 describe('on-demand asset scan', () => {
   it('separates readable, old, orphaned and invalid assets and reads only bounded batches', async () => {
     const db = await openDb();
@@ -122,7 +285,7 @@ describe('on-demand asset scan', () => {
     expect(scan.assetsById.get(1)?.format).toBe('png');
     expect(scan.assetsById.get(2)?.format).toBe('jpeg');
     expect(scan.assetsById.get(3)?.readable).toBe(false);
-    expect(progress.at(-1)).toEqual({ processed: 29, total: 29 });
+    expect(progress).toContainEqual({ phase: 'images', processed: 29, total: 29 });
     const batches = getAll.mock.calls.filter(
       (_, index) => (getAll.mock.contexts[index] as IDBObjectStore).name === 'image_cache',
     );

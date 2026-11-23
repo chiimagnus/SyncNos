@@ -70,8 +70,8 @@ vi.mock('../../src/ui/i18n', () => ({
       cancelButton: 'Cancel',
       detailTextCountLabel: 'Words',
       detailImageCountLabel: 'Images',
-      detailImageCachedLabel: 'Cached',
-      detailImageUncachedLabel: 'Uncached',
+      detailImageLocalReferenceLabel: 'Local refs',
+      detailImageOtherReferenceLabel: 'Other refs',
       videoDescriptionLabel: 'Description',
       videoChaptersLabel: 'Chapters',
     };
@@ -1393,7 +1393,7 @@ describe('ConversationDetailPane header actions', () => {
     const textCountRow = document.querySelector('[data-detail-text-count-row="true"]') as HTMLElement | null;
     const imageCountRow = document.querySelector('[data-detail-image-count-row="true"]') as HTMLElement | null;
     expect(textCountRow).toBeTruthy();
-    expect(imageCountRow?.textContent).toBe('Images 0 · Cached 0 · Uncached 0');
+    expect(imageCountRow?.textContent).toBe('Images 0 · Local refs 0 · Other refs 0');
     expect(textCountRow?.getAttribute('data-tooltip-id')).toBeNull();
     expect(imageCountRow?.getAttribute('data-tooltip-id')).toBeNull();
 
@@ -1498,7 +1498,7 @@ describe('ConversationDetailPane header actions', () => {
       await Promise.resolve();
     });
     expect(await openMoreAndReadStatRow('[data-detail-image-count-row="true"]')).toBe(
-      'Images 3 · Cached 1 · Uncached 2',
+      'Images 3 · Local refs 1 · Other refs 2',
     );
   });
 

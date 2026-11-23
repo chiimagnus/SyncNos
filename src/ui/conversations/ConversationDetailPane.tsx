@@ -224,7 +224,7 @@ export function ConversationDetailPane({
       ? `${textCountLabel} ${Math.max(0, Math.floor(textCount)).toLocaleString()}`
       : '';
   const imageCountText = imageCount
-    ? `${t('detailImageCountLabel')} ${imageCount.total.toLocaleString()} · ${t('detailImageCachedLabel')} ${imageCount.cached.toLocaleString()} · ${t('detailImageUncachedLabel')} ${imageCount.uncached.toLocaleString()}`
+    ? `${t('detailImageCountLabel')} ${imageCount.total.toLocaleString()} · ${t('detailImageLocalReferenceLabel')} ${imageCount.localReferences.toLocaleString()} · ${t('detailImageOtherReferenceLabel')} ${imageCount.otherReferences.toLocaleString()}`
     : '';
   const hasReaderMoreMenuContent = readerFeatures.textLayout || readerFeatures.theme || readerFeatures.narration;
   const hasMoreMenuContent =

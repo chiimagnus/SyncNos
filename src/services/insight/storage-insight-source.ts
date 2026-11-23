@@ -3,6 +3,9 @@ import { estimateOriginStorage } from '@platform/storage/storage-estimate';
 import { readDataRevisionSnapshot } from '@services/data-revisions/storage-idb';
 import { normalizeImageCacheAsset, type ImageCacheRow } from '@services/conversations/data/image-cache-read';
 import { inspectImageBlob, type AnimationState, type ImageFormat } from '@services/insight/image-format';
+import { collectMarkdownImageReferences } from '@services/shared/markdown-image-references';
+import { isSyncnosAssetUrl, parseSyncnosAssetId } from '@services/shared/syncnos-asset-uri';
+import { encodeConversationLoc } from '@services/shared/conversation-loc';
 
 export type StorageOverview = {
   imageCacheRecords: number;
@@ -56,6 +59,33 @@ export type StorageAssetInfo = {
   metadataMismatch: boolean;
   formatMismatch: boolean;
   readable: boolean;
+  title: string;
+  source: string;
+  loc: string;
+};
+
+export type StorageConversationRank = {
+  conversationId: number;
+  title: string;
+  source: string;
+  loc: string;
+  bytes: number;
+};
+
+export type StorageContentSummary = {
+  logicalTextBytes: number;
+  byKind: Array<{ kind: string; bytes: number }>;
+  commentBytes: number;
+  orphanCommentBytes: number;
+  imageOccurrences: number;
+  uniqueImageTargets: number;
+  uniqueLocalAssetIds: number;
+  availableLocalOccurrences: number;
+  brokenLocalOccurrences: number;
+  otherImageOccurrences: number;
+  unreferencedCacheRecords: number;
+  topConversations: StorageConversationRank[];
+  topSources: Array<{ source: string; bytes: number }>;
 };
 
 export type StorageAssetScan = {
@@ -72,6 +102,7 @@ export type StorageAssetScan = {
   formats: Array<{ format: ImageFormat; count: number; bytes: number }>;
   topImages: StorageAssetInfo[];
   assetsById: Map<number, StorageAssetInfo>;
+  content: StorageContentSummary;
 };
 
 const SCAN_BATCH_SIZE = 24;
@@ -81,31 +112,49 @@ function checkCancelled(signal?: AbortSignal): void {
   if (signal?.aborted) throw new DOMException('Storage scan cancelled', 'AbortError');
 }
 
-async function countCacheRows(db: IDBDatabase): Promise<number> {
-  const transaction = db.transaction('image_cache', 'readonly');
+async function countStorageRows(
+  db: IDBDatabase,
+  store: 'image_cache' | 'messages' | 'article_comments',
+): Promise<number> {
+  const transaction = db.transaction(store, 'readonly');
   const done = transactionDone(transaction);
-  const count = await requestDone(transaction.objectStore('image_cache').count());
+  const count = await requestDone(transaction.objectStore(store).count());
   await done;
   return count;
 }
 
-async function listConversationIds(db: IDBDatabase): Promise<Set<number>> {
+type StorageOwner = {
+  source: string;
+  conversationKey: string;
+  sourceType: string;
+  title: string;
+};
+
+async function listConversationOwners(db: IDBDatabase): Promise<Map<number, StorageOwner>> {
   const transaction = db.transaction('conversations', 'readonly');
   const done = transactionDone(transaction);
-  const ids = new Set<number>();
+  const owners = new Map<number, StorageOwner>();
   await new Promise<void>((resolve, reject) => {
-    const request = transaction.objectStore('conversations').openKeyCursor();
+    const request = transaction.objectStore('conversations').openCursor();
     request.onsuccess = () => {
       const cursor = request.result;
       if (!cursor) return resolve();
       const id = Number(cursor.key);
-      if (Number.isSafeInteger(id) && id > 0) ids.add(id);
+      if (Number.isSafeInteger(id) && id > 0) {
+        const row = cursor.value as Record<string, unknown>;
+        owners.set(id, {
+          source: String(row.source || ''),
+          conversationKey: String(row.conversationKey || ''),
+          sourceType: String(row.sourceType || 'chat').toLowerCase(),
+          title: String(row.title || '').trim(),
+        });
+      }
       cursor.continue();
     };
     request.onerror = () => reject(request.error || new Error('indexedDB key cursor failed'));
   });
   await done;
-  return ids;
+  return owners;
 }
 
 async function nextAssetBatch(db: IDBDatabase, after: number | null): Promise<ImageCacheRow[]> {
@@ -124,7 +173,7 @@ function isFormatMismatch(contentType: string, format: ImageFormat): boolean {
   return normalized !== `image/${format === 'svg' ? 'svg+xml' : format}`;
 }
 
-async function describeAsset(row: ImageCacheRow, owners: Set<number>): Promise<StorageAssetInfo> {
+async function describeAsset(row: ImageCacheRow, owners: ReadonlyMap<number, StorageOwner>): Promise<StorageAssetInfo> {
   const id = Number(row.id);
   const conversationId = Number(row.conversationId);
   const asset = normalizeImageCacheAsset({ id, row });
@@ -139,6 +188,7 @@ async function describeAsset(row: ImageCacheRow, owners: Set<number>): Promise<S
       // Bytes may be readable even when the inspection API is unavailable.
     }
   }
+  const owner = owners.get(conversationId);
   const contentType = String(row.contentType || blob?.type || '')
     .trim()
     .toLowerCase();
@@ -155,19 +205,184 @@ async function describeAsset(row: ImageCacheRow, owners: Set<number>): Promise<S
     metadataMismatch: readable && Number(row.byteSize) > 0 && Number(row.byteSize) !== blob!.size,
     formatMismatch: isFormatMismatch(contentType, format),
     readable,
+    title: owner?.title || '',
+    source: owner?.source || '',
+    loc:
+      owner?.source && owner.conversationKey
+        ? encodeConversationLoc({ source: owner.source, conversationKey: owner.conversationKey })
+        : '',
+  };
+}
+
+type MessageScanRow = {
+  id?: number;
+  conversationId?: number;
+  contentMarkdown?: string;
+  transcriptCues?: Array<{ text?: string }>;
+  videoChapters?: Array<{ title?: string }>;
+};
+type CommentScanRow = { id?: number; conversationId?: number | null; commentText?: string; quoteText?: string };
+
+async function nextContentBatch<T>(
+  db: IDBDatabase,
+  storeName: 'messages' | 'article_comments',
+  after: number | null,
+): Promise<T[]> {
+  const transaction = db.transaction(storeName, 'readonly');
+  const done = transactionDone(transaction);
+  const range = after == null ? undefined : IDBKeyRange.lowerBound(after, true);
+  const rows = await requestDone(transaction.objectStore(storeName).getAll(range, 12));
+  await done;
+  return rows as T[];
+}
+
+async function scanStoredContent(
+  db: IDBDatabase,
+  owners: ReadonlyMap<number, StorageOwner>,
+  assets: ReadonlyMap<number, StorageAssetInfo>,
+  signal?: AbortSignal,
+  onProgress?: (value: { phase: 'messages' | 'comments'; processed: number; total: number }) => void | Promise<void>,
+): Promise<StorageContentSummary> {
+  const textEncoder = new TextEncoder();
+  const kindBytes = new Map<string, number>();
+  const referencedAssetIds = new Set<number>();
+  const imageTargets = new Set<string>();
+  let imageOccurrences = 0;
+  let availableLocalOccurrences = 0;
+  let brokenLocalOccurrences = 0;
+  let otherImageOccurrences = 0;
+  let commentBytes = 0;
+  let orphanCommentBytes = 0;
+  let messageTotalBytes = 0;
+  const [totalMessages, totalComments] = await Promise.all([
+    countStorageRows(db, 'messages'),
+    countStorageRows(db, 'article_comments'),
+  ]);
+  let processed = 0;
+
+  let cursor: number | null = null;
+  while (true) {
+    checkCancelled(signal);
+    const batch: MessageScanRow[] = await nextContentBatch<MessageScanRow>(db, 'messages', cursor);
+    if (!batch.length) break;
+    for (const message of batch) {
+      checkCancelled(signal);
+      processed++;
+      const ownerId = Number(message.conversationId);
+      const owner = owners.get(ownerId);
+      const markdown = String(message.contentMarkdown || '');
+      const supplementary =
+        !markdown && Array.isArray(message.transcriptCues)
+          ? message.transcriptCues.map((cue) => String(cue.text || '')).join('\n')
+          : '';
+      const chapterText =
+        !markdown && Array.isArray(message.videoChapters)
+          ? message.videoChapters.map((chapter) => String(chapter.title || '')).join('\n')
+          : '';
+      const amount =
+        textEncoder.encode(markdown || supplementary).byteLength + textEncoder.encode(chapterText).byteLength;
+      messageTotalBytes += amount;
+      const kind = owner?.sourceType || 'orphan';
+      kindBytes.set(kind, (kindBytes.get(kind) || 0) + amount);
+
+      for (const reference of collectMarkdownImageReferences(markdown)) {
+        imageOccurrences++;
+        imageTargets.add(reference.target);
+        const assetId = parseSyncnosAssetId(reference.target);
+        if (assetId != null || isSyncnosAssetUrl(reference.target)) {
+          if (assetId != null) referencedAssetIds.add(assetId);
+          const asset = assetId == null ? null : assets.get(assetId);
+          if (asset?.readable && asset.conversationId === ownerId) availableLocalOccurrences++;
+          else brokenLocalOccurrences++;
+        } else otherImageOccurrences++;
+      }
+    }
+    cursor = Number(batch[batch.length - 1]!.id);
+    if (!Number.isSafeInteger(cursor)) throw new Error('invalid message key');
+    await onProgress?.({ phase: 'messages', processed, total: totalMessages });
+    if (batch.length < 12) break;
+  }
+
+  cursor = null;
+  processed = 0;
+  while (true) {
+    checkCancelled(signal);
+    const batch: CommentScanRow[] = await nextContentBatch<CommentScanRow>(db, 'article_comments', cursor);
+    if (!batch.length) break;
+    for (const comment of batch) {
+      checkCancelled(signal);
+      processed++;
+      const bytes =
+        textEncoder.encode(String(comment.commentText || '')).byteLength +
+        textEncoder.encode(String(comment.quoteText || '')).byteLength;
+      commentBytes += bytes;
+      const ownerId = Number(comment.conversationId);
+      if (!owners.has(ownerId)) orphanCommentBytes += bytes;
+    }
+    cursor = Number(batch[batch.length - 1]!.id);
+    if (!Number.isSafeInteger(cursor)) throw new Error('invalid comment key');
+    await onProgress?.({ phase: 'comments', processed, total: totalComments });
+    if (batch.length < 12) break;
+  }
+
+  const imageBytes = new Map<number, number>();
+  for (const asset of assets.values()) {
+    if (!asset.readable || !owners.has(asset.conversationId)) continue;
+    imageBytes.set(asset.conversationId, (imageBytes.get(asset.conversationId) || 0) + asset.bytes);
+  }
+  const topConversations = Array.from(imageBytes, ([id, bytes]) => {
+    const owner = owners.get(id)!;
+    return {
+      conversationId: id,
+      title: owner.title || owner.conversationKey,
+      source: owner.source,
+      loc:
+        owner.source && owner.conversationKey
+          ? encodeConversationLoc({ source: owner.source, conversationKey: owner.conversationKey })
+          : '',
+      bytes,
+    };
+  })
+    .sort((a, b) => b.bytes - a.bytes || a.conversationId - b.conversationId)
+    .slice(0, 12);
+  const sourceBytes = new Map<string, number>();
+  for (const [id, value] of imageBytes) {
+    const source = owners.get(id)?.source || '';
+    sourceBytes.set(source, (sourceBytes.get(source) || 0) + value);
+  }
+  return {
+    logicalTextBytes: messageTotalBytes + commentBytes,
+    byKind: [...kindBytes].map(([kind, bytes]) => ({ kind, bytes })).sort((a, b) => b.bytes - a.bytes),
+    commentBytes,
+    orphanCommentBytes,
+    imageOccurrences,
+    uniqueImageTargets: imageTargets.size,
+    uniqueLocalAssetIds: referencedAssetIds.size,
+    availableLocalOccurrences,
+    brokenLocalOccurrences,
+    otherImageOccurrences,
+    unreferencedCacheRecords: [...assets.keys()].filter((id) => !referencedAssetIds.has(id)).length,
+    topConversations,
+    topSources: [...sourceBytes]
+      .map(([source, bytes]) => ({ source, bytes }))
+      .sort((a, b) => b.bytes - a.bytes || a.source.localeCompare(b.source)),
   };
 }
 
 export async function scanStorageAssets(
   options: {
     signal?: AbortSignal;
-    onProgress?: (progress: { processed: number; total: number }) => void | Promise<void>;
+    onProgress?: (progress: {
+      phase: 'images' | 'messages' | 'comments';
+      processed: number;
+      total: number;
+    }) => void | Promise<void>;
   } = {},
 ): Promise<StorageAssetScan> {
   checkCancelled(options.signal);
   const db = await openDb();
   const before = await readDataRevisionSnapshot();
-  const [owners, total] = await Promise.all([listConversationIds(db), countCacheRows(db)]);
+  const [owners, total] = await Promise.all([listConversationOwners(db), countStorageRows(db, 'image_cache')]);
   const formats = new Map<ImageFormat, { count: number; bytes: number }>();
   const assetsById = new Map<number, StorageAssetInfo>();
   const topImages: StorageAssetInfo[] = [];
@@ -215,13 +430,19 @@ export async function scanStorageAssets(
 
     after = Number(rows[rows.length - 1]!.id);
     if (!Number.isFinite(after)) throw new Error('invalid image cache key');
-    await options.onProgress?.({ processed: records, total });
+    await options.onProgress?.({ phase: 'images', processed: records, total });
     if (rows.length < SCAN_BATCH_SIZE) break;
   }
 
   checkCancelled(options.signal);
+  const content = await scanStoredContent(db, owners, assetsById, options.signal, options.onProgress);
   const afterRevisions = await readDataRevisionSnapshot();
-  if (before.image_cache !== afterRevisions.image_cache || before.conversations !== afterRevisions.conversations) {
+  if (
+    before.image_cache !== afterRevisions.image_cache ||
+    before.conversations !== afterRevisions.conversations ||
+    before.messages !== afterRevisions.messages ||
+    before.article_comments !== afterRevisions.article_comments
+  ) {
     throw new Error('storage_insight_stale');
   }
   return {
@@ -238,5 +459,6 @@ export async function scanStorageAssets(
     formats: Array.from(formats, ([format, stat]) => ({ format, ...stat })).sort((a, b) => b.bytes - a.bytes),
     topImages,
     assetsById,
+    content,
   };
 }

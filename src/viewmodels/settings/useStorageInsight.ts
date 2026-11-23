@@ -21,7 +21,11 @@ export function useStorageInsight() {
   const [error, setError] = useState('');
   const [scanStatus, setScanStatus] = useState<ScanStatus>('idle');
   const [scanError, setScanError] = useState('');
-  const [scanProgress, setScanProgress] = useState<{ processed: number; total: number } | null>(null);
+  const [scanProgress, setScanProgress] = useState<{
+    phase: 'images' | 'messages' | 'comments';
+    processed: number;
+    total: number;
+  } | null>(null);
   const [scanData, setScanData] = useState<StorageAssetScan | null>(null);
   const scanGenerationRef = useRef(0);
   const scanControllerRef = useRef<AbortController | null>(null);
@@ -108,11 +112,11 @@ export function useStorageInsight() {
     };
 
     const unsubscribe = subscribeDataRevisionChanges((scopes) => {
-      if (scopes.includes('image_cache')) {
+      if (scopes.some((scope) => ['image_cache', 'conversations', 'messages', 'article_comments'].includes(scope))) {
         version += 1;
         read();
       }
-      if (scopes.includes('image_cache') || scopes.includes('conversations')) {
+      if (scopes.some((scope) => ['image_cache', 'conversations', 'messages', 'article_comments'].includes(scope))) {
         ++scanGenerationRef.current;
         scanControllerRef.current?.abort();
         scanControllerRef.current = null;
