@@ -261,6 +261,231 @@ describe('obsidian-sync-orchestrator', () => {
     expect((await orch.getSyncStatus()).job).toBeNull();
   });
 
+  it('persists separate vault-relative folders and rejects invalid updates atomically', async () => {
+    const { store } = setupChromeStorage();
+    const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
+    const defaults = await settingsStore.getObsidianSettings();
+    expect([defaults.chatAttachmentFolder, defaults.articleAttachmentFolder, defaults.videoAttachmentFolder]).toEqual([
+      '.',
+      '.',
+      '.',
+    ]);
+
+    const saved = await settingsStore.saveObsidianSettings({
+      chatAttachmentFolder: './images/../photos',
+      articleAttachmentFolder: 'Assets',
+      videoAttachmentFolder: 'Clips',
+    });
+    expect([saved.chatAttachmentFolder, saved.articleAttachmentFolder, saved.videoAttachmentFolder]).toEqual([
+      'photos',
+      'Assets',
+      'Clips',
+    ]);
+    expect((await settingsStore.getObsidianPathConfig()).articleAttachmentFolder).toBe('Assets');
+    expect(store.obsidian_chat_attachment_folder).toBe('photos');
+    expect(store.obsidian_article_attachment_folder).toBe('Assets');
+    expect(store.obsidian_video_attachment_folder).toBe('Clips');
+
+    await expect(
+      settingsStore.saveObsidianSettings({
+        apiBaseUrl: 'http://example.com',
+        chatAttachmentFolder: 'Other',
+        videoAttachmentFolder: '../outside',
+      }),
+    ).rejects.toThrow('escapes the vault');
+    expect(store.obsidian_api_base_url).toBeUndefined();
+    expect(store.obsidian_chat_attachment_folder).toBe('photos');
+  });
+
+  it.each([
+    ['chat', 'Shared assets', 'Shared assets', '../../Shared%20assets'],
+    ['article', 'Shared assets', 'Shared assets', '../../Shared%20assets'],
+    ['video', 'Shared assets', 'Shared assets', '../../Shared%20assets'],
+    ['chat', 'Notebook/Chats/images (2026)', 'Notebook/Chats/images (2026)', 'images%20%282026%29'],
+    ['article', '.', 'Notebook/Articles', ''],
+  ] as const)(
+    'uploads %s attachments to configured vault folder %s with valid Markdown references',
+    async (kind, folder, expectedDir, expectedLink) => {
+      setupChromeStorage();
+      const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
+      const naming = await loadModule('@services/conversations/domain/file-naming.ts');
+      const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
+      const convo = {
+        id: 1,
+        sourceType: kind,
+        source: kind === 'article' ? 'web' : 'chatgpt',
+        conversationKey: `relative-attachments-${kind}`,
+        title: 'Attachments',
+      };
+      const basename = naming.buildConversationBasename(convo);
+      backgroundStorageMocks.getConversationById.mockResolvedValue(convo);
+      backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+        {
+          messageKey: kind === 'article' ? 'article_body' : kind === 'video' ? 'video_transcript' : 'm1',
+          sequence: 1,
+          contentMarkdown: '![local](syncnos-asset://7)',
+          updatedAt: 1,
+        },
+      ]);
+      imageCacheMocks.getImageCacheAssetsByIds.mockResolvedValue(
+        new Map([
+          [
+            7,
+            {
+              id: 7,
+              conversationId: 1,
+              blob: new Blob([Uint8Array.from([1, 2])], { type: 'image/png' }),
+              contentType: 'image/png',
+            },
+          ],
+        ]),
+      );
+
+      const seen: Array<{ method: string; path: string; body: unknown }> = [];
+      // @ts-expect-error test global
+      globalThis.fetch = async (url: string, init: RequestInit) => {
+        const method = String(init?.method || 'GET').toUpperCase();
+        const path = decodeURIComponent(new URL(url).pathname.slice('/vault/'.length));
+        seen.push({ method, path, body: init?.body });
+        if (method === 'GET') return new Response('not found', { status: 404 });
+        if (method === 'PUT')
+          return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+        throw new Error(`unexpected ${method}`);
+      };
+
+      const noteFolders = { chat: 'Notebook/Chats', article: 'Notebook/Articles', video: 'Notebook/Videos' };
+      await settingsStore.saveObsidianSettings({
+        apiKey: 'k',
+        chatFolder: noteFolders.chat,
+        articleFolder: noteFolders.article,
+        videoFolder: noteFolders.video,
+        chatAttachmentFolder: kind === 'chat' ? folder : 'Other/Chats',
+        articleAttachmentFolder: kind === 'article' ? folder : 'Other/Articles',
+        videoAttachmentFolder: kind === 'video' ? folder : 'Other/Videos',
+      });
+      const result = await orch.syncConversations({ conversationIds: [1] });
+      expect(result.results[0].ok).toBe(true);
+      const assetName = `${basename}-1.png`;
+      const binaryPut = seen.find((call) => call.method === 'PUT' && call.body instanceof Uint8Array);
+      expect(binaryPut?.path).toBe(`${expectedDir}/${assetName}`);
+      expect(Array.from((binaryPut?.body as Uint8Array) || [])).toEqual([1, 2]);
+      const notePut = seen.find((call) => call.method === 'PUT' && typeof call.body === 'string');
+      expect(notePut?.path).toBe(`${noteFolders[kind]}/${basename}.md`);
+      expect(notePut?.body).toContain(`![local](${expectedLink ? `${expectedLink}/` : ''}${assetName})`);
+      expect(seen.filter((call) => call.method === 'PUT')).toHaveLength(2);
+      expect(backgroundStorageMocks.recordObsidianRemoteWrite).toHaveBeenCalledOnce();
+    },
+  );
+
+  it.each([
+    ['![local](syncnos-asset://7)', 'article'],
+    ['![generated](chatgpt-file://file_1)', 'chat'],
+    ['plain text', 'chat'],
+  ])('rejects out-of-vault folder before any remote write (%s)', async (contentMarkdown, sourceType) => {
+    const { store } = setupChromeStorage();
+    const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
+    const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
+    backgroundStorageMocks.getConversationById.mockResolvedValue({
+      id: 1,
+      sourceType,
+      source: 'chatgpt',
+      conversationKey: 'out-of-vault',
+      title: 'Path traversal',
+    });
+    backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+      { messageKey: sourceType === 'article' ? 'article_body' : 'm1', sequence: 1, contentMarkdown, updatedAt: 1 },
+    ]);
+    const methods: string[] = [];
+    // @ts-expect-error test global
+    globalThis.fetch = async (_url: string, init: RequestInit) => {
+      const method = String(init?.method || 'GET').toUpperCase();
+      methods.push(method);
+      return new Response('not found', { status: 404 });
+    };
+    await settingsStore.saveObsidianSettings({ apiKey: 'k' });
+    store[`obsidian_${sourceType === 'article' ? 'article' : 'chat'}_attachment_folder`] = '../../outside';
+    const result = await orch.syncConversations({ conversationIds: [1] });
+    expect(result.results[0].ok).toBe(false);
+    expect(result.results[0].error).toContain('escapes the vault');
+    expect(methods).not.toContain('PUT');
+    expect(backgroundStorageMocks.recordObsidianRemoteWrite).not.toHaveBeenCalled();
+    expect(imageCacheMocks.getImageCacheAssetsByIds).not.toHaveBeenCalled();
+    expect(chatgptImageMocks.downloadChatgptImagesForStoredConversation).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])(
+    'keeps existing attachments and updates references after a folder change (valid remote metadata: %s)',
+    async (validMetadata) => {
+      setupChromeStorage();
+      const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
+      const naming = await loadModule('@services/conversations/domain/file-naming.ts');
+      const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
+      const convo = {
+        id: 1,
+        sourceType: 'article',
+        source: 'web',
+        conversationKey: 'moving-assets',
+        title: 'Move assets',
+      };
+      const basename = naming.buildConversationBasename(convo);
+      backgroundStorageMocks.getConversationById.mockResolvedValue(convo);
+      backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
+        { messageKey: 'article_body', sequence: 1, contentMarkdown: '![image](syncnos-asset://7)', updatedAt: 1 },
+      ]);
+      imageCacheMocks.getImageCacheAssetsByIds.mockResolvedValue(
+        new Map([
+          [
+            7,
+            {
+              id: 7,
+              conversationId: 1,
+              blob: new Blob([Uint8Array.from([5])], { type: 'image/png' }),
+              contentType: 'image/png',
+            },
+          ],
+        ]),
+      );
+      const vault = new Map<string, unknown>();
+      const methods: string[] = [];
+      // @ts-expect-error test global
+      globalThis.fetch = async (url: string, init: RequestInit) => {
+        const method = String(init?.method || 'GET').toUpperCase();
+        const path = decodeURIComponent(new URL(url).pathname.slice('/vault/'.length));
+        methods.push(method);
+        if (method === 'GET') {
+          if (vault.has(path))
+            return new Response(
+              JSON.stringify({
+                frontmatter: validMetadata
+                  ? { syncnos: { schemaVersion: 1, source: convo.source, conversationKey: convo.conversationKey } }
+                  : {},
+              }),
+              {
+                status: 200,
+                headers: { 'content-type': 'application/json' },
+              },
+            );
+          return new Response('missing', { status: 404 });
+        }
+        if (method === 'PUT') {
+          vault.set(path, init?.body);
+          return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+        }
+        throw new Error(`unexpected ${method}`);
+      };
+      await settingsStore.saveObsidianSettings({ apiKey: 'k' });
+      expect((await orch.syncConversations({ conversationIds: [1] })).okCount).toBe(1);
+      expect(vault.has(`SyncNos-WebArticles/${basename}-1.png`)).toBe(true);
+
+      await settingsStore.saveObsidianSettings({ articleAttachmentFolder: 'images' });
+      expect((await orch.syncConversations({ conversationIds: [1] })).okCount).toBe(1);
+      expect(vault.has(`images/${basename}-1.png`)).toBe(true);
+      expect(vault.has(`SyncNos-WebArticles/${basename}-1.png`)).toBe(true);
+      expect(vault.get(`SyncNos-WebArticles/${basename}.md`)).toContain(`![image](../images/${basename}-1.png)`);
+      expect(methods).not.toContain('DELETE');
+    },
+  );
+
   it('materializes SyncNos image refs through the shared Markdown helper without changing Obsidian naming', async () => {
     setupChromeStorage();
     const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');

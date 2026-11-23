@@ -17,6 +17,9 @@ export function ObsidianSettingsSection(props: {
   chatFolder: string;
   articleFolder: string;
   videoFolder: string;
+  chatAttachmentFolder: string;
+  articleAttachmentFolder: string;
+  videoAttachmentFolder: string;
   statusText: string;
   obsidianLogoUrl: string;
   onChangeApiBaseUrl: (v: string) => void;
@@ -25,6 +28,9 @@ export function ObsidianSettingsSection(props: {
   onChangeChatFolder: (v: string) => void;
   onChangeArticleFolder: (v: string) => void;
   onChangeVideoFolder: (v: string) => void;
+  onChangeChatAttachmentFolder: (v: string) => void;
+  onChangeArticleAttachmentFolder: (v: string) => void;
+  onChangeVideoAttachmentFolder: (v: string) => void;
   onToggleSyncEnabled: (enabled: boolean) => void;
   onToggleAutoSyncEnabled: (enabled: boolean) => void;
   onSave: () => void;
@@ -43,6 +49,9 @@ export function ObsidianSettingsSection(props: {
     chatFolder,
     articleFolder,
     videoFolder,
+    chatAttachmentFolder,
+    articleAttachmentFolder,
+    videoAttachmentFolder,
     statusText,
     obsidianLogoUrl,
     onChangeApiBaseUrl,
@@ -51,6 +60,9 @@ export function ObsidianSettingsSection(props: {
     onChangeChatFolder,
     onChangeArticleFolder,
     onChangeVideoFolder,
+    onChangeChatAttachmentFolder,
+    onChangeArticleAttachmentFolder,
+    onChangeVideoAttachmentFolder,
     onToggleSyncEnabled,
     onToggleAutoSyncEnabled,
     onSave,
@@ -164,47 +176,61 @@ export function ObsidianSettingsSection(props: {
         <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('obsidianPaths')}</h2>
 
         <div className="tw-mt-3 tw-grid tw-gap-2">
-          <SettingsFormRow label={t('aiChatsFolder')}>
-            <input
-              value={chatFolder}
-              onChange={(e) => onChangeChatFolder(e.target.value)}
-              onBlur={onSave}
-              onKeyDown={(e) => onEnterToSave(e)}
-              disabled={busy}
-              spellCheck={false}
-              placeholder="SyncNos-AIChats"
-              className={settingsTextInputClassName}
-              aria-label={t('aiChatsFolder')}
-            />
-          </SettingsFormRow>
-
-          <SettingsFormRow label={t('webClipperFolder')}>
-            <input
-              value={articleFolder}
-              onChange={(e) => onChangeArticleFolder(e.target.value)}
-              onBlur={onSave}
-              onKeyDown={(e) => onEnterToSave(e)}
-              disabled={busy}
-              spellCheck={false}
-              placeholder="SyncNos-WebArticles"
-              className={settingsTextInputClassName}
-              aria-label={t('webClipperFolder')}
-            />
-          </SettingsFormRow>
-
-          <SettingsFormRow label={t('videoScriptsFolder')}>
-            <input
-              value={videoFolder}
-              onChange={(e) => onChangeVideoFolder(e.target.value)}
-              onBlur={onSave}
-              onKeyDown={(e) => onEnterToSave(e)}
-              disabled={busy}
-              spellCheck={false}
-              placeholder="SyncNos-Videos"
-              className={settingsTextInputClassName}
-              aria-label={t('videoScriptsFolder')}
-            />
-          </SettingsFormRow>
+          {[
+            {
+              label: t('aiChatsFolder'),
+              folder: chatFolder,
+              attachmentFolder: chatAttachmentFolder,
+              onChangeFolder: onChangeChatFolder,
+              onChangeAttachment: onChangeChatAttachmentFolder,
+            },
+            {
+              label: t('webClipperFolder'),
+              folder: articleFolder,
+              attachmentFolder: articleAttachmentFolder,
+              onChangeFolder: onChangeArticleFolder,
+              onChangeAttachment: onChangeArticleAttachmentFolder,
+            },
+            {
+              label: t('videoScriptsFolder'),
+              folder: videoFolder,
+              attachmentFolder: videoAttachmentFolder,
+              onChangeFolder: onChangeVideoFolder,
+              onChangeAttachment: onChangeVideoAttachmentFolder,
+            },
+          ].map(({ label, folder, attachmentFolder, onChangeFolder, onChangeAttachment }) => (
+            <SettingsFormRow key={label} label={label}>
+              <div className="tw-flex tw-min-w-0 tw-flex-wrap tw-items-center tw-gap-2">
+                <input
+                  value={folder}
+                  onChange={(e) => onChangeFolder(e.target.value)}
+                  onBlur={onSave}
+                  onKeyDown={(e) => onEnterToSave(e)}
+                  disabled={busy}
+                  spellCheck={false}
+                  className={settingsTextInputClassName}
+                  aria-label={label}
+                />
+                <label className="tw-flex tw-min-w-0 tw-max-w-full tw-flex-wrap tw-items-center tw-gap-2 sm:tw-shrink-0 sm:tw-flex-nowrap">
+                  <span className="tw-whitespace-nowrap tw-text-xs tw-font-bold tw-text-[var(--text-secondary)]">
+                    {t('obsidianAttachmentFolder')}
+                  </span>
+                  <input
+                    value={attachmentFolder === '.' ? '' : attachmentFolder}
+                    onChange={(e) => onChangeAttachment(e.target.value)}
+                    onBlur={onSave}
+                    onKeyDown={(e) => onEnterToSave(e)}
+                    disabled={busy}
+                    spellCheck={false}
+                    placeholder={folder}
+                    className={settingsTextInputClassName}
+                    aria-label={`${label} · ${t('obsidianAttachmentFolder')}`}
+                  />
+                </label>
+              </div>
+            </SettingsFormRow>
+          ))}
+          <p className="tw-m-0 tw-text-xs tw-text-[var(--text-secondary)]">{t('obsidianAttachmentFolderHelp')}</p>
         </div>
       </section>
     </>

@@ -1,6 +1,7 @@
 import { parseArticleCommentDtos, type ArticleCommentDto } from '@services/comments/domain/comment-dto';
 import { backgroundStorage as defaultBackgroundStorage } from '@services/conversations/background/storage';
 import { getObsidianConnectionConfig, getObsidianPathConfig } from '@services/sync/obsidian/settings-store';
+import { conversationKinds } from '@services/protocols/conversation-kinds';
 import {
   NOTE_JSON_ACCEPT,
   createClient as createDefaultObsidianClient,
@@ -10,6 +11,7 @@ import {
   buildStableNotePath as buildDefaultStableNotePath,
   resolveExistingNotePath as resolveDefaultExistingNotePath,
 } from '@services/sync/obsidian/obsidian-note-path.ts';
+import { resolveAttachmentTarget } from '@services/sync/obsidian/obsidian-attachment-path';
 import {
   buildSyncnosObject as buildDefaultSyncnosObject,
   readSyncnosObject as readDefaultSyncnosObject,
@@ -77,22 +79,18 @@ function buildNoteBasenameFromFilePath(filePath: unknown) {
   return dot > 0 ? filename.slice(0, dot) : filename;
 }
 
-function buildAttachmentPath(filePath: unknown, attachmentName: string) {
-  const raw = safeString(filePath);
-  const dir = raw.split('/').slice(0, -1).filter(Boolean).join('/');
-  return dir ? `${dir}/${attachmentName}` : attachmentName;
-}
-
 async function materializeMarkdownAssetsForObsidian({
   client,
   conversationId,
   filePath,
+  attachmentFolder,
   markdown,
   indexScopeMarkdown,
 }: {
   client: any;
   conversationId: number;
   filePath: string;
+  attachmentFolder: string;
   markdown: string;
   indexScopeMarkdown?: string;
 }): Promise<string> {
@@ -176,16 +174,15 @@ async function materializeMarkdownAssetsForObsidian({
     const index = indexByKey.get(key);
     if (!index) throw new Error(`missing asset index mapping: ${key}`);
     const attachmentName = `${noteBase}-${index}.${ext}`;
-    const putRes = await client.putVaultBinaryFile(
-      buildAttachmentPath(filePath, attachmentName),
-      new Uint8Array(await blob.arrayBuffer()),
-      { contentType },
-    );
+    const target = resolveAttachmentTarget(filePath, attachmentFolder, attachmentName);
+    const putRes = await client.putVaultBinaryFile(target.filePath, new Uint8Array(await blob.arrayBuffer()), {
+      contentType,
+    });
     if (!putRes || !putRes.ok) {
       const message = putRes && putRes.error && putRes.error.message ? putRes.error.message : 'attachment put failed';
       throw new Error(String(message || 'attachment put failed'));
     }
-    replacementByTarget.set(sourceTarget, attachmentName);
+    replacementByTarget.set(sourceTarget, target.markdownTarget);
   };
 
   for (const assetId of targetAssetIds) {
@@ -341,10 +338,6 @@ async function decideSyncModeForConversation({
   const client = clientRes.client;
   const accept = clientRes.noteJsonAccept || client.NOTE_JSON_ACCEPT || NOTE_JSON_ACCEPT;
 
-  let existingRemote: any = null;
-  let existingPath = '';
-  let deleteAfterFilePath = '';
-
   const pathResolution = await resolveDefaultExistingNotePath({
     conversation: convo,
     client,
@@ -370,93 +363,32 @@ async function decideSyncModeForConversation({
 
   const desiredFilePath =
     safeString(pathResolution?.desiredFilePath) || buildDefaultStableNotePath(convo, { folderByKindId });
-  existingPath = safeString(pathResolution?.resolvedFilePath);
+  const attachmentFolders: Record<string, string> = {
+    chat: pathConfig.chatAttachmentFolder,
+    article: pathConfig.articleAttachmentFolder,
+    video: pathConfig.videoAttachmentFolder,
+  };
+  const attachmentFolder = attachmentFolders[conversationKinds.pick(convo)?.id || 'chat'] || '.';
+  resolveAttachmentTarget(desiredFilePath, attachmentFolder, 'attachment');
 
-  if (pathResolution?.found && existingPath) {
-    existingRemote = {
-      ok: true,
-      data: pathResolution.note || null,
-    };
-  }
-
-  if (!existingRemote) {
-    return {
-      isFinal: false,
-      conversationId,
-      convo,
-      filePath: desiredFilePath,
-      messages,
-      comments: articleComments,
-      mode: forceFull ? 'full_rebuild_forced' : 'full_rebuild',
-    };
-  }
-
-  if (existingPath && existingPath !== desiredFilePath) {
-    deleteAfterFilePath = existingPath;
-    return {
-      isFinal: false,
-      conversationId,
-      convo,
-      filePath: desiredFilePath,
-      deleteAfterFilePath,
-      messages,
-      comments: articleComments,
-      mode: forceFull ? 'full_rebuild_forced' : 'full_rebuild_rename',
-    };
-  }
-
-  if (forceFull) {
-    return {
-      isFinal: false,
-      conversationId,
-      convo,
-      filePath: desiredFilePath,
-      messages,
-      comments: articleComments,
-      mode: 'full_rebuild_forced',
-    };
-  }
-
-  const note = existingRemote.data && typeof existingRemote.data === 'object' ? existingRemote.data : null;
-  const frontmatter = note && note.frontmatter && typeof note.frontmatter === 'object' ? note.frontmatter : null;
-
-  const parsed = readDefaultSyncnosObject(frontmatter);
-  const parsedData = parsed && parsed.ok && parsed.data ? parsed.data : null;
-  if (!parsedData) {
-    return {
-      isFinal: false,
-      conversationId,
-      convo,
-      filePath: desiredFilePath,
-      messages,
-      comments: articleComments,
-      mode: 'full_rebuild',
-    };
-  }
-  if (
-    safeString(parsedData.source) !== safeString(convo.source) ||
-    safeString(parsedData.conversationKey) !== safeString(convo.conversationKey)
-  ) {
-    return {
-      isFinal: false,
-      conversationId,
-      convo,
-      filePath: desiredFilePath,
-      messages,
-      comments: articleComments,
-      mode: 'full_rebuild',
-    };
-  }
-
-  return {
+  const rebuild = {
     isFinal: false,
     conversationId,
     convo,
     filePath: desiredFilePath,
     messages,
     comments: articleComments,
-    mode: 'full_rebuild',
+    attachmentFolder,
   };
+  const existingPath = pathResolution?.found ? safeString(pathResolution.resolvedFilePath) : '';
+  if (existingPath && existingPath !== desiredFilePath) {
+    return {
+      ...rebuild,
+      deleteAfterFilePath: existingPath,
+      mode: forceFull ? 'full_rebuild_forced' : 'full_rebuild_rename',
+    };
+  }
+  return { ...rebuild, mode: forceFull ? 'full_rebuild_forced' : 'full_rebuild' };
 }
 
 async function testConnection({ instanceId }: { instanceId?: string } = {}) {
@@ -625,6 +557,7 @@ async function runSyncConversations({
             client,
             conversationId: decision.conversationId,
             filePath: decision.filePath,
+            attachmentFolder: decision.attachmentFolder,
             markdown: rawMarkdown,
             indexScopeMarkdown: rawMarkdown,
           });

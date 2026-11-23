@@ -10,7 +10,7 @@ description: 把本地内容同步到 Notion、Obsidian、飞书或 GitHub。
 | 目标 | 适合场景 |
 | --- | --- |
 | [Notion](/docs/sync/notion/) | 数据库和页面 |
-| [Obsidian](/docs/sync/obsidian/) | 本地 Markdown vault |
+| [Obsidian](/docs/sync/obsidian/) | 本地 Markdown 笔记，可自定义图片目录 |
 | [飞书](/docs/sync/feishu/) | 飞书云文档 |
 | [GitHub](/docs/sync/github/) | Markdown 仓库 |
 

@@ -299,6 +299,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [obsidianChatFolder, setObsidianChatFolder] = useState<string>('');
   const [obsidianArticleFolder, setObsidianArticleFolder] = useState<string>('');
   const [obsidianVideoFolder, setObsidianVideoFolder] = useState<string>('');
+  const [obsidianChatAttachmentFolder, setObsidianChatAttachmentFolder] = useState<string>('.');
+  const [obsidianArticleAttachmentFolder, setObsidianArticleAttachmentFolder] = useState<string>('.');
+  const [obsidianVideoAttachmentFolder, setObsidianVideoAttachmentFolder] = useState<string>('.');
   const [obsidianStatus, setObsidianStatus] = useState<string>(t('statusIdle'));
   const [obsidianSyncEnabled, setObsidianSyncEnabled] = useState(true);
   const [obsidianAutoSyncEnabled, setObsidianAutoSyncEnabled] = useState(false);
@@ -823,6 +826,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setObsidianChatFolder(String(obsidianSettings?.chatFolder || ''));
     setObsidianArticleFolder(String(obsidianSettings?.articleFolder || ''));
     setObsidianVideoFolder(String(obsidianSettings?.videoFolder || ''));
+    setObsidianChatAttachmentFolder(String(obsidianSettings?.chatAttachmentFolder || '.'));
+    setObsidianArticleAttachmentFolder(String(obsidianSettings?.articleAttachmentFolder || '.'));
+    setObsidianVideoAttachmentFolder(String(obsidianSettings?.videoAttachmentFolder || '.'));
     setObsidianApiKeyDraft('');
     setObsidianStatus(t('statusIdle'));
 
@@ -1624,6 +1630,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
             chatFolder: obsidianChatFolder,
             articleFolder: obsidianArticleFolder,
             videoFolder: obsidianVideoFolder,
+            chatAttachmentFolder: obsidianChatAttachmentFolder,
+            articleAttachmentFolder: obsidianArticleAttachmentFolder,
+            videoAttachmentFolder: obsidianVideoAttachmentFolder,
           };
 
           if (includeApiKey === true && String(obsidianApiKeyDraft || '').trim()) {
@@ -1640,6 +1649,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
           setObsidianChatFolder(String(data?.chatFolder || ''));
           setObsidianArticleFolder(String(data?.articleFolder || ''));
           setObsidianVideoFolder(String(data?.videoFolder || ''));
+          setObsidianChatAttachmentFolder(String(data?.chatAttachmentFolder || '.'));
+          setObsidianArticleAttachmentFolder(String(data?.articleAttachmentFolder || '.'));
+          setObsidianVideoAttachmentFolder(String(data?.videoAttachmentFolder || '.'));
           setObsidianApiKeyDraft('');
         },
         {
@@ -1657,6 +1669,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       obsidianApiBaseUrl,
       obsidianApiKeyDraft,
       obsidianArticleFolder,
+      obsidianChatAttachmentFolder,
+      obsidianArticleAttachmentFolder,
+      obsidianVideoAttachmentFolder,
       obsidianAuthHeaderName,
       obsidianChatFolder,
       obsidianVideoFolder,
@@ -2285,6 +2300,12 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setObsidianArticleFolder,
     obsidianVideoFolder,
     setObsidianVideoFolder,
+    obsidianChatAttachmentFolder,
+    setObsidianChatAttachmentFolder,
+    obsidianArticleAttachmentFolder,
+    setObsidianArticleAttachmentFolder,
+    obsidianVideoAttachmentFolder,
+    setObsidianVideoAttachmentFolder,
     obsidianStatus,
     onSaveObsidianSettings,
     onTestObsidianConnection,

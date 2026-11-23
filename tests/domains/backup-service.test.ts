@@ -638,6 +638,34 @@ describe('backup service', () => {
     expect(chromeMock.__store.inpage_display_mode).toBe('all');
   });
 
+  it('normalizes restored Obsidian attachment paths and rejects invalid values before applying any settings', async () => {
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    // @ts-expect-error test global
+    globalThis.browser = undefined;
+
+    const stats = await importBackupZipMerge(
+      emptyBackupZipEntries({
+        obsidian_chat_attachment_folder: './pictures/../images',
+        obsidian_article_attachment_folder: 'Shared/Assets',
+        obsidian_video_attachment_folder: '.',
+      }),
+    );
+    expect(stats.settingsApplied).toBe(3);
+    expect(chromeMock.__store.obsidian_chat_attachment_folder).toBe('images');
+    expect(chromeMock.__store.obsidian_article_attachment_folder).toBe('Shared/Assets');
+    expect(chromeMock.__store.obsidian_video_attachment_folder).toBe('.');
+
+    await expect(
+      importBackupZipMerge(
+        emptyBackupZipEntries({ obsidian_video_attachment_folder: '../outside', other_setting: 'bad' }),
+      ),
+    ).rejects.toThrow('escapes the vault');
+    expect(chromeMock.__store.obsidian_chat_attachment_folder).toBe('images');
+    expect(chromeMock.__store.other_setting).toBeUndefined();
+  });
+
   it('restores the portable ChatGPT Advanced API capture setting', async () => {
     const chromeMock = mockChromeStorage();
     // @ts-expect-error test global

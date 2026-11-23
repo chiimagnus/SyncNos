@@ -6,6 +6,7 @@ import { saveFeishuOAuthConfig } from '@services/sync/feishu/auth/oauth';
 import { FEISHU_OAUTH_TOKEN_KEY, replaceFeishuOAuthToken } from '@services/sync/feishu/auth/token-store';
 import { NOTION_OAUTH_TOKEN_KEY, replaceNotionOAuthToken } from '@services/sync/notion/auth/token-store';
 import { OBSIDIAN_STORAGE_KEYS, saveObsidianSettings } from '@services/sync/obsidian/settings-store';
+import { normalizeAttachmentFolder } from '@services/sync/obsidian/obsidian-attachment-path';
 import {
   GITHUB_AUTH_STATE_KEY,
   replaceGithubAuthState,
@@ -364,6 +365,12 @@ export async function importBackupZipMerge(
   const filteredSettings = filterStorageForBackup((configDoc as any).storageLocal || {}, {
     includeSensitiveData: includesSensitiveData,
   });
+  for (const field of ['chatAttachmentFolder', 'articleAttachmentFolder', 'videoAttachmentFolder'] as const) {
+    const key = OBSIDIAN_STORAGE_KEYS[field];
+    if (Object.prototype.hasOwnProperty.call(filteredSettings, key)) {
+      filteredSettings[key] = normalizeAttachmentFolder(filteredSettings[key]);
+    }
+  }
   if (includesSensitiveData) {
     const sensitiveStorageValidation = validateSensitiveBackupStorage(filteredSettings);
     if (!sensitiveStorageValidation.ok) throw new Error(sensitiveStorageValidation.error);

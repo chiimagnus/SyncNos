@@ -39,6 +39,7 @@ const STORAGE_BACKUP_ALWAYS_DENYLIST_EXACT = new Set<string>([
   'feishu_oauth_last_error',
   // Removed feature: never carry the old Notion AI model preference through backups.
   'notion_ai_preferred_model_index',
+  'obsidian_attachment_folder',
   // Runtime-only cross-context invalidation metadata and popup UI handoff state.
   DATA_REVISION_WAKE_STORAGE_KEY,
   POPUP_SYNC_SELECTION_HANDOFF_KEY,
