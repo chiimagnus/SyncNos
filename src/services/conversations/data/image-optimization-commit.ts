@@ -21,7 +21,6 @@ type ImageOptimizationInput = {
   originalAsset: ImageCacheAsset;
   preview: ValidPreview;
   expectedRevision: number;
-  approveLossy?: boolean;
 };
 
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
@@ -76,14 +75,10 @@ export async function commitImageOptimization(input: ImageOptimizationInput): Pr
     preview.savedBytes <= 0 ||
     preview.contentType !== preview.optimizedBlob.type ||
     !['image/png', 'image/jpeg'].includes(preview.contentType) ||
-    (preview.mode === 'pixel-exact' && !preview.pixelsEqual)
+    !preview.pixelsEqual
   ) {
     throw new Error('image_optimization_invalid_preview');
   }
-  if (preview.mode === 'lossy-preview' && input.approveLossy !== true) {
-    throw new Error('image_optimization_lossy_confirmation_required');
-  }
-
   const image = await inspectImageBlob(preview.optimizedBlob);
   if (
     (image.format !== 'png' && image.format !== 'jpeg') ||

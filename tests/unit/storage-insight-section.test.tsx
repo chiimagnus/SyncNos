@@ -242,7 +242,7 @@ describe('InsightSection storage overview', () => {
     expect(sections.map((section) => section.querySelector('summary')?.textContent?.trim())).toEqual([
       'Image resource details',
       'Duplicate image report',
-      'Image compression preview',
+      'Compress cached images',
     ]);
   });
 

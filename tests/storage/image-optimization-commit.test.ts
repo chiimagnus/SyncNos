@@ -71,7 +71,6 @@ async function setup(options: { dataUrl?: string } = {}) {
   await complete(tx);
   const preview = {
     ok: true as const,
-    mode: 'pixel-exact' as const,
     originalBlob: source,
     optimizedBlob: candidate,
     originalBytes: source.size,
@@ -231,16 +230,16 @@ describe('atomic image optimization commit', () => {
     expect((await readAfter(data)).asset.blob.size).toBe(candidate.size);
   });
 
-  it('rejects unapproved lossy changes or malformed candidate metadata before writing', async () => {
+  it('rejects changed pixels or malformed candidate metadata before writing', async () => {
     const data = await setup();
     await expect(
       commitImageOptimization({
         selection: { id: data.id, conversationId: data.ownerId },
         originalAsset: data.asset,
-        preview: { ...data.preview, mode: 'lossy-preview', pixelsEqual: false },
+        preview: { ...data.preview, pixelsEqual: false },
         expectedRevision: data.expectedRevision,
       }),
-    ).rejects.toThrow('image_optimization_lossy_confirmation_required');
+    ).rejects.toThrow('image_optimization_invalid_preview');
 
     await expect(
       commitImageOptimization({

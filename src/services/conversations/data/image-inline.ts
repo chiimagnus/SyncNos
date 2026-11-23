@@ -247,10 +247,9 @@ async function upsertCachedImageAsset(input: {
     try {
       const prefs = await storageGet([AUTO_OPTIMIZE_NEW_IMAGES_STORAGE_KEY]);
       if (prefs[AUTO_OPTIMIZE_NEW_IMAGES_STORAGE_KEY] === true) {
-        const optimized = await createImageOptimizationPreview({ blob, contentType, mode: 'pixel-exact' });
+        const optimized = await createImageOptimizationPreview({ blob, contentType });
         if (
           optimized.ok &&
-          optimized.mode === 'pixel-exact' &&
           optimized.pixelsEqual &&
           optimized.savedBytes > 0 &&
           optimized.contentType === contentType

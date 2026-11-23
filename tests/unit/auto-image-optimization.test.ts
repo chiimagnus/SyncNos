@@ -51,7 +51,6 @@ beforeEach(async () => {
   }));
   candidate.make.mockReset().mockImplementation(async ({ blob }: { blob: Blob }) => ({
     ok: true,
-    mode: 'pixel-exact',
     originalBlob: blob,
     optimizedBlob: optimized,
     originalBytes: blob.size,
@@ -85,7 +84,6 @@ describe('opt-in optimization on new image cache writes', () => {
     expect(candidate.make).toHaveBeenCalledWith(
       expect.objectContaining({
         blob: expect.any(Blob),
-        mode: 'pixel-exact',
         contentType: 'image/png',
       }),
     );

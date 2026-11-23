@@ -228,7 +228,6 @@ describe('compressed image Backup continuity', () => {
       },
       preview: {
         ok: true,
-        mode: 'pixel-exact',
         pixelsEqual: true,
         originalBlob: source,
         optimizedBlob: output,

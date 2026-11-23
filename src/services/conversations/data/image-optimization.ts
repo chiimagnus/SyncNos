@@ -1,7 +1,6 @@
 import { renderImageCandidate } from '@platform/image/canvas-codec';
 import { inspectImageBlob } from '@services/insight/image-format';
 
-export type ImageOptimizationMode = 'pixel-exact' | 'lossy-preview';
 export type ImageOptimizationSkipReason =
   | 'invalid-source'
   | 'unsupported-format'
@@ -19,13 +18,12 @@ export type ImageOptimizationPreview =
   | { ok: false; reason: ImageOptimizationSkipReason }
   | {
       ok: true;
-      mode: ImageOptimizationMode;
       originalBlob: Blob;
       optimizedBlob: Blob;
       originalBytes: number;
       optimizedBytes: number;
       savedBytes: number;
-      contentType: 'image/png' | 'image/jpeg' | 'image/webp';
+      contentType: 'image/png' | 'image/jpeg';
       width: number;
       height: number;
       pixelsEqual: boolean;
@@ -62,20 +60,17 @@ function samePixels(left: Uint8ClampedArray, right: Uint8ClampedArray): boolean 
 export async function createImageOptimizationPreview(input: {
   blob: Blob;
   contentType?: string;
-  mode?: ImageOptimizationMode;
   signal?: AbortSignal;
 }): Promise<ImageOptimizationPreview> {
   const { blob, signal } = input;
   if (signal?.aborted) return { ok: false, reason: 'cancelled' };
   if (!(blob instanceof Blob) || blob.size === 0) return { ok: false, reason: 'invalid-source' };
-  const mode = input.mode || 'pixel-exact';
 
   try {
     const { format, animation } = await inspectImageBlob(blob);
     if (animation !== 'static' || (format !== 'png' && format !== 'jpeg')) {
       return { ok: false, reason: 'unsupported-format' };
     }
-    if (mode === 'lossy-preview' && format !== 'jpeg') return { ok: false, reason: 'unsupported-format' };
     const expectedSource = format === 'png' ? 'image/png' : 'image/jpeg';
     const claim = String(input.contentType || blob.type || expectedSource)
       .split(';')[0]!
@@ -89,8 +84,7 @@ export async function createImageOptimizationPreview(input: {
     }
 
     const targetType = expectedSource;
-    const quality = mode === 'lossy-preview' ? 0.9 : undefined;
-    const result = await renderImageCandidate(blob, targetType, quality, signal);
+    const result = await renderImageCandidate(blob, targetType, signal);
     if (signal?.aborted) return { ok: false, reason: 'cancelled' };
     if (
       !Number.isSafeInteger(result.width) ||
@@ -108,11 +102,10 @@ export async function createImageOptimizationPreview(input: {
       return { ok: false, reason: 'mime-mismatch' };
     }
     const pixelsEqual = samePixels(result.originalPixels, result.optimizedPixels);
-    if (mode === 'pixel-exact' && !pixelsEqual) return { ok: false, reason: 'pixels-changed' };
+    if (!pixelsEqual) return { ok: false, reason: 'pixels-changed' };
     if (result.blob.size === 0 || result.blob.size >= blob.size) return { ok: false, reason: 'no-savings' };
     return {
       ok: true,
-      mode,
       originalBlob: blob,
       optimizedBlob: result.blob,
       originalBytes: blob.size,

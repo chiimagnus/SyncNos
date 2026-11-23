@@ -34,16 +34,13 @@ You can navigate from the largest-image and per-conversation rankings to the sav
 The ordinary conversation detail menu counts **local image references**, not verified cached images;
 only the on-demand resource audit verifies local ownership and readable bytes.
 
-After scanning, eligible static PNG/JPEG resources can be previewed in pixel-identical mode,
-or in an explicitly selected high-quality lossy mode for JPEG.
-Compare the original with the proposed result and the measured byte savings.
-Animated and unsupported formats are excluded. A preview never changes saved data;
-explicitly saving an eligible result replaces only the selected local Blob while preserving its asset ID.
-Lossy results require an additional acknowledgement. Export a Backup before saving if you need
-original bytes later. You can select eligible images for a separately confirmed, pixel-identical
-batch optimization. It processes one image at a time, can be stopped after the current item,
-and reports successful saves, no savings, skipped images, conflicts, failures, and only verified
-bytes saved. Batch mode never silently applies lossy encoding.
+After scanning, select eligible PNG/JPEG images and choose **Compress selected**, then confirm.
+There are no image previews, visual comparisons, or lossy compression options.
+Only smaller, pixel-identical images are saved. Animated and unsupported formats are skipped.
+Images are processed one at a time; you can stop between items and see the actual space saved.
+Saving replaces local bytes without changing asset IDs or conversation references.
+Metadata may change, so export a Backup first if you need the originals.
+Existing remote copies are not updated automatically.
 
 Use **Find duplicate images** to explicitly inspect same-size cached files with chunked SHA-256.
 The result lists byte-identical files across conversations and their potential duplicate bytes;

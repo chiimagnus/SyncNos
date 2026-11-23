@@ -86,7 +86,6 @@ describe('safe image optimization preview', () => {
     const preview = await createImageOptimizationPreview({ blob: original });
     expect(preview).toMatchObject({
       ok: true,
-      mode: 'pixel-exact',
       contentType: 'image/png',
       originalBytes: original.size,
       optimizedBytes: output.size,
@@ -97,7 +96,7 @@ describe('safe image optimization preview', () => {
       expect(preview.optimizedBlob).toBe(output);
       expect(preview.savedBytes).toBe(original.size - output.size);
     }
-    expect(codec.render).toHaveBeenCalledWith(original, 'image/png', undefined, undefined);
+    expect(codec.render).toHaveBeenCalledWith(original, 'image/png', undefined);
   });
 
   it('will not claim safe savings for fallback PNG, larger output, changed pixels or bad dimensions', async () => {
@@ -126,8 +125,14 @@ describe('safe image optimization preview', () => {
     });
   });
 
-  it('requires explicit lossy preview and keeps byte/format evidence visible', async () => {
+  it('rejects pixel changes in JPEG as well as a smaller output with the wrong media type', async () => {
     const original = new Blob([await jpeg().arrayBuffer(), new Uint8Array(400)], { type: 'image/jpeg' });
+    codec.render.mockResolvedValueOnce(encoded(jpeg(), staticPixels, new Uint8ClampedArray([65, 128, 192, 255])));
+    expect(await createImageOptimizationPreview({ blob: original })).toMatchObject({
+      ok: false,
+      reason: 'pixels-changed',
+    });
+    expect(codec.render).toHaveBeenCalledWith(original, 'image/jpeg', undefined);
     const webp = new Blob(
       [
         Uint8Array.from([
@@ -149,14 +154,6 @@ describe('safe image optimization preview', () => {
       ],
       { type: 'image/webp' },
     );
-    codec.render.mockResolvedValueOnce(encoded(jpeg(), staticPixels, new Uint8ClampedArray([65, 128, 192, 255])));
-    expect(await createImageOptimizationPreview({ blob: original, mode: 'lossy-preview' })).toMatchObject({
-      ok: true,
-      mode: 'lossy-preview',
-      contentType: 'image/jpeg',
-      pixelsEqual: false,
-    });
-    expect(codec.render).toHaveBeenCalledWith(original, 'image/jpeg', 0.9, undefined);
     codec.render.mockResolvedValueOnce(encoded(webp));
     expect(await createImageOptimizationPreview({ blob: original })).toMatchObject({
       ok: false,
@@ -164,11 +161,7 @@ describe('safe image optimization preview', () => {
     });
   });
 
-  it('does not convert a transparent PNG to lossy WebP or return a result when codec fails', async () => {
-    expect(await createImageOptimizationPreview({ blob: png(), mode: 'lossy-preview' })).toMatchObject({
-      ok: false,
-      reason: 'unsupported-format',
-    });
+  it('reports codec errors instead of returning an unverified image', async () => {
     codec.render.mockRejectedValueOnce(new Error('decode failed'));
     expect(await createImageOptimizationPreview({ blob: png() })).toMatchObject({
       ok: false,

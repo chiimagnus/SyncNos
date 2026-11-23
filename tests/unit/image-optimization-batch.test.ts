@@ -36,7 +36,6 @@ beforeEach(() => {
   }));
   mocks.preview.mockImplementation(async ({ blob }: { blob: Blob }) => ({
     ok: true,
-    mode: 'pixel-exact',
     pixelsEqual: true,
     originalBlob: blob,
     optimizedBlob: new Blob(['x'], { type: 'image/png' }),
@@ -56,7 +55,7 @@ beforeEach(() => {
 });
 
 describe('bounded sequential image batch optimization', () => {
-  it('processes one candidate at a time, with actual committed savings and no automatic lossy consent', async () => {
+  it('processes one pixel-identical candidate at a time, with actual committed savings', async () => {
     let simultaneous = 0;
     let peak = 0;
     mocks.preview.mockImplementation(async ({ blob }: { blob: Blob }) => {
@@ -66,7 +65,6 @@ describe('bounded sequential image batch optimization', () => {
       simultaneous--;
       return {
         ok: true,
-        mode: 'pixel-exact',
         pixelsEqual: true,
         originalBlob: blob,
         optimizedBlob: new Blob(['x'], { type: 'image/png' }),
@@ -86,8 +84,7 @@ describe('bounded sequential image batch optimization', () => {
     expect(result.entries).toHaveLength(10);
     expect(peak).toBe(1);
     expect(mocks.commit).toHaveBeenCalledTimes(10);
-    expect(mocks.preview).toHaveBeenCalledWith(expect.objectContaining({ mode: 'pixel-exact' }));
-    expect(mocks.commit).toHaveBeenCalledWith(expect.objectContaining({ approveLossy: false }));
+    expect(mocks.preview).toHaveBeenCalledWith(expect.objectContaining({ blob: expect.any(Blob) }));
     expect(progress.at(-1)).toEqual({ processed: 10, total: 10, bytesSaved: 4000 });
   });
 

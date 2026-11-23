@@ -105,8 +105,8 @@ describe('browser canvas codec', () => {
     await expect(renderImageCandidate(pngHeader(1, 1), 'image/png')).rejects.toThrow('image_codec_unavailable');
     const controller = new AbortController();
     controller.abort();
-    await expect(
-      renderImageCandidate(pngHeader(1, 1), 'image/png', undefined, controller.signal),
-    ).rejects.toMatchObject({ name: 'AbortError' });
+    await expect(renderImageCandidate(pngHeader(1, 1), 'image/png', controller.signal)).rejects.toMatchObject({
+      name: 'AbortError',
+    });
   });
 });

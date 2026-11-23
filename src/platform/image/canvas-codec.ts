@@ -95,27 +95,22 @@ async function decodePixels(
   }
 }
 
-async function canvasBlob(canvas: OffscreenCanvas | HTMLCanvasElement, type: string, quality?: number): Promise<Blob> {
+async function canvasBlob(canvas: OffscreenCanvas | HTMLCanvasElement, type: string): Promise<Blob> {
   if ('convertToBlob' in canvas) {
-    return await canvas.convertToBlob({ type, ...(quality == null ? null : { quality }) });
+    return await canvas.convertToBlob({ type });
   }
   return await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => {
-        if (blob) resolve(blob);
-        else reject(new Error('image_encode_failed'));
-      },
-      type,
-      quality,
-    );
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error('image_encode_failed'));
+    }, type);
   });
 }
 
 /** Browser-native encoding. Pixel budget is checked from source headers before allocating decoded images. */
 export async function renderImageCandidate(
   source: Blob,
-  type: 'image/png' | 'image/jpeg' | 'image/webp',
-  quality?: number,
+  type: 'image/png' | 'image/jpeg',
   signal?: AbortSignal,
 ): Promise<RasterizedImageCandidate> {
   const firstBytes = new Uint8Array(await source.slice(0, HEADER_BYTES).arrayBuffer());
@@ -129,7 +124,7 @@ export async function renderImageCandidate(
       throw new Error('image_dimensions_changed');
     }
     if (signal?.aborted) throw new DOMException('Image optimization cancelled', 'AbortError');
-    const output = await canvasBlob(original.canvas, type, quality);
+    const output = await canvasBlob(original.canvas, type);
     if (signal?.aborted) throw new DOMException('Image optimization cancelled', 'AbortError');
     const optimized = await decodePixels(output, signal);
     try {

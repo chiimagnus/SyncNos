@@ -81,7 +81,6 @@ export async function optimizeImageBatch(
         const preview = await createImageOptimizationPreview({
           blob: asset.blob,
           contentType: asset.contentType,
-          mode: 'pixel-exact',
           signal: options.signal,
         });
         if (options.signal?.aborted) break;
@@ -106,7 +105,6 @@ export async function optimizeImageBatch(
               originalAsset: asset,
               preview,
               expectedRevision: beforeRevision,
-              approveLossy: false,
             });
             entry = { ...selection, status: 'saved', bytesSaved: saved.bytesSaved };
           }
