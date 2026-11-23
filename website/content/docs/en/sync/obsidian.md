@@ -33,16 +33,22 @@ Copy the plugin **API Key**, then open **SyncNos → Settings → Obsidian**:
 
 Click **Test**. Once it succeeds, use manual sync or enable auto-sync.
 
-### Where to save attachments
+### Where notes and attachments go
 
-Under **Obsidian Paths → Attachment Folder**, enter a path relative to each Markdown note:
+Under **Obsidian Paths**, set separate note and attachment folders for AI chats, web articles, and video scripts:
 
-- `.` (default): images alongside the note.
-- `images`: images in the note's `images/` subfolder.
-- `../images`: images in the parent directory's `images/` folder.
+| Content | Note folder | Attachment folder |
+| --- | --- | --- |
+| AI chats | `Notes/Chats` | `Assets` |
+| Web articles | `Notes/Articles` | `Assets` |
+| Video scripts | `Notes/Videos` | `Assets` |
 
-SyncNos creates missing folders and updates Markdown image references. Paths cannot escape the Obsidian vault.
-Changing the setting writes images into the new folder on the next sync, but does not automatically delete old images that may still be linked from other notes.
+All paths are **relative to the Obsidian vault root**. Enter `Assets` for all three attachment folders to collect images in one shared folder, or choose different paths for each type.
+
+Leave an attachment folder empty or enter `.` (the default) to save images beside that type of note. For example, if notes are in `Notes/Chats`, enter `Notes/Chats/images` for a subfolder.
+
+SyncNos updates Markdown image references automatically. Folder paths cannot leave the vault.
+Changing a folder writes attachments to the new location on the next sync without deleting older files that may still be referenced elsewhere.
 
 ![Configure the API key in SyncNos](/assets/docs/obsidian/obsidian-copy-api-key.png)
 

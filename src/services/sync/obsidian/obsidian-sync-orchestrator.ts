@@ -1,6 +1,7 @@
 import { parseArticleCommentDtos, type ArticleCommentDto } from '@services/comments/domain/comment-dto';
 import { backgroundStorage as defaultBackgroundStorage } from '@services/conversations/background/storage';
 import { getObsidianConnectionConfig, getObsidianPathConfig } from '@services/sync/obsidian/settings-store';
+import { conversationKinds } from '@services/protocols/conversation-kinds';
 import {
   NOTE_JSON_ACCEPT,
   createClient as createDefaultObsidianClient,
@@ -362,8 +363,13 @@ async function decideSyncModeForConversation({
 
   const desiredFilePath =
     safeString(pathResolution?.desiredFilePath) || buildDefaultStableNotePath(convo, { folderByKindId });
-  // Validate per-note vault containment before any image or Markdown write (including optional ChatGPT images).
-  resolveAttachmentTarget(desiredFilePath, pathConfig.attachmentFolder, 'attachment');
+  const attachmentFolders: Record<string, string> = {
+    chat: pathConfig.chatAttachmentFolder,
+    article: pathConfig.articleAttachmentFolder,
+    video: pathConfig.videoAttachmentFolder,
+  };
+  const attachmentFolder = attachmentFolders[conversationKinds.pick(convo)?.id || 'chat'] || '.';
+  resolveAttachmentTarget(desiredFilePath, attachmentFolder, 'attachment');
 
   const rebuild = {
     isFinal: false,
@@ -372,7 +378,7 @@ async function decideSyncModeForConversation({
     filePath: desiredFilePath,
     messages,
     comments: articleComments,
-    attachmentFolder: pathConfig.attachmentFolder,
+    attachmentFolder,
   };
   const existingPath = pathResolution?.found ? safeString(pathResolution.resolvedFilePath) : '';
   if (existingPath && existingPath !== desiredFilePath) {

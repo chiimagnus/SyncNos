@@ -365,10 +365,11 @@ export async function importBackupZipMerge(
   const filteredSettings = filterStorageForBackup((configDoc as any).storageLocal || {}, {
     includeSensitiveData: includesSensitiveData,
   });
-  if (Object.prototype.hasOwnProperty.call(filteredSettings, OBSIDIAN_STORAGE_KEYS.attachmentFolder)) {
-    filteredSettings[OBSIDIAN_STORAGE_KEYS.attachmentFolder] = normalizeAttachmentFolder(
-      filteredSettings[OBSIDIAN_STORAGE_KEYS.attachmentFolder],
-    );
+  for (const field of ['chatAttachmentFolder', 'articleAttachmentFolder', 'videoAttachmentFolder'] as const) {
+    const key = OBSIDIAN_STORAGE_KEYS[field];
+    if (Object.prototype.hasOwnProperty.call(filteredSettings, key)) {
+      filteredSettings[key] = normalizeAttachmentFolder(filteredSettings[key]);
+    }
   }
   if (includesSensitiveData) {
     const sensitiveStorageValidation = validateSensitiveBackupStorage(filteredSettings);

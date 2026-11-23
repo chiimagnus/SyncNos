@@ -26,7 +26,9 @@ export function registerObsidianSettingsHandlers(router: AnyRouter, deps: Deps) 
       chatFolder: msg.chatFolder,
       articleFolder: msg.articleFolder,
       videoFolder: msg.videoFolder,
-      attachmentFolder: msg.attachmentFolder,
+      chatAttachmentFolder: msg.chatAttachmentFolder,
+      articleAttachmentFolder: msg.articleAttachmentFolder,
+      videoAttachmentFolder: msg.videoAttachmentFolder,
     });
     return router.ok(data);
   });

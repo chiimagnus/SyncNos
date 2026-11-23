@@ -126,7 +126,11 @@ describe('background-router obsidian sync routes', () => {
     expect(getRes.ok).toBe(true);
     expect(getRes.data?.apiBaseUrl).toContain('http://127.0.0.1:27123');
     expect(getRes.data?.apiKeyPresent).toBe(false);
-    expect(getRes.data?.attachmentFolder).toBe('.');
+    expect([
+      getRes.data?.chatAttachmentFolder,
+      getRes.data?.articleAttachmentFolder,
+      getRes.data?.videoAttachmentFolder,
+    ]).toEqual(['.', '.', '.']);
     expect(getRes.data).not.toHaveProperty('apiKey');
 
     const saveRes = await router.dispatch({
@@ -134,13 +138,21 @@ describe('background-router obsidian sync routes', () => {
       apiBaseUrl: 'http://127.0.0.1:27123',
       apiKey: 'k',
       authHeaderName: 'Authorization',
-      attachmentFolder: '../images',
+      chatAttachmentFolder: 'Assets',
+      articleAttachmentFolder: 'Assets',
+      videoAttachmentFolder: 'Videos/Assets',
     });
     expect(saveRes.ok).toBe(true);
     expect(saveRes.data?.apiKeyPresent).toBe(true);
-    expect(saveRes.data?.attachmentFolder).toBe('../images');
-    expect(store['obsidian_attachment_folder']).toBe('../images');
-    expect((await router.dispatch({ type: 'obsidianGetSettings' })).data?.attachmentFolder).toBe('../images');
+    expect([
+      saveRes.data?.chatAttachmentFolder,
+      saveRes.data?.articleAttachmentFolder,
+      saveRes.data?.videoAttachmentFolder,
+    ]).toEqual(['Assets', 'Assets', 'Videos/Assets']);
+    expect(store['obsidian_chat_attachment_folder']).toBe('Assets');
+    expect(store['obsidian_article_attachment_folder']).toBe('Assets');
+    expect(store['obsidian_video_attachment_folder']).toBe('Videos/Assets');
+    expect((await router.dispatch({ type: 'obsidianGetSettings' })).data?.chatAttachmentFolder).toBe('Assets');
     expect(saveRes.data?.apiKeyMasked).toBe('********************************');
     expect(saveRes.data).not.toHaveProperty('apiKey');
     expect(JSON.stringify(saveRes.data)).not.toContain('"apiKey":"k"');

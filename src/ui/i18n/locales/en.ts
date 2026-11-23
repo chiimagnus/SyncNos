@@ -231,8 +231,8 @@ export const en = {
   aiChatsFolder: 'AI Chats Folder',
   webClipperFolder: 'Web Clipper Folder',
   videoScriptsFolder: 'Video Scripts Folder',
-  obsidianAttachmentFolder: 'Attachment Folder',
-  obsidianAttachmentFolderHelp: 'Relative to each note: . = same folder, images = subfolder, ../images = parent folder.',
+  obsidianAttachmentFolder: 'Attachment folder',
+  obsidianAttachmentFolderHelp: 'Paths are relative to the Obsidian vault root. Use the same attachment path to share a folder. Empty or . means beside each note.',
 
   // AboutSection
   sourceCode: 'Source Code',

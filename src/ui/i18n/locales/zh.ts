@@ -229,7 +229,7 @@ export const zh: { [K in TranslationKey]: string } = {
   webClipperFolder: '网页剪藏文件夹',
   videoScriptsFolder: '视频脚本文件夹',
   obsidianAttachmentFolder: '附件文件夹',
-  obsidianAttachmentFolderHelp: '相对于每篇笔记：. 为同目录，images 为子目录，../images 为上级目录。',
+  obsidianAttachmentFolderHelp: '路径相对于 Obsidian 笔记库根目录；各类填写同一目录即可共用。留空或 . 表示与对应笔记同目录。',
 
   // AboutSection
   sourceCode: '源代码',

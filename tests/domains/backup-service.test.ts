@@ -646,15 +646,23 @@ describe('backup service', () => {
     globalThis.browser = undefined;
 
     const stats = await importBackupZipMerge(
-      emptyBackupZipEntries({ obsidian_attachment_folder: './pictures/../images' }),
+      emptyBackupZipEntries({
+        obsidian_chat_attachment_folder: './pictures/../images',
+        obsidian_article_attachment_folder: 'Shared/Assets',
+        obsidian_video_attachment_folder: '.',
+      }),
     );
-    expect(stats.settingsApplied).toBe(1);
-    expect(chromeMock.__store.obsidian_attachment_folder).toBe('images');
+    expect(stats.settingsApplied).toBe(3);
+    expect(chromeMock.__store.obsidian_chat_attachment_folder).toBe('images');
+    expect(chromeMock.__store.obsidian_article_attachment_folder).toBe('Shared/Assets');
+    expect(chromeMock.__store.obsidian_video_attachment_folder).toBe('.');
 
     await expect(
-      importBackupZipMerge(emptyBackupZipEntries({ obsidian_attachment_folder: '/outside', other_setting: 'bad' })),
-    ).rejects.toThrow('relative to the note');
-    expect(chromeMock.__store.obsidian_attachment_folder).toBe('images');
+      importBackupZipMerge(
+        emptyBackupZipEntries({ obsidian_video_attachment_folder: '../outside', other_setting: 'bad' }),
+      ),
+    ).rejects.toThrow('escapes the vault');
+    expect(chromeMock.__store.obsidian_chat_attachment_folder).toBe('images');
     expect(chromeMock.__store.other_setting).toBeUndefined();
   });
 

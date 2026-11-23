@@ -92,7 +92,11 @@ let feishuGetQueue: Array<ApiResponse | Promise<ApiResponse>> = [];
 let notionStartQueue: Array<ApiResponse | Promise<ApiResponse>> = [];
 let feishuStartQueue: Array<ApiResponse | Promise<ApiResponse>> = [];
 let displaySetQueue: Array<Promise<void> | Error> = [];
-let obsidianStoredAttachmentFolder = '.';
+let obsidianStoredAttachmentFolders = {
+  chatAttachmentFolder: '.',
+  articleAttachmentFolder: '.',
+  videoAttachmentFolder: '.',
+};
 let obsidianSaveMode: 'normal' | 'failed' = 'normal';
 
 function ControllerHarness() {
@@ -172,7 +176,11 @@ beforeEach(() => {
   notionStartQueue = [];
   feishuStartQueue = [];
   displaySetQueue = [];
-  obsidianStoredAttachmentFolder = '.';
+  obsidianStoredAttachmentFolders = {
+    chatAttachmentFolder: '.',
+    articleAttachmentFolder: '.',
+    videoAttachmentFolder: '.',
+  };
   obsidianSaveMode = 'normal';
 
   antiHotlinkMocks.load.mockResolvedValue([{ domain: 'initial.example', referer: 'https://initial.example/' }]);
@@ -239,7 +247,11 @@ beforeEach(() => {
     if (type === 'obsidianGetSettings' || type === 'obsidianSaveSettings') {
       if (type === 'obsidianSaveSettings') {
         if (obsidianSaveMode === 'failed') return { ok: false, data: null, error: { message: 'storage write failed' } };
-        if (obsidianSaveMode === 'normal') obsidianStoredAttachmentFolder = String(_payload?.attachmentFolder || '.');
+        if (obsidianSaveMode === 'normal') {
+          for (const field of ['chatAttachmentFolder', 'articleAttachmentFolder', 'videoAttachmentFolder'] as const) {
+            obsidianStoredAttachmentFolders[field] = String(_payload?.[field] || '.');
+          }
+        }
       }
       const snapshot = {
         apiBaseUrl: 'http://127.0.0.1:27123',
@@ -249,7 +261,7 @@ beforeEach(() => {
         chatFolder: 'Chats',
         articleFolder: 'Articles',
         videoFolder: 'Videos',
-        attachmentFolder: obsidianStoredAttachmentFolder,
+        ...obsidianStoredAttachmentFolders,
       };
       return ok(snapshot);
     }
@@ -282,21 +294,30 @@ afterEach(() => {
 });
 
 describe('Settings scoped refresh', () => {
-  it('shows success only after a new background confirms the persisted attachment folder', async () => {
+  it('saves all three attachment paths and rehydrates independent settings', async () => {
     await renderController();
-    await invoke(() => latestSnapshot!.setObsidianAttachmentFolder('../images'));
+    await invoke(() => latestSnapshot!.setObsidianChatAttachmentFolder('Shared/Assets'));
+    await invoke(() => latestSnapshot!.setObsidianArticleAttachmentFolder('Shared/Assets'));
+    await invoke(() => latestSnapshot!.setObsidianVideoAttachmentFolder('Videos/Assets'));
     await invoke(() => latestSnapshot!.onSaveObsidianSettings());
     expect(latestSnapshot!.obsidianStatus).toBe('statusSaved');
-    expect(latestSnapshot!.obsidianAttachmentFolder).toBe('../images');
-    expect(obsidianStoredAttachmentFolder).toBe('../images');
+    expect(obsidianStoredAttachmentFolders).toEqual({
+      chatAttachmentFolder: 'Shared/Assets',
+      articleAttachmentFolder: 'Shared/Assets',
+      videoAttachmentFolder: 'Videos/Assets',
+    });
+    act(() => root!.unmount());
+    root = ReactDOM.createRoot(document.getElementById('root')!);
+    await renderController();
+    expect(latestSnapshot!.obsidianArticleAttachmentFolder).toBe('Shared/Assets');
   });
 
   it('does not report success when Obsidian settings storage fails', async () => {
     await renderController();
     obsidianSaveMode = 'failed';
-    await invoke(() => latestSnapshot!.setObsidianAttachmentFolder('images'));
+    await invoke(() => latestSnapshot!.setObsidianChatAttachmentFolder('images'));
     await invoke(() => latestSnapshot!.onSaveObsidianSettings());
-    expect(latestSnapshot!.obsidianAttachmentFolder).toBe('images');
+    expect(latestSnapshot!.obsidianChatAttachmentFolder).toBe('images');
     expect(latestSnapshot!.obsidianStatus).toBe('statusError');
     expect(latestSnapshot!.error).toBe('storage write failed');
   });

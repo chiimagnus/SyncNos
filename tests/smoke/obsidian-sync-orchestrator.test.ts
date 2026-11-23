@@ -261,44 +261,71 @@ describe('obsidian-sync-orchestrator', () => {
     expect((await orch.getSyncStatus()).job).toBeNull();
   });
 
-  it('persists a normalized relative attachment folder and refuses invalid updates atomically', async () => {
+  it('persists separate vault-relative folders and rejects invalid updates atomically', async () => {
     const { store } = setupChromeStorage();
     const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
-    expect((await settingsStore.getObsidianSettings()).attachmentFolder).toBe('.');
+    const defaults = await settingsStore.getObsidianSettings();
+    expect([defaults.chatAttachmentFolder, defaults.articleAttachmentFolder, defaults.videoAttachmentFolder]).toEqual([
+      '.',
+      '.',
+      '.',
+    ]);
 
-    const saved = await settingsStore.saveObsidianSettings({ attachmentFolder: './images/../photos' });
-    expect(saved.attachmentFolder).toBe('photos');
-    expect((await settingsStore.getObsidianPathConfig()).attachmentFolder).toBe('photos');
-    expect(store.obsidian_attachment_folder).toBe('photos');
+    const saved = await settingsStore.saveObsidianSettings({
+      chatAttachmentFolder: './images/../photos',
+      articleAttachmentFolder: 'Assets',
+      videoAttachmentFolder: 'Clips',
+    });
+    expect([saved.chatAttachmentFolder, saved.articleAttachmentFolder, saved.videoAttachmentFolder]).toEqual([
+      'photos',
+      'Assets',
+      'Clips',
+    ]);
+    expect((await settingsStore.getObsidianPathConfig()).articleAttachmentFolder).toBe('Assets');
+    expect(store.obsidian_chat_attachment_folder).toBe('photos');
+    expect(store.obsidian_article_attachment_folder).toBe('Assets');
+    expect(store.obsidian_video_attachment_folder).toBe('Clips');
 
     await expect(
-      settingsStore.saveObsidianSettings({ apiBaseUrl: 'http://example.com', attachmentFolder: '/outside' }),
-    ).rejects.toThrow('relative to the note');
+      settingsStore.saveObsidianSettings({
+        apiBaseUrl: 'http://example.com',
+        chatAttachmentFolder: 'Other',
+        videoAttachmentFolder: '../outside',
+      }),
+    ).rejects.toThrow('escapes the vault');
     expect(store.obsidian_api_base_url).toBeUndefined();
-    expect(store.obsidian_attachment_folder).toBe('photos');
+    expect(store.obsidian_chat_attachment_folder).toBe('photos');
   });
 
   it.each([
-    ['images (2026)', 'Notebook/Chats', 'Notebook/Chats/images (2026)', 'images%20%282026%29'],
-    ['../Shared images', 'Notebook/Chats', 'Notebook/Shared images', '../Shared%20images'],
-  ])(
-    'writes Obsidian attachments to configured folder %s with valid Markdown references',
-    async (folder, chatFolder, expectedDir, expectedLink) => {
+    ['chat', 'Shared assets', 'Shared assets', '../../Shared%20assets'],
+    ['article', 'Shared assets', 'Shared assets', '../../Shared%20assets'],
+    ['video', 'Shared assets', 'Shared assets', '../../Shared%20assets'],
+    ['chat', 'Notebook/Chats/images (2026)', 'Notebook/Chats/images (2026)', 'images%20%282026%29'],
+    ['article', '.', 'Notebook/Articles', ''],
+  ] as const)(
+    'uploads %s attachments to configured vault folder %s with valid Markdown references',
+    async (kind, folder, expectedDir, expectedLink) => {
       setupChromeStorage();
       const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
       const naming = await loadModule('@services/conversations/domain/file-naming.ts');
       const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
       const convo = {
         id: 1,
-        sourceType: 'chat',
-        source: 'chatgpt',
-        conversationKey: 'relative-attachments',
+        sourceType: kind,
+        source: kind === 'article' ? 'web' : 'chatgpt',
+        conversationKey: `relative-attachments-${kind}`,
         title: 'Attachments',
       };
       const basename = naming.buildConversationBasename(convo);
       backgroundStorageMocks.getConversationById.mockResolvedValue(convo);
       backgroundStorageMocks.getMessagesByConversationId.mockResolvedValue([
-        { messageKey: 'm1', sequence: 1, contentMarkdown: '![local](syncnos-asset://7)', updatedAt: 1 },
+        {
+          messageKey: kind === 'article' ? 'article_body' : kind === 'video' ? 'video_transcript' : 'm1',
+          sequence: 1,
+          contentMarkdown: '![local](syncnos-asset://7)',
+          updatedAt: 1,
+        },
       ]);
       imageCacheMocks.getImageCacheAssetsByIds.mockResolvedValue(
         new Map([
@@ -326,7 +353,16 @@ describe('obsidian-sync-orchestrator', () => {
         throw new Error(`unexpected ${method}`);
       };
 
-      await settingsStore.saveObsidianSettings({ apiKey: 'k', chatFolder, attachmentFolder: folder });
+      const noteFolders = { chat: 'Notebook/Chats', article: 'Notebook/Articles', video: 'Notebook/Videos' };
+      await settingsStore.saveObsidianSettings({
+        apiKey: 'k',
+        chatFolder: noteFolders.chat,
+        articleFolder: noteFolders.article,
+        videoFolder: noteFolders.video,
+        chatAttachmentFolder: kind === 'chat' ? folder : 'Other/Chats',
+        articleAttachmentFolder: kind === 'article' ? folder : 'Other/Articles',
+        videoAttachmentFolder: kind === 'video' ? folder : 'Other/Videos',
+      });
       const result = await orch.syncConversations({ conversationIds: [1] });
       expect(result.results[0].ok).toBe(true);
       const assetName = `${basename}-1.png`;
@@ -334,8 +370,8 @@ describe('obsidian-sync-orchestrator', () => {
       expect(binaryPut?.path).toBe(`${expectedDir}/${assetName}`);
       expect(Array.from((binaryPut?.body as Uint8Array) || [])).toEqual([1, 2]);
       const notePut = seen.find((call) => call.method === 'PUT' && typeof call.body === 'string');
-      expect(notePut?.path).toBe(`${chatFolder}/${basename}.md`);
-      expect(notePut?.body).toContain(`![local](${expectedLink}/${assetName})`);
+      expect(notePut?.path).toBe(`${noteFolders[kind]}/${basename}.md`);
+      expect(notePut?.body).toContain(`![local](${expectedLink ? `${expectedLink}/` : ''}${assetName})`);
       expect(seen.filter((call) => call.method === 'PUT')).toHaveLength(2);
       expect(backgroundStorageMocks.recordObsidianRemoteWrite).toHaveBeenCalledOnce();
     },
@@ -346,7 +382,7 @@ describe('obsidian-sync-orchestrator', () => {
     ['![generated](chatgpt-file://file_1)', 'chat'],
     ['plain text', 'chat'],
   ])('rejects out-of-vault folder before any remote write (%s)', async (contentMarkdown, sourceType) => {
-    setupChromeStorage();
+    const { store } = setupChromeStorage();
     const settingsStore = await loadModule('@services/sync/obsidian/settings-store.ts');
     const orch = await loadModule('@services/sync/obsidian/obsidian-sync-orchestrator.ts');
     backgroundStorageMocks.getConversationById.mockResolvedValue({
@@ -366,7 +402,8 @@ describe('obsidian-sync-orchestrator', () => {
       methods.push(method);
       return new Response('not found', { status: 404 });
     };
-    await settingsStore.saveObsidianSettings({ apiKey: 'k', attachmentFolder: '../../outside' });
+    await settingsStore.saveObsidianSettings({ apiKey: 'k' });
+    store[`obsidian_${sourceType === 'article' ? 'article' : 'chat'}_attachment_folder`] = '../../outside';
     const result = await orch.syncConversations({ conversationIds: [1] });
     expect(result.results[0].ok).toBe(false);
     expect(result.results[0].error).toContain('escapes the vault');
@@ -440,7 +477,7 @@ describe('obsidian-sync-orchestrator', () => {
       expect((await orch.syncConversations({ conversationIds: [1] })).okCount).toBe(1);
       expect(vault.has(`SyncNos-WebArticles/${basename}-1.png`)).toBe(true);
 
-      await settingsStore.saveObsidianSettings({ attachmentFolder: '../images' });
+      await settingsStore.saveObsidianSettings({ articleAttachmentFolder: 'images' });
       expect((await orch.syncConversations({ conversationIds: [1] })).okCount).toBe(1);
       expect(vault.has(`images/${basename}-1.png`)).toBe(true);
       expect(vault.has(`SyncNos-WebArticles/${basename}-1.png`)).toBe(true);

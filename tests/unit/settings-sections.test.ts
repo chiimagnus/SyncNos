@@ -434,7 +434,7 @@ describe('settings section definitions', () => {
     setupDom();
     const root = ReactDOM.createRoot(document.getElementById('root')!);
     const onTest = vi.fn();
-    const onChangeAttachmentFolder = vi.fn();
+    const onChangeChatAttachmentFolder = vi.fn();
 
     act(() => {
       root.render(
@@ -450,7 +450,9 @@ describe('settings section definitions', () => {
           chatFolder: 'SyncNos-AIChats',
           articleFolder: 'SyncNos-WebArticles',
           videoFolder: 'SyncNos-Videos',
-          attachmentFolder: '../images',
+          chatAttachmentFolder: 'Assets',
+          articleAttachmentFolder: 'Assets',
+          videoAttachmentFolder: '.',
           statusText: '',
           obsidianLogoUrl: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>',
           onChangeApiBaseUrl: () => {},
@@ -459,7 +461,9 @@ describe('settings section definitions', () => {
           onChangeChatFolder: () => {},
           onChangeArticleFolder: () => {},
           onChangeVideoFolder: () => {},
-          onChangeAttachmentFolder,
+          onChangeChatAttachmentFolder,
+          onChangeArticleAttachmentFolder: () => {},
+          onChangeVideoAttachmentFolder: () => {},
           onToggleSyncEnabled: () => {},
           onToggleAutoSyncEnabled: () => {},
           onSave: () => {},
@@ -473,9 +477,25 @@ describe('settings section definitions', () => {
     expect(helpLink?.textContent).toContain('Help docs');
     const baseUrlInput = document.querySelector('input[aria-label="Base URL"]') as HTMLInputElement | null;
     expect(baseUrlInput?.className || '').toContain('tw-max-w-[180px]');
-    const attachmentInput = document.querySelector('input[aria-label="Attachment Folder"]') as HTMLInputElement | null;
-    expect(attachmentInput?.value).toBe('../images');
-    expect(attachmentInput?.closest('section')?.textContent).toContain('Relative to each note');
+    const chatAttachmentInput = document.querySelector(
+      'input[aria-label="AI Chats Folder · Attachment folder"]',
+    ) as HTMLInputElement | null;
+    const articleAttachmentInput = document.querySelector(
+      'input[aria-label="Web Clipper Folder · Attachment folder"]',
+    ) as HTMLInputElement | null;
+    const videoAttachmentInput = document.querySelector(
+      'input[aria-label="Video Scripts Folder · Attachment folder"]',
+    ) as HTMLInputElement | null;
+    expect([chatAttachmentInput?.value, articleAttachmentInput?.value, videoAttachmentInput?.value]).toEqual([
+      'Assets',
+      'Assets',
+      '',
+    ]);
+    expect(videoAttachmentInput?.placeholder).toBe('SyncNos-Videos');
+    expect(chatAttachmentInput?.closest('section')?.textContent).toContain('vault root');
+    expect(document.querySelectorAll('input[aria-label$="Attachment folder"]')).toHaveLength(3);
+    act(() => chatAttachmentInput!.dispatchEvent(new window.FocusEvent('focusout', { bubbles: true })));
+    expect(onChangeChatAttachmentFolder).not.toHaveBeenCalled();
     const section = document.querySelector('section[aria-label="Obsidian"]');
     const header = section?.firstElementChild;
     const testButton = Array.from(header?.querySelectorAll('button') || []).find(
