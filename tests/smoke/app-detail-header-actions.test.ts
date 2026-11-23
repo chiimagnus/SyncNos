@@ -1389,7 +1389,7 @@ describe('ConversationDetailPane header actions', () => {
     expect(cacheButton).toBeTruthy();
     const moreMenu = document.querySelector('[role="menu"][aria-label="moreButton"]') as HTMLElement | null;
     expect(moreMenu).toBeTruthy();
-    expect(moreMenu?.className || '').toContain('tw-w-[260px]');
+    expect(moreMenu?.className || '').toContain('tw-w-[308px]');
     const textCountRow = document.querySelector('[data-detail-text-count-row="true"]') as HTMLElement | null;
     const imageCountRow = document.querySelector('[data-detail-image-count-row="true"]') as HTMLElement | null;
     expect(textCountRow).toBeTruthy();
