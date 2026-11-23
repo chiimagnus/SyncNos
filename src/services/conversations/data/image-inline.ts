@@ -1,4 +1,6 @@
 import { openDb } from '@platform/idb/schema';
+import { storageGet } from '@platform/storage/local';
+import { createImageOptimizationPreview } from '@services/conversations/data/image-optimization';
 import { downloadImageSmart } from '@platform/webext/image-download-proxy';
 import { reusableImageCacheByteSize } from '@services/conversations/data/image-cache-record';
 import { chatgptFileIdFromUrl } from '@services/shared/chatgpt-image-identity';
@@ -9,6 +11,8 @@ import {
   type MarkdownImageReference,
 } from '@services/shared/markdown-image-references';
 import { formatSyncnosAssetUrl } from '@services/shared/syncnos-asset-uri';
+
+export const AUTO_OPTIMIZE_NEW_IMAGES_STORAGE_KEY = 'auto_optimize_new_images_enabled';
 
 const NO_IMAGE_SIZE_LIMIT = Number.POSITIVE_INFINITY;
 
@@ -230,13 +234,35 @@ async function upsertCachedImageAsset(input: {
   byteSize: number;
   contentType: string;
   dataUrl?: string;
+  autoOptimizeNew?: boolean;
 }): Promise<CachedAsset> {
   const safeUrl = String(input.url || '').trim();
   if (!safeUrl) throw new Error('image cache url required');
 
-  const byteSize = Number(input.byteSize) || input.blob.size || 0;
-  const contentType = parseContentType(input.contentType || input.blob.type);
+  let blob = input.blob;
+  const contentType = parseContentType(input.contentType || blob.type);
   const dataUrl = String(input.dataUrl || '').trim();
+
+  if (input.autoOptimizeNew === true) {
+    try {
+      const prefs = await storageGet([AUTO_OPTIMIZE_NEW_IMAGES_STORAGE_KEY]);
+      if (prefs[AUTO_OPTIMIZE_NEW_IMAGES_STORAGE_KEY] === true) {
+        const optimized = await createImageOptimizationPreview({ blob, contentType, mode: 'pixel-exact' });
+        if (
+          optimized.ok &&
+          optimized.mode === 'pixel-exact' &&
+          optimized.pixelsEqual &&
+          optimized.savedBytes > 0 &&
+          optimized.contentType === contentType
+        ) {
+          blob = optimized.optimizedBlob;
+        }
+      }
+    } catch (_error) {
+      // Optional optimization cannot prevent the original image from being cached.
+    }
+  }
+  const byteSize = blob.size;
   const db = await openDb();
 
   return runTrackedTransaction(
@@ -259,8 +285,8 @@ async function upsertCachedImageAsset(input: {
         ...(Number.isFinite(existingId) && existingId > 0 ? { id: existingId } : {}),
         conversationId: input.conversationId,
         url: safeUrl,
-        ...(dataUrl ? { dataUrl } : existing?.dataUrl ? { dataUrl: existing.dataUrl } : {}),
-        blob: input.blob,
+        ...(blob === input.blob && (dataUrl || existing?.dataUrl) ? { dataUrl: dataUrl || existing?.dataUrl } : {}),
+        blob,
         byteSize,
         contentType,
         createdAt: existing?.createdAt || now,
@@ -302,13 +328,19 @@ async function downloadImageAsBlob(input: {
   maxBytes: number;
 }): Promise<
   | { ok: true; blob: Blob; byteSize: number; contentType: string }
-  | { ok: false; reason: 'http' | 'non_image' | 'empty' | 'too_large' | 'fetch' }
+  | { ok: false; reason: 'http' | 'non_image' | 'empty' | 'too_large' | 'fetch' | 'retryable_http' }
 > {
   const safeUrl = String(input.url || '').trim();
   if (!isHttpUrl(safeUrl)) return { ok: false, reason: 'fetch' };
   try {
     const result = await downloadImageSmart({ url: safeUrl, maxBytes: input.maxBytes });
     if (result.ok) return result;
+    if (result.reason === 'http') {
+      const status = result.status;
+      if (status === 408 || status === 425 || status === 429 || (status != null && status >= 500 && status < 600)) {
+        return { ok: false, reason: 'retryable_http' };
+      }
+    }
     return { ok: false, reason: result.reason === 'invalid_input' ? 'fetch' : result.reason };
   } catch (_error) {
     return { ok: false, reason: 'fetch' };
@@ -452,6 +484,7 @@ export async function inlineChatImagesInMessages(input: {
           blob: downloaded.blob,
           byteSize: downloaded.byteSize,
           contentType: downloaded.contentType,
+          autoOptimizeNew: true,
         });
         chatgptAssetByUrl.set(url, asset);
         downloadedCount += 1;
@@ -528,6 +561,7 @@ export async function inlineChatImagesInMessages(input: {
             blob: parsed.blob,
             byteSize: parsed.byteSize,
             contentType: parsed.contentType,
+            autoOptimizeNew: true,
           });
         } catch (_error) {
           warningFlags.add('inline_images_download_failed');
@@ -538,7 +572,9 @@ export async function inlineChatImagesInMessages(input: {
         const downloaded = await downloadImageAsBlob({ url, maxBytes: NO_IMAGE_SIZE_LIMIT });
         if (!downloaded.ok) {
           warningFlags.add('inline_images_download_failed');
-          if (downloaded.reason === 'fetch') warningFlags.add('inline_images_cache_incomplete');
+          if (downloaded.reason === 'fetch' || downloaded.reason === 'retryable_http') {
+            warningFlags.add('inline_images_cache_incomplete');
+          }
           continue;
         }
         try {
@@ -548,6 +584,7 @@ export async function inlineChatImagesInMessages(input: {
             blob: downloaded.blob,
             byteSize: downloaded.byteSize,
             contentType: downloaded.contentType,
+            autoOptimizeNew: true,
           });
         } catch (_error) {
           warningFlags.add('inline_images_download_failed');

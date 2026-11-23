@@ -182,6 +182,8 @@ export function SettingsScene(props: SettingsSceneProps) {
     onToggleAiChatCacheImagesEnabled,
     webArticleCacheImagesEnabled,
     onToggleWebArticleCacheImagesEnabled,
+    autoOptimizeNewImagesEnabled,
+    onToggleAutoOptimizeNewImagesEnabled,
     antiHotlinkAdvancedOpen,
     onToggleAntiHotlinkAdvancedOpen,
     antiHotlinkRules,
@@ -496,6 +498,10 @@ export function SettingsScene(props: SettingsSceneProps) {
           webArticleCacheImagesEnabled={webArticleCacheImagesEnabled}
           onToggleWebArticleCacheImagesEnabled={(next) => {
             void onToggleWebArticleCacheImagesEnabled(next);
+          }}
+          autoOptimizeNewImagesEnabled={autoOptimizeNewImagesEnabled}
+          onToggleAutoOptimizeNewImagesEnabled={(next) => {
+            void onToggleAutoOptimizeNewImagesEnabled(next);
           }}
           antiHotlinkAdvancedOpen={antiHotlinkAdvancedOpen}
           onToggleAntiHotlinkAdvancedOpen={onToggleAntiHotlinkAdvancedOpen}

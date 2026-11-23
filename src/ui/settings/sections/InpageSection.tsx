@@ -65,6 +65,8 @@ export function InpageSection(props: {
   onToggleAiChatCacheImagesEnabled: (next: boolean) => void;
   webArticleCacheImagesEnabled: boolean;
   onToggleWebArticleCacheImagesEnabled: (next: boolean) => void;
+  autoOptimizeNewImagesEnabled: boolean;
+  onToggleAutoOptimizeNewImagesEnabled: (next: boolean) => void;
   antiHotlinkAdvancedOpen: boolean;
   onToggleAntiHotlinkAdvancedOpen: () => void;
   antiHotlinkRules: AntiHotlinkRuleEditorRow[];
@@ -96,6 +98,8 @@ export function InpageSection(props: {
     onToggleAiChatCacheImagesEnabled,
     webArticleCacheImagesEnabled,
     onToggleWebArticleCacheImagesEnabled,
+    autoOptimizeNewImagesEnabled,
+    onToggleAutoOptimizeNewImagesEnabled,
     antiHotlinkAdvancedOpen,
     onToggleAntiHotlinkAdvancedOpen,
     antiHotlinkRules,
@@ -279,6 +283,17 @@ export function InpageSection(props: {
             </span>
           </span>
         </label>
+        <label className="tw-mt-3 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
+          <input
+            type="checkbox"
+            checked={autoOptimizeNewImagesEnabled}
+            disabled={busy}
+            onChange={(event) => onToggleAutoOptimizeNewImagesEnabled(event.target.checked)}
+            className={checkboxClassName}
+          />
+          {t('autoOptimizeNewImagesLabel')}
+        </label>
+        <p className="tw-mt-1 tw-text-xs tw-text-[var(--text-secondary)]">{t('autoOptimizeNewImagesHint')}</p>
         <div className="tw-mt-3">
           <button
             type="button"

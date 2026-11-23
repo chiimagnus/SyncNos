@@ -245,6 +245,73 @@ afterEach(async () => {
   cleanupDom();
 });
 
+describe('Settings controller new image optimization preference', () => {
+  it('keeps the latest storage change when an older settings refresh returns later', async () => {
+    const staleRead = deferred<Record<string, unknown>>();
+    storageMocks.get.mockImplementation((keys: string[]) =>
+      keys.includes('auto_optimize_new_images_enabled')
+        ? staleRead.promise
+        : Promise.resolve(Object.fromEntries(keys.map((key) => [key, undefined]))),
+    );
+    let onStorageChanged: ((changes: Record<string, unknown>, areaName: string) => void) | null = null;
+    storageMocks.onChanged.mockImplementation((listener) => {
+      onStorageChanged = listener;
+      return () => {};
+    });
+    await renderController('general');
+    expect(latestSnapshot?.autoOptimizeNewImagesEnabled).toBe(false);
+    act(() => onStorageChanged?.({ auto_optimize_new_images_enabled: { newValue: true } }, 'local'));
+    expect(latestSnapshot?.autoOptimizeNewImagesEnabled).toBe(true);
+    await act(async () => {
+      staleRead.resolve({ auto_optimize_new_images_enabled: false });
+      await staleRead.promise;
+    });
+    expect(latestSnapshot?.autoOptimizeNewImagesEnabled).toBe(true);
+  });
+
+  it('keeps external changes made during a pending local preference write', async () => {
+    const deferredWrite = deferred<void>();
+    let onStorageChanged: ((changes: Record<string, unknown>, areaName: string) => void) | null = null;
+    storageMocks.onChanged.mockImplementation((listener) => {
+      onStorageChanged = listener;
+      return () => {};
+    });
+    storageMocks.set.mockReturnValue(deferredWrite.promise);
+    await renderController('general');
+    let write: Promise<void> = Promise.resolve();
+    await act(async () => {
+      write = latestSnapshot!.onToggleAutoOptimizeNewImagesEnabled(true);
+      for (let i = 0; i < 8; i++) await Promise.resolve();
+    });
+    act(() => onStorageChanged?.({ auto_optimize_new_images_enabled: { newValue: false } }, 'local'));
+    await act(async () => {
+      deferredWrite.resolve();
+      await write;
+    });
+    expect(latestSnapshot?.autoOptimizeNewImagesEnabled).toBe(false);
+  });
+
+  it('defaults off, persists opt-in, and never changes either source cache preference', async () => {
+    await renderController('general');
+    expect(latestSnapshot?.autoOptimizeNewImagesEnabled).toBe(false);
+    await act(async () => {
+      await latestSnapshot!.onToggleAutoOptimizeNewImagesEnabled(true);
+    });
+    expect(latestSnapshot?.autoOptimizeNewImagesEnabled).toBe(true);
+    expect(storageMocks.set).toHaveBeenCalledWith({ auto_optimize_new_images_enabled: true });
+    expect(storageMocks.set).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        ai_chat_cache_images_enabled: true,
+      }),
+    );
+    expect(storageMocks.set).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        web_article_cache_images_enabled: true,
+      }),
+    );
+  });
+});
+
 describe('Settings controller AI thinking preference', () => {
   it('does not overwrite a newer storage change with a stale settings refresh', async () => {
     const staleRead = deferred<Record<string, unknown>>();

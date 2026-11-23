@@ -696,6 +696,24 @@ describe('image-inline', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('retries HTTP 429 and 5xx later but does not retry them in the same save', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('', { status: 429 }))
+      .mockResolvedValueOnce(new Response('', { status: 503 }));
+    // @ts-expect-error test global
+    globalThis.fetch = fetchMock;
+    for (const [index, status] of [429, 503].entries()) {
+      const markdown = `![retry](https://example.com/image-${status}.png)`;
+      const messages = [{ messageKey: `retry-${index}`, contentMarkdown: markdown }];
+      const result = await inlineChatImagesInMessages({ conversationId: 82 + index, messages });
+      expect(result.warningFlags).toContain('inline_images_cache_incomplete');
+      expect(result.warningFlags).toContain('inline_images_download_failed');
+      expect(messages[0]?.contentMarkdown).toBe(markdown);
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('does not retry a failed smart HTTP image download through a second plain fetch', async () => {
     const fetchMock = vi.fn(async () => new Response('', { status: 403 }));
     // @ts-expect-error test global

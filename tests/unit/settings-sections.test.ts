@@ -580,6 +580,8 @@ describe('inpage anti-hotlink advanced editor', () => {
       onToggleAiChatCacheImagesEnabled: () => {},
       webArticleCacheImagesEnabled: true,
       onToggleWebArticleCacheImagesEnabled: () => {},
+      autoOptimizeNewImagesEnabled: false,
+      onToggleAutoOptimizeNewImagesEnabled: () => {},
       antiHotlinkAdvancedOpen: false,
       onToggleAntiHotlinkAdvancedOpen: () => {},
       antiHotlinkRules: [],
@@ -657,6 +659,25 @@ describe('inpage anti-hotlink advanced editor', () => {
     expect(section?.textContent).toContain('future saves');
     act(() => toggle!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
     expect(onToggleAiChatIncludeThinkingEnabled).toHaveBeenCalledWith(false);
+  });
+
+  it('shows one opt-in image optimization toggle without changing either caching preference', () => {
+    const change = vi.fn();
+    renderInpage({
+      aiChatCacheImagesEnabled: false,
+      webArticleCacheImagesEnabled: false,
+      autoOptimizeNewImagesEnabled: false,
+      onToggleAutoOptimizeNewImagesEnabled: change,
+    });
+    const label = Array.from(document.querySelectorAll('label')).find((node) =>
+      node.textContent?.includes('Optimize newly cached images'),
+    );
+    const toggle = label?.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+    expect(toggle).toBeTruthy();
+    expect(toggle?.checked).toBe(false);
+    expect(document.body.textContent).toContain('Only smaller, pixel-identical results');
+    act(() => toggle!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
+    expect(change).toHaveBeenCalledWith(true);
   });
 
   it('keeps ChatGPT Advanced capture in General settings', () => {

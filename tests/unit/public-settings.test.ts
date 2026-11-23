@@ -82,6 +82,7 @@ const EXPECTED_KEYS = [
   'capture.ai-chat-auto-save',
   'capture.ai-chat-cache-images',
   'capture.web-article-cache-images',
+  'capture.auto-optimize-new-images',
   'mention.enabled',
   'anti-hotlink.rules',
   'theme.mode',
@@ -140,6 +141,7 @@ describe('public settings facade', () => {
     expect(snapshot['capture.ai-chat-auto-save']).toBe(true);
     expect(snapshot['capture.ai-chat-cache-images']).toBe(false);
     expect(snapshot['capture.web-article-cache-images']).toBe(false);
+    expect(snapshot['capture.auto-optimize-new-images']).toBe(false);
     expect(snapshot['mention.enabled']).toBe(true);
     expect(snapshot['theme.mode']).toBe('system');
     expect(snapshot['markdown.reading-profile']).toBe('medium');
@@ -152,6 +154,24 @@ describe('public settings facade', () => {
     expect(snapshot['provider.feishu.auto-sync']).toBe(false);
     expect(snapshot['provider.github.auto-sync']).toBe(false);
     expect(snapshot['reader.tts.ai-api-key']).toEqual({ present: false });
+  });
+
+  it('keeps new image optimization opt-in, independent of both image caching switches', async () => {
+    await expect(setPublicSetting('capture.auto-optimize-new-images', 'true')).rejects.toSatisfy((error: unknown) => {
+      expectPublicSettingsError(error, 'settings_invalid_value');
+      return true;
+    });
+    expect((await getPublicSetting('capture.auto-optimize-new-images')).value).toBe(false);
+    const enabled = await setPublicSetting('capture.auto-optimize-new-images', true);
+    expect(enabled.value).toBe(true);
+    expect(state.storage.auto_optimize_new_images_enabled).toBe(true);
+    expect((await getAllPublicSettings())['capture.ai-chat-cache-images']).toBe(false);
+    expect((await getAllPublicSettings())['capture.web-article-cache-images']).toBe(false);
+    expect(await getPublicSetting('capture.auto-optimize-new-images')).toMatchObject({
+      key: 'capture.auto-optimize-new-images',
+      value: true,
+    });
+    expect((await setPublicSetting('capture.auto-optimize-new-images', false)).value).toBe(false);
   });
 
   it('never returns raw secrets through reader.prefs, get-all, or schema even when unrelated provider secrets exist in storage', async () => {

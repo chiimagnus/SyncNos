@@ -144,7 +144,7 @@ export async function downloadImagePlain(input: {
   timeoutMs?: number;
 }): Promise<
   | { ok: true; blob: Blob; byteSize: number; contentType: string }
-  | { ok: false; reason: 'invalid_input' | 'http' | 'non_image' | 'empty' | 'too_large' | 'fetch' }
+  | { ok: false; reason: 'invalid_input' | 'http' | 'non_image' | 'empty' | 'too_large' | 'fetch'; status?: number }
 > {
   const safeUrl = String(input.url || '').trim();
   const maxBytes = Number(input.maxBytes) || 2_000_000;
@@ -161,7 +161,7 @@ export async function downloadImagePlain(input: {
       redirect: 'follow',
       ...(controller ? { signal: controller.signal } : null),
     });
-    if (!res.ok) return { ok: false, reason: 'http' } as const;
+    if (!res.ok) return { ok: false, reason: 'http', status: res.status } as const;
 
     const contentType = parseContentType(res.headers.get('content-type') || '');
     if (!contentType.startsWith('image/')) return { ok: false, reason: 'non_image' } as const;
@@ -196,7 +196,7 @@ export async function downloadImageSmart(input: {
   maxBytes?: number;
 }): Promise<
   | { ok: true; blob: Blob; byteSize: number; contentType: string }
-  | { ok: false; reason: 'invalid_input' | 'http' | 'non_image' | 'empty' | 'too_large' | 'fetch' }
+  | { ok: false; reason: 'invalid_input' | 'http' | 'non_image' | 'empty' | 'too_large' | 'fetch'; status?: number }
 > {
   const safeUrl = String(input.url || '').trim();
   const maxBytes = Number(input.maxBytes) || 2_000_000;

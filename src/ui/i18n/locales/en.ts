@@ -520,6 +520,8 @@ export const en = {
   storageInsightContentByKind: 'Message text by content type',
   storageInsightTopSources: 'Largest image sources',
   storageInsightTopConversations: 'Conversations with largest cached images',
+  autoOptimizeNewImagesLabel: 'Optimize newly cached images',
+  autoOptimizeNewImagesHint: 'Off by default. Only smaller, pixel-identical results; does not enable image caching.',
   storageImageOptimizeTitle: 'Image compression preview',
   storageImageOptimizeDescription: 'Preview eligible PNG/JPEG images. Nothing changes until you save.',
   storageImagePreviewPixel: 'Preview exact pixels',

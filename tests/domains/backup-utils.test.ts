@@ -54,6 +54,7 @@ describe('backup backup-utils', () => {
       syncnos_cli_instance_id_v1: 'profile-instance',
       syncnos_cli_integration_enabled_v1: true,
       chatgpt_api_capture_enabled: true,
+      auto_optimize_new_images_enabled: true,
     });
     expect(filtered).toEqual({
       notion_parent_page_id: 'p1',
@@ -70,6 +71,7 @@ describe('backup backup-utils', () => {
       github_repository: 'chiimagnus/SyncNos-Webclipper',
       github_branch: 'main',
       chatgpt_api_capture_enabled: true,
+      auto_optimize_new_images_enabled: true,
     });
     expect(filtered.webclipper_popup_sync_selection_handoff_v1).toBeUndefined();
     expect(JSON.stringify(filtered)).not.toMatch(

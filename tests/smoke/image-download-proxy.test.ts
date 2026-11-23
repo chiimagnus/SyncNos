@@ -204,6 +204,19 @@ describe('image-download-proxy', () => {
       }
     });
 
+    it('preserves HTTP status evidence so background recovery can distinguish 403 from 429 and 503', async () => {
+      const { downloadImagePlain } = await import('@platform/webext/image-download-proxy');
+      for (const status of [403, 429, 503]) {
+        mockFetch.mockResolvedValueOnce({ ok: false, status });
+        expect(await downloadImagePlain({ url: 'https://example.com/blocked.png' })).toEqual({
+          ok: false,
+          reason: 'http',
+          status,
+        });
+      }
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+    });
+
     it('returns error when fetch returns 403', async () => {
       const { downloadImageSmart } = await import('@platform/webext/image-download-proxy');
       mockFetch.mockResolvedValue({ ok: false, status: 403 });

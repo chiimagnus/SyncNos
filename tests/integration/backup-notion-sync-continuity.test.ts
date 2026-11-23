@@ -140,6 +140,30 @@ afterEach(async () => {
   await deleteDb();
 });
 
+describe('portable image optimization setting', () => {
+  it('restores an opt-in preference from ordinary Backup, while old Backup without the key preserves the current setting', async () => {
+    const chromeStore = (globalThis as any).chrome.__store as Record<string, unknown>;
+    chromeStore.auto_optimize_new_images_enabled = true;
+    const archive = await exportBackupZip();
+    const entries = await extractZipEntries(archive.blob);
+    const configPath = 'config/storage-local.json';
+    const original = JSON.parse(new TextDecoder().decode(entries.get(configPath)));
+    expect(original.storageLocal.auto_optimize_new_images_enabled).toBe(true);
+
+    chromeStore.auto_optimize_new_images_enabled = false;
+    await importBackupZipMerge(entries);
+    expect(chromeStore.auto_optimize_new_images_enabled).toBe(true);
+
+    const legacyConfig = structuredClone(original);
+    delete legacyConfig.storageLocal.auto_optimize_new_images_enabled;
+    const oldEntries = new Map(entries);
+    oldEntries.set(configPath, new TextEncoder().encode(JSON.stringify(legacyConfig)));
+    chromeStore.auto_optimize_new_images_enabled = false;
+    await importBackupZipMerge(oldEntries);
+    expect(chromeStore.auto_optimize_new_images_enabled).toBe(false);
+  });
+});
+
 describe('compressed image Backup continuity', () => {
   it('exports optimized bytes and restores renderable identity without touching the message or activity time', async () => {
     const db = await openDb();

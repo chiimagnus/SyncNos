@@ -357,6 +357,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const aiChatIncludeThinkingObservationRevisionRef = useRef(0);
   const [aiChatCacheImagesEnabled, setAiChatCacheImagesEnabled] = useState<boolean>(false);
   const [webArticleCacheImagesEnabled, setWebArticleCacheImagesEnabled] = useState<boolean>(false);
+  const [autoOptimizeNewImagesEnabled, setAutoOptimizeNewImagesEnabled] = useState<boolean>(false);
+  const autoOptimizeNewImagesObservationRevisionRef = useRef(0);
   const [antiHotlinkAdvancedOpen, setAntiHotlinkAdvancedOpen] = useState<boolean>(false);
   const [antiHotlinkRules, setAntiHotlinkRules] = useState<AntiHotlinkRuleDraft[]>(() =>
     getDefaultAntiHotlinkRulesForSettings(),
@@ -704,6 +706,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     const inpageDisplayObservationAtStart = inpageDisplayObservationRevisionRef.current;
     const aiChatAutoSaveObservationAtStart = aiChatAutoSaveObservationRevisionRef.current;
     const aiChatIncludeThinkingObservationAtStart = aiChatIncludeThinkingObservationRevisionRef.current;
+    const autoOptimizeNewImagesObservationAtStart = autoOptimizeNewImagesObservationRevisionRef.current;
     const aiChatDollarMentionObservationAtStart = aiChatDollarMentionObservationRevisionRef.current;
     const [
       ,
@@ -737,6 +740,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         AI_CHAT_INCLUDE_THINKING_STORAGE_KEY,
         'ai_chat_cache_images_enabled',
         'web_article_cache_images_enabled',
+        'auto_optimize_new_images_enabled',
         'ai_chat_dollar_mention_enabled',
         MARKDOWN_READING_PROFILE_STORAGE_KEY,
         LAST_BACKUP_EXPORT_AT_STORAGE_KEY,
@@ -807,6 +811,9 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     }
     setAiChatCacheImagesEnabled(local?.ai_chat_cache_images_enabled === true);
     setWebArticleCacheImagesEnabled(local?.web_article_cache_images_enabled === true);
+    if (autoOptimizeNewImagesObservationRevisionRef.current === autoOptimizeNewImagesObservationAtStart) {
+      setAutoOptimizeNewImagesEnabled(local?.auto_optimize_new_images_enabled === true);
+    }
     setAntiHotlinkRules(Array.isArray(antiHotlinkRulesDraft) ? antiHotlinkRulesDraft : []);
     setAntiHotlinkRuleErrors([]);
     if (aiChatDollarMentionObservationRevisionRef.current === aiChatDollarMentionObservationAtStart) {
@@ -913,6 +920,10 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       if (Object.prototype.hasOwnProperty.call(changes, AI_CHAT_INCLUDE_THINKING_STORAGE_KEY)) {
         aiChatIncludeThinkingObservationRevisionRef.current += 1;
         setAiChatIncludeThinkingEnabled(changes[AI_CHAT_INCLUDE_THINKING_STORAGE_KEY]?.newValue !== false);
+      }
+      if (Object.prototype.hasOwnProperty.call(changes, 'auto_optimize_new_images_enabled')) {
+        autoOptimizeNewImagesObservationRevisionRef.current += 1;
+        setAutoOptimizeNewImagesEnabled(changes.auto_optimize_new_images_enabled?.newValue === true);
       }
       if (Object.prototype.hasOwnProperty.call(changes, 'ai_chat_dollar_mention_enabled')) {
         aiChatDollarMentionObservationRevisionRef.current += 1;
@@ -1799,6 +1810,19 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     [runTask],
   );
 
+  const onToggleAutoOptimizeNewImagesEnabled = useCallback(
+    async (next: boolean) => {
+      await runTask(async () => {
+        const revision = autoOptimizeNewImagesObservationRevisionRef.current;
+        await storageSet({ auto_optimize_new_images_enabled: next === true });
+        if (autoOptimizeNewImagesObservationRevisionRef.current !== revision) return;
+        autoOptimizeNewImagesObservationRevisionRef.current += 1;
+        setAutoOptimizeNewImagesEnabled(next === true);
+      });
+    },
+    [runTask],
+  );
+
   const onToggleAntiHotlinkAdvancedOpen = useCallback(() => {
     setAntiHotlinkAdvancedOpen((open) => !open);
   }, []);
@@ -2351,6 +2375,8 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onToggleAiChatCacheImagesEnabled,
     webArticleCacheImagesEnabled,
     onToggleWebArticleCacheImagesEnabled,
+    autoOptimizeNewImagesEnabled,
+    onToggleAutoOptimizeNewImagesEnabled,
     antiHotlinkAdvancedOpen,
     onToggleAntiHotlinkAdvancedOpen,
     antiHotlinkRules,

@@ -514,6 +514,8 @@ export const zh: { [K in TranslationKey]: string } = {
   storageInsightContentByKind: '各内容类型的消息文本',
   storageInsightTopSources: '图片占用最多的来源',
   storageInsightTopConversations: '图片占用最多的会话',
+  autoOptimizeNewImagesLabel: '自动优化新缓存图片',
+  autoOptimizeNewImagesHint: '默认关闭。仅保存更小且像素一致的结果，不会自动开启图片缓存。',
   storageImageOptimizeTitle: '图片压缩预览',
   storageImageOptimizeDescription: '预览可优化的 PNG/JPEG；确认保存前不会修改原图。',
   storageImagePreviewPixel: '预览像素一致',

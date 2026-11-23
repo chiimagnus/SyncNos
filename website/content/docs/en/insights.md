@@ -50,3 +50,8 @@ The result lists byte-identical files across conversations and their potential d
 it never merges assets, rewrites IDs, deletes content, or triggers synchronization. You can cancel
 or rerun after changes to the local library.
 Existing remote copies are not updated automatically; rescan before further changes.
+
+In **Settings → General**, **Optimize newly cached images** is off by default. Enable it to
+try pixel-identical compression only when a new image is first cached. Unsupported images,
+failed encoding, and candidates without smaller bytes keep their original data. The setting
+does not turn on AI chat or article image caching, change previously stored images, or trigger remote sync.
