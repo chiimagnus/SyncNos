@@ -147,19 +147,29 @@ describe('settings section definitions', () => {
       root.render(createElement(AboutSection));
     });
 
-    expect(document.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/"]')?.textContent).toContain(
-      'Help docs',
-    );
+    const help = document.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/"]');
+    expect(help?.getAttribute('aria-label')).toBe('Help docs');
+    expect(help?.querySelector('svg.lucide-book-open')).toBeTruthy();
+    expect(help?.textContent).toBe('');
     const externalLinks = document.querySelectorAll(
       '#linkAboutSource, #linkAboutChangelog, #linkAboutGitHub, #linkAboutAngels',
     );
     expect(externalLinks).toHaveLength(4);
+    for (const [id, icon] of [
+      ['linkAboutSource', 'code-xml'],
+      ['linkAboutChangelog', 'history'],
+      ['linkAboutGitHub', 'message-square-plus'],
+      ['linkAboutAngels', 'heart-handshake'],
+    ]) {
+      expect(document.querySelector('#' + id + ' svg.lucide-' + icon)).toBeTruthy();
+    }
     expect(Array.from(externalLinks).every((link) => link.tagName === 'A')).toBe(true);
     expect(Array.from(externalLinks).every((link) => link.getAttribute('target') === '_blank')).toBe(true);
     for (const link of externalLinks) {
       expect(link.getAttribute('aria-label')).toBeTruthy();
       expect(link.querySelector('svg[aria-hidden="true"]')).toBeTruthy();
       expect(link.textContent).toBe('');
+      expect(link.getAttribute('data-tooltip-content')).toBe(link.getAttribute('aria-label'));
     }
     expect(document.querySelector('[id^="btnAbout"]')).toBeNull();
     expect(document.querySelector('img[src=""]')).toBeNull();

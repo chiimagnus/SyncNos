@@ -1,7 +1,8 @@
 import { getManifest, getURL } from '@services/shared/runtime';
 
-import { t } from '@i18n';
-import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
+import { getCurrentLocale, t } from '@i18n';
+import { BookOpen, CodeXml, History, MessageSquarePlus, HeartHandshake } from 'lucide-react';
+import { buildSettingsDocsUrl } from '@ui/settings/SettingsDocsLink';
 import { SettingsExternalLink } from './SettingsExternalLink';
 import { SettingsFormRow } from './SettingsFormRow';
 import { SettingsGroup } from './SettingsGroup';
@@ -30,11 +31,16 @@ export function AboutSection() {
             </span>
           }
         >
-          <SettingsDocsLink />
+          <SettingsExternalLink
+            href={buildSettingsDocsUrl(undefined, getCurrentLocale())}
+            label={t('settingsDocsLink')}
+            icon={BookOpen}
+          />
         </SettingsFormRow>
         <SettingsFormRow label={t('sourceCode')}>
           <SettingsExternalLink
             id="linkAboutSource"
+            icon={CodeXml}
             href="https://github.com/chiimagnus/SyncNos"
             label={t('sourceCode')}
           />
@@ -42,6 +48,7 @@ export function AboutSection() {
         <SettingsFormRow label={t('changelog')}>
           <SettingsExternalLink
             id="linkAboutChangelog"
+            icon={History}
             href="https://github.com/chiimagnus/SyncNos/releases"
             label={t('changelog')}
           />
@@ -49,6 +56,7 @@ export function AboutSection() {
         <SettingsFormRow label={t('githubFeedback')}>
           <SettingsExternalLink
             id="linkAboutGitHub"
+            icon={MessageSquarePlus}
             href="https://github.com/chiimagnus/SyncNos/issues"
             label={t('githubFeedback')}
           />
@@ -74,6 +82,7 @@ export function AboutSection() {
         <SettingsFormRow label={t('angelsLinkLabel')} description={t('angelsCta')}>
           <SettingsExternalLink
             id="linkAboutAngels"
+            icon={HeartHandshake}
             href="https://chiimagnus.github.io/SyncNos/#sponsors"
             label={t('angelsLinkLabel')}
           />
