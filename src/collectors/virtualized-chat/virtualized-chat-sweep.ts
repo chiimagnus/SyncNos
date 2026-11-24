@@ -424,6 +424,7 @@ export type VirtualizedPassAdapter<T> = {
   readUnresolvedKeys?: () => string[];
   readPendingKeys?: () => string[];
   readBoundaryState?: (boundary: VirtualizedBoundary) => VirtualizedBoundaryState;
+  readScrollAnchors?: (root: Element) => ReadonlyMap<string, { top: number; bottom: number }>;
   onUpwardScroll?: (root: Element) => void;
   onTopConfirmed?: (accumulator: PreparedAccumulator<T>) => void;
   harvest: (accumulator: PreparedAccumulator<T>) => Promise<{ added: number; updated: number }>;
@@ -534,6 +535,7 @@ export async function runVirtualizedPass<T>(
   let overlapRecoveries = 0;
   let boundaryRecoveries = 0;
   let lastPendingTopMessageCount = -1;
+  let upwardRecoveries = 0;
   const departedWindows = new Map<string, number>();
   let previousWindowKeys = '';
   const unresolvedKeys = new Set<string>();
@@ -638,9 +640,10 @@ export async function runVirtualizedPass<T>(
     return latest;
   };
 
-  const scrollOlder = (left: number, top: number): void => {
+  const scrollOlder = (left: number, top: number): ScrollMetrics => {
     adapter.onUpwardScroll?.(root);
     writeScrollPosition(runtime, root, left, top);
+    return readScrollMetrics(runtime, root);
   };
 
   const recoverRegressedBottom = async (metrics: ScrollMetrics): Promise<StableWindow | null> => {
@@ -801,12 +804,12 @@ export async function runVirtualizedPass<T>(
       if (upwards && options.holdAtTop) {
         const topState = readBoundaryState('top');
         if (!topState) break;
-        const windowKeys = `${topState}|${stable.keys.join('\u001f')}`;
+        const windowKeys = `${topState}|${contentFreeWindowSignature(originalIdentity, stable.metrics, stable.keys)}`;
         if (windowKeys !== previousWindowKeys) {
           if (previousWindowKeys) departedWindows.set(previousWindowKeys, accumulator.records.length);
           const previousCount = departedWindows.get(windowKeys);
           if (previousCount !== undefined && previousCount === accumulator.records.length) {
-            if (topState !== 'pending') {
+            if (topState !== 'pending' || !isAtScrollTop(stable.metrics)) {
               addReason('scroll_stalled');
               break;
             }
@@ -820,6 +823,7 @@ export async function runVirtualizedPass<T>(
       }
       if (
         options.stopAtKey &&
+        reachedBottom &&
         accumulator.records.some((record) => record.key === options.stopAtKey) &&
         !accumulator.reasons.includes('order_unanchored') &&
         !accumulator.reasons.includes('order_conflict')
@@ -868,7 +872,8 @@ export async function runVirtualizedPass<T>(
         }
         const knownAfterHarvest = new Set(accumulator.records.map((record) => record.key));
         const beforeDistance = metrics.scrollHeight - metrics.clientHeight - metrics.top;
-        scrollOlder(metrics.left, nextTop);
+        const beforeAnchors = adapter.readScrollAnchors?.(root);
+        const requestedMetrics = scrollOlder(metrics.left, nextTop);
         const nextWindow = await stabilize();
         if (!nextWindow) break;
         const afterDistance =
@@ -878,12 +883,50 @@ export async function runVirtualizedPass<T>(
           firstKnown > 0 && nextWindow.keys.slice(0, firstKnown).some((key) => !knownAfterHarvest.has(key));
         const requestedAdvance = metrics.top - nextTop;
         const observedAdvance = afterDistance - beforeDistance;
-        const movedTowardsOlder = observedAdvance > 1 && Math.abs(observedAdvance - requestedAdvance) <= 2;
+        const afterAnchors = adapter.readScrollAnchors?.(root);
+        const extentStable =
+          Math.abs(nextWindow.metrics.scrollHeight - metrics.scrollHeight) <= 2 &&
+          Math.abs(nextWindow.metrics.clientHeight - metrics.clientHeight) <= 2;
+        const anchoredAdvance =
+          beforeAnchors &&
+          afterAnchors &&
+          Array.from(beforeAnchors).some(([key, before]) => {
+            const after = afterAnchors.get(key);
+            if (!after) return false;
+            const advance = after.top - before.top;
+            return (
+              advance > 1 && advance <= requestedAdvance + 2 && Math.abs(after.bottom - before.bottom - advance) <= 2
+            );
+          });
+        const exactAdvance = observedAdvance > 1 && Math.abs(observedAdvance - requestedAdvance) <= 2;
+        const hasCommonAnchor =
+          beforeAnchors && afterAnchors && Array.from(beforeAnchors.keys()).some((key) => afterAnchors.has(key));
+        const movedTowardsOlder = options.holdAtTop
+          ? extentStable
+            ? observedAdvance > 1 && observedAdvance <= requestedAdvance + 2
+            : hasCommonAnchor
+              ? anchoredAdvance
+              : exactAdvance
+          : exactAdvance;
+        if (hasOlderMessages) upwardRecoveries = 0;
         if (!movedTowardsOlder && !hasOlderMessages) {
-          if (options.holdAtTop && readBoundaryState('top') === 'pending') {
-            const loaded = await acquireLogicalTop(nextWindow);
-            if (!loaded) break;
-            stable = loaded;
+          // A mounted history sentinel is not an in-flight request. Only wait at an edge we actually reached.
+          if (options.holdAtTop && isAtScrollTop(requestedMetrics)) {
+            if (isAtScrollTop(nextWindow.metrics)) {
+              stable = nextWindow;
+              continue;
+            }
+            if (readBoundaryState('top') === 'pending') {
+              const loaded = await acquireLogicalTop(nextWindow);
+              if (!loaded) break;
+              stable = loaded;
+              continue;
+            }
+          }
+          // Rebase against the current layout with a bounded budget per older-message frontier.
+          if (options.holdAtTop && upwardRecoveries < 2) {
+            upwardRecoveries += 1;
+            stable = nextWindow;
             continue;
           }
           addReason('scroll_stalled');

@@ -720,7 +720,8 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     return null;
   }
 
-  const BOUNDARY_LOADING_SELECTOR = '[data-chatgpt-conversation-selection-target] [role="status"]';
+  const BOUNDARY_LOADING_SELECTOR =
+    '[data-chatgpt-conversation-selection-target] [role="status"] [data-loading-indicator]';
 
   function hasBoundaryLoadingSignal(boundary: VirtualizedBoundary, root = getConversationRoot()): boolean {
     if (!root?.querySelectorAll) return false;
@@ -929,6 +930,23 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       getScrollSeed: manualAdapter.readScrollSeed,
       sampleIdentity,
       readDescriptorKeys: manualAdapter.readDescriptorKeys,
+      readScrollAnchors: (scrollRoot: Element) => {
+        const transcript = getConversationRoot();
+        const viewport =
+          scrollRoot === env.document.scrollingElement
+            ? { top: 0, bottom: scrollRoot.clientHeight }
+            : scrollRoot.getBoundingClientRect();
+        const anchors = new Map<string, { top: number; bottom: number }>();
+        for (const turn of readTurnShells(transcript)) {
+          const key = turnKeyOf(turn);
+          if (!key || isExplicitlyHiddenWithin(turn, transcript)) continue;
+          const rect = turn.getBoundingClientRect();
+          if (rect.height > 0 && rect.bottom > viewport.top && rect.top < viewport.bottom) {
+            anchors.set(key, { top: rect.top - viewport.top, bottom: rect.bottom - viewport.top });
+          }
+        }
+        return anchors;
+      },
       onUpwardScroll: (scrollRoot: Element) => {
         if (typeof env.window.WheelEvent === 'function') {
           scrollRoot.dispatchEvent(

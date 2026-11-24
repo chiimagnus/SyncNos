@@ -316,6 +316,7 @@ describe('current page capture integrity routing', () => {
     const save = harness.calls.find((call) => call.type === 'syncConversationMessages');
     expect(save?.payload?.mode).toBe('append');
     expect(save?.payload?.chatgptDomCoverage).toBeUndefined();
+    expect(harness.activities.at(-1)).toMatchObject({ kind: 'success' });
     expect(chatgptApiMocks.capture).not.toHaveBeenCalled();
   });
 
@@ -349,6 +350,7 @@ describe('current page capture integrity routing', () => {
       chatgptDomHistoryVerified: false,
     });
     expect(save?.payload?.diff?.removed || []).toEqual([]);
+    expect(harness.activities.at(-1)).toMatchObject({ kind: 'info', message: t('chatgptDomHistoryIncomplete') });
     expect(chatgptApiMocks.capture).not.toHaveBeenCalled();
   });
 
@@ -367,6 +369,7 @@ describe('current page capture integrity routing', () => {
       chatgptDomHistoryVerified: true,
       mode: 'append',
     });
+    expect(harness.activities.at(-1)).toMatchObject({ kind: 'success' });
   });
 
   it('does not skip missing historical messages for legacy partial DOM coverage', async () => {
