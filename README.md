@@ -47,7 +47,7 @@ syncnos install
 syncnos doctor
 ```
 
-Then enable **Settings → CLI & AI SKILL → Local CLI Integration → SyncNos CLI** in the target
+Then enable **Settings → CLI & AI SKILL → Local access → Enable SyncNos CLI** in the target
 browser profile. See [CLI & AI SKILL](https://chiimagnus.github.io/SyncNos/docs/en/cli/).
 
 ## Demo & screenshots

@@ -29,3 +29,5 @@ A Full Backup is not additionally encrypted by SyncNos. Protect it like a passwo
 ## Restore
 
 Import merges Backup data into the current local library instead of clearing existing content first.
+Settings in the Backup and credentials in a Full Backup may replace current configuration.
+After restoring, check your connected accounts and sync destinations. Reconnect if a credential is no longer valid.

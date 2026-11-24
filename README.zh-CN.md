@@ -47,7 +47,7 @@ syncnos install
 syncnos doctor
 ```
 
-然后在目标浏览器 Profile 中开启 **设置 → CLI & AI SKILL → 本地 CLI 集成 → SyncNos CLI**。
+然后在目标浏览器 Profile 中开启 **设置 → CLI & AI SKILL → 本地访问 → 启用 SyncNos CLI**。
 完整说明见 [CLI & AI SKILL](https://chiimagnus.github.io/SyncNos/docs/cli/)。
 
 ## 演示与预览

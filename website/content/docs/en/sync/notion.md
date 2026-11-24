@@ -3,53 +3,67 @@ title: Notion
 description: Connect Notion and sync SyncNos content under a page you choose.
 ---
 
-## Connect
+Open **Settings → Notion**, turn on **Sync to Notion**, and choose a connection method.
 
-1. Open **SyncNos → Settings → Notion**.
-2. Click **Connect** and select the pages to authorize in Notion.
-3. Choose a **Destination page**.
-4. Run one manual sync and confirm the result.
+## Default connection
 
-Enable auto-sync only if you want it.
+Click **Connect**, authorize the destination page in Notion, then return to SyncNos and confirm
+that it is connected. If the callback page does not close automatically, check the connection
+status in SyncNos settings.
 
-## Connect manually (advanced)
+## Connect manually
 
-If the default authorization service is unavailable, or you prefer to use your own Notion integration,
-connect manually instead. This does not depend on the SyncNos authorization server, but still requires access to Notion.
+If the default authorization service is unavailable, or you prefer to use your own Notion
+integration, connect manually. This does not require the SyncNos authorization service, but
+still requires access to Notion.
 
-1. Open the [Notion developer portal](https://app.notion.com/developers/connections), create a
-   **New connection**, select **API token** (internal connection), and choose your workspace.
+1. In the [Notion developer portal](https://app.notion.com/developers/connections), create a
+   **New connection** and select your workspace and **API token** (internal connection).
    You must be a workspace owner.
-2. Enable the Read content, Insert content, and Update content capabilities in the connection settings.
-3. Open your destination page in Notion, choose **⋯ → More → Connections → Add a new connection**,
-   and select your new connection.
-4. Return to the connection's configuration page and copy the integration token.
-5. In **SyncNos → Settings → Notion → Connect manually…**, paste the token and click **Connect**.
-6. Choose the **Destination page** and run one manual sync to confirm the result.
+2. Make sure the connection can read, insert, and update content.
+3. Open the destination page in Notion and add your connection through
+   **⋯ → More → Connections → Add a new connection**.
+4. Copy the integration token from the connection's configuration.
+   In **SyncNos → Settings → Notion → Connect manually…**, paste it and click **Connect**.
 
-Treat the token like a password. Do not publish or share it.
-SyncNos stores it locally in this browser and sends it only to the official Notion API. Standard backups exclude it.
+Treat the token like a password. SyncNos stores it locally in the browser and uses it only
+with the official Notion API. See [Export & backup](/docs/en/export-backup/#backup) for
+credential handling in Backups.
 
-## Sync location
+## Choose where to sync
 
-SyncNos can access only pages shared with the current integration.
-If your destination is missing, add the integration to the page in Notion and refresh,
-or select **Choose by link…** in the destination menu and paste the shared page's link.
+Select an authorized Notion page under **Destination page**.
+If the page is missing from the list, check that it is shared with your current connection and
+refresh; you can also choose **Choose by link…**, paste the page link, and save.
 
-SyncNos organizes content under the selected page automatically. You do not need to create or
-edit a database yourself. To reuse a particular database, open **Advanced options** and paste its
-full-page link or ID into the field for that content type. It must be under the selected destination
-page. Clear the field or click **Reset** to restore automatic selection.
+SyncNos automatically creates or reuses databases for AI chats, web articles, and videos under
+the destination page. Run one manual sync to verify the result before enabling auto-sync.
 
-Changing the destination page sends future syncs to the new location.
+### Reuse an existing database
+
+You normally do not need to configure databases yourself.
+To reuse an existing SyncNos database, open **Advanced**, paste its full-page link or
+ID into the corresponding field, then press Enter or leave the field to save.
+Links are automatically converted to database IDs.
+
+The database must be directly under the destination page and compatible with SyncNos's schema.
+Sync may add required properties, so do not select an unrelated database.
+Clear the field or click **Reset** to find or create a database automatically.
+
+Changing the destination page clears the database settings. Existing remote content is not moved
+or deleted; subsequent syncs use the new destination.
 
 ## Disconnect and troubleshoot
 
-To switch connection methods or change the token, click **Disconnect** first, reconnect, and choose the destination page again.
-Disconnect removes local credentials and destination settings, not content already synced to Notion.
-To revoke authorization or reset a token, use Notion's integration settings.
+**Disconnect** removes local credentials and destination settings, not synced content.
+To switch connection methods or change the token, disconnect first, reconnect, and choose
+the destination again. Manage the connection in Notion to revoke access or reset the token.
 
-If the default authorization service is unavailable, try manual connection.
-If Notion itself is unreachable, check your network and enable a proxy if needed before retrying.
+- Cannot reach the SyncNos authorization service: check your network, enable a proxy if needed,
+  or connect manually.
+- Cannot reach Notion: check your network and enable a proxy if needed. If the service is
+  temporarily unavailable, try again later.
+- Invalid token or insufficient access: copy the internal integration token again and check
+  the connection's capabilities and destination page access.
 
-Sync failures do not affect local content. Fix the connection and retry.
+Sync failures do not delete local content. Fix the connection or permissions and retry.

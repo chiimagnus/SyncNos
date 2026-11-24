@@ -22,6 +22,7 @@ in your browser's extension shortcut settings.
 
 Check the destination connection and permissions, then retry. Local content will not be deleted.
 See [Sync](/docs/en/sync/) for setup instructions.
+If Notion authorization fails or a destination page is missing, see [Notion](/docs/en/sync/notion/).
 
 ## Updates and feedback
 

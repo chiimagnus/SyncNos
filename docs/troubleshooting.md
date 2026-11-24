@@ -15,7 +15,7 @@
 | --- | --- |
 | `npm ci` 失败 | Node/npm 与 lockfile 是否匹配。 |
 | Vitest 不退出 | 未释放的 timer、listener 或 React root；超时不是 PASS。 |
-| OAuth Connect 无响应 | client ID、redirect URI、授权状态和对应 Worker / endpoint。 |
+| OAuth Connect 无响应 | 分别检查授权入口、回调和 token exchange；Notion 默认连接另见下方诊断。 |
 | Notion schema / managed section 异常 | 不要新增重复字段或把读取失败当作“未找到”；按真实不兼容或远端失败处理。 |
 | ChatGPT Advanced 失败 | 查看 `chatgpt_api_*` 错误码及 HTTP 状态：先确认登录、正式会话和连接；分页中断后旧页可能已保存。结构不确定时按 partial-safe 处理，不静默回退 DOM；采集规则见 [`collectors.md`](collectors.md#chatgpt-手动采集)。 |
 | 正文已保存但图片缺失 | 检查图片设置、resolver、anti-hotlink 与 warning；图片失败不改变正文成功状态。 |
@@ -24,6 +24,18 @@
 | 评论无法定位 | 检查 `resolveCommentAnchor()` reason、候选 root 和 exact quote；不要增加模糊高亮。 |
 | 公式错位、重复或缺字 | 按 [`Markdown 与公式渲染`](markdown-rendering.md#排障与验证) 检查样式 root、隐藏 MathML 与扩展字体请求。 |
 | Zen 本地测试 | 用 `npm run dev:zen` / `npm run build:zen`；unsigned XPI 只用于测试 Profile。 |
+
+## Notion 连接与目标
+
+- 默认 OAuth：区分 Worker 预检、Notion 授权、官网回调和 token exchange 失败。
+  回调页仅表示收到回调，以扩展连接状态为准；不要放宽 state 或 redirect 校验。
+- 手动连接：直接验证 Notion API 的内部集成身份，不经过 Worker。
+  网络超时、令牌无效、权限不足和服务异常分别处理；已连接不等于目标页有写入权限。
+- 目标页搜索为空不等于没有权限。通过已授权页面链接直接读取确认；
+  数据库保存前校验资源类型、访问权限及目标页归属，不使用视图 ID。
+  最后通过真实同步和远端读取验收，不能只检查本地配置。
+
+用户操作见 [Notion 帮助](../website/content/docs/zh/sync/notion.md)。
 
 ## 消息生命周期
 

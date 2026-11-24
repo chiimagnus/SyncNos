@@ -11,7 +11,7 @@ description: "使用 syncnos CLI 采集、查找、管理、同步、导出或�
 
 1. 命令或能力不确定时运行 `syncnos --help` / `syncnos capabilities`，以当前输出为准，不在 Skill 维护命令副本。
 2. 普通命令失败时先按 CLI JSON `error.code` 分流。安装、卸载、`doctor`，或 `extension_unreachable` / `native_host_*` / `browser_not_found` / `package_invalid` 问题：读取 `references/installation.md`，继续诊断和修复，不停在 `doctor` 的 candidate reasons。
-3. 任务需要网页选区、OAuth 用户批准、Local CLI Integration 权限 user gesture，或真实 active tab/composer：读取 `references/browser-required.md`，并使用现有浏览器 Skill。
+3. 任务需要网页选区、浏览器中的 Provider 认证（含 Notion 手动连接）、Local CLI Integration 权限 user gesture，或真实 active tab/composer：读取 `references/browser-required.md`，并使用现有浏览器 Skill。
 4. 以 CLI JSON、稳定 error code 和最终业务状态为准。写操作结果不确定时先用 CLI read-back，不盲目重复 mutation。
 
 ## 运行边界
@@ -25,7 +25,7 @@ description: "使用 syncnos CLI 采集、查找、管理、同步、导出或�
 - `capture` 使用浏览器最近聚焦窗口的活动标签页；已知目标链接时优先用 `capture --url <已打开页面链接>` 精确指定。没有匹配页或匹配多个时拒绝保存；不要重新实现 collector。ChatGPT 高级采集报错时，前几页可能已保存；重试前先查本地条目，不要当成全部回滚。
 - 评论 root/reply/delete 走 CLI。root/reply 正文可以直接传 Markdown 和 `$...$` / `$$...$$` 数学公式源码；Markdown 图片语法不代表评论附件能力。CLI 创建的 root/reply 作者自动记为 `<About You 用户名>' CLI`，未配置用户名时记为 `CLI`，不接受调用方覆盖作者；网页选区评论走 browser-required 流程，不伪造 locator。
 - 修改设置前先运行 `settings schema`，只操作 public key。
-- Provider 认证/配置只走 CLI 暴露接口，不直接读取底层凭据。
+- Provider 认证/配置走 CLI 暴露接口，例外见 `references/browser-required.md`；不直接读取底层凭据。
 - 用户要求“同步并确认完成”时保留默认等待语义；仅在明确需要异步时使用 `--no-wait`。`sync_wait_timeout` 不等于远端任务已取消。
 - `get`、`open`、`link` 均可接收数字 ID 或 SyncNos 链接；消息链接交给 `get` 时随完整会话返回 `targetMessage`。
   `open` 仍解析原站或同步目标（实际打开才加 `--launch`），`link` 生成本地引用。

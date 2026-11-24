@@ -20,5 +20,6 @@
 - [用户文档](https://chiimagnus.github.io/SyncNos/docs/)
 - [采集](https://chiimagnus.github.io/SyncNos/docs/capture/)
 - [同步](https://chiimagnus.github.io/SyncNos/docs/sync/)
+- [Notion（默认授权与手动连接）](https://chiimagnus.github.io/SyncNos/docs/sync/notion/)
 - [导出与备份](https://chiimagnus.github.io/SyncNos/docs/export-backup/)
 - [源码](https://github.com/chiimagnus/SyncNos)
