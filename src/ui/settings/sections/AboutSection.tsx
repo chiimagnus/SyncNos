@@ -2,7 +2,7 @@ import { getManifest, getURL } from '@services/shared/runtime';
 
 import { t } from '@i18n';
 import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
-import { buttonClassName } from '@ui/settings/ui';
+import { SettingsExternalLink } from './SettingsExternalLink';
 import { SettingsFormRow } from './SettingsFormRow';
 import { SettingsGroup } from './SettingsGroup';
 
@@ -33,40 +33,25 @@ export function AboutSection() {
           <SettingsDocsLink />
         </SettingsFormRow>
         <SettingsFormRow label={t('sourceCode')}>
-          <a
+          <SettingsExternalLink
             id="linkAboutSource"
-            className={buttonClassName}
             href="https://github.com/chiimagnus/SyncNos"
-            target="_blank"
-            rel="noreferrer"
-            aria-label={t('sourceCode')}
-          >
-            {t('settingsOpenLink')}
-          </a>
+            label={t('sourceCode')}
+          />
         </SettingsFormRow>
         <SettingsFormRow label={t('changelog')}>
-          <a
+          <SettingsExternalLink
             id="linkAboutChangelog"
-            className={buttonClassName}
             href="https://github.com/chiimagnus/SyncNos/releases"
-            target="_blank"
-            rel="noreferrer"
-            aria-label={t('changelog')}
-          >
-            {t('settingsOpenLink')}
-          </a>
+            label={t('changelog')}
+          />
         </SettingsFormRow>
         <SettingsFormRow label={t('githubFeedback')}>
-          <a
+          <SettingsExternalLink
             id="linkAboutGitHub"
-            className={buttonClassName}
             href="https://github.com/chiimagnus/SyncNos/issues"
-            target="_blank"
-            rel="noreferrer"
-            aria-label={t('githubFeedback')}
-          >
-            {t('settingsOpenLink')}
-          </a>
+            label={t('githubFeedback')}
+          />
         </SettingsFormRow>
       </SettingsGroup>
       <SettingsGroup title={t('authorSectionAria')}>
@@ -87,16 +72,11 @@ export function AboutSection() {
           <span />
         </SettingsFormRow>
         <SettingsFormRow label={t('angelsLinkLabel')} description={t('angelsCta')}>
-          <a
+          <SettingsExternalLink
             id="linkAboutAngels"
-            className={buttonClassName}
             href="https://chiimagnus.github.io/SyncNos/#sponsors"
-            target="_blank"
-            rel="noreferrer"
-            aria-label={t('angelsLinkLabel')}
-          >
-            {t('settingsOpenLink')}
-          </a>
+            label={t('angelsLinkLabel')}
+          />
         </SettingsFormRow>
       </SettingsGroup>
       <SettingsGroup title={t('supportHeading')} ariaLabel={t('supportSectionAria')}>

@@ -16,7 +16,6 @@ export const en = {
   settingsSectionsAria: 'Settings sections',
   settingsDialogAria: 'Settings',
   settingsDocsLink: 'Help docs',
-  settingsOpenLink: 'Open',
   settingsMoreInfo: 'Learn more',
   settingsSearch: 'Search settings',
   settingsNoResults: 'No matching settings',

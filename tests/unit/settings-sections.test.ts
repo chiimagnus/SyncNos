@@ -169,6 +169,11 @@ describe('settings section definitions', () => {
     expect(externalLinks).toHaveLength(4);
     expect(Array.from(externalLinks).every((link) => link.tagName === 'A')).toBe(true);
     expect(Array.from(externalLinks).every((link) => link.getAttribute('target') === '_blank')).toBe(true);
+    for (const link of externalLinks) {
+      expect(link.getAttribute('aria-label')).toBeTruthy();
+      expect(link.querySelector('svg[aria-hidden="true"]')).toBeTruthy();
+      expect(link.textContent).toBe('');
+    }
     expect(document.querySelector('[id^="btnAbout"]')).toBeNull();
     expect(document.querySelector('img[src=""]')).toBeNull();
 
