@@ -121,6 +121,9 @@ describe('settings section definitions', () => {
 
     const groups = Array.from(document.querySelectorAll('nav .settings-nav-group'));
     expect(groups).toHaveLength(4);
+    expect(document.querySelector('.settings-sidebar')?.firstElementChild?.tagName).toBe('NAV');
+    expect(document.querySelectorAll('.settings-sidebar img')).toHaveLength(4);
+    expect(document.querySelector('.settings-sidebar__close')).toBeNull();
     expect(groups.map((group) => group.querySelectorAll('button').length)).toEqual([3, 4, 2, 1]);
     expect(groups.slice(0, 3).map((group) => group.querySelector('h2')?.textContent)).toEqual([
       'Preferences',

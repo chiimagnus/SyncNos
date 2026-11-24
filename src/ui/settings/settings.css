@@ -11,32 +11,16 @@
   background: var(--bg-sunken);
   border-right: 1px solid var(--border);
 }
-.settings-sidebar__heading {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 22px 16px 12px;
-}
-.settings-sidebar__heading img {
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-inline);
-}
-.settings-sidebar__heading strong {
-  display: block;
-  font-size: 16px;
-  font-weight: 700;
-}
-.settings-sidebar__heading small {
-  display: block;
-  color: var(--text-secondary);
-  font-size: 11px;
+.settings-sidebar__close {
+  align-self: flex-end;
+  flex-shrink: 0;
+  margin: 10px 14px 0;
 }
 .settings-sidebar nav {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 4px 12px 18px;
+  padding: 23px 12px 18px;
 }
 .settings-nav-group + .settings-nav-group {
   margin-top: 18px;

@@ -12,7 +12,6 @@ export const en = {
   section_cli_label: 'CLI & AI SKILL',
   section_inpage_label: 'General',
   section_aboutme_label: 'About',
-  settingsTitle: 'Settings',
   settingsSectionsAria: 'Settings sections',
   settingsDialogAria: 'Settings',
   settingsDocsLink: 'Help docs',

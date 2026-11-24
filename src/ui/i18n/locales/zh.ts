@@ -14,7 +14,6 @@ export const zh: { [K in TranslationKey]: string } = {
   section_cli_label: 'CLI & AI SKILL',
   section_inpage_label: '通用',
   section_aboutme_label: '关于',
-  settingsTitle: '设置',
   settingsSectionsAria: '设置分区',
   settingsDialogAria: '设置',
   settingsDocsLink: '帮助文档',

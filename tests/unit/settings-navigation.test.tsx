@@ -120,7 +120,8 @@ describe('settings navigation', () => {
     click('[data-open]');
     expect(list()).toBeTruthy();
     expect(detail()).toBeNull();
-    click('.settings-sidebar__heading button');
+    expect(list()?.querySelector('img[src*="icon-128"]')).toBeNull();
+    click('.settings-sidebar__close');
     expect(route()).toBe('/?loc=original');
   });
 

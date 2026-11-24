@@ -60,18 +60,16 @@ export function SettingsSidebarNav({
 }) {
   return (
     <aside className="settings-sidebar">
-      <div className="settings-sidebar__heading">
-        <img src={getURL('icons/icon-128.png' as any) || undefined} alt="" />
-        <div className="tw-min-w-0 tw-flex-1">
-          <strong>SyncNos</strong>
-          <small>{t('settingsTitle')}</small>
-        </div>
-        {narrow && onClose ? (
-          <button type="button" className="settings-info" aria-label={t('closeSettings')} onClick={onClose}>
-            <X size={18} />
-          </button>
-        ) : null}
-      </div>
+      {narrow && onClose ? (
+        <button
+          type="button"
+          className="settings-info settings-sidebar__close"
+          aria-label={t('closeSettings')}
+          onClick={onClose}
+        >
+          <X size={18} aria-hidden="true" />
+        </button>
+      ) : null}
       <nav aria-label={t('settingsSectionsAria')}>
         {SETTINGS_SECTION_GROUPS.map((group) => (
           <div key={group.key} className="settings-nav-group">
