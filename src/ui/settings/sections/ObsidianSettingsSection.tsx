@@ -2,7 +2,7 @@ import type { KeyboardEvent } from 'react';
 
 import { t } from '@i18n';
 import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
-import { buttonClassName, cardClassName, checkboxClassName, settingsTextInputClassName } from '@ui/settings/ui';
+import { buttonClassName, cardClassName, settingsTextInputClassName } from '@ui/settings/ui';
 import { SettingsFormRow } from '@ui/settings/sections/SettingsFormRow';
 
 export function ObsidianSettingsSection(props: {
@@ -100,7 +100,8 @@ export function ObsidianSettingsSection(props: {
             <input
               id="obsidianSyncEnabledToggle"
               type="checkbox"
-              className={checkboxClassName}
+              role="switch"
+              className="webclipper-switch"
               checked={syncEnabled}
               disabled={busy}
               aria-label={t('obsidianSyncEnabledLabel')}
@@ -113,7 +114,8 @@ export function ObsidianSettingsSection(props: {
               <input
                 id="obsidianAutoSyncEnabledToggle"
                 type="checkbox"
-                className={checkboxClassName}
+                role="switch"
+                className="webclipper-switch"
                 checked={autoSyncEnabled}
                 disabled={busy}
                 aria-label={t('obsidianAutoSyncEnabledLabel')}

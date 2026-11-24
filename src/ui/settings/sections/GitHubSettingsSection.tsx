@@ -6,7 +6,6 @@ import { SettingsFormRow } from '@ui/settings/sections/SettingsFormRow';
 import {
   buttonClassName,
   cardClassName,
-  checkboxClassName,
   dangerButtonClassName,
   primaryButtonClassName,
   settingsControlWidthClassName,
@@ -165,7 +164,8 @@ export function GitHubSettingsSection(props: {
             <input
               id="githubSyncEnabledToggle"
               type="checkbox"
-              className={checkboxClassName}
+              role="switch"
+              className="webclipper-switch"
               checked={syncEnabled}
               disabled={busy}
               aria-label={t('githubSyncEnabledLabel')}
@@ -177,7 +177,8 @@ export function GitHubSettingsSection(props: {
               <input
                 id="githubAutoSyncEnabledToggle"
                 type="checkbox"
-                className={checkboxClassName}
+                role="switch"
+                className="webclipper-switch"
                 checked={autoSyncEnabled}
                 disabled={busy}
                 aria-label={t('githubAutoSyncEnabledLabel')}

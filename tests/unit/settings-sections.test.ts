@@ -403,6 +403,10 @@ describe('settings section definitions', () => {
     expect(refreshButton?.getAttribute('aria-busy')).toBe('true');
     expect(refreshButton?.textContent).toContain('⏳');
     expect(disconnectButton?.disabled).toBe(false);
+    expect(syncToggle?.getAttribute('role')).toBe('switch');
+    expect(autoSyncToggle?.getAttribute('role')).toBe('switch');
+    expect(syncToggle?.classList.contains('webclipper-switch')).toBe(true);
+    expect(autoSyncToggle?.classList.contains('webclipper-switch')).toBe(true);
     expect(syncToggle?.disabled).toBe(false);
     expect(autoSyncToggle?.disabled).toBe(false);
     expect(branchInput?.disabled).toBe(false);
@@ -473,6 +477,9 @@ describe('settings section definitions', () => {
       );
     });
 
+    expect(document.querySelectorAll('input.webclipper-switch[role="switch"]')).toHaveLength(2);
+    expect(document.querySelector<HTMLInputElement>('#obsidianSyncEnabledToggle')?.checked).toBe(true);
+    expect(document.querySelector<HTMLInputElement>('#obsidianAutoSyncEnabledToggle')?.checked).toBe(false);
     const helpLink = document.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/sync/obsidian/"]');
     expect(helpLink?.textContent).toContain('Help docs');
     const baseUrlInput = document.querySelector('input[aria-label="Base URL"]') as HTMLInputElement | null;

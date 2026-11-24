@@ -4,7 +4,6 @@ import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
 import {
   buttonClassName,
   cardClassName,
-  checkboxClassName,
   dangerButtonClassName,
   primaryButtonClassName,
   settingsTextInputClassName,
@@ -122,7 +121,8 @@ export function FeishuOAuthSection(props: {
             <input
               id="feishuSyncEnabledToggle"
               type="checkbox"
-              className={checkboxClassName}
+              role="switch"
+              className="webclipper-switch"
               checked={syncEnabled}
               disabled={busy}
               aria-label={t('feishuSyncEnabledLabel')}
@@ -137,7 +137,8 @@ export function FeishuOAuthSection(props: {
               <input
                 id="feishuAutoSyncEnabledToggle"
                 type="checkbox"
-                className={checkboxClassName}
+                role="switch"
+                className="webclipper-switch"
                 checked={autoSyncEnabled}
                 disabled={busy}
                 aria-label={t('feishuAutoSyncEnabledLabel')}

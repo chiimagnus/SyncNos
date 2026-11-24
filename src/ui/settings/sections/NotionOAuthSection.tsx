@@ -5,7 +5,6 @@ import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
 import {
   buttonClassName,
   cardClassName,
-  checkboxClassName,
   dangerButtonClassName,
   primaryButtonClassName,
   settingsControlWidthClassName,
@@ -113,7 +112,8 @@ export function NotionOAuthSection(props: {
           <input
             id="notionSyncEnabledToggle"
             type="checkbox"
-            className={checkboxClassName}
+            role="switch"
+            className="webclipper-switch"
             checked={syncEnabled}
             disabled={busy}
             aria-label={t('notionSyncEnabledLabel')}
@@ -128,7 +128,8 @@ export function NotionOAuthSection(props: {
             <input
               id="notionAutoSyncEnabledToggle"
               type="checkbox"
-              className={checkboxClassName}
+              role="switch"
+              className="webclipper-switch"
               checked={autoSyncEnabled}
               disabled={busy}
               aria-label={t('notionAutoSyncEnabledLabel')}
