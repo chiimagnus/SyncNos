@@ -6,13 +6,13 @@ description: Connect Notion and sync SyncNos content under a page you choose.
 ## Connect
 
 1. Open **SyncNos → Settings → Notion**.
-2. Click **Connect** and finish authorization.
-3. Choose a **Parent Page**.
+2. Click **Connect** and select the pages to authorize in Notion.
+3. Choose a **Destination page**.
 4. Run one manual sync and confirm the result.
 
 Enable auto-sync only if you want it. SyncNos can access only the Notion content you authorize.
-If the parent-page list is empty, share a page with SyncNos in Notion and refresh.
-You can also paste the authorized page's link into **Page link or ID** and save without waiting for search indexing.
+If you cannot find the page, share it with SyncNos in Notion and refresh.
+Alternatively, select **Choose by link…** in the destination menu, paste the shared page's link, and save.
 
 ## Sync location
 

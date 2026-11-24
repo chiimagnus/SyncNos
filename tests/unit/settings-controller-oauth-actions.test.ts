@@ -257,13 +257,18 @@ describe('Settings OAuth actions', () => {
     const original = runtimeMocks.send.getMockImplementation()!;
     runtimeMocks.send.mockImplementation(async (type, payload) =>
       type === NOTION_MESSAGE_TYPES.SAVE_CONFIG
-        ? { ok: false, data: null, error: { message: 'page not shared' } }
+        ? {
+            ok: false,
+            data: null,
+            error: { message: 'page not shared', extra: { code: 'notion_parent_page_unavailable' } },
+          }
         : original(type, payload),
     );
     await invoke(async () => {
       expect(await latestSnapshot!.onSaveNotionParentPage(link)).toBe(false);
     });
     expect(latestSnapshot!.notionParentPageId).toBe('');
+    expect(latestSnapshot!.error).toBe('notionParentPageUnavailable');
 
     runtimeMocks.send.mockImplementation(async (type, payload) =>
       type === NOTION_MESSAGE_TYPES.SAVE_CONFIG

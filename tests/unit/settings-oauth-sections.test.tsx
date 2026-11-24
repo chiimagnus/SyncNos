@@ -28,6 +28,8 @@ function setupDom() {
   Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: dom.window.HTMLElement });
   Object.defineProperty(globalThis, 'Node', { configurable: true, value: dom.window.Node });
   Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', { configurable: true, value: true });
+  (dom.window.HTMLElement.prototype as any).attachEvent ||= () => {};
+  (dom.window.HTMLElement.prototype as any).detachEvent ||= () => {};
   root = ReactDOM.createRoot(document.getElementById('root')!);
 }
 
@@ -64,6 +66,7 @@ function notionProps(overrides: Partial<NotionProps> = {}): NotionProps {
     onToggleAutoSyncEnabled: noOp,
     onToggleAdvancedOpen: noOp,
     onConnectOrDisconnect: noOp,
+    onClearError: noOp,
     onSaveNotionParentPage: async () => true,
     onChangeNotionChatDatabaseId: noOp,
     onChangeNotionArticleDatabaseId: noOp,
@@ -179,18 +182,112 @@ describe('Settings OAuth sections', () => {
     }
   });
 
-  it('shows a recovery path when Notion is connected but the parent list is empty', async () => {
-    await render(createElement(NotionOAuthSection, notionProps({ notionConnected: true })));
+  it('offers link selection inside the destination menu and only shows one input at a time', async () => {
+    const onClearError = vi.fn();
+    const props = notionProps({ notionConnected: true, notionPageSearchEmpty: true, onClearError });
+    await render(createElement(NotionOAuthSection, { ...props, notionConnected: false }));
+    expect(document.querySelector<HTMLButtonElement>('#notionPages')?.disabled).toBe(true);
     expect(document.body.textContent).not.toContain('notionNoParentPages');
-    await render(
-      createElement(NotionOAuthSection, notionProps({ notionConnected: true, notionPageSearchEmpty: true })),
-    );
+
+    await render(createElement(NotionOAuthSection, { ...props, loadingNotionPages: true }));
+    expect(document.querySelector<HTMLButtonElement>('#notionPages')?.disabled).toBe(true);
+    expect(document.body.textContent).not.toContain('notionNoParentPages');
+
+    await render(createElement(NotionOAuthSection, props));
     expect(document.body.textContent).toContain('notionNoParentPages');
-    expect(document.querySelector('label[for="notionParentPageLink"]')?.textContent).toBe('notionParentPageLink');
-    expect(document.querySelector<HTMLInputElement>('#notionParentPageLink')?.disabled).toBe(false);
-    await render(createElement(NotionOAuthSection, notionProps({ notionConnected: true, loadingNotionPages: true })));
-    expect(document.body.textContent).not.toContain('notionNoParentPages');
-    expect(document.querySelector<HTMLInputElement>('#notionParentPageLink')?.disabled).toBe(true);
+    expect(document.querySelector('#notionParentPageLink')).toBeNull();
+    act(() => document.querySelector<HTMLButtonElement>('#notionPages')!.click());
+    const chooseByLink = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')).find(
+      (button) => button.textContent === 'notionChoosePageByLink',
+    )!;
+    act(() => chooseByLink.click());
+    expect(document.querySelector('#notionPages')).toBeNull();
+    const input = document.querySelector<HTMLInputElement>('#notionParentPageLink')!;
+    expect(input.disabled).toBe(false);
+    expect(input.getAttribute('aria-label')).toBe('notionParentPageLink');
+    expect(document.activeElement).toBe(input);
+    expect(document.body.textContent).toContain('notionParentPageLinkHint');
+
+    act(() =>
+      input.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })),
+    );
+    expect(document.querySelector('#notionParentPageLink')).toBeNull();
+    expect(document.querySelector('#notionPages')).toBeTruthy();
+    expect(document.body.textContent).toContain('notionNoParentPages');
+    expect(onClearError).toHaveBeenCalledOnce();
+  });
+
+  it('keeps a failed link selection editable and returns to the saved page after success', async () => {
+    const onSaveNotionParentPage = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    const props = notionProps({
+      notionConnected: true,
+      notionParentPageId: 'existing',
+      notionPageOptions: [{ id: 'existing', title: 'Existing' }],
+      onSaveNotionParentPage,
+    });
+    await render(createElement(NotionOAuthSection, props));
+    act(() => document.querySelector<HTMLButtonElement>('#notionPages')!.click());
+    act(() =>
+      Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'))
+        .find((button) => button.textContent === 'notionChoosePageByLink')!
+        .click(),
+    );
+    const input = document.querySelector<HTMLInputElement>('#notionParentPageLink')!;
+    const link = 'https://www.notion.so/' + 'a'.repeat(32);
+    const setValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!;
+    act(() => {
+      setValue.call(input, link);
+      input.dispatchEvent(new window.Event('input', { bubbles: true }));
+    });
+    const save = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent === 'saveButton',
+    )!;
+    await act(async () => save.click());
+    expect(onSaveNotionParentPage).toHaveBeenCalledWith(link);
+    expect(document.querySelector('#notionParentPageLink')).toBe(input);
+    expect(input.value).toBe(link);
+    await act(async () => save.click());
+    expect(onSaveNotionParentPage).toHaveBeenCalledTimes(2);
+    await render(
+      createElement(NotionOAuthSection, {
+        ...props,
+        notionParentPageId: 'a'.repeat(32),
+        notionPageOptions: [{ id: 'a'.repeat(32), title: 'New destination' }],
+      }),
+    );
+    expect(document.querySelector('#notionParentPageLink')).toBeNull();
+    expect(document.querySelector('#notionPages')?.textContent).toContain('New destination');
+  });
+
+  it('selects a discovered page directly and resets an unfinished link on disconnect', async () => {
+    const onSaveNotionParentPage = vi.fn().mockResolvedValue(true);
+    const props = notionProps({
+      notionConnected: true,
+      notionPageOptions: [{ id: 'page-1', title: 'Page' }],
+      onSaveNotionParentPage,
+    });
+    await render(createElement(NotionOAuthSection, props));
+    act(() => document.querySelector<HTMLButtonElement>('#notionPages')!.click());
+    act(() =>
+      Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'))
+        .find((button) => button.textContent === 'Page')!
+        .click(),
+    );
+    expect(onSaveNotionParentPage).toHaveBeenCalledWith('page-1');
+    expect(document.querySelector('#notionParentPageLink')).toBeNull();
+
+    act(() => document.querySelector<HTMLButtonElement>('#notionPages')!.click());
+    act(() =>
+      Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'))
+        .find((button) => button.textContent === 'notionChoosePageByLink')!
+        .click(),
+    );
+    expect(document.querySelector('#notionParentPageLink')).toBeTruthy();
+    await render(createElement(NotionOAuthSection, { ...props, notionConnected: false }));
+    expect(document.querySelector('#notionParentPageLink')).toBeNull();
+    await render(createElement(NotionOAuthSection, props));
+    expect(document.querySelector('#notionParentPageLink')).toBeNull();
+    expect(document.querySelector('#notionPages')).toBeTruthy();
   });
 
   it('keeps provider text fields and select triggers on the compact settings control width', async () => {

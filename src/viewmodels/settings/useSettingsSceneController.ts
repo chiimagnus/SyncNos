@@ -1537,12 +1537,14 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       const next = String(id || '').trim();
       if (!next) return false;
       return runTask(async () => {
-        const config = unwrap(
-          await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.SAVE_CONFIG, {
-            parentPageId: next,
-          }),
-        );
-        applyNotionConfig(config);
+        const response = await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.SAVE_CONFIG, {
+          parentPageId: next,
+        });
+        const extra = response?.error?.extra;
+        const code = extra && typeof extra === 'object' && 'code' in extra ? extra.code : '';
+        if (code === 'invalid_notion_parent_page') throw new Error(t('notionParentPageInvalid'));
+        if (code === 'notion_parent_page_unavailable') throw new Error(t('notionParentPageUnavailable'));
+        applyNotionConfig(unwrap(response));
       });
     },
     [applyNotionConfig, runTask],
