@@ -395,7 +395,7 @@ export function createZaiCollectorDef(env: CollectorEnv): CollectorDefinition {
     });
 
     try {
-      const sweep = await runVirtualizedSweep(
+      await runVirtualizedSweep(
         runtime,
         {
           getScrollSeed: getConversationRoot,
@@ -426,7 +426,6 @@ export function createZaiCollectorDef(env: CollectorEnv): CollectorDefinition {
           now: options.now,
         },
       );
-      accumulator.completeness = sweep.completeness;
     } finally {
       const restoreResult = scrollRestorer.restore();
       if (!restoreResult.restored) {

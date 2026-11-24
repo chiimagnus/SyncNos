@@ -429,7 +429,7 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
     });
 
     try {
-      const sweep = await runVirtualizedSweep(
+      await runVirtualizedSweep(
         runtime,
         {
           getScrollSeed: getConversationScrollSeed,
@@ -463,7 +463,6 @@ export function createClaudeCollectorDef(env: CollectorEnv): CollectorDefinition
           now: options.now,
         },
       );
-      accumulator.completeness = sweep.completeness;
       validateCoverage(accumulator);
     } finally {
       const restoreResult = scrollRestorer.restore();

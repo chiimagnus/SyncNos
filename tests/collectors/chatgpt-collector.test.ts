@@ -540,7 +540,8 @@ describe('chatgpt current DOM', () => {
       totalDeadlineMs: 160,
     });
     expect(prepared.records.map((record: any) => record.key)).toEqual(['user-7', 'assistant-7']);
-    expect(prepared.reasons).toContain('boundary_stalled');
+    expect(prepared.reasons).toContain('scroll_stalled');
+    expect(prepared.reasons).not.toContain('boundary_stalled');
     expect(prepared.completeness).toBe('partial');
     expect(prepared.metrics.steps).toBeLessThan(8);
     expect(test.getWrites()).toBeLessThan(10);
@@ -580,6 +581,47 @@ describe('chatgpt current DOM', () => {
       Array.from({ length: 27 }, (_, index) => [`user-${index}`, `assistant-${index}`]).flat(),
     );
     expect(prepared.metrics).toMatchObject({ reachedTop: true, reachedBottom: true });
+  });
+
+  it('keeps scrolling after a shorter-than-requested move with an offscreen history sentinel', async () => {
+    const test = simulatedLazyChatgptHistory(27, 5, true, 5, false, 0, true);
+    const root = test.dom.window.document.querySelector('[data-app-action-timeline-scroll]')!;
+    const scroll = Object.getOwnPropertyDescriptor(root, 'scrollTop')!;
+    let first = true;
+    Object.defineProperty(root, 'scrollTop', {
+      ...scroll,
+      set(value: number) {
+        const actual = first ? (scroll.get!.call(root) + value) / 2 : value;
+        first = false;
+        scroll.set!.call(root, actual);
+      },
+    });
+    const prepared = await prepare(currentDef(test.dom), { now: test.now, sleep: test.sleep, pollMs: 1 });
+    expect(test.getTopArrivals()).toBe(5);
+    expect(test.getLoaded()).toBe(27);
+    expect(test.getMovesDuringLoad()).toBe(0);
+    expect(test.getBottomReturns()).toBe(0);
+    expect(prepared.records.map((record: any) => record.key)).toEqual(
+      Array.from({ length: 27 }, (_, index) => [`user-${index}`, `assistant-${index}`]).flat(),
+    );
+    expect(prepared.metrics).toMatchObject({ reachedTop: true, reachedBottom: true });
+    expect(prepared.completeness).toBe('complete');
+    expect(prepared.reasons).not.toContain('boundary_stalled');
+  });
+
+  it('does not let a saved tail stop a sweep that starts in the middle', async () => {
+    const test = simulatedLazyChatgptHistory(27, 5, true, 5, false, 0, true);
+    test.setTop(200);
+    const prepared = await prepare(currentDef(test.dom), {
+      now: test.now,
+      sleep: test.sleep,
+      pollMs: 1,
+      savedTailMessageKey: 'user-24',
+    });
+    expect(test.getLoaded()).toBe(27);
+    expect(prepared.records[0]?.key).toBe('user-0');
+    expect(prepared.metrics).toMatchObject({ reachedTop: true, reachedBottom: false, stoppedAtKey: false });
+    expect(prepared.completeness).toBe('partial');
   });
 
   it('scrolls through 250 turns (500 messages) with stable identities and no duplicate records', async () => {
@@ -1784,6 +1826,8 @@ A --> B</code></pre>
     dom.window.history.replaceState({}, '', '/c/current-conversation-2026?model=gpt-5&foo=bar');
     const after = def.collector.__test.sampleIdentityGuard(root);
     expect(before.durableId).toBe('current-conversation-2026');
+    expect(before.anchors).toEqual([]);
+    expect(after.anchors).toEqual([]);
     expect(after.durableId).toBe(before.durableId);
     expect(after.route).toBe(before.route);
   });

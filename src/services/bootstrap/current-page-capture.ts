@@ -698,8 +698,12 @@ export function createCurrentPageCaptureService(deps: CurrentPageCaptureDeps) {
 
       const title = String(snapshot?.conversation?.title || '');
       const isNew = firstPageIsNew ?? saved.isNew;
-      const message = buildCaptureSuccessTipMessage({ isNew, title });
-      setCaptureActivity('settled', 'success', message, pageUrl);
+      const incompleteDomHistory =
+        target.collectorId === 'chatgpt' && !target.useChatgptApi && snapshot.domHistoryVerified === false;
+      const message = incompleteDomHistory
+        ? t('chatgptDomHistoryIncomplete')
+        : buildCaptureSuccessTipMessage({ isNew, title });
+      setCaptureActivity('settled', incompleteDomHistory ? 'info' : 'success', message, pageUrl);
       return {
         kind: 'chat',
         label: target.label,

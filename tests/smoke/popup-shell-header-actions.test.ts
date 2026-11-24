@@ -374,8 +374,8 @@ describe('PopupShell header actions', () => {
     const locateButton = document.querySelector('[data-current-page-saved]') as HTMLButtonElement;
     expect(captureButton).toBeTruthy();
     expect(locateButton).toBeTruthy();
-    expect(locateButton.getAttribute('aria-label')).toBe('Current page saved · View');
-    expect(locateButton.parentElement?.getAttribute('data-tooltip-content')).toBe('Saved · Click to view');
+    expect(locateButton.getAttribute('aria-label')).toBe('Current page has a saved record · View');
+    expect(locateButton.parentElement?.getAttribute('data-tooltip-content')).toBe('Saved record · Click to view');
     expect(locateButton.parentElement?.getAttribute('data-tooltip-place')).toBe('bottom-end');
     expect(locateButton.parentElement?.parentElement).toBe(captureButton.parentElement?.parentElement);
     expect(locateButton.getAttribute('aria-haspopup')).toBeNull();

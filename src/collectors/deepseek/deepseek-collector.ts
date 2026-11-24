@@ -343,8 +343,7 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
       if (!message) continue;
       if (message.captureMergePolicy === 'preserve-existing-markdown') {
         accumulator.completeness = 'partial';
-        if (!accumulator.reasons.includes('inline_images_incomplete'))
-          accumulator.reasons.push('inline_images_incomplete');
+        addPreparedReason(accumulator, 'inline_images_incomplete');
       }
       records.push({
         key: descriptor.key,
@@ -384,7 +383,7 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
     });
 
     try {
-      const sweep = await runVirtualizedSweep(
+      await runVirtualizedSweep(
         runtime,
         {
           getScrollSeed: getConversationRoot,
@@ -415,9 +414,6 @@ export function createDeepseekCollectorDef(env: CollectorEnv): CollectorDefiniti
           now: options.now,
         },
       );
-      accumulator.completeness = accumulator.reasons.includes('inline_images_incomplete')
-        ? 'partial'
-        : sweep.completeness;
     } finally {
       const restored = scrollRestorer.restore();
       if (!restored.restored) {

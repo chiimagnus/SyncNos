@@ -596,7 +596,7 @@ describe('virtualized chat single pass', () => {
       test.accumulator,
       { scanUpwards: true, stableSamples: 1, pollMs: 0, overlapRatio: 0.6 },
     );
-    expect(writes).toHaveLength(1);
+    expect(writes).toHaveLength(3);
     expect(writes[0]).toBeLessThan(200);
     expect(result).toMatchObject({ completeness: 'partial', reachedBottom: true, reachedTop: false });
     expect(result.reasons).toContain('scroll_stalled');
@@ -696,7 +696,7 @@ describe('virtualized chat single pass', () => {
       test.accumulator,
       { scanUpwards: true, stableSamples: 1, pollMs: 0, overlapRatio: 0.6, maxSteps: 1000 },
     );
-    expect(writes).toBe(1);
+    expect(writes).toBe(3);
     expect(result.reasons).toContain('scroll_stalled');
     expect(result.completeness).toBe('partial');
     expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual(['new']);
@@ -773,8 +773,8 @@ describe('virtualized chat single pass', () => {
         test.accumulator,
         { scanUpwards: true, stableSamples: 1, pollMs: 0, overlapRatio: 0.6, maxSteps: 1000 },
       );
-      expect(writes).toBe(1);
-      expect(result).toMatchObject({ completeness: 'partial', steps: 1 });
+      expect(writes).toBe(3);
+      expect(result).toMatchObject({ completeness: 'partial', steps: 3 });
       expect(result.reasons).toContain('scroll_stalled');
       expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual(['same']);
     },
@@ -799,7 +799,7 @@ describe('virtualized chat single pass', () => {
       test.accumulator,
       { scanUpwards: true, stableSamples: 1, pollMs: 0, overlapRatio: 0.6, maxSteps: 1000 },
     );
-    expect(writes).toBe(1);
+    expect(writes).toBe(3);
     expect(result.reasons).toContain('scroll_stalled');
     expect(result.reasons).not.toContain('step_budget_exhausted');
     expect(result.completeness).toBe('partial');
@@ -874,7 +874,7 @@ describe('virtualized chat single pass', () => {
       { document: test.dom.window.document, window: test.dom.window as any },
       test.adapter,
       test.accumulator,
-      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, stopAtKey: 'b' },
+      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, scanUpwards: true, stopAtKey: 'b' },
     );
     expect(result).toMatchObject({
       stoppedAtKey: true,
@@ -901,7 +901,7 @@ describe('virtualized chat single pass', () => {
       { document: test.dom.window.document, window: test.dom.window as any },
       test.adapter,
       test.accumulator,
-      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, stopAtKey: 'm158' },
+      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, scanUpwards: true, stopAtKey: 'm158' },
     );
     expect(result).toMatchObject({ stoppedAtKey: true, steps: 2, reachedTop: false, reachedBottom: true });
     expect(finishPreparedCapture(test.accumulator).records.map((record) => record.key)).toEqual([
@@ -935,7 +935,7 @@ describe('virtualized chat single pass', () => {
       { document: test.dom.window.document, window: test.dom.window as any },
       test.adapter,
       test.accumulator,
-      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, stopAtKey: 'anchor' },
+      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, scanUpwards: true, stopAtKey: 'anchor' },
     );
     expect(result).toMatchObject({ stoppedAtKey: false, reachedTop: true, completeness: 'partial' });
     expect(result.reasons).toContain('order_unanchored');
@@ -961,7 +961,7 @@ describe('virtualized chat single pass', () => {
       { document: test.dom.window.document, window: test.dom.window as any },
       test.adapter,
       test.accumulator,
-      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, stopAtKey: 'retired-message' },
+      { stableSamples: 1, pollMs: 0, overlapRatio: 0.6, scanUpwards: true, stopAtKey: 'retired-message' },
     );
     expect(result.stoppedAtKey).toBe(false);
     expect(result.reachedTop).toBe(true);
@@ -1013,6 +1013,63 @@ describe('virtualized chat single pass', () => {
     expect(finishPreparedCapture(test.accumulator).records.at(-1)?.key).toBe('g');
   });
 
+  it('uses a shared visible turn to establish upward progress after a scroll-height rebase', async () => {
+    const test = harness([{ top: 0, keys: ['same'] }], { initialTop: 400, initialScrollHeight: 500 });
+    const scroll = Object.getOwnPropertyDescriptor(test.root, 'scrollTop')!;
+    let writes = 0;
+    let anchorTop = -500;
+    Object.defineProperty(test.root, 'scrollTop', {
+      ...scroll,
+      set(value: number) {
+        writes += 1;
+        anchorTop += test.getTop() - value;
+        if (writes === 1) test.setScrollHeight(550);
+        scroll.set!.call(test.root, value);
+      },
+    });
+    const result = await runVirtualizedPass(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      {
+        ...test.adapter,
+        readScrollAnchors: () => new Map([['same', { top: anchorTop, bottom: anchorTop + 650 }]]),
+        readBoundaryState: (boundary) => (boundary === 'top' && test.getTop() > 0 ? 'pending' : 'confirmed'),
+      },
+      test.accumulator,
+      { scanUpwards: true, stableSamples: 1, pollMs: 1, boundaryTimeoutMs: 10 },
+    );
+    expect(writes).toBeGreaterThan(1);
+    expect(result).toMatchObject({ reachedTop: true, reachedBottom: true });
+    expect(result.reasons).not.toContain('boundary_stalled');
+    expect(result.reasons).not.toContain('scroll_stalled');
+  });
+
+  it('does not count a matching extent change alone as progress when the visible anchor is stationary', async () => {
+    const test = harness([{ top: 0, keys: ['same'] }], { initialTop: 400, initialScrollHeight: 500 });
+    const scroll = Object.getOwnPropertyDescriptor(test.root, 'scrollTop')!;
+    let writes = 0;
+    Object.defineProperty(test.root, 'scrollTop', {
+      ...scroll,
+      set(value: number) {
+        writes += 1;
+        test.setScrollHeight(500 + (test.getTop() - value) * writes);
+      },
+    });
+    const result = await runVirtualizedPass(
+      { document: test.dom.window.document, window: test.dom.window as any },
+      {
+        ...test.adapter,
+        readScrollAnchors: () => new Map([['same', { top: -500, bottom: 150 }]]),
+        readBoundaryState: (boundary) => (boundary === 'top' ? 'pending' : 'confirmed'),
+      },
+      test.accumulator,
+      { scanUpwards: true, stableSamples: 1, pollMs: 1, maxSteps: 100 },
+    );
+    expect(writes).toBe(3);
+    expect(result.reachedTop).toBe(false);
+    expect(result.reasons).toContain('scroll_stalled');
+    expect(result.reasons).not.toContain('boundary_stalled');
+  });
+
   it('holds at the top during pending lazy history without re-entering or restarting', async () => {
     const test = harness(
       [
@@ -1044,7 +1101,6 @@ describe('virtualized chat single pass', () => {
       test.accumulator,
       {
         scanUpwards: true,
-        holdAtTop: true,
         stableSamples: 1,
         pollMs: 5,
         boundaryTimeoutMs: 30,
@@ -1083,7 +1139,6 @@ describe('virtualized chat single pass', () => {
       test.accumulator,
       {
         scanUpwards: true,
-        holdAtTop: true,
         stableSamples: 1,
         pollMs: 2,
         boundaryTimeoutMs: 40,
@@ -1131,7 +1186,6 @@ describe('virtualized chat single pass', () => {
       test.accumulator,
       {
         scanUpwards: true,
-        holdAtTop: true,
         stableSamples: 1,
         pollMs: 5,
         boundaryTimeoutMs: 80,
@@ -1192,7 +1246,6 @@ describe('virtualized chat single pass', () => {
       test.accumulator,
       {
         scanUpwards: true,
-        holdAtTop: true,
         stableSamples: 1,
         pollMs: 5,
         boundaryTimeoutMs: 40,
@@ -1245,7 +1298,6 @@ describe('virtualized chat single pass', () => {
       test.accumulator,
       {
         scanUpwards: true,
-        holdAtTop: true,
         stableSamples: 1,
         pollMs: 5,
         boundaryTimeoutMs: 35,
@@ -1294,7 +1346,6 @@ describe('virtualized chat single pass', () => {
       test.accumulator,
       {
         scanUpwards: true,
-        holdAtTop: true,
         stableSamples: 1,
         pollMs: 5,
         maxSteps: 80,
@@ -1339,7 +1390,6 @@ describe('virtualized chat single pass', () => {
       test.accumulator,
       {
         scanUpwards: true,
-        holdAtTop: true,
         stableSamples: 1,
         pollMs: 5,
         boundaryTimeoutMs: 35,
@@ -1644,7 +1694,6 @@ describe('virtualized chat single pass', () => {
       test.accumulator,
       {
         scanUpwards: true,
-        holdAtTop: true,
         stableSamples: 1,
         pollMs: 0,
         sleep: async () => {
@@ -1670,7 +1719,6 @@ describe('virtualized chat single pass', () => {
       test.accumulator,
       {
         scanUpwards: true,
-        holdAtTop: true,
         maxSteps: 1,
         stableSamples: 1,
         pollMs: 0,
