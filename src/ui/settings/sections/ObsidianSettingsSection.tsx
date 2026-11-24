@@ -3,7 +3,8 @@ import type { KeyboardEvent } from 'react';
 import { t } from '@i18n';
 import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
 import { buttonClassName, settingsTextInputClassName } from '@ui/settings/ui';
-import { SettingsFormRow, SettingsSwitchRow } from './SettingsFormRow';
+import { SettingsFormRow } from './SettingsFormRow';
+import { SettingsSyncSection } from './SettingsSyncSection';
 import { SettingsGroup } from './SettingsGroup';
 
 export function ObsidianSettingsSection(props: {
@@ -83,7 +84,14 @@ export function ObsidianSettingsSection(props: {
   };
 
   return (
-    <>
+    <SettingsSyncSection
+      provider="obsidian"
+      busy={busy}
+      syncEnabled={syncEnabled}
+      autoSyncEnabled={autoSyncEnabled}
+      onToggleSyncEnabled={onToggleSyncEnabled}
+      onToggleAutoSyncEnabled={onToggleAutoSyncEnabled}
+    >
       <SettingsGroup title={t('settingsAccount')} ariaLabel={t('obsidianLocalRestApi')}>
         <SettingsFormRow
           label={
@@ -103,27 +111,6 @@ export function ObsidianSettingsSection(props: {
         <div className="settings-group-link">
           <SettingsDocsLink path="sync/obsidian" />
         </div>
-      </SettingsGroup>
-      <SettingsGroup title={t('settingsSync')}>
-        <SettingsSwitchRow
-          label={t('obsidianSyncEnabledLabel')}
-          id="obsidianSyncEnabledToggle"
-          checked={syncEnabled}
-          disabled={busy}
-          onChange={onToggleSyncEnabled}
-          info={t('settingsSyncInfo')}
-        />
-        {syncEnabled ? (
-          <SettingsSwitchRow
-            label={t('obsidianAutoSyncEnabledLabel')}
-            id="obsidianAutoSyncEnabledToggle"
-            checked={autoSyncEnabled}
-            disabled={busy}
-            onChange={onToggleAutoSyncEnabled}
-            dependent
-            info={t('settingsAutoSyncInfo')}
-          />
-        ) : null}
       </SettingsGroup>
       <SettingsGroup title={t('settingsAuthorization')}>
         <SettingsFormRow label={t('baseUrl')} info={t('settingsObsidianUrlInfo')}>
@@ -228,6 +215,6 @@ export function ObsidianSettingsSection(props: {
           </div>
         ))}
       </SettingsGroup>
-    </>
+    </SettingsSyncSection>
   );
 }

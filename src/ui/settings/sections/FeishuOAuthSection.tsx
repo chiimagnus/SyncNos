@@ -7,7 +7,8 @@ import {
   primaryButtonClassName,
   settingsTextInputClassName,
 } from '@ui/settings/ui';
-import { SettingsFormRow, SettingsSwitchRow } from './SettingsFormRow';
+import { SettingsFormRow } from './SettingsFormRow';
+import { SettingsSyncSection } from './SettingsSyncSection';
 import { SettingsGroup } from './SettingsGroup';
 
 export function FeishuOAuthSection(props: {
@@ -84,7 +85,14 @@ export function FeishuOAuthSection(props: {
   };
 
   return (
-    <>
+    <SettingsSyncSection
+      provider="feishu"
+      busy={busy}
+      syncEnabled={syncEnabled}
+      autoSyncEnabled={autoSyncEnabled}
+      onToggleSyncEnabled={onToggleSyncEnabled}
+      onToggleAutoSyncEnabled={onToggleAutoSyncEnabled}
+    >
       <SettingsGroup title={t('settingsAccount')} ariaLabel={t('feishuOAuth')}>
         <SettingsFormRow
           label={
@@ -119,27 +127,6 @@ export function FeishuOAuthSection(props: {
         <div className="settings-group-link">
           <SettingsDocsLink path="sync/feishu" />
         </div>
-      </SettingsGroup>
-      <SettingsGroup title={t('settingsSync')}>
-        <SettingsSwitchRow
-          label={t('feishuSyncEnabledLabel')}
-          id="feishuSyncEnabledToggle"
-          checked={syncEnabled}
-          disabled={busy}
-          onChange={onToggleSyncEnabled}
-          info={t('settingsSyncInfo')}
-        />
-        {syncEnabled ? (
-          <SettingsSwitchRow
-            label={t('feishuAutoSyncEnabledLabel')}
-            id="feishuAutoSyncEnabledToggle"
-            checked={autoSyncEnabled}
-            disabled={busy}
-            onChange={onToggleAutoSyncEnabled}
-            dependent
-            info={t('settingsAutoSyncInfo')}
-          />
-        ) : null}
       </SettingsGroup>
       <SettingsGroup title={t('settingsAuthorization')}>
         <div id="feishu-advanced-settings">
@@ -242,6 +229,6 @@ export function FeishuOAuthSection(props: {
           />
         </SettingsFormRow>
       </SettingsGroup>
-    </>
+    </SettingsSyncSection>
   );
 }

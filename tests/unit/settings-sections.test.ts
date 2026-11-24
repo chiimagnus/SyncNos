@@ -439,6 +439,18 @@ describe('settings section definitions', () => {
     expect(repositoryCard?.contains(discoveryError)).toBe(true);
     expect(document.querySelector('[aria-label="settings-error"]')).toBeNull();
 
+    expect(document.querySelector('.settings-group .settings-form-row input')).toBe(syncToggle);
+    act(() => root.render(createElement(GitHubSettingsSection, { ...baseProps, syncEnabled: false })));
+    expect(document.querySelectorAll('.settings-group')).toHaveLength(1);
+    expect(Array.from(document.querySelectorAll('input'))).toEqual([syncToggle]);
+    expect(syncToggle?.checked).toBe(false);
+    expect(document.querySelector('#githubRepository')).toBeNull();
+    act(() => root.render(createElement(GitHubSettingsSection, baseProps)));
+    expect(document.querySelector('#githubSyncEnabledToggle')).toBe(syncToggle);
+    expect(document.querySelector<HTMLInputElement>('#githubAutoSyncEnabledToggle')?.checked).toBe(true);
+    expect(document.querySelector('input[aria-label="Branch"]')?.getAttribute('value')).toBe('main');
+    expect(document.querySelector('#githubRepository')).toBeTruthy();
+
     act(() => root.unmount());
     cleanupDom();
   });
@@ -449,42 +461,39 @@ describe('settings section definitions', () => {
     const onTest = vi.fn();
     const onChangeChatAttachmentFolder = vi.fn();
 
-    act(() => {
-      root.render(
-        createElement(ObsidianSettingsSection, {
-          busy: false,
-          syncEnabled: true,
-          autoSyncEnabled: false,
-          apiBaseUrl: 'http://127.0.0.1:27123',
-          authHeaderName: 'Authorization',
-          apiKeyDraft: '',
-          apiKeyPresent: false,
-          apiKeyMasked: '',
-          chatFolder: 'SyncNos-AIChats',
-          articleFolder: 'SyncNos-WebArticles',
-          videoFolder: 'SyncNos-Videos',
-          chatAttachmentFolder: 'Assets',
-          articleAttachmentFolder: 'Assets',
-          videoAttachmentFolder: '.',
-          statusText: '',
-          obsidianLogoUrl: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>',
-          onChangeApiBaseUrl: () => {},
-          onChangeAuthHeaderName: () => {},
-          onChangeApiKeyDraft: () => {},
-          onChangeChatFolder: () => {},
-          onChangeArticleFolder: () => {},
-          onChangeVideoFolder: () => {},
-          onChangeChatAttachmentFolder,
-          onChangeArticleAttachmentFolder: () => {},
-          onChangeVideoAttachmentFolder: () => {},
-          onToggleSyncEnabled: () => {},
-          onToggleAutoSyncEnabled: () => {},
-          onSave: () => {},
-          onSaveApiKey: () => {},
-          onTest,
-        }),
-      );
-    });
+    const baseProps: Parameters<typeof ObsidianSettingsSection>[0] = {
+      busy: false,
+      syncEnabled: true,
+      autoSyncEnabled: false,
+      apiBaseUrl: 'http://127.0.0.1:27123',
+      authHeaderName: 'Authorization',
+      apiKeyDraft: '',
+      apiKeyPresent: false,
+      apiKeyMasked: '',
+      chatFolder: 'SyncNos-AIChats',
+      articleFolder: 'SyncNos-WebArticles',
+      videoFolder: 'SyncNos-Videos',
+      chatAttachmentFolder: 'Assets',
+      articleAttachmentFolder: 'Assets',
+      videoAttachmentFolder: '.',
+      statusText: '',
+      obsidianLogoUrl: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>',
+      onChangeApiBaseUrl: () => {},
+      onChangeAuthHeaderName: () => {},
+      onChangeApiKeyDraft: () => {},
+      onChangeChatFolder: () => {},
+      onChangeArticleFolder: () => {},
+      onChangeVideoFolder: () => {},
+      onChangeChatAttachmentFolder,
+      onChangeArticleAttachmentFolder: () => {},
+      onChangeVideoAttachmentFolder: () => {},
+      onToggleSyncEnabled: () => {},
+      onToggleAutoSyncEnabled: () => {},
+      onSave: () => {},
+      onSaveApiKey: () => {},
+      onTest,
+    };
+    act(() => root.render(createElement(ObsidianSettingsSection, baseProps)));
 
     expect(document.querySelectorAll('input.webclipper-switch[role="switch"]')).toHaveLength(2);
     expect(document.querySelector<HTMLInputElement>('#obsidianSyncEnabledToggle')?.checked).toBe(true);
@@ -523,6 +532,23 @@ describe('settings section definitions', () => {
     act(() => {
       testButton!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
+    expect(onTest).toHaveBeenCalledTimes(1);
+
+    const syncToggle = document.querySelector<HTMLInputElement>('#obsidianSyncEnabledToggle')!;
+    expect(document.querySelector('.settings-group .settings-form-row input')).toBe(syncToggle);
+    act(() =>
+      root.render(createElement(ObsidianSettingsSection, { ...baseProps, syncEnabled: false, autoSyncEnabled: true })),
+    );
+    expect(document.querySelectorAll('.settings-group')).toHaveLength(1);
+    expect(Array.from(document.querySelectorAll('input'))).toEqual([syncToggle]);
+    expect(syncToggle.checked).toBe(false);
+    act(() => root.render(createElement(ObsidianSettingsSection, { ...baseProps, autoSyncEnabled: true })));
+    expect(document.querySelector('#obsidianSyncEnabledToggle')).toBe(syncToggle);
+    expect(document.querySelector<HTMLInputElement>('#obsidianAutoSyncEnabledToggle')?.checked).toBe(true);
+    expect(document.querySelector<HTMLInputElement>('input[aria-label="Base URL"]')?.value).toBe(baseProps.apiBaseUrl);
+    expect(
+      document.querySelector<HTMLInputElement>('input[aria-label="AI Chats Folder · Attachment folder"]')?.value,
+    ).toBe('Assets');
     expect(onTest).toHaveBeenCalledTimes(1);
 
     act(() => root.unmount());

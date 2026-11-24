@@ -9,7 +9,8 @@ import {
   settingsControlWidthClassName,
   settingsTextInputClassName,
 } from '@ui/settings/ui';
-import { SettingsFormRow, SettingsSwitchRow } from './SettingsFormRow';
+import { SettingsFormRow } from './SettingsFormRow';
+import { SettingsSyncSection } from './SettingsSyncSection';
 import { SettingsGroup } from './SettingsGroup';
 import { SelectMenu } from '@ui/shared/SelectMenu';
 
@@ -81,7 +82,14 @@ export function NotionOAuthSection(props: {
   };
 
   return (
-    <>
+    <SettingsSyncSection
+      provider="notion"
+      busy={busy}
+      syncEnabled={syncEnabled}
+      autoSyncEnabled={autoSyncEnabled}
+      onToggleSyncEnabled={onToggleSyncEnabled}
+      onToggleAutoSyncEnabled={onToggleAutoSyncEnabled}
+    >
       <SettingsGroup title={t('settingsAccount')} ariaLabel={t('notionOAuth')}>
         <SettingsFormRow
           label={
@@ -106,27 +114,6 @@ export function NotionOAuthSection(props: {
         <div className="settings-group-link">
           <SettingsDocsLink path="sync/notion" />
         </div>
-      </SettingsGroup>
-      <SettingsGroup title={t('settingsSync')}>
-        <SettingsSwitchRow
-          label={t('notionSyncEnabledLabel')}
-          id="notionSyncEnabledToggle"
-          checked={syncEnabled}
-          disabled={busy}
-          onChange={onToggleSyncEnabled}
-          info={t('settingsSyncInfo')}
-        />
-        {syncEnabled ? (
-          <SettingsSwitchRow
-            label={t('notionAutoSyncEnabledLabel')}
-            id="notionAutoSyncEnabledToggle"
-            checked={autoSyncEnabled}
-            disabled={busy}
-            onChange={onToggleAutoSyncEnabled}
-            dependent
-            info={t('settingsAutoSyncInfo')}
-          />
-        ) : null}
       </SettingsGroup>
       <SettingsGroup title={t('settingsDestination')}>
         <SettingsFormRow label={t('parentPage')} info={t('settingsNotionDestinationInfo')}>
@@ -254,6 +241,6 @@ export function NotionOAuthSection(props: {
           </div>
         ) : null}
       </SettingsGroup>
-    </>
+    </SettingsSyncSection>
   );
 }

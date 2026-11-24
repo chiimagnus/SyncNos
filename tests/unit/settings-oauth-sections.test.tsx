@@ -146,6 +146,8 @@ describe('Settings OAuth sections', () => {
         expect(control.getAttribute('role')).toBe('switch');
         expect(control.classList.contains('webclipper-switch')).toBe(true);
       }
+      expect(document.querySelector('.settings-group .settings-form-row input')).toBe(sync);
+      expect(document.querySelectorAll('.settings-group').length).toBeGreaterThan(1);
       expect(sync.checked).toBe(true);
       expect(auto.checked).toBe(false);
       act(() => auto.click());
@@ -158,9 +160,18 @@ describe('Settings OAuth sections', () => {
       expect(auto.checked).toBe(true);
       act(() => auto.click());
       expect(onToggleAutoSyncEnabled).toHaveBeenCalledTimes(1);
-      await renderSection({ ...callbacks, syncEnabled: false });
+      await renderSection({ ...callbacks, syncEnabled: false, autoSyncEnabled: true });
       expect(sync.checked).toBe(false);
+      expect(document.querySelectorAll('.settings-group')).toHaveLength(1);
+      expect(Array.from(document.querySelectorAll('input'))).toEqual([sync]);
       expect(document.querySelector(`#${provider}AutoSyncEnabledToggle`)).toBeNull();
+      act(() => sync.click());
+      expect(onToggleSyncEnabled).toHaveBeenLastCalledWith(true);
+      await renderSection({ ...callbacks, autoSyncEnabled: true });
+      expect(document.querySelector(`#${provider}SyncEnabledToggle`)).toBe(sync);
+      expect(document.querySelector<HTMLInputElement>(`#${provider}AutoSyncEnabledToggle`)?.checked).toBe(true);
+      expect(document.querySelectorAll('.settings-group').length).toBeGreaterThan(1);
+      expect(onToggleAutoSyncEnabled).toHaveBeenCalledTimes(1);
     }
   });
 

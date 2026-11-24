@@ -2,7 +2,8 @@ import type { KeyboardEvent } from 'react';
 
 import { t } from '@i18n';
 import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
-import { SettingsFormRow, SettingsSwitchRow } from './SettingsFormRow';
+import { SettingsFormRow } from './SettingsFormRow';
+import { SettingsSyncSection } from './SettingsSyncSection';
 import { SettingsGroup } from './SettingsGroup';
 import {
   buttonClassName,
@@ -129,7 +130,14 @@ export function GitHubSettingsSection(props: {
               : '';
 
   return (
-    <>
+    <SettingsSyncSection
+      provider="github"
+      busy={busy}
+      syncEnabled={syncEnabled}
+      autoSyncEnabled={autoSyncEnabled}
+      onToggleSyncEnabled={onToggleSyncEnabled}
+      onToggleAutoSyncEnabled={onToggleAutoSyncEnabled}
+    >
       <SettingsGroup title={t('settingsAccount')} ariaLabel={t('githubSettingsTitle')}>
         <SettingsFormRow
           label={
@@ -196,27 +204,6 @@ export function GitHubSettingsSection(props: {
         <div className="settings-group-link">
           <SettingsDocsLink path="sync/github" />
         </div>
-      </SettingsGroup>
-      <SettingsGroup title={t('settingsSync')}>
-        <SettingsSwitchRow
-          label={t('githubSyncEnabledLabel')}
-          id="githubSyncEnabledToggle"
-          checked={syncEnabled}
-          disabled={busy}
-          onChange={onToggleSyncEnabled}
-          info={t('settingsSyncInfo')}
-        />
-        {syncEnabled ? (
-          <SettingsSwitchRow
-            label={t('githubAutoSyncEnabledLabel')}
-            id="githubAutoSyncEnabledToggle"
-            checked={autoSyncEnabled}
-            disabled={busy}
-            onChange={onToggleAutoSyncEnabled}
-            dependent
-            info={t('settingsAutoSyncInfo')}
-          />
-        ) : null}
       </SettingsGroup>
 
       {auth.state === 'connected' ? (
@@ -335,6 +322,6 @@ export function GitHubSettingsSection(props: {
           </SettingsGroup>
         </>
       ) : null}
-    </>
+    </SettingsSyncSection>
   );
 }
