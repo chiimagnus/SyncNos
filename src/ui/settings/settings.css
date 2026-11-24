@@ -32,27 +32,6 @@
   color: var(--text-secondary);
   font-size: 11px;
 }
-.settings-sidebar__search {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin: 0 16px 10px;
-  padding: 0 9px;
-  min-height: 32px;
-}
-.settings-sidebar__search input {
-  flex: 1;
-  width: 0;
-  border: 0;
-  outline: none;
-  background: transparent;
-  font: inherit;
-  color: inherit;
-}
-.settings-sidebar__search:focus-within {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
 .settings-sidebar nav {
   flex: 1;
   min-height: 0;

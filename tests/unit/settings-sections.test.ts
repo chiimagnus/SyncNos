@@ -111,7 +111,7 @@ describe('settings section definitions', () => {
     ]);
   });
 
-  it('shows the approved sidebar groups, selected section, and searchable settings labels', async () => {
+  it('shows all sidebar groups and selected section without a search field', async () => {
     setupDom();
     const root = ReactDOM.createRoot(document.getElementById('root')!);
     const onSelectSection = vi.fn();
@@ -130,23 +130,10 @@ describe('settings section definitions', () => {
     expect(document.querySelector('[aria-current="page"]')?.textContent).toBe('General');
     expect(document.querySelectorAll('nav button svg, nav button img')).toHaveLength(10);
     expect(document.querySelector('img[src=""]')).toBeNull();
-    const search = document.querySelector<HTMLInputElement>('input[aria-label="Search settings"]')!;
-    const setSearch = (value: string) =>
-      act(() => {
-        Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!.call(search, value);
-        search.dispatchEvent(new window.Event('input', { bubbles: true }));
-      });
-    setSearch('thinking content');
-    expect(Array.from(document.querySelectorAll('nav button')).map((button) => button.textContent)).toEqual([
-      'General',
-    ]);
-    act(() => search.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
-    expect(onSelectSection).toHaveBeenCalledWith('general');
-    setSearch('not-a-real-setting');
-    expect(document.querySelector('nav button')).toBeNull();
-    expect(document.querySelector('nav [role="status"]')?.textContent).toContain('No matching settings');
-    setSearch('');
-    expect(document.querySelectorAll('nav button')).toHaveLength(10);
+    expect(document.querySelector('input[type="search"]')).toBeNull();
+    const notion = document.querySelector<HTMLButtonElement>('[data-settings-section="notion"]')!;
+    act(() => notion.click());
+    expect(onSelectSection).toHaveBeenCalledWith('notion');
 
     act(() => root.unmount());
     cleanupDom();

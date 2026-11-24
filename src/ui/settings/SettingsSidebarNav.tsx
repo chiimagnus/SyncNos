@@ -1,18 +1,6 @@
-import { useState } from 'react';
-import {
-  Settings,
-  Keyboard,
-  Terminal,
-  DatabaseBackup,
-  ChartNoAxesColumn,
-  Info,
-  Search,
-  ChevronRight,
-  X,
-} from 'lucide-react';
+import { Settings, Keyboard, Terminal, DatabaseBackup, ChartNoAxesColumn, Info, ChevronRight, X } from 'lucide-react';
 import { t } from '@i18n';
 import { getURL } from '@services/shared/runtime';
-import { IN_APP_SHORTCUT_ACTIONS } from '@services/shortcuts/in-app-shortcuts';
 import { navItemClassName } from '@ui/shared/nav-styles';
 import { SETTINGS_SECTION_GROUPS, type SettingsSectionKey } from '@viewmodels/settings/types';
 
@@ -28,76 +16,6 @@ const groupLabels = {
   data: 'settingsData',
   about: 'section_aboutme_label',
 } as const;
-
-const searchLabels: Record<SettingsSectionKey, readonly LabelKey[]> = {
-  general: [
-    'aboutYouUserNameSectionTitle',
-    'languageLabel',
-    'inpageButtonHeading',
-    'inpageDisplayModeLabel',
-    'aiChatDollarMentionLabel',
-    'aiChatAutoSaveLabel',
-    'aiChatThinkingIncludeLabel',
-    'chatgptApiCaptureAdvancedLabel',
-    'aiChatCacheImagesLabel',
-    'webArticleCacheImagesLabel',
-    'antiHotlinkRulesLabel',
-  ],
-  shortcuts: [
-    'keyboardShortcutsOpenPopup',
-    'keyboardShortcutsCaptureCurrentPage',
-    'keyboardShortcutsOpenTab',
-    'keyboardShortcutsBrowserHeading',
-    'keyboardShortcutsInAppHeading',
-    ...IN_APP_SHORTCUT_ACTIONS.map(({ labelKey }) => labelKey),
-  ],
-  cli: ['localCliIntegrationHeading', 'localCliIntegrationLabel', 'cliSkillHeading'],
-  notion: [
-    'notionSyncEnabledLabel',
-    'notionAutoSyncEnabledLabel',
-    'notionDbIdAiChats',
-    'notionDbIdWebArticles',
-    'notionDbIdVideos',
-    'parentPage',
-    'settingsAccount',
-    'settingsDestination',
-  ],
-  feishu: [
-    'feishuSyncEnabledLabel',
-    'feishuAutoSyncEnabledLabel',
-    'feishuOAuthClientIdLabel',
-    'feishuOAuthClientSecretLabel',
-    'feishuTokenExchangeProxyUrlLabel',
-    'feishuPaths',
-    'aiChatsFolder',
-    'webClipperFolder',
-    'videoScriptsFolder',
-  ],
-  obsidian: [
-    'obsidianSyncEnabledLabel',
-    'obsidianAutoSyncEnabledLabel',
-    'baseUrl',
-    'apiKey',
-    'authHeader',
-    'obsidianPaths',
-    'obsidianAttachmentFolder',
-    'aiChatsFolder',
-    'webClipperFolder',
-    'videoScriptsFolder',
-  ],
-  github: [
-    'githubSyncEnabledLabel',
-    'githubAutoSyncEnabledLabel',
-    'githubRepositoryLabel',
-    'githubBranchLabel',
-    'githubInstallOrConfigureApp',
-    'githubConnect',
-    'githubTestConnection',
-  ],
-  backup: ['databaseBackup', 'backupIncludeSensitiveData', 'backupOrphanedHeading', 'settingsRestore'],
-  aboutyou: ['aboutYouInsightSectionTitle'],
-  aboutme: ['githubFeedback'],
-};
 
 const icons = {
   general: Settings,
@@ -145,19 +63,6 @@ export function SettingsSidebarNav({
   narrow?: boolean;
   onClose?: () => void;
 }) {
-  const [query, setQuery] = useState('');
-  const normalized = query.trim().toLocaleLowerCase();
-  const groups = SETTINGS_SECTION_GROUPS.map((group) => ({
-    ...group,
-    sections: group.sections.filter(
-      ({ key }) =>
-        !normalized ||
-        [settingsSectionLabel(key), key, ...searchLabels[key].map((label) => t(label))].some((label) =>
-          label.toLocaleLowerCase().includes(normalized),
-        ),
-    ),
-  })).filter((group) => group.sections.length > 0);
-
   return (
     <aside className="settings-sidebar">
       <div className="settings-sidebar__heading">
@@ -172,23 +77,8 @@ export function SettingsSidebarNav({
           </button>
         ) : null}
       </div>
-      <label className="settings-sidebar__search webclipper-field">
-        <Search size={14} aria-hidden="true" className="tw-shrink-0 tw-text-[var(--text-secondary)]" />
-        <input
-          type="search"
-          value={query}
-          onInput={(event) => setQuery(event.currentTarget.value)}
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter' || !normalized || !groups[0]?.sections[0]) return;
-            event.preventDefault();
-            onSelectSection(groups[0].sections[0].key);
-          }}
-          placeholder={t('settingsSearch')}
-          aria-label={t('settingsSearch')}
-        />
-      </label>
       <nav aria-label={t('settingsSectionsAria')}>
-        {groups.map((group) => (
+        {SETTINGS_SECTION_GROUPS.map((group) => (
           <div key={group.key} className="settings-nav-group">
             {group.key !== 'about' ? <h2 className="settings-nav-heading">{t(groupLabels[group.key])}</h2> : null}
             {group.sections.map(({ key }) => (
@@ -207,11 +97,6 @@ export function SettingsSidebarNav({
             ))}
           </div>
         ))}
-        {!groups.length ? (
-          <p className="tw-px-2 tw-text-xs tw-text-[var(--text-secondary)]" role="status">
-            {t('settingsNoResults')}
-          </p>
-        ) : null}
       </nav>
     </aside>
   );

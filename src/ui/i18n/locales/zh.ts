@@ -19,8 +19,6 @@ export const zh: { [K in TranslationKey]: string } = {
   settingsDialogAria: '设置',
   settingsDocsLink: '帮助文档',
   settingsMoreInfo: '了解更多',
-  settingsSearch: '搜索设置',
-  settingsNoResults: '没有匹配的设置',
   settingsBack: '返回设置列表',
   settingsPreferences: '偏好设置',
   settingsSyncServices: '同步服务',
