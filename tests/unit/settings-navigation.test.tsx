@@ -139,6 +139,16 @@ describe('settings navigation', () => {
     expect(detail()?.querySelector('#linkAboutSource')).toBeTruthy();
   });
 
+  it('uses the library close icon for settings errors and preserves dismissal', () => {
+    const clearError = vi.fn();
+    controller.mockReturnValue({ ...controller(), error: 'Test settings error', clearError });
+    render('/settings?section=aboutme');
+    const dismiss = detail()?.querySelector<HTMLButtonElement>('button[aria-label="dismiss error"]');
+    expect(dismiss?.querySelector('svg.lucide-x[aria-hidden="true"]')).toBeTruthy();
+    act(() => dismiss!.click());
+    expect(clearError).toHaveBeenCalledTimes(1);
+  });
+
   it('shows the category list for an invalid section instead of opening the stored section', () => {
     window.localStorage.setItem(SETTINGS_ACTIVE_SECTION_STORAGE_KEY, 'aboutme');
     render('/settings?section=unknown');

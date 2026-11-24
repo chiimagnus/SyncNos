@@ -774,9 +774,11 @@ describe('inpage anti-hotlink advanced editor', () => {
     renderInpage();
 
     const panel = openInfo('Insert saved items with $');
-    expect(
-      panel?.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/dollar-mention/"]')?.textContent,
-    ).toContain('Help docs');
+    const help = panel?.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/dollar-mention/"]');
+    expect(help?.textContent).toContain('Help docs');
+    expect(help?.querySelector('svg.lucide-arrow-up-right')?.classList).toContain('tw-text-[var(--accent)]');
+    expect(help?.hasAttribute('data-tooltip-id')).toBe(false);
+    expect(help?.hasAttribute('title')).toBe(false);
     expect(panel?.textContent).toContain('Tab or Enter');
     act(() =>
       document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })),

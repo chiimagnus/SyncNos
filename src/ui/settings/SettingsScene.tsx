@@ -257,10 +257,7 @@ export function SettingsScene(props: SettingsSceneProps) {
               <div className="tw-text-sm tw-font-black tw-text-[var(--error)]">{error}</div>
             </div>
             <button type="button" className={headerButtonClassName()} onClick={clearError} aria-label="dismiss error">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path d="M4 4L12 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                <path d="M12 4L4 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-              </svg>
+              <X size={16} strokeWidth={1.6} aria-hidden="true" />
             </button>
           </div>
         </section>
