@@ -23,7 +23,7 @@ export function SettingsSyncSection({
 }) {
   return (
     <>
-      <SettingsGroup title={t('settingsSync')}>
+      <SettingsGroup ariaLabel={t('settingsSync')}>
         <SettingsSwitchRow
           label={t(`${provider}SyncEnabledLabel`)}
           id={provider + 'SyncEnabledToggle'}

@@ -452,6 +452,8 @@ describe('settings section definitions', () => {
     expect(refreshButton?.getAttribute('aria-busy')).toBe('true');
     expect(refreshButton?.textContent).toContain('⏳');
     expect(disconnectButton?.disabled).toBe(false);
+    expect(syncToggle?.closest('.settings-group')?.getAttribute('aria-label')).toBe('Sync');
+    expect(syncToggle?.closest('.settings-group')?.querySelector('h2')).toBeNull();
     expect(syncToggle?.closest('.settings-group')?.querySelector('.settings-info')).toBeNull();
     expect(repositoryTrigger?.closest('.settings-form-row')?.querySelector('.settings-info')).toBeNull();
     expect(syncToggle?.getAttribute('role')).toBe('switch');
@@ -538,9 +540,10 @@ describe('settings section definitions', () => {
     act(() => root.render(createElement(ObsidianSettingsSection, baseProps)));
 
     expect(document.querySelectorAll('input.webclipper-switch[role="switch"]')).toHaveLength(2);
-    expect(
-      document.querySelector('#obsidianSyncEnabledToggle')?.closest('.settings-group')?.querySelector('.settings-info'),
-    ).toBeNull();
+    const syncGroup = document.querySelector('#obsidianSyncEnabledToggle')?.closest('.settings-group');
+    expect(syncGroup?.getAttribute('aria-label')).toBe('Sync');
+    expect(syncGroup?.querySelector('h2')).toBeNull();
+    expect(syncGroup?.querySelector('.settings-info')).toBeNull();
     expect(document.querySelector<HTMLInputElement>('#obsidianSyncEnabledToggle')?.checked).toBe(true);
     expect(document.querySelector<HTMLInputElement>('#obsidianAutoSyncEnabledToggle')?.checked).toBe(false);
     const helpLink = document.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/sync/obsidian/"]');

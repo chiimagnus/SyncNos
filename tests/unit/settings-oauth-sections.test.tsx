@@ -148,6 +148,8 @@ describe('Settings OAuth sections', () => {
       }
       expect(document.querySelector('.settings-group .settings-form-row input')).toBe(sync);
       expect(document.querySelectorAll('.settings-group').length).toBeGreaterThan(1);
+      expect(sync.closest('.settings-group')?.getAttribute('aria-label')).toBe('settingsSync');
+      expect(sync.closest('.settings-group')?.querySelector('h2')).toBeNull();
       expect(sync.closest('.settings-group')?.querySelector('.settings-info')).toBeNull();
       expect(sync.checked).toBe(true);
       expect(auto.checked).toBe(false);
