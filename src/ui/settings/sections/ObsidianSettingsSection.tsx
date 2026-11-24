@@ -2,8 +2,10 @@ import type { KeyboardEvent } from 'react';
 
 import { t } from '@i18n';
 import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
-import { buttonClassName, cardClassName, checkboxClassName, settingsTextInputClassName } from '@ui/settings/ui';
-import { SettingsFormRow } from '@ui/settings/sections/SettingsFormRow';
+import { buttonClassName, settingsTextInputClassName } from '@ui/settings/ui';
+import { SettingsFormRow } from './SettingsFormRow';
+import { SettingsSyncSection } from './SettingsSyncSection';
+import { SettingsGroup } from './SettingsGroup';
 
 export function ObsidianSettingsSection(props: {
   busy: boolean;
@@ -82,157 +84,137 @@ export function ObsidianSettingsSection(props: {
   };
 
   return (
-    <>
-      <section className={cardClassName} aria-label={t('obsidianLocalRestApi')}>
-        <div className="tw-flex tw-items-center tw-gap-2">
-          <img className="tw-h-5 tw-w-5 tw-shrink-0" src={obsidianLogoUrl} alt="" aria-hidden="true" />
-          <h2 className="tw-m-0 tw-min-w-0 tw-flex-1 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
-            {t('obsidianLocalRestApi')}
-          </h2>
-          <SettingsDocsLink path="sync/obsidian" />
+    <SettingsSyncSection
+      provider="obsidian"
+      busy={busy}
+      syncEnabled={syncEnabled}
+      autoSyncEnabled={autoSyncEnabled}
+      onToggleSyncEnabled={onToggleSyncEnabled}
+      onToggleAutoSyncEnabled={onToggleAutoSyncEnabled}
+    >
+      <SettingsGroup title={t('settingsAccount')} ariaLabel={t('obsidianLocalRestApi')}>
+        <SettingsFormRow
+          label={
+            <span className="settings-account">
+              <img src={obsidianLogoUrl} alt="" />
+              <span>
+                {t('obsidianLocalRestApi')}
+                <small>{statusText}</small>
+              </span>
+            </span>
+          }
+        >
           <button className={buttonClassName} onClick={onTest} disabled={busy} type="button">
             {t('test')}
           </button>
+        </SettingsFormRow>
+        <div className="settings-group-link">
+          <SettingsDocsLink path="sync/obsidian" />
         </div>
+      </SettingsGroup>
+      <SettingsGroup title={t('settingsAuthorization')}>
+        <SettingsFormRow label={t('baseUrl')} info={t('settingsObsidianUrlInfo')}>
+          <input
+            value={apiBaseUrl}
+            onChange={(e) => onChangeApiBaseUrl(e.target.value)}
+            onBlur={onSave}
+            onKeyDown={(e) => onEnterToSave(e)}
+            disabled={busy}
+            spellCheck={false}
+            placeholder="http://127.0.0.1:27123"
+            className={settingsTextInputClassName}
+            aria-label={t('baseUrl')}
+          />
+        </SettingsFormRow>
 
-        <div className="tw-mt-3 tw-grid tw-gap-2">
-          <SettingsFormRow label={t('obsidianSyncEnabledLabel')}>
-            <input
-              id="obsidianSyncEnabledToggle"
-              type="checkbox"
-              className={checkboxClassName}
-              checked={syncEnabled}
-              disabled={busy}
-              aria-label={t('obsidianSyncEnabledLabel')}
-              onChange={(e) => onToggleSyncEnabled(e.target.checked)}
-            />
-          </SettingsFormRow>
+        <SettingsFormRow label={t('apiKey')}>
+          <input
+            type="password"
+            value={apiKeyDraft}
+            onChange={(e) => onChangeApiKeyDraft(e.target.value)}
+            onBlur={() => {
+              if (!String(apiKeyDraft || '').trim()) return;
+              onSaveApiKey();
+            }}
+            onKeyDown={(e) => onEnterToSave(e, 'apiKey')}
+            disabled={busy}
+            placeholder={apiKeyPresent ? apiKeyMasked : ''}
+            className={settingsTextInputClassName}
+            aria-label={t('apiKey')}
+          />
+        </SettingsFormRow>
 
-          {syncEnabled ? (
-            <SettingsFormRow label={t('obsidianAutoSyncEnabledLabel')}>
+        <SettingsFormRow label={t('authHeader')}>
+          <input
+            value={authHeaderName}
+            onChange={(e) => onChangeAuthHeaderName(e.target.value)}
+            onBlur={onSave}
+            onKeyDown={(e) => onEnterToSave(e)}
+            disabled={busy}
+            spellCheck={false}
+            placeholder="Authorization"
+            className={settingsTextInputClassName}
+            aria-label={t('authHeader')}
+          />
+        </SettingsFormRow>
+      </SettingsGroup>
+      <SettingsGroup
+        title={t('settingsFolders')}
+        ariaLabel={t('obsidianPaths')}
+        note={t('obsidianAttachmentFolderHelp')}
+      >
+        {[
+          {
+            label: t('aiChatsFolder'),
+            folder: chatFolder,
+            attachmentFolder: chatAttachmentFolder,
+            onChangeFolder: onChangeChatFolder,
+            onChangeAttachment: onChangeChatAttachmentFolder,
+          },
+          {
+            label: t('webClipperFolder'),
+            folder: articleFolder,
+            attachmentFolder: articleAttachmentFolder,
+            onChangeFolder: onChangeArticleFolder,
+            onChangeAttachment: onChangeArticleAttachmentFolder,
+          },
+          {
+            label: t('videoScriptsFolder'),
+            folder: videoFolder,
+            attachmentFolder: videoAttachmentFolder,
+            onChangeFolder: onChangeVideoFolder,
+            onChangeAttachment: onChangeVideoAttachmentFolder,
+          },
+        ].map(({ label, folder, attachmentFolder, onChangeFolder, onChangeAttachment }) => (
+          <div className="settings-path-pair" key={label}>
+            <SettingsFormRow label={label}>
               <input
-                id="obsidianAutoSyncEnabledToggle"
-                type="checkbox"
-                className={checkboxClassName}
-                checked={autoSyncEnabled}
+                value={folder}
+                onChange={(e) => onChangeFolder(e.target.value)}
+                onBlur={onSave}
+                onKeyDown={(e) => onEnterToSave(e)}
                 disabled={busy}
-                aria-label={t('obsidianAutoSyncEnabledLabel')}
-                onChange={(e) => onToggleAutoSyncEnabled(e.target.checked)}
+                spellCheck={false}
+                className={settingsTextInputClassName}
+                aria-label={label}
               />
             </SettingsFormRow>
-          ) : null}
-
-          <SettingsFormRow label={t('baseUrl')}>
-            <input
-              value={apiBaseUrl}
-              onChange={(e) => onChangeApiBaseUrl(e.target.value)}
-              onBlur={onSave}
-              onKeyDown={(e) => onEnterToSave(e)}
-              disabled={busy}
-              spellCheck={false}
-              placeholder="http://127.0.0.1:27123"
-              className={settingsTextInputClassName}
-              aria-label={t('baseUrl')}
-            />
-          </SettingsFormRow>
-
-          <SettingsFormRow label={t('apiKey')}>
-            <input
-              value={apiKeyDraft}
-              onChange={(e) => onChangeApiKeyDraft(e.target.value)}
-              onBlur={() => {
-                if (!String(apiKeyDraft || '').trim()) return;
-                onSaveApiKey();
-              }}
-              onKeyDown={(e) => onEnterToSave(e, 'apiKey')}
-              disabled={busy}
-              placeholder={apiKeyPresent ? apiKeyMasked : ''}
-              className={settingsTextInputClassName}
-              aria-label={t('apiKey')}
-            />
-          </SettingsFormRow>
-
-          <SettingsFormRow label={t('authHeader')}>
-            <input
-              value={authHeaderName}
-              onChange={(e) => onChangeAuthHeaderName(e.target.value)}
-              onBlur={onSave}
-              onKeyDown={(e) => onEnterToSave(e)}
-              disabled={busy}
-              spellCheck={false}
-              placeholder="Authorization"
-              className={settingsTextInputClassName}
-              aria-label={t('authHeader')}
-            />
-          </SettingsFormRow>
-
-          <SettingsFormRow label={t('status')} align="start">
-            <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{statusText}</div>
-          </SettingsFormRow>
-        </div>
-      </section>
-
-      <section className={cardClassName} aria-label={t('obsidianPaths')}>
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('obsidianPaths')}</h2>
-
-        <div className="tw-mt-3 tw-grid tw-gap-2">
-          {[
-            {
-              label: t('aiChatsFolder'),
-              folder: chatFolder,
-              attachmentFolder: chatAttachmentFolder,
-              onChangeFolder: onChangeChatFolder,
-              onChangeAttachment: onChangeChatAttachmentFolder,
-            },
-            {
-              label: t('webClipperFolder'),
-              folder: articleFolder,
-              attachmentFolder: articleAttachmentFolder,
-              onChangeFolder: onChangeArticleFolder,
-              onChangeAttachment: onChangeArticleAttachmentFolder,
-            },
-            {
-              label: t('videoScriptsFolder'),
-              folder: videoFolder,
-              attachmentFolder: videoAttachmentFolder,
-              onChangeFolder: onChangeVideoFolder,
-              onChangeAttachment: onChangeVideoAttachmentFolder,
-            },
-          ].map(({ label, folder, attachmentFolder, onChangeFolder, onChangeAttachment }) => (
-            <SettingsFormRow key={label} label={label}>
-              <div className="tw-flex tw-min-w-0 tw-flex-wrap tw-items-center tw-gap-2">
-                <input
-                  value={folder}
-                  onChange={(e) => onChangeFolder(e.target.value)}
-                  onBlur={onSave}
-                  onKeyDown={(e) => onEnterToSave(e)}
-                  disabled={busy}
-                  spellCheck={false}
-                  className={settingsTextInputClassName}
-                  aria-label={label}
-                />
-                <label className="tw-flex tw-min-w-0 tw-max-w-full tw-flex-wrap tw-items-center tw-gap-2 sm:tw-shrink-0 sm:tw-flex-nowrap">
-                  <span className="tw-whitespace-nowrap tw-text-xs tw-font-bold tw-text-[var(--text-secondary)]">
-                    {t('obsidianAttachmentFolder')}
-                  </span>
-                  <input
-                    value={attachmentFolder === '.' ? '' : attachmentFolder}
-                    onChange={(e) => onChangeAttachment(e.target.value)}
-                    onBlur={onSave}
-                    onKeyDown={(e) => onEnterToSave(e)}
-                    disabled={busy}
-                    spellCheck={false}
-                    placeholder={folder}
-                    className={settingsTextInputClassName}
-                    aria-label={`${label} · ${t('obsidianAttachmentFolder')}`}
-                  />
-                </label>
-              </div>
+            <SettingsFormRow label={t('obsidianAttachmentFolder')} dependent>
+              <input
+                value={attachmentFolder === '.' ? '' : attachmentFolder}
+                onChange={(e) => onChangeAttachment(e.target.value)}
+                onBlur={onSave}
+                onKeyDown={(e) => onEnterToSave(e)}
+                disabled={busy}
+                spellCheck={false}
+                placeholder={folder}
+                className={settingsTextInputClassName}
+                aria-label={label + ' · ' + t('obsidianAttachmentFolder')}
+              />
             </SettingsFormRow>
-          ))}
-          <p className="tw-m-0 tw-text-xs tw-text-[var(--text-secondary)]">{t('obsidianAttachmentFolderHelp')}</p>
-        </div>
-      </section>
-    </>
+          </div>
+        ))}
+      </SettingsGroup>
+    </SettingsSyncSection>
   );
 }

@@ -1,48 +1,95 @@
+import { Settings, Keyboard, Terminal, DatabaseBackup, ChartNoAxesColumn, Info, ChevronRight, X } from 'lucide-react';
 import { t } from '@i18n';
+import { getURL } from '@services/shared/runtime';
 import { navItemClassName } from '@ui/shared/nav-styles';
-import type { SettingsSectionKey } from '@viewmodels/settings/types';
-import { SETTINGS_SECTION_GROUPS } from '@viewmodels/settings/types';
+import { SETTINGS_SECTION_GROUPS, type SettingsSectionKey } from '@viewmodels/settings/types';
 
-function sectionLabel(key: SettingsSectionKey): string {
-  return t(`section_${key}_label` as Parameters<typeof t>[0]);
+type LabelKey = Parameters<typeof t>[0];
+
+export function settingsSectionLabel(key: SettingsSectionKey): string {
+  return t(`section_${key}_label` as LabelKey);
 }
 
-export function SettingsSidebarNav(props: {
+const groupLabels = {
+  preferences: 'settingsPreferences',
+  sync: 'settingsSyncServices',
+  data: 'settingsData',
+  about: 'section_aboutme_label',
+} as const;
+
+const icons = {
+  general: Settings,
+  shortcuts: Keyboard,
+  cli: Terminal,
+  backup: DatabaseBackup,
+  aboutyou: ChartNoAxesColumn,
+  aboutme: Info,
+};
+
+function SectionIcon({ section, active }: { section: SettingsSectionKey; active: boolean }) {
+  const Icon = section in icons ? icons[section as keyof typeof icons] : undefined;
+  return (
+    <span className="settings-nav-icon" aria-hidden="true">
+      {Icon ? (
+        <Icon size={18} strokeWidth={1.8} />
+      ) : (
+        <img
+          src={getURL(`icons/${section}.svg` as any) || undefined}
+          className={
+            !active && (section === 'notion' || section === 'github')
+              ? 'webclipper-provider-logo--invert-in-dark'
+              : undefined
+          }
+          alt=""
+        />
+      )}
+    </span>
+  );
+}
+
+export function SettingsSidebarNav({
+  activeSection,
+  onSelectSection,
+  narrow = false,
+  onClose,
+}: {
   activeSection: SettingsSectionKey;
   onSelectSection: (key: SettingsSectionKey) => void;
+  narrow?: boolean;
+  onClose?: () => void;
 }) {
-  const { activeSection, onSelectSection } = props;
-
   return (
-    <aside className="tw-flex tw-w-[220px] tw-min-h-0 tw-shrink-0 tw-flex-col tw-border-r tw-border-[var(--border)] tw-bg-[var(--bg-sunken)]">
-      <nav
-        className="tw-flex-1 tw-min-h-0 tw-overflow-y-auto tw-overflow-x-hidden tw-px-4 tw-py-5"
-        aria-label={t('settingsSectionsAria')}
-      >
-        <div className="tw-flex tw-flex-col tw-gap-4">
-          {SETTINGS_SECTION_GROUPS.map((group, groupIndex) => (
-            <div key={groupIndex} className="tw-flex tw-flex-col tw-gap-0.5">
-              {groupIndex === 0 ? null : (
-                <div className="tw-mb-3 tw-h-px tw-w-full tw-bg-[var(--border)] tw-opacity-70" aria-hidden="true" />
-              )}
-              {group.sections.map((section) => {
-                const active = activeSection === section.key;
-                const label = sectionLabel(section.key);
-                return (
-                  <button
-                    key={section.key}
-                    type="button"
-                    onClick={() => onSelectSection(section.key)}
-                    className={navItemClassName(active)}
-                    aria-current={active ? 'page' : undefined}
-                  >
-                    <div className="tw-truncate tw-leading-5">{label}</div>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </div>
+    <aside className="settings-sidebar">
+      {narrow && onClose ? (
+        <button
+          type="button"
+          className="settings-info settings-sidebar__close"
+          aria-label={t('closeSettings')}
+          onClick={onClose}
+        >
+          <X size={18} aria-hidden="true" />
+        </button>
+      ) : null}
+      <nav aria-label={t('settingsSectionsAria')}>
+        {SETTINGS_SECTION_GROUPS.map((group) => (
+          <div key={group.key} className="settings-nav-group">
+            {group.key !== 'about' ? <h2 className="settings-nav-heading">{t(groupLabels[group.key])}</h2> : null}
+            {group.sections.map(({ key }) => (
+              <button
+                key={key}
+                type="button"
+                className={`${navItemClassName(activeSection === key)} settings-nav-item`}
+                data-settings-section={key}
+                aria-current={activeSection === key ? 'page' : undefined}
+                onClick={() => onSelectSection(key)}
+              >
+                <SectionIcon section={key} active={activeSection === key} />
+                <span className="tw-min-w-0 tw-flex-1">{settingsSectionLabel(key)}</span>
+                {narrow ? <ChevronRight size={14} aria-hidden="true" className="tw-shrink-0 tw-opacity-60" /> : null}
+              </button>
+            ))}
+          </div>
+        ))}
       </nav>
     </aside>
   );

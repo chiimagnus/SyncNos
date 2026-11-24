@@ -122,6 +122,62 @@ afterEach(() => {
 });
 
 describe('Settings OAuth sections', () => {
+  it('uses switches for both provider and automatic sync, preserving checked and disabled states', async () => {
+    const onToggleSyncEnabled = vi.fn();
+    const onToggleAutoSyncEnabled = vi.fn();
+    const callbacks = { onToggleSyncEnabled, onToggleAutoSyncEnabled };
+    for (const [provider, renderSection] of [
+      [
+        'notion',
+        (overrides: Partial<NotionProps>) => render(createElement(NotionOAuthSection, notionProps(overrides))),
+      ],
+      [
+        'feishu',
+        (overrides: Partial<FeishuProps>) => render(createElement(FeishuOAuthSection, feishuProps(overrides))),
+      ],
+    ] as const) {
+      onToggleSyncEnabled.mockClear();
+      onToggleAutoSyncEnabled.mockClear();
+      await renderSection(callbacks);
+      const sync = document.querySelector<HTMLInputElement>(`#${provider}SyncEnabledToggle`)!;
+      const auto = document.querySelector<HTMLInputElement>(`#${provider}AutoSyncEnabledToggle`)!;
+      for (const control of [sync, auto]) {
+        expect(control.type).toBe('checkbox');
+        expect(control.getAttribute('role')).toBe('switch');
+        expect(control.classList.contains('webclipper-switch')).toBe(true);
+      }
+      expect(document.querySelector('.settings-group .settings-form-row input')).toBe(sync);
+      expect(document.querySelectorAll('.settings-group').length).toBeGreaterThan(1);
+      expect(sync.closest('.settings-group')?.getAttribute('aria-label')).toBe('settingsSync');
+      expect(sync.closest('.settings-group')?.querySelector('h2')).toBeNull();
+      expect(sync.closest('.settings-group')?.querySelector('.settings-info')).toBeNull();
+      expect(sync.checked).toBe(true);
+      expect(auto.checked).toBe(false);
+      act(() => auto.click());
+      expect(onToggleAutoSyncEnabled).toHaveBeenCalledWith(true);
+      act(() => sync.click());
+      expect(onToggleSyncEnabled).toHaveBeenCalledWith(false);
+      await renderSection({ ...callbacks, busy: true, autoSyncEnabled: true });
+      expect(sync.disabled).toBe(true);
+      expect(auto.disabled).toBe(true);
+      expect(auto.checked).toBe(true);
+      act(() => auto.click());
+      expect(onToggleAutoSyncEnabled).toHaveBeenCalledTimes(1);
+      await renderSection({ ...callbacks, syncEnabled: false, autoSyncEnabled: true });
+      expect(sync.checked).toBe(false);
+      expect(document.querySelectorAll('.settings-group')).toHaveLength(1);
+      expect(Array.from(document.querySelectorAll('input'))).toEqual([sync]);
+      expect(document.querySelector(`#${provider}AutoSyncEnabledToggle`)).toBeNull();
+      act(() => sync.click());
+      expect(onToggleSyncEnabled).toHaveBeenLastCalledWith(true);
+      await renderSection({ ...callbacks, autoSyncEnabled: true });
+      expect(document.querySelector(`#${provider}SyncEnabledToggle`)).toBe(sync);
+      expect(document.querySelector<HTMLInputElement>(`#${provider}AutoSyncEnabledToggle`)?.checked).toBe(true);
+      expect(document.querySelectorAll('.settings-group').length).toBeGreaterThan(1);
+      expect(onToggleAutoSyncEnabled).toHaveBeenCalledTimes(1);
+    }
+  });
+
   it('keeps provider text fields and select triggers on the compact settings control width', async () => {
     await render(
       createElement(

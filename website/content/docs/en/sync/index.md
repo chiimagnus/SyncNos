@@ -14,6 +14,9 @@ Sync is optional; SyncNos works without any external service.
 | [Feishu](/docs/en/sync/feishu/) | Feishu cloud documents |
 | [GitHub](/docs/en/sync/github/) | Markdown repositories |
 
+Select a destination in Settings and turn on the top sync switch to configure its connection and auto-sync.
+Turning it off hides its settings without deleting the connection, configuration, or synced content.
+
 Each destination supports manual sync and optional auto-sync. Local content stays in SyncNos.
 
 If you edited notes in a destination, preserve those changes before syncing again.

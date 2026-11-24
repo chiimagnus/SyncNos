@@ -105,6 +105,8 @@ vi.mock('../../src/viewmodels/reader/useReaderPrefs', () => ({
   useReaderPrefs: () => ({
     prefs: currentReaderPrefs,
     update: vi.fn(),
+    preview: vi.fn(),
+    commitPreview: vi.fn().mockResolvedValue(undefined),
   }),
 }));
 
@@ -139,6 +141,10 @@ function setupDom() {
   Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: dom.window.HTMLElement });
   Object.defineProperty(globalThis, 'Node', { configurable: true, value: dom.window.Node });
   Object.defineProperty(globalThis, 'Element', { configurable: true, value: dom.window.Element });
+  Object.defineProperty(globalThis, 'getComputedStyle', {
+    configurable: true,
+    value: dom.window.getComputedStyle.bind(dom.window),
+  });
   Object.defineProperty(globalThis, 'MouseEvent', { configurable: true, value: dom.window.MouseEvent });
   Object.defineProperty(globalThis, 'KeyboardEvent', { configurable: true, value: dom.window.KeyboardEvent });
   Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', {
@@ -153,6 +159,7 @@ function cleanupDom() {
   delete (globalThis as any).navigator;
   delete (globalThis as any).HTMLElement;
   delete (globalThis as any).Element;
+  delete (globalThis as any).getComputedStyle;
   delete (globalThis as any).Node;
   delete (globalThis as any).MouseEvent;
   delete (globalThis as any).KeyboardEvent;

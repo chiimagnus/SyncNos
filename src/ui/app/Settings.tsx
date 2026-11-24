@@ -13,7 +13,7 @@ export default function Settings() {
   const routerLocation = useLocation();
   const navigate = useNavigate();
 
-  type SearchParams = { section: SettingsSectionKey; focus: string };
+  type SearchParams = { section: SettingsSectionKey | null; activeSection: SettingsSectionKey; focus: string };
 
   const params = useMemo<SearchParams>(() => {
     const s = new URLSearchParams(routerLocation.search || '');
@@ -24,12 +24,11 @@ export default function Settings() {
       .trim()
       .toLowerCase();
 
-    const section: SettingsSectionKey = coerceSettingsSectionKey(rawSection) ?? readStoredSettingsSection();
-    const focus = rawFocus;
-    return { section, focus };
+    const section = coerceSettingsSectionKey(rawSection);
+    return { section, activeSection: section ?? readStoredSettingsSection(), focus: rawFocus };
   }, [routerLocation.search]);
 
-  const activeSection = params.section;
+  const activeSection = params.activeSection;
   const focusKey = params.focus;
 
   const setActiveSection = (key: SettingsSectionKey) => {
@@ -39,6 +38,16 @@ export default function Settings() {
     next.delete('focus');
     navigate(
       { pathname: routerLocation.pathname, search: `?${next.toString()}` },
+      { replace: true, state: routerLocation.state },
+    );
+  };
+
+  const backToList = () => {
+    const next = new URLSearchParams(routerLocation.search || '');
+    next.delete('section');
+    next.delete('focus');
+    navigate(
+      { pathname: routerLocation.pathname, search: next.toString() },
       { replace: true, state: routerLocation.state },
     );
   };
@@ -54,7 +63,9 @@ export default function Settings() {
     <SettingsScene
       activeSection={activeSection}
       focusKey={focusKey}
+      hasExplicitSection={params.section !== null}
       onSelectSection={setActiveSection}
+      onBackToList={backToList}
       onClose={closeSettings}
     />
   );

@@ -15,7 +15,7 @@ syncnos doctor
 
 然后在目标浏览器 Profile 中开启：
 
-**设置 → CLI & AI SKILL → 本地 CLI 集成 → SyncNos CLI**
+**设置 → CLI & AI SKILL → 本地访问 → 启用 SyncNos CLI**
 
 使用时保持该浏览器 Profile 运行。
 

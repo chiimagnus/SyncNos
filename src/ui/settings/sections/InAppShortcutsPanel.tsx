@@ -1,3 +1,5 @@
+import { SettingsGroup } from './SettingsGroup';
+import { SettingsFormRow } from './SettingsFormRow';
 import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 
 import { t } from '@i18n';
@@ -12,7 +14,7 @@ import {
   type InAppShortcutAction,
 } from '@services/shortcuts/in-app-shortcuts';
 import { useInAppShortcutBindings } from '@viewmodels/shortcuts/useInAppShortcuts';
-import { buttonClassName, cardClassName, textInputClassName } from '@ui/settings/ui';
+import { buttonClassName, textInputClassName } from '@ui/settings/ui';
 
 const GROUPS = [
   { key: 'navigation', label: 'keyboardShortcutsNavigationGroup' },
@@ -130,13 +132,8 @@ export function InAppShortcutsPanel() {
   })).filter((group) => group.items.length > 0);
 
   return (
-    <section className={cardClassName} aria-label={t('keyboardShortcutsInAppHeading')}>
-      <div className="tw-flex tw-flex-wrap tw-items-center tw-justify-between tw-gap-2">
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
-          {t('keyboardShortcutsInAppHeading')}
-        </h2>
-        <span className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{platformLabel}</span>
-      </div>
+    <SettingsGroup title={t('keyboardShortcutsInAppHeading')}>
+      <div className="tw-pt-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{platformLabel}</div>
       <p className="tw-mb-3 tw-mt-2 tw-text-xs tw-leading-relaxed tw-text-[var(--text-secondary)]">
         {t('keyboardShortcutsInAppHint')}
       </p>
@@ -182,22 +179,23 @@ export function InAppShortcutsPanel() {
                   const isRecording = recording === action.id;
                   const displayed = isRecording ? pressed : bindings[action.id];
                   return (
-                    <div
+                    <SettingsFormRow
                       key={action.id}
-                      className="tw-flex tw-min-h-12 tw-items-center tw-justify-between tw-gap-3 tw-py-2"
+                      label={
+                        <span className="tw-min-w-0">
+                          {t(action.labelKey)}
+                          {message && messageAction === action.id ? (
+                            <span role="alert" className="tw-block tw-mt-1 tw-text-xs tw-text-[var(--error)]">
+                              {message}
+                            </span>
+                          ) : null}
+                        </span>
+                      }
                     >
-                      <div className="tw-min-w-0 tw-flex-1">
-                        <span className="tw-text-sm tw-text-[var(--text-secondary)]">{t(action.labelKey)}</span>
-                        {message && messageAction === action.id ? (
-                          <p role="alert" className="tw-m-0 tw-mt-1 tw-text-xs tw-text-[var(--error)]">
-                            {message}
-                          </p>
-                        ) : null}
-                      </div>
-                      <div className="tw-flex tw-min-w-0 tw-shrink-0 tw-items-center tw-gap-1.5">
+                      <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-1.5">
                         <button
                           type="button"
-                          className={`${buttonClassName} tw-min-w-16 tw-max-w-[240px]`}
+                          className={`${buttonClassName} tw-min-w-0 tw-max-w-[240px]`}
                           disabled={!ready || saving || storageError}
                           onClick={(event) => {
                             if (isRecording) {
@@ -250,7 +248,7 @@ export function InAppShortcutsPanel() {
                           <span className="tw-size-7 tw-shrink-0" aria-hidden="true" />
                         )}
                       </div>
-                    </div>
+                    </SettingsFormRow>
                   );
                 })}
               </div>
@@ -262,7 +260,7 @@ export function InAppShortcutsPanel() {
           </p>
         )}
       </div>
-      <div className="tw-mt-3 tw-flex tw-flex-wrap tw-items-center tw-justify-between tw-gap-2">
+      <div className="tw-mt-3 tw-flex tw-flex-wrap tw-items-center tw-justify-between tw-gap-2 tw-pb-3">
         <span className="tw-text-xs tw-text-[var(--text-secondary)]">{t('keyboardShortcutsPhysicalKeysHint')}</span>
         <button
           type="button"
@@ -281,6 +279,6 @@ export function InAppShortcutsPanel() {
           {t('keyboardShortcutsReset')}
         </button>
       </div>
-    </section>
+    </SettingsGroup>
   );
 }

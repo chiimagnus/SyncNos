@@ -15,7 +15,7 @@ syncnos doctor
 
 Then enable this in the target browser profile:
 
-**Settings → CLI & AI SKILL → Local CLI Integration → SyncNos CLI**
+**Settings → CLI & AI SKILL → Local access → Enable SyncNos CLI**
 
 Keep that browser profile running while the agent uses it.
 

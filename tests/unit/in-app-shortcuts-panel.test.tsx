@@ -159,7 +159,9 @@ describe('in-app shortcut editor', () => {
       await Promise.resolve();
     });
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('Settings');
-    expect(conflicting.closest('div.tw-min-h-12')?.querySelector('[role="alert"]')?.textContent).toContain('Settings');
+    expect(conflicting.closest('.settings-form-row')?.querySelector('[role="alert"]')?.textContent).toContain(
+      'Settings',
+    );
     expect(conflicting.textContent).toContain('Recording');
     expect(persisted['toggle-sidebar']).toBeUndefined();
 

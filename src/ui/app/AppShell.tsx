@@ -8,7 +8,7 @@ import { ConversationsScene } from '@ui/conversations/ConversationsScene';
 import { LazyArticleCommentsSection, LazyConversationDetailPane } from '@ui/conversations/LazyConversationSurfaces';
 import type { CommentLocatorSurfaceRoots } from '@ui/comments';
 import { createAppCommentSelectionSource } from '@ui/comments/app-comment-selection-source';
-import { buttonIconCircleGhostClassName, headerButtonClassName } from '@ui/shared/button-styles';
+import { headerButtonClassName } from '@ui/shared/button-styles';
 import { AppTooltipHost, tooltipAttrsWithShortcut } from '@ui/shared/AppTooltip';
 import { useResponsiveTier } from '@ui/shared/hooks/useResponsiveTier';
 import { useArticleCommentsSidebarRuntime } from '@viewmodels/comments/useArticleCommentsSidebarRuntime';
@@ -214,7 +214,7 @@ export default function AppShell() {
     const routesLocation =
       backgroundLocation || (showSettingsSheet ? ({ ...location, pathname: '/' } as any) : location);
 
-    const settingsCloseButtonRef = useRef<HTMLButtonElement | null>(null);
+    const settingsDialogRef = useRef<HTMLDivElement | null>(null);
     const settingsLastActiveElementRef = useRef<HTMLElement | null>(null);
 
     const closeSettings = () => {
@@ -369,7 +369,13 @@ export default function AppShell() {
     useEffect(() => {
       if (!showSettingsSheet) return;
       const onKey = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') {
+        if (e.key === 'Escape' && !e.defaultPrevented) {
+          if (
+            document.querySelector(
+              '.settings-scene [data-settings-info-panel], .settings-scene [role="menu"]:not([hidden])',
+            )
+          )
+            return;
           const target = e.target;
           if (target instanceof Element && target.closest('[data-shortcut-recording="true"]')) return;
           e.preventDefault();
@@ -390,7 +396,7 @@ export default function AppShell() {
         }
 
         const timer = window.setTimeout(() => {
-          settingsCloseButtonRef.current?.focus({ preventScroll: true });
+          settingsDialogRef.current?.focus({ preventScroll: true });
         }, 0);
 
         return () => window.clearTimeout(timer);
@@ -519,7 +525,7 @@ export default function AppShell() {
                   'tw-h-full tw-min-w-0 tw-flex-1 tw-overflow-hidden',
                   showSettingsSheet ? 'tw-pointer-events-none tw-select-none tw-overflow-hidden' : '',
                 ].join(' ')}
-                {...(showSettingsSheet ? ({ inert: '' } as any) : {})}
+                inert={showSettingsSheet}
                 aria-hidden={showSettingsSheet}
               >
                 <Routes location={routesLocation}>
@@ -615,35 +621,22 @@ export default function AppShell() {
           {showSettingsSheet ? (
             <div
               className="tw-fixed tw-inset-0 tw-z-50 tw-flex tw-items-center tw-justify-center tw-p-4"
+              ref={settingsDialogRef}
+              tabIndex={-1}
               role="dialog"
               aria-modal="true"
               aria-label={t('settingsDialogAria')}
             >
-              <div
-                className="tw-absolute tw-inset-0 tw-bg-[var(--bg-overlay)]"
-                role="presentation"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  closeSettings();
-                }}
+              <button
+                type="button"
+                className="tw-absolute tw-inset-0 tw-border-0 tw-bg-[var(--bg-overlay)] tw-p-0 focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:-tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+                aria-label={t('closeSettings')}
+                onClick={closeSettings}
               />
               <div
                 className="tw-relative tw-z-10 tw-h-[min(760px,calc(100vh-40px))] tw-w-[min(1080px,calc(100vw-40px))] tw-overflow-hidden tw-rounded-[var(--radius-outer)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-card)]"
                 onMouseDown={(e) => e.stopPropagation()}
               >
-                <button
-                  type="button"
-                  onClick={closeSettings}
-                  ref={settingsCloseButtonRef}
-                  className={['tw-absolute tw-right-1 tw-top-1 tw-z-20', buttonIconCircleGhostClassName()].join(' ')}
-                  aria-label={t('closeSettings')}
-                >
-                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                    <path d="M4 4L12 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                    <path d="M12 4L4 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                  </svg>
-                </button>
-
                 <div className="tw-h-full tw-overflow-hidden">
                   <Settings />
                 </div>

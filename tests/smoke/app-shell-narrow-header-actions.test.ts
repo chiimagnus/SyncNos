@@ -122,6 +122,7 @@ function setupDom() {
   Object.defineProperty(globalThis, 'document', { configurable: true, value: dom.window.document });
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: dom.window.navigator });
   Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: dom.window.HTMLElement });
+  Object.defineProperty(globalThis, 'Element', { configurable: true, value: dom.window.Element });
   Object.defineProperty(globalThis, 'Node', { configurable: true, value: dom.window.Node });
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: dom.window.localStorage });
   Object.defineProperty(globalThis, 'MutationObserver', {
@@ -148,6 +149,7 @@ function cleanupDom() {
   delete (globalThis as any).document;
   delete (globalThis as any).navigator;
   delete (globalThis as any).HTMLElement;
+  delete (globalThis as any).Element;
   delete (globalThis as any).Node;
   delete (globalThis as any).localStorage;
   delete (globalThis as any).MutationObserver;
@@ -194,4 +196,47 @@ describe('AppShell narrow list header actions', () => {
     expect(document.querySelector('[aria-label="Open Settings"]')).toBeFalsy();
     expect(document.querySelector('[data-mock-narrow-detail="true"]')).toBeTruthy();
   });
+
+  it.each(['medium', 'wide'] as const)(
+    'closes the %s settings sheet without an in-panel close button',
+    async (tier) => {
+      responsiveTierState.value = tier;
+      act(() => root!.render(createElement(AppShell)));
+
+      const opener = document.querySelector<HTMLButtonElement>('button[aria-label="Open Settings"]')!;
+      expect(opener).toBeTruthy();
+      const open = async () => {
+        opener.focus();
+        act(() => opener.click());
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        });
+        const dialog = document.querySelector<HTMLDivElement>('[role="dialog"][aria-modal="true"]')!;
+        expect(dialog).toBeTruthy();
+        expect(document.activeElement).toBe(dialog);
+        expect(opener.closest('[inert]')).toBeTruthy();
+        const dismiss = dialog.querySelector<HTMLButtonElement>('button[aria-label="Close settings"]')!;
+        expect(dismiss.parentElement).toBe(dialog);
+        expect(dismiss.querySelector('svg')).toBeNull();
+        expect(dialog.querySelectorAll('button[aria-label="Close settings"]')).toHaveLength(1);
+        return dismiss;
+      };
+
+      await open();
+      act(() =>
+        document.activeElement!.dispatchEvent(
+          new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+        ),
+      );
+      expect(document.querySelector('[aria-modal="true"]')).toBeNull();
+      expect(document.activeElement).toBe(opener);
+      expect(opener.closest('[inert]')).toBeNull();
+
+      const dismiss = await open();
+      act(() => dismiss.click());
+      expect(document.querySelector('[aria-modal="true"]')).toBeNull();
+      expect(document.activeElement).toBe(opener);
+      expect(opener.closest('[inert]')).toBeNull();
+    },
+  );
 });

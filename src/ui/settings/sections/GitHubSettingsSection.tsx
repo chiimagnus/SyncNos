@@ -2,11 +2,11 @@ import type { KeyboardEvent } from 'react';
 
 import { t } from '@i18n';
 import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
-import { SettingsFormRow } from '@ui/settings/sections/SettingsFormRow';
+import { SettingsFormRow } from './SettingsFormRow';
+import { SettingsSyncSection } from './SettingsSyncSection';
+import { SettingsGroup } from './SettingsGroup';
 import {
   buttonClassName,
-  cardClassName,
-  checkboxClassName,
   dangerButtonClassName,
   primaryButtonClassName,
   settingsControlWidthClassName,
@@ -130,25 +130,34 @@ export function GitHubSettingsSection(props: {
               : '';
 
   return (
-    <>
-      <section className={cardClassName} aria-label={t('githubSettingsTitle')}>
-        <div className="tw-flex tw-items-center tw-gap-2">
-          <span className="tw-inline-flex tw-h-6 tw-w-6 tw-shrink-0 tw-items-center tw-justify-center tw-rounded-[var(--radius-inline)] tw-bg-white tw-p-0.5">
-            <img className="tw-h-5 tw-w-5" src={githubLogoUrl} alt="" aria-hidden="true" />
-          </span>
-          <div className="tw-min-w-0 tw-flex-1">
-            <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
-              {t('githubSettingsTitle')}
-            </h2>
-            <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
-              {auth.state === 'connected'
-                ? connectedStatus
-                : auth.state === 'pending'
-                  ? t('githubStatusWaiting')
-                  : t('statusNotConnected')}
-            </div>
-          </div>
-          <SettingsDocsLink path="sync/github" />
+    <SettingsSyncSection
+      provider="github"
+      busy={busy}
+      syncEnabled={syncEnabled}
+      autoSyncEnabled={autoSyncEnabled}
+      onToggleSyncEnabled={onToggleSyncEnabled}
+      onToggleAutoSyncEnabled={onToggleAutoSyncEnabled}
+    >
+      <SettingsGroup title={t('settingsAccount')} ariaLabel={t('githubSettingsTitle')}>
+        <SettingsFormRow
+          label={
+            <span className="settings-account">
+              <span className="settings-github-logo">
+                <img src={githubLogoUrl} alt="" />
+              </span>
+              <span>
+                {t('githubSettingsTitle')}
+                <small>
+                  {auth.state === 'connected'
+                    ? connectedStatus
+                    : auth.state === 'pending'
+                      ? t('githubStatusWaiting')
+                      : t('statusNotConnected')}
+                </small>
+              </span>
+            </span>
+          }
+        >
           {auth.state === 'disconnected' ? (
             <button type="button" className={primaryButtonClassName} onClick={onConnect} disabled={busy}>
               {t('githubConnect')}
@@ -158,35 +167,7 @@ export function GitHubSettingsSection(props: {
               {t('disconnect')}
             </button>
           ) : null}
-        </div>
-
-        <div className="tw-mt-3 tw-grid tw-gap-2">
-          <SettingsFormRow label={t('githubSyncEnabledLabel')}>
-            <input
-              id="githubSyncEnabledToggle"
-              type="checkbox"
-              className={checkboxClassName}
-              checked={syncEnabled}
-              disabled={busy}
-              aria-label={t('githubSyncEnabledLabel')}
-              onChange={(event) => onToggleSyncEnabled(event.target.checked)}
-            />
-          </SettingsFormRow>
-          {syncEnabled ? (
-            <SettingsFormRow label={t('githubAutoSyncEnabledLabel')}>
-              <input
-                id="githubAutoSyncEnabledToggle"
-                type="checkbox"
-                className={checkboxClassName}
-                checked={autoSyncEnabled}
-                disabled={busy}
-                aria-label={t('githubAutoSyncEnabledLabel')}
-                onChange={(event) => onToggleAutoSyncEnabled(event.target.checked)}
-              />
-            </SettingsFormRow>
-          ) : null}
-        </div>
-
+        </SettingsFormRow>
         {auth.state === 'pending' ? (
           <div className="tw-mt-3 tw-grid tw-gap-2 tw-rounded-[var(--radius-card)] tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-p-3">
             <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
@@ -220,130 +201,127 @@ export function GitHubSettingsSection(props: {
             </div>
           </div>
         ) : null}
-      </section>
+        <div className="settings-group-link">
+          <SettingsDocsLink path="sync/github" />
+        </div>
+      </SettingsGroup>
 
       {auth.state === 'connected' ? (
         <>
-          <section className={cardClassName} aria-label={t('githubRepositoryLabel')}>
-            <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
-              {t('githubRepositoryLabel')}
-            </h2>
+          <SettingsGroup title={t('settingsDestination')} ariaLabel={t('githubRepositoryLabel')}>
+            {repositoryStatus === 'github_app_not_installed' ? (
+              <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
+                {t('githubInstallRequired')}
+              </div>
+            ) : repositoryStatus === 'github_no_accessible_repositories' ? (
+              <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
+                {t('githubNoAccessibleRepositories')}
+              </div>
+            ) : null}
 
-            <div className="tw-mt-3 tw-grid tw-gap-2">
-              {repositoryStatus === 'github_app_not_installed' ? (
-                <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
-                  {t('githubInstallRequired')}
-                </div>
-              ) : repositoryStatus === 'github_no_accessible_repositories' ? (
-                <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
-                  {t('githubNoAccessibleRepositories')}
-                </div>
-              ) : null}
-
-              <SettingsFormRow label={t('githubRepositoryLabel')}>
-                <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
-                  <SelectMenu<string>
-                    buttonId="githubRepository"
-                    className={`${settingsControlWidthClassName} tw-min-w-0`}
-                    buttonClassName={`${buttonClassName} tw-w-full`}
-                    value={repository}
-                    options={repositoryOptions}
-                    disabled={busy || repositoriesLoading || repositoryStatus !== 'ready'}
-                    ariaLabel={t('githubRepositoryLabel')}
-                    minWidth={180}
-                    maxHeight={360}
-                    onChange={onChangeRepository}
-                  />
-                  <button
-                    type="button"
-                    title={t('refresh')}
-                    onClick={onRefreshRepositories}
-                    disabled={busy || repositoriesLoading}
-                    className="webclipper-btn webclipper-btn--icon"
-                    aria-label={t('githubRefreshRepositories')}
-                    aria-busy={repositoriesLoading}
-                  >
-                    {repositoriesLoading ? '⏳' : '↻'}
-                  </button>
-                </div>
-              </SettingsFormRow>
-
-              {repositoryDiscoveryError ? (
-                <div
-                  className="tw-text-xs tw-font-semibold tw-text-[var(--error)]"
-                  role="status"
-                  data-github-repository-discovery-error="true"
-                >
-                  {t('statusError')}: {repositoryDiscoveryError}
-                </div>
-              ) : null}
-
-              {targetUnavailable ? (
-                <div className="tw-text-xs tw-font-semibold tw-text-[var(--error)]" role="status">
-                  {t('githubTargetUnavailableHint')}
-                </div>
-              ) : null}
-
-              <SettingsFormRow label={t('githubBranchLabel')}>
-                <input
-                  value={branch}
-                  onChange={(event) => onChangeBranch(event.target.value)}
-                  onBlur={onSaveBranch}
-                  onKeyDown={onSaveKeyDown}
-                  disabled={busy || !repository || targetUnavailable}
-                  spellCheck={false}
-                  placeholder="main"
-                  className={settingsTextInputClassName}
-                  aria-label={t('githubBranchLabel')}
+            <SettingsFormRow label={t('githubRepositoryLabel')}>
+              <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
+                <SelectMenu<string>
+                  buttonId="githubRepository"
+                  className={`${settingsControlWidthClassName} tw-min-w-0`}
+                  buttonClassName={`${buttonClassName} tw-w-full`}
+                  value={repository}
+                  options={repositoryOptions}
+                  disabled={busy || repositoriesLoading || repositoryStatus !== 'ready'}
+                  ariaLabel={t('githubRepositoryLabel')}
+                  minWidth={180}
+                  maxHeight={360}
+                  onChange={onChangeRepository}
                 />
-              </SettingsFormRow>
-
-              <div className="tw-flex tw-flex-wrap tw-gap-2">
                 <button
                   type="button"
-                  className={buttonClassName}
-                  onClick={onTestConnection}
-                  disabled={
-                    busy ||
-                    !repository ||
-                    targetUnavailable ||
-                    connectionTest.status === 'testing' ||
-                    connectionTest.status === 'initializing'
-                  }
+                  title={t('refresh')}
+                  onClick={onRefreshRepositories}
+                  disabled={busy || repositoriesLoading}
+                  className="webclipper-btn webclipper-btn--icon"
+                  aria-label={t('githubRefreshRepositories')}
+                  aria-busy={repositoriesLoading}
                 >
-                  {t('githubTestConnection')}
+                  {repositoriesLoading ? '⏳' : '↻'}
                 </button>
-                {connectionTest.status === 'uninitialized' || connectionTest.status === 'initializing' ? (
-                  <button
-                    type="button"
-                    className={primaryButtonClassName}
-                    onClick={onInitializeRepository}
-                    disabled={busy || connectionTest.status === 'initializing'}
-                  >
-                    {connectionTest.status === 'initializing'
-                      ? t('githubInitializingRepository')
-                      : t('githubInitializeRepository')}
-                  </button>
-                ) : null}
-                <a
-                  className={buttonClassName}
-                  href={repositoryStatus === 'github_app_not_installed' ? installUrl : appUrl || installUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {t('githubInstallOrConfigureApp')}
-                </a>
               </div>
+            </SettingsFormRow>
 
-              {testStatus ? (
-                <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]" role="status">
-                  {testStatus}
-                </div>
+            {repositoryDiscoveryError ? (
+              <div
+                className="tw-text-xs tw-font-semibold tw-text-[var(--error)]"
+                role="status"
+                data-github-repository-discovery-error="true"
+              >
+                {t('statusError')}: {repositoryDiscoveryError}
+              </div>
+            ) : null}
+
+            {targetUnavailable ? (
+              <div className="tw-text-xs tw-font-semibold tw-text-[var(--error)]" role="status">
+                {t('githubTargetUnavailableHint')}
+              </div>
+            ) : null}
+
+            <SettingsFormRow label={t('githubBranchLabel')}>
+              <input
+                value={branch}
+                onChange={(event) => onChangeBranch(event.target.value)}
+                onBlur={onSaveBranch}
+                onKeyDown={onSaveKeyDown}
+                disabled={busy || !repository || targetUnavailable}
+                spellCheck={false}
+                placeholder="main"
+                className={settingsTextInputClassName}
+                aria-label={t('githubBranchLabel')}
+              />
+            </SettingsFormRow>
+
+            <div className="settings-group-actions tw-flex tw-flex-wrap tw-gap-2">
+              <button
+                type="button"
+                className={buttonClassName}
+                onClick={onTestConnection}
+                disabled={
+                  busy ||
+                  !repository ||
+                  targetUnavailable ||
+                  connectionTest.status === 'testing' ||
+                  connectionTest.status === 'initializing'
+                }
+              >
+                {t('githubTestConnection')}
+              </button>
+              {connectionTest.status === 'uninitialized' || connectionTest.status === 'initializing' ? (
+                <button
+                  type="button"
+                  className={primaryButtonClassName}
+                  onClick={onInitializeRepository}
+                  disabled={busy || connectionTest.status === 'initializing'}
+                >
+                  {connectionTest.status === 'initializing'
+                    ? t('githubInitializingRepository')
+                    : t('githubInitializeRepository')}
+                </button>
               ) : null}
+              <a
+                className={buttonClassName}
+                href={repositoryStatus === 'github_app_not_installed' ? installUrl : appUrl || installUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {t('githubInstallOrConfigureApp')}
+              </a>
             </div>
-          </section>
+
+            {testStatus ? (
+              <div className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]" role="status">
+                {testStatus}
+              </div>
+            ) : null}
+          </SettingsGroup>
         </>
       ) : null}
-    </>
+    </SettingsSyncSection>
   );
 }

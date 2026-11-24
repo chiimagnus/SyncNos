@@ -1,3 +1,6 @@
+import { useEffect, useRef } from 'react';
+import { ChevronLeft, X } from 'lucide-react';
+import './settings.css';
 import { getURL } from '@services/shared/runtime';
 
 import { t } from '@i18n';
@@ -6,8 +9,7 @@ import { headerButtonClassName } from '@ui/shared/button-styles';
 
 import { useSettingsSceneController } from '@viewmodels/settings/useSettingsSceneController';
 import { useKeyboardShortcutsController } from '@viewmodels/settings/useKeyboardShortcutsController';
-import { SettingsSidebarNav } from '@ui/settings/SettingsSidebarNav';
-import { SettingsTopTabsNav } from '@ui/settings/SettingsTopTabsNav';
+import { SettingsSidebarNav, settingsSectionLabel } from '@ui/settings/SettingsSidebarNav';
 import { type SettingsSectionKey } from '@viewmodels/settings/types';
 import { AboutSection } from '@ui/settings/sections/AboutSection';
 import { BackupSection } from '@ui/settings/sections/BackupSection';
@@ -23,17 +25,46 @@ import { GitHubSettingsSection } from '@ui/settings/sections/GitHubSettingsSecti
 export type SettingsSceneProps = {
   activeSection: SettingsSectionKey;
   focusKey?: string;
+  hasExplicitSection: boolean;
+  onBackToList: () => void;
   onSelectSection: (key: SettingsSectionKey) => void;
   onClose?: () => void;
 };
 
 export function SettingsScene(props: SettingsSceneProps) {
-  const { activeSection, focusKey = '', onSelectSection, onClose } = props;
+  const { activeSection, focusKey = '', hasExplicitSection, onSelectSection, onBackToList, onClose } = props;
 
   const isNarrow = useIsNarrowScreen();
+  const showList = isNarrow && !hasExplicitSection;
+  const detailScrollRef = useRef<HTMLDivElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const navigationFocus = useRef<SettingsSectionKey | 'detail' | null>(null);
+
+  useEffect(() => {
+    if (detailScrollRef.current && focusKey !== 'import') detailScrollRef.current.scrollTop = 0;
+  }, [activeSection, focusKey]);
+
+  useEffect(() => {
+    const target = navigationFocus.current;
+    if (!target || !isNarrow) return;
+    navigationFocus.current = null;
+    if (showList && target !== 'detail') {
+      const selected = document.querySelector<HTMLButtonElement>('[data-settings-section="' + target + '"]');
+      selected?.focus({ preventScroll: true });
+      selected?.scrollIntoView?.({ block: 'nearest' });
+    } else if (!showList && target === 'detail') {
+      titleRef.current?.focus({ preventScroll: true });
+    }
+  }, [activeSection, isNarrow, showList]);
 
   const setActiveSection = (key: SettingsSectionKey) => {
+    navigationFocus.current = isNarrow ? 'detail' : null;
     onSelectSection(key);
+  };
+
+  const backToList = () => {
+    navigationFocus.current = activeSection;
+    onBackToList();
   };
 
   const {
@@ -211,10 +242,8 @@ export function SettingsScene(props: SettingsSceneProps) {
   } = useSettingsSceneController({ activeSection, focusKey });
   const keyboardShortcuts = useKeyboardShortcutsController({ active: activeSection === 'shortcuts' });
 
-  const detailMaxWidthClassName = activeSection === 'aboutyou' ? 'tw-max-w-[1120px]' : 'tw-max-w-[980px]';
-
   const renderDetailContent = () => (
-    <section className={`route-scroll tw-mx-auto tw-grid tw-w-full ${detailMaxWidthClassName} tw-gap-4 tw-pr-1`}>
+    <section className="settings-detail-content">
       {error ? (
         <section
           className={[
@@ -228,10 +257,7 @@ export function SettingsScene(props: SettingsSceneProps) {
               <div className="tw-text-sm tw-font-black tw-text-[var(--error)]">{error}</div>
             </div>
             <button type="button" className={headerButtonClassName()} onClick={clearError} aria-label="dismiss error">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path d="M4 4L12 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                <path d="M12 4L4 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-              </svg>
+              <X size={16} strokeWidth={1.6} aria-hidden="true" />
             </button>
           </div>
         </section>
@@ -555,44 +581,46 @@ export function SettingsScene(props: SettingsSceneProps) {
     </section>
   );
 
-  if (isNarrow) {
-    return (
-      <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-flex-col tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]">
-        <div className="tw-border-b tw-border-[var(--border)] tw-bg-[var(--bg-card)]">
-          <SettingsTopTabsNav
-            activeSection={activeSection}
-            onSelectSection={setActiveSection}
-            rightSlot={
-              onClose ? (
+  return (
+    <div
+      className="settings-scene tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]"
+      data-narrow={isNarrow}
+    >
+      {!isNarrow || showList ? (
+        <SettingsSidebarNav
+          activeSection={activeSection}
+          onSelectSection={setActiveSection}
+          narrow={isNarrow}
+          onClose={onClose}
+        />
+      ) : null}
+      {!isNarrow || !showList ? (
+        <section className="settings-detail" aria-label={settingsSectionLabel(activeSection)}>
+          {isNarrow ? (
+            <header className="settings-detail-header">
+              <button type="button" className="settings-info" aria-label={t('settingsBack')} onClick={backToList}>
+                <ChevronLeft size={21} aria-hidden="true" />
+              </button>
+              <h1 ref={titleRef} tabIndex={-1}>
+                {settingsSectionLabel(activeSection)}
+              </h1>
+              {onClose ? (
                 <button
                   type="button"
-                  onClick={onClose}
                   className={headerButtonClassName()}
                   aria-label={t('closeSettings')}
+                  onClick={onClose}
                 >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                    <path d="M4 4L12 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                    <path d="M12 4L4 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                  </svg>
+                  <X size={16} aria-hidden="true" />
                 </button>
-              ) : null
-            }
-          />
-        </div>
-
-        <div className="route-scroll tw-min-h-0 tw-flex-1 tw-overflow-auto tw-overflow-x-hidden tw-bg-[var(--bg-primary)] tw-p-3">
-          {renderDetailContent()}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="tw-flex tw-h-full tw-min-h-0 tw-w-full tw-min-w-0 tw-bg-[var(--bg-primary)] tw-text-[var(--text-primary)]">
-      <SettingsSidebarNav activeSection={activeSection} onSelectSection={setActiveSection} />
-      <div className="tw-min-w-0 tw-flex-1 tw-overflow-y-auto tw-overflow-x-hidden tw-bg-[var(--bg-primary)] tw-p-4">
-        {renderDetailContent()}
-      </div>
+              ) : null}
+            </header>
+          ) : null}
+          <div ref={detailScrollRef} className="settings-detail-scroll route-scroll">
+            {renderDetailContent()}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

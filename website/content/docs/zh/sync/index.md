@@ -14,6 +14,9 @@ description: 把本地内容同步到 Notion、Obsidian、飞书或 GitHub。
 | [飞书](/docs/sync/feishu/) | 飞书云文档 |
 | [GitHub](/docs/sync/github/) | Markdown 仓库 |
 
+在设置中选择目标，开启顶部的同步开关，即可配置连接和自动同步。
+关闭后会隐藏相关设置，保留连接和配置，且不会删除已同步内容。
+
 每个目标都支持手动同步，并可单独开启自动同步。本地内容始终保留在 SyncNos。
 
 如果在目标平台手动修改过笔记，同步前请注意保存这些修改。
