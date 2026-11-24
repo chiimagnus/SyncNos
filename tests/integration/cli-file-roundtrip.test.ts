@@ -1,4 +1,5 @@
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -82,8 +83,11 @@ beforeEach(() => {
 });
 
 describe('CLI file transfer host/extension roundtrip', () => {
-  it('round-trips extension export bytes to a host file using the canonical frame contract', async () => {
-    const dir = await mkdtemp('/tmp/syncnos-roundtrip-');
+  it('round-trips extension export bytes to a host file using the canonical frame contract', async ({
+    onTestFinished,
+  }) => {
+    const dir = await mkdtemp(join(tmpdir(), 'syncnos-roundtrip-'));
+    onTestFinished(() => rm(dir, { recursive: true, force: true }));
     const outputPath = join(dir, 'selected.zip');
     const payload = Buffer.alloc(contract.fileTransfer.chunkBytes * 4 + 17, 0x45);
     fileMocks.prepareMarkdownExport.mockResolvedValue({
@@ -116,8 +120,11 @@ describe('CLI file transfer host/extension roundtrip', () => {
     }
   });
 
-  it('round-trips a host backup file into the extension importer without host-side ZIP interpretation', async () => {
-    const dir = await mkdtemp('/tmp/syncnos-roundtrip-');
+  it('round-trips a host backup file into the extension importer without host-side ZIP interpretation', async ({
+    onTestFinished,
+  }) => {
+    const dir = await mkdtemp(join(tmpdir(), 'syncnos-roundtrip-'));
+    onTestFinished(() => rm(dir, { recursive: true, force: true }));
     const inputPath = join(dir, 'restore.zip');
     const payload = Buffer.alloc(contract.fileTransfer.chunkBytes * 4 + 23, 0x5a);
     await writeFile(inputPath, payload);

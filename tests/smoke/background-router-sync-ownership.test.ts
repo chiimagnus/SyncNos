@@ -13,7 +13,7 @@ import { createSyncAlreadyRunningError, createSyncRunOwnership } from '@services
 
 const mocks = vi.hoisted(() => ({
   ensureSyncProviderEnabled: vi.fn(),
-  getNotionOAuthToken: vi.fn(),
+  getNotionConnectionToken: vi.fn(),
   getFeishuOAuthToken: vi.fn(),
   startFeishuOAuthAttempt: vi.fn(),
   getFeishuOAuthAttemptSummary: vi.fn(),
@@ -29,7 +29,7 @@ vi.mock('@services/sync/sync-provider-gate', () => ({
   ensureSyncProviderEnabled: mocks.ensureSyncProviderEnabled,
 }));
 vi.mock('@services/sync/notion/auth/token-store', () => ({
-  getNotionOAuthToken: mocks.getNotionOAuthToken,
+  getNotionConnectionToken: mocks.getNotionConnectionToken,
 }));
 vi.mock('@services/sync/feishu/auth/token-store', () => ({
   getFeishuOAuthToken: mocks.getFeishuOAuthToken,
@@ -146,7 +146,7 @@ function deferred<T>() {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.ensureSyncProviderEnabled.mockResolvedValue(null);
-  mocks.getNotionOAuthToken.mockResolvedValue({ accessToken: 'notion-token' });
+  mocks.getNotionConnectionToken.mockResolvedValue({ accessToken: 'notion-token' });
   mocks.getFeishuOAuthToken.mockResolvedValue({ accessToken: 'feishu-token' });
   mocks.startFeishuOAuthAttempt.mockResolvedValue({ state: 'feishu-state' });
   mocks.getFeishuOAuthAttemptSummary.mockResolvedValue({ pending: false, errorPresent: false });
@@ -177,7 +177,7 @@ describe('background sync ownership admission', () => {
       expect(response).toMatchObject({ ok: false, error: { extra: { code: 'sync_already_running' } } });
       expect(harness.sync[provider]).toHaveBeenCalledTimes(1);
       if (provider === 'notion') {
-        expect(mocks.getNotionOAuthToken).toHaveBeenCalledTimes(1);
+        expect(mocks.getNotionConnectionToken).toHaveBeenCalledTimes(1);
         expect(mocks.storageGet).toHaveBeenCalledTimes(1);
       }
       if (provider === 'obsidian') expect(harness.obsidianPreflight).toHaveBeenCalledTimes(1);
@@ -278,7 +278,7 @@ describe('background sync ownership admission', () => {
       expect(response).toMatchObject({ ok: false, error: { extra: { code: 'sync_already_running' } } });
       expect(harness.sync[provider]).toHaveBeenCalledTimes(1);
       if (provider === 'notion') {
-        expect(mocks.getNotionOAuthToken).toHaveBeenCalledTimes(1);
+        expect(mocks.getNotionConnectionToken).toHaveBeenCalledTimes(1);
         expect(mocks.storageGet).toHaveBeenCalledTimes(1);
       }
       if (provider === 'obsidian') expect(harness.obsidianPreflight).toHaveBeenCalledTimes(1);

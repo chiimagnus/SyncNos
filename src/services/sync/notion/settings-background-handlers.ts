@@ -1,16 +1,23 @@
 import { NOTION_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+import { getURL } from '@platform/runtime/runtime';
 import {
   clearNotionOAuthAttemptAndToken,
+  connectNotionInternalToken,
   getNotionOAuthAttemptSummary,
+  NOTION_INTERNAL_AUTH_ERRORS,
   startNotionOAuthAttempt,
 } from '@services/sync/notion/auth/oauth';
-import { getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
+import { getNotionConnectionToken } from '@services/sync/notion/auth/token-store';
+import { resolveNotionDatabaseId } from '@services/sync/notion/notion-db-manager';
+import { normalizeNotionId } from '@services/shared/notion-id';
+import { normalizeNotionIdInput } from '@services/sync/notion/notion-id-utils';
 import { listNotionParentPages, resolveNotionParentPage } from '@services/sync/notion/notion-parent-pages.ts';
 import {
   clearAllNotionSettings,
   getNotionParentPage,
   getNotionSettingsConfig,
   NOTION_DATABASE_KIND_IDS,
+  type NotionDatabaseKindId,
   resetNotionDatabaseId,
   setNotionDatabaseId,
   setNotionParentPage,
@@ -19,7 +26,7 @@ import {
 type AnyRouter = {
   ok: (data: unknown) => any;
   err: (message: string, extra?: unknown) => any;
-  register: (type: string, handler: (msg: any) => Promise<any> | any) => void;
+  register: (type: string, handler: (msg: any, sender?: any) => Promise<any> | any) => void;
 };
 
 type Deps = {
@@ -33,15 +40,35 @@ function handlerError(router: AnyRouter, error: unknown, fallback: string) {
   return code ? router.err(message, { code }) : router.err(message);
 }
 
+async function readAuthStatus() {
+  const [token, attempt] = await Promise.all([getNotionConnectionToken(), getNotionOAuthAttemptSummary()]);
+  return {
+    connected: !!token?.accessToken,
+    workspaceName: String(token?.workspaceName || ''),
+    ...(token?.connectionMethod === 'internal' ? { connectionMethod: 'internal' as const } : {}),
+    pending: attempt.pending,
+    errorPresent: attempt.errorPresent,
+  };
+}
+
 export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
-  router.register(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, async () => {
-    const [token, attempt] = await Promise.all([getNotionOAuthToken(), getNotionOAuthAttemptSummary()]);
-    return router.ok({
-      connected: !!(token && token.accessToken),
-      workspaceName: token?.workspaceName ? String(token.workspaceName) : '',
-      pending: attempt.pending,
-      errorPresent: attempt.errorPresent,
-    });
+  router.register(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, async () => router.ok(await readAuthStatus()));
+
+  router.register(NOTION_MESSAGE_TYPES.CONNECT_INTERNAL, async (msg, sender) => {
+    const base = getURL('');
+    if (!base || !String(sender?.url || '').startsWith(base)) {
+      return router.err('Notion connection must be configured in SyncNos settings.', { code: 'INVALID_ARGUMENT' });
+    }
+    try {
+      return await deps.runExclusiveConfigMutation(async () => {
+        await connectNotionInternalToken(msg?.token);
+        return router.ok(await readAuthStatus());
+      });
+    } catch (error) {
+      const code = Object.values(NOTION_INTERNAL_AUTH_ERRORS).find((value) => value === (error as any)?.code);
+      // Credential validation failures must never return a raw request or response body.
+      return router.err(code || 'notion_internal_connect_failed', { code: code || 'notion_internal_connect_failed' });
+    }
   });
 
   router.register(NOTION_MESSAGE_TYPES.START_AUTH, async () => {
@@ -65,29 +92,44 @@ export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
       return await deps.runExclusiveConfigMutation(async () => {
         const hasParentId = Object.prototype.hasOwnProperty.call(msg || {}, 'parentPageId');
         const hasParentTitle = Object.prototype.hasOwnProperty.call(msg || {}, 'parentPageTitle');
-        if (hasParentId || hasParentTitle) {
-          const current = await getNotionSettingsConfig();
-          const input = hasParentId ? String(msg?.parentPageId ?? '').trim() : current.parentPageId;
-          if (hasParentId && input) {
-            const token = await getNotionOAuthToken();
-            if (!token?.accessToken) return router.err('notion not connected');
-            const page = await resolveNotionParentPage(token.accessToken, input);
-            await setNotionParentPage(page);
-          } else {
-            await setNotionParentPage({
-              id: input,
-              title: hasParentTitle ? msg?.parentPageTitle : current.parentPageTitle,
-            });
-          }
+        const current = await getNotionSettingsConfig();
+        const token = await getNotionConnectionToken();
+        const parentInput = hasParentId ? String(msg?.parentPageId ?? '').trim() : current.parentPageId;
+        let parent = {
+          id: parentInput,
+          title: hasParentTitle ? String(msg?.parentPageTitle ?? '').trim() : current.parentPageTitle,
+        };
+        if (hasParentId && parentInput) {
+          if (!token?.accessToken) return router.err('notion not connected');
+          parent = await resolveNotionParentPage(token.accessToken, parentInput);
         }
 
+        // Validate every new destination before writing any of the settings.
+        const updates: [NotionDatabaseKindId, string][] = [];
         const databaseIds = msg?.databaseIds && typeof msg.databaseIds === 'object' ? msg.databaseIds : null;
         if (databaseIds) {
           for (const kindId of NOTION_DATABASE_KIND_IDS) {
             if (!Object.prototype.hasOwnProperty.call(databaseIds, kindId)) continue;
-            await setNotionDatabaseId(kindId, databaseIds[kindId]);
+            const raw = String(databaseIds[kindId] ?? '').trim();
+            if (!raw) {
+              updates.push([kindId, '']);
+              continue;
+            }
+            const id = normalizeNotionIdInput(raw);
+            if (!id) return router.err('Enter a database link or ID.', { code: 'invalid_notion_database_id' });
+            const unchanged =
+              id === normalizeNotionId(current.databaseIds[kindId]) &&
+              parent.id &&
+              normalizeNotionId(parent.id) === normalizeNotionId(current.parentPageId);
+            if (!unchanged) {
+              if (!token?.accessToken) return router.err('notion not connected');
+              await resolveNotionDatabaseId(token.accessToken, id, parent.id);
+            }
+            updates.push([kindId, id]);
           }
         }
+        if (hasParentId || hasParentTitle) await setNotionParentPage(parent);
+        for (const [kindId, id] of updates) await setNotionDatabaseId(kindId, id);
         return router.ok(await getNotionSettingsConfig());
       });
     } catch (error) {
@@ -107,7 +149,7 @@ export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
   });
 
   router.register(NOTION_MESSAGE_TYPES.LIST_PARENT_PAGES, async () => {
-    const token = await getNotionOAuthToken();
+    const token = await getNotionConnectionToken();
     const accessToken = token?.accessToken ? String(token.accessToken) : '';
     if (!accessToken) return router.err('notion not connected');
 

@@ -22,7 +22,6 @@ import {
   NOTION_MESSAGE_TYPES,
   OBSIDIAN_MESSAGE_TYPES,
 } from '@services/protocols/message-contracts';
-import { conversationKinds } from '@services/protocols/conversation-kinds';
 import { MARKDOWN_READING_PROFILE_STORAGE_KEY } from '@services/protocols/markdown-reading-profile-storage';
 import { AI_CHAT_INCLUDE_THINKING_STORAGE_KEY } from '@services/shared/thinking-block';
 import { send } from '@services/shared/runtime';
@@ -31,7 +30,11 @@ import { downloadBlobFile, openOrFocusExtensionAppTab } from '@services/shared/w
 import type { Conversation } from '@services/conversations/domain/models';
 import { setSyncProviderEnabled, syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
 import { GITHUB_AUTH_STATE_KEY } from '@services/sync/github/auth/auth-store';
-import { NOTION_OAUTH_NETWORK_ERROR, NOTION_OAUTH_SERVICE_ERROR } from '@services/sync/notion/auth/oauth';
+import {
+  NOTION_INTERNAL_AUTH_ERRORS,
+  NOTION_OAUTH_NETWORK_ERROR,
+  NOTION_OAUTH_SERVICE_ERROR,
+} from '@services/sync/notion/auth/oauth';
 import { autoSyncEnabledStorageKey, setAutoSyncEnabled } from '@services/sync/auto-sync/auto-sync-settings';
 import {
   ANTI_HOTLINK_RULES_SETTINGS_STORAGE_KEY,
@@ -86,12 +89,6 @@ const NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY = autoSyncEnabledStorageKey('notion')
 const OBSIDIAN_AUTO_SYNC_ENABLED_STORAGE_KEY = autoSyncEnabledStorageKey('obsidian');
 const FEISHU_AUTO_SYNC_ENABLED_STORAGE_KEY = autoSyncEnabledStorageKey('feishu');
 const GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY = autoSyncEnabledStorageKey('github');
-function getKindDbTitle(kindId: string) {
-  const title = String(conversationKinds.getNotionDbSpecByKindId(kindId)?.title || '').trim();
-  if (!title) throw new Error(`missing Notion database spec for kind: ${kindId}`);
-  return title;
-}
-
 function isFirefoxFamilyBrowser() {
   try {
     const ua = String(globalThis.navigator?.userAgent || '').toLowerCase();
@@ -246,6 +243,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   // Notion
   const [notionConnected, setNotionConnected] = useState<boolean | null>(null);
   const [notionWorkspaceName, setNotionWorkspaceName] = useState<string>('');
+  const [notionInternalConnection, setNotionInternalConnection] = useState(false);
   const [notionPendingState, setNotionPendingState] = useState<string>('');
   const [notionLastError, setNotionLastError] = useState<string>('');
   const [notionParentPageId, setNotionParentPageId] = useState<string>('');
@@ -343,9 +341,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [includeSensitiveBackupData, setIncludeSensitiveBackupData] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const backupImportRef = useRef<HTMLDivElement | null>(null);
-  const chatDbTitle = useMemo(() => getKindDbTitle('chat'), []);
-  const articleDbTitle = useMemo(() => getKindDbTitle('article'), []);
-  const videoDbTitle = useMemo(() => getKindDbTitle('video'), []);
   const [notionAdvancedOpen, setNotionAdvancedOpen] = useState(false);
   const [notionChatDatabaseId, setNotionChatDatabaseId] = useState<string>('');
   const [notionArticleDatabaseId, setNotionArticleDatabaseId] = useState<string>('');
@@ -456,6 +451,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       notionConnectedRef.current = connected;
       setNotionConnected(connected);
       setNotionWorkspaceName(String(raw?.workspaceName || ''));
+      setNotionInternalConnection(connected && raw?.connectionMethod === 'internal');
       if (connected) {
         notionStartGenerationRef.current += 1;
         setNotionPollingState(false);
@@ -1122,6 +1118,38 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setNotionPollingState,
   ]);
 
+  const onConnectNotionInternal = useCallback(
+    async (token: string) =>
+      runTask(async () => {
+        let response: ApiResponse<unknown>;
+        try {
+          response = await send<ApiResponse<unknown>>(NOTION_MESSAGE_TYPES.CONNECT_INTERNAL, { token });
+        } catch {
+          throw new Error(t('notionInternalConnectFailed'));
+        }
+        if (!response?.ok) {
+          const code = response?.error?.message;
+          const messages: Record<string, string> = {
+            [NOTION_INTERNAL_AUTH_ERRORS.alreadyConnected]: t('notionAlreadyConnected'),
+            [NOTION_INTERNAL_AUTH_ERRORS.invalidToken]: t('notionInternalTokenInvalid'),
+            [NOTION_INTERNAL_AUTH_ERRORS.wrongTokenType]: t('notionInternalTokenRequired'),
+            [NOTION_INTERNAL_AUTH_ERRORS.network]: t('notionApiUnreachable'),
+            [NOTION_INTERNAL_AUTH_ERRORS.permission]: t('notionInternalTokenPermission'),
+            [NOTION_INTERNAL_AUTH_ERRORS.rateLimited]: t('notionApiRateLimited'),
+            [NOTION_INTERNAL_AUTH_ERRORS.service]: t('notionApiUnavailable'),
+          };
+          throw new Error(messages[String(code)] || t('notionInternalConnectFailed'));
+        }
+        const status = await readNotionAuthStatus();
+        if (!status?.connected || status.connectionMethod !== 'internal') {
+          throw new Error(t('notionInternalConnectFailed'));
+        }
+        applyNotionPendingStorageObservation('');
+        applyNotionErrorStorageObservation('');
+      }),
+    [runTask, readNotionAuthStatus, applyNotionPendingStorageObservation, applyNotionErrorStorageObservation],
+  );
+
   const onToggleNotionSyncEnabled = useCallback(
     async (enabled: boolean) => {
       await runTask(
@@ -1578,12 +1606,16 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
       await runTask(
         async () => {
-          const config = unwrap(
-            await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.SAVE_CONFIG, {
-              databaseIds: { [kind]: String(raw || '') },
-            }),
-          );
-          applyNotionConfig(config);
+          const response = await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.SAVE_CONFIG, {
+            databaseIds: { [kind]: String(raw || '') },
+          });
+          const extra = response?.error?.extra;
+          const code = extra && typeof extra === 'object' && 'code' in extra ? extra.code : '';
+          if (code === 'invalid_notion_database_id') throw new Error(t('notionDatabaseInvalid'));
+          if (code === 'notion_database_unavailable') throw new Error(t('notionDatabaseUnavailable'));
+          if (code === 'notion_database_wrong_parent') throw new Error(t('notionDatabaseWrongParent'));
+          if (code === 'notion_parent_page_required') throw new Error(t('notionDatabaseChooseDestination'));
+          applyNotionConfig(unwrap(response));
         },
         { fallbackMessage: 'save notion database id failed' },
       );
@@ -2183,12 +2215,13 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     if (notionConnected == null) return t('statusUnknown');
     if (notionConnected) {
       const workspace = String(notionWorkspaceName || '').trim();
-      return workspace ? `${t('statusConnected')} ✅ (${workspace})` : `${t('statusConnected')} ✅`;
+      const status = notionInternalConnection ? t('notionInternalConnected') : `${t('statusConnected')} ✅`;
+      return workspace ? `${status} (${workspace})` : status;
     }
     if (notionLastError) return t('statusError');
     if (notionPendingState) return t('statusWaiting');
     return t('statusNotConnected');
-  }, [notionConnected, notionLastError, notionPendingState, notionWorkspaceName]);
+  }, [notionConnected, notionInternalConnection, notionLastError, notionPendingState, notionWorkspaceName]);
   const notionAuthErrorText = !notionConnected
     ? notionLastError === NOTION_OAUTH_NETWORK_ERROR
       ? t('notionOAuthNetworkUnavailable')
@@ -2239,9 +2272,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setNotionArticleDatabaseId,
     notionVideoDatabaseId,
     setNotionVideoDatabaseId,
-    notionChatDatabaseLabel: chatDbTitle,
-    notionArticleDatabaseLabel: articleDbTitle,
-    notionVideoDatabaseLabel: videoDbTitle,
     onSaveNotionDatabaseId,
     onResetNotionDatabaseId,
     notionParentPageId,
@@ -2250,6 +2280,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     notionStatusText,
     notionAuthErrorText,
     onNotionConnectOrDisconnect,
+    onConnectNotionInternal,
     onSaveNotionParentPage,
     onLoadNotionPages,
 

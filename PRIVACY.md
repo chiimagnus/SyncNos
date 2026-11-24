@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last Updated: 2026-10-25**
+**Last Updated: 2026-11-25**
 
 This policy covers SyncNos WebClipper on supported Chromium, Firefox-family, and Safari builds.
 
@@ -33,10 +33,11 @@ Backup ZIP is a separate recovery package. By default it may contain captured co
 sync mappings, cached images, article comments, and non-sensitive settings, while authentication
 secrets are excluded. In **Settings → Backup**, the optional
 **Include private data (for migration)** checkbox creates a Full Backup that also contains
-portable long-lived credentials such as Notion/Feishu OAuth tokens, a user-configured Feishu
-client secret, the Obsidian API key, connected GitHub auth tokens, and the Reader TTS AI API
-key. This option is off by default and is not persisted. SyncNos does not add encryption to
-the Backup ZIP, so a Full Backup must be protected like a password file. Transient OAuth/Device
+portable long-lived credentials such as Notion OAuth or internal integration tokens, Feishu OAuth
+tokens, a user-configured Feishu client secret, the Obsidian API key, connected GitHub auth tokens,
+and the Reader TTS AI API key. This option is off by default and is not persisted.
+SyncNos does not add encryption to the Backup ZIP, so a Full Backup must be protected like a
+password file. Transient OAuth/Device
 Flow state and machine/profile-specific CLI identity or opt-in state are always excluded.
 
 See [storage, backup, and recovery](docs/storage.md) for the recovery contract.
@@ -86,8 +87,15 @@ in captured messages, browser local storage, or Backup ZIP files.
 Notion sync sends selected local content to the Notion API over HTTPS. When needed, referenced
 images may also be fetched and uploaded to Notion.
 
-Notion OAuth uses a token-exchange proxy so the official client secret is not embedded in the
-Extension. The proxy receives OAuth exchange data, not captured conversation/article/video content.
+Notion supports two connection methods:
+
+- OAuth uses a token-exchange proxy so the official client secret is not embedded in the
+  Extension. The proxy receives OAuth exchange data, not captured conversation/article/video content.
+- Manual connection uses a user-provided internal integration token directly with the official
+  Notion API. It does not use the token-exchange proxy.
+
+Both methods store credentials locally. Disconnect removes the local connection and destination
+settings without deleting synced Notion content; revoking access is a separate action in Notion.
 
 ### Feishu (Lark)
 

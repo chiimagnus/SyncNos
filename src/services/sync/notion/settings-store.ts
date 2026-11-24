@@ -1,6 +1,6 @@
 import { conversationKinds } from '@services/protocols/conversation-kinds';
 import { normalizeNotionId } from '@services/shared/notion-id';
-import { normalizeNotionDatabaseIdInput } from '@services/sync/notion/notion-id-utils';
+import { normalizeNotionIdInput } from '@services/sync/notion/notion-id-utils';
 import { storageGet, storageRemove, storageSet } from '@platform/storage/local';
 
 export const NOTION_PARENT_PAGE_ID_STORAGE_KEY = 'notion_parent_page_id';
@@ -111,7 +111,7 @@ export async function setNotionDatabaseId(kindIdInput: unknown, input: unknown):
     await storageRemove([spec.storageKey]);
     return '';
   }
-  const databaseId = normalizeNotionDatabaseIdInput(raw);
+  const databaseId = normalizeNotionIdInput(raw);
   if (!databaseId) throw notionSettingsError('invalid_notion_database_id', 'invalid Notion database id');
   await storageSet({ [spec.storageKey]: databaseId });
   return databaseId;
@@ -119,7 +119,7 @@ export async function setNotionDatabaseId(kindIdInput: unknown, input: unknown):
 
 export async function cacheNotionManagedDatabaseId(kindIdInput: unknown, input: unknown): Promise<string> {
   const spec = getDatabaseSpec(kindIdInput);
-  const databaseId = normalizeNotionDatabaseIdInput(safeString(input));
+  const databaseId = normalizeNotionIdInput(safeString(input));
   if (!databaseId) throw notionSettingsError('invalid_notion_database_id', 'invalid Notion database id');
   await storageSet({ [spec.storageKey]: databaseId });
   return databaseId;

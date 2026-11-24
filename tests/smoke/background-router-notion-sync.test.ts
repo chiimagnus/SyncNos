@@ -6,6 +6,7 @@ import { createNotionSyncOrchestrator } from '@services/sync/notion/notion-sync-
 import { conversationKinds } from '@services/protocols/conversation-kinds.ts';
 import { SYNC_JOB_STORAGE_KEYS } from '@services/sync/sync-job-store';
 import { notionFetch } from '@services/sync/notion/notion-api.ts';
+import { getNotionConnectionToken } from '@services/sync/notion/auth/token-store';
 import { messagesToBlocks as renderNotionMessageBlocks } from '@services/sync/notion/notion-sync-service.ts';
 
 function mockChromeStorage({ parentPageId = 'parent_page' } = {}) {
@@ -241,80 +242,174 @@ describe('background-router notion sync', () => {
     });
   });
 
-  it('allows an authorized direct page link when search is empty, preserving the old destination on failure', async () => {
-    const id = '346be9d6386a81748c6af9b7db455770';
-    const dashed = '346be9d6-386a-8174-8c6a-f9b7db455770';
-    const chromeMock = mockChromeStorage({ parentPageId: '' });
-    const jobStore = createInMemoryJobStore();
-    const ensureDatabase = vi.fn(async () => ({ databaseId: 'db1' }));
-    const createPageInDatabase = vi.fn(async () => ({ id: 'synced-page' }));
+  it.each(['oauth', 'internal'])(
+    'uses %s credentials for authorized direct links, configuration and sync',
+    async (method) => {
+      const id = '346be9d6386a81748c6af9b7db455770';
+      const dashed = '346be9d6-386a-8174-8c6a-f9b7db455770';
+      const chromeMock = mockChromeStorage({ parentPageId: '' });
+      const accessToken = method === 'internal' ? 'internal-fixture-token' : 't';
+      const extensionUrl = 'chrome-extension://fixture-extension/';
+      Object.assign(chromeMock.runtime, { getURL: (path: string) => extensionUrl + path });
+      if (method === 'internal') delete chromeMock.__store.notion_oauth_token_v1;
+      const jobStore = createInMemoryJobStore();
+      const ensureDatabase = vi.fn(async () => ({ databaseId: 'db1' }));
+      const createPageInDatabase = vi.fn(async () => ({ id: 'synced-page' }));
+      const router = createRouter({
+        chromeMock,
+        notionServices: {
+          tokenStore: { getToken: getNotionConnectionToken },
+          storage: {
+            getSyncMappingByConversation: async () => ({
+              conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
+              mapping: null,
+            }),
+            getMessagesByConversationId: async () => [
+              { messageKey: 'm1', role: 'user', contentMarkdown: 'hi', sequence: 1 },
+            ],
+            setConversationNotionPageId: async () => true,
+            setSyncCursor: async () => true,
+            patchSyncMapping: async () => true,
+          },
+          dbManager: { ensureDatabase },
+          syncService: {
+            createPageInDatabase,
+            appendChildren: async (_t: string, _pageId: string, blocks: any[]) => notionAppendResult(blocks),
+            messagesToBlocks: () => [],
+          },
+          jobStore,
+        },
+      });
+      let shared = false;
+      const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+        expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer ' + accessToken);
+        if (url === 'https://api.notion.com/v1/users/me') {
+          return notionHttpResponse({
+            object: 'user',
+            id: 'bot-id',
+            type: 'bot',
+            bot: { owner: { type: 'workspace' }, workspace_name: 'Fixture' },
+          });
+        }
+        if (init?.method === 'POST') return notionHttpResponse({ results: [], has_more: false });
+        expect(url).toBe('https://api.notion.com/v1/pages/' + id);
+        return shared
+          ? notionHttpResponse({
+              object: 'page',
+              id: dashed,
+              properties: { title: { type: 'title', title: [{ plain_text: 'Authorized' }] } },
+            })
+          : notionHttpResponse({ code: 'object_not_found' }, 404);
+      });
+      (globalThis as any).fetch = fetchMock;
+      if (method === 'internal') {
+        const connect = { type: 'notionConnectInternal', token: accessToken };
+        expect(await router.dispatch(connect, { url: 'https://example.com/' })).toMatchObject({ ok: false });
+        expect(fetchMock).not.toHaveBeenCalled();
+        const result = await router.dispatch(connect, { url: extensionUrl + 'app.html' });
+        expect(result).toMatchObject({
+          ok: true,
+          data: { connected: true, connectionMethod: 'internal', workspaceName: 'Fixture', pending: false },
+        });
+        expect(JSON.stringify(result)).not.toContain(accessToken);
+        const status = await router.dispatch({ type: 'getNotionAuthStatus' });
+        expect(status.data).toMatchObject({ connected: true, connectionMethod: 'internal' });
+        expect(JSON.stringify(status)).not.toContain(accessToken);
+      }
+      expect(await router.dispatch({ type: 'listNotionParentPages' })).toMatchObject({ ok: true, data: { pages: [] } });
+      expect(await router.dispatch({ type: 'notionSyncConversations', conversationIds: [1] })).toMatchObject({
+        ok: false,
+        error: { extra: { code: 'notion_parent_page_required' } },
+      });
+      expect(jobStore.__getJob()).toBeNull();
+      const message = { type: 'notionSaveConfig', parentPageId: 'https://www.notion.so/Authorized-' + id };
+      expect(await router.dispatch(message)).toMatchObject({
+        ok: false,
+        error: { extra: { code: 'notion_parent_page_unavailable' } },
+      });
+      expect(chromeMock.__store.notion_parent_page_id).toBe('');
+      shared = true;
+      expect(await router.dispatch(message)).toMatchObject({
+        ok: true,
+        data: { parentPageId: dashed, parentPageTitle: 'Authorized' },
+      });
+      expect(chromeMock.__store.notion_parent_page_id).toBe(dashed);
+      const cacheKey = conversationKinds.getNotionDbSpecByKindId('chat')!.storageKey;
+      chromeMock.__store[cacheKey] = 'a'.repeat(32);
+      shared = false;
+      expect(await router.dispatch(message)).toMatchObject({ ok: false });
+      expect(chromeMock.__store.notion_parent_page_id).toBe(dashed);
+      expect(chromeMock.__store[cacheKey]).toBe('a'.repeat(32));
+      shared = true;
+      const job = await startNotionSync(router, jobStore, [1]);
+      expect(job.okCount).toBe(1);
+      expect(ensureDatabase).toHaveBeenCalledWith(expect.objectContaining({ parentPageId: dashed }));
+      expect(createPageInDatabase).toHaveBeenCalledWith(accessToken, expect.objectContaining({ databaseId: 'db1' }));
+      expect(await router.dispatch({ type: 'notionDisconnect' })).toMatchObject({ ok: true });
+      expect(chromeMock.__store.notion_oauth_token_v1).toBeUndefined();
+      expect(chromeMock.__store.notion_parent_page_id).toBeUndefined();
+    },
+  );
+
+  it('validates database links before saving and ignores view IDs for all three content types', async () => {
+    const parent = '1'.repeat(32);
+    const chromeMock = mockChromeStorage({ parentPageId: parent });
     const router = createRouter({
       chromeMock,
       notionServices: {
-        tokenStore: { getToken: async () => ({ accessToken: 't' }) },
-        storage: {
-          getSyncMappingByConversation: async () => ({
-            conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt' },
-            mapping: null,
-          }),
-          getMessagesByConversationId: async () => [
-            { messageKey: 'm1', role: 'user', contentMarkdown: 'hi', sequence: 1 },
-          ],
-          setConversationNotionPageId: async () => true,
-          setSyncCursor: async () => true,
-          patchSyncMapping: async () => true,
-        },
-        dbManager: { ensureDatabase },
-        syncService: {
-          createPageInDatabase,
-          appendChildren: async (_t: string, _pageId: string, blocks: any[]) => notionAppendResult(blocks),
-          messagesToBlocks: () => [],
-        },
-        jobStore,
+        tokenStore: { getToken: getNotionConnectionToken },
+        storage: null,
+        dbManager: null,
+        syncService: null,
+        jobStore: createInMemoryJobStore(),
       },
     });
-    let shared = false;
-    const fetchMock = vi.fn(async (url: string, init?: { method?: string }) => {
-      if (init?.method === 'POST') return notionHttpResponse({ results: [], has_more: false });
-      expect(url).toBe('https://api.notion.com/v1/pages/' + id);
-      return shared
-        ? notionHttpResponse({
-            object: 'page',
-            id: dashed,
-            properties: { title: { type: 'title', title: [{ plain_text: 'Authorized' }] } },
-          })
-        : notionHttpResponse({ code: 'object_not_found' }, 404);
+    const kinds = ['chat', 'article', 'video'] as const;
+    const ids = { chat: 'a'.repeat(32), article: 'b'.repeat(32), video: 'c'.repeat(32) };
+    const view = 'd'.repeat(32);
+    const links = Object.fromEntries(
+      kinds.map((kind) => [kind, `https://app.notion.com/p/example/${ids[kind]}?v=${view}&source=copy_link`]),
+    );
+    const request = { type: 'notionSaveConfig', databaseIds: links };
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(init?.method).toBe('GET');
+      expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer t');
+      const id = url.split('/').at(-1);
+      expect(Object.values(ids)).toContain(id);
+      return notionHttpResponse({ object: 'database', id, parent: { type: 'page_id', page_id: parent } });
     });
     (globalThis as any).fetch = fetchMock;
-    expect(await router.dispatch({ type: 'listNotionParentPages' })).toMatchObject({ ok: true, data: { pages: [] } });
-    expect(await router.dispatch({ type: 'notionSyncConversations', conversationIds: [1] })).toMatchObject({
-      ok: false,
-      error: { extra: { code: 'notion_parent_page_required' } },
+    expect(await router.dispatch(request)).toMatchObject({ ok: true, data: { databaseIds: ids } });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(await router.dispatch(request)).toMatchObject({ ok: true, data: { databaseIds: ids } });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const prior = { ...chromeMock.__store };
+    const invalid = await router.dispatch({
+      type: 'notionSaveConfig',
+      databaseIds: { chat: `https://www.notion.so/?v=${view}` },
     });
-    expect(jobStore.__getJob()).toBeNull();
-    const message = { type: 'notionSaveConfig', parentPageId: 'https://www.notion.so/Authorized-' + id };
-    expect(await router.dispatch(message)).toMatchObject({
-      ok: false,
-      error: { extra: { code: 'notion_parent_page_unavailable' } },
-    });
-    expect(chromeMock.__store.notion_parent_page_id).toBe('');
-    shared = true;
-    expect(await router.dispatch(message)).toMatchObject({
+    expect(invalid).toMatchObject({ ok: false, error: { extra: { code: 'invalid_notion_database_id' } } });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(chromeMock.__store).toEqual(prior);
+
+    const candidate = 'e'.repeat(32);
+    const patch = { type: 'notionSaveConfig', databaseIds: { chat: '', article: candidate } };
+    for (const [body, status, code] of [
+      [{ object: 'page', id: candidate }, 200, 'notion_database_unavailable'],
+      [{ object: 'database', id: candidate, archived: true }, 200, 'notion_database_unavailable'],
+      [{ object: 'database', id: view, parent: { page_id: parent } }, 200, 'notion_database_unavailable'],
+      [{ object: 'database', id: candidate, parent: { page_id: view } }, 200, 'notion_database_wrong_parent'],
+      [{ code: 'object_not_found' }, 404, 'notion_database_unavailable'],
+      [{ code: 'rate_limited' }, 429, 'rate_limited'],
+    ] as const) {
+      fetchMock.mockResolvedValueOnce(notionHttpResponse(body, status));
+      expect(await router.dispatch(patch)).toMatchObject({ ok: false, error: { extra: { code } } });
+      expect(chromeMock.__store).toEqual(prior);
+    }
+    expect(await router.dispatch({ type: 'notionResetDatabaseId', kindId: 'article' })).toMatchObject({
       ok: true,
-      data: { parentPageId: dashed, parentPageTitle: 'Authorized' },
+      data: { databaseIds: { ...ids, article: '' } },
     });
-    expect(chromeMock.__store.notion_parent_page_id).toBe(dashed);
-    const cacheKey = conversationKinds.getNotionDbSpecByKindId('chat')!.storageKey;
-    chromeMock.__store[cacheKey] = 'a'.repeat(32);
-    shared = false;
-    expect(await router.dispatch(message)).toMatchObject({ ok: false });
-    expect(chromeMock.__store.notion_parent_page_id).toBe(dashed);
-    expect(chromeMock.__store[cacheKey]).toBe('a'.repeat(32));
-    shared = true;
-    const job = await startNotionSync(router, jobStore, [1]);
-    expect(job.okCount).toBe(1);
-    expect(ensureDatabase).toHaveBeenCalledWith(expect.objectContaining({ parentPageId: dashed }));
-    expect(createPageInDatabase).toHaveBeenCalledWith('t', expect.objectContaining({ databaseId: 'db1' }));
   });
 
   it('returns a safe Notion auth summary without token, raw pending state, or error text', async () => {

@@ -24,6 +24,7 @@ export const DATA_REVISION_MESSAGE_TYPES = {
 export const NOTION_MESSAGE_TYPES = {
   GET_AUTH_STATUS: 'getNotionAuthStatus',
   START_AUTH: 'notionStartAuth',
+  CONNECT_INTERNAL: 'notionConnectInternal',
   DISCONNECT: 'notionDisconnect',
   GET_CONFIG: 'notionGetConfig',
   SAVE_CONFIG: 'notionSaveConfig',

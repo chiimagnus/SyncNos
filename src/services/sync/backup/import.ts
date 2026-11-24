@@ -4,7 +4,7 @@ import { mergeSyncMappingForImport } from '@platform/idb/sync-mapping-record';
 import { storageGet, storageSet } from '@platform/storage/local';
 import { saveFeishuOAuthConfig } from '@services/sync/feishu/auth/oauth';
 import { FEISHU_OAUTH_TOKEN_KEY, replaceFeishuOAuthToken } from '@services/sync/feishu/auth/token-store';
-import { NOTION_OAUTH_TOKEN_KEY, replaceNotionOAuthToken } from '@services/sync/notion/auth/token-store';
+import { NOTION_TOKEN_KEY, replaceNotionConnectionToken } from '@services/sync/notion/auth/token-store';
 import { OBSIDIAN_STORAGE_KEYS, saveObsidianSettings } from '@services/sync/obsidian/settings-store';
 import { normalizeAttachmentFolder } from '@services/sync/obsidian/obsidian-attachment-path';
 import {
@@ -200,10 +200,10 @@ async function applyImportedStorageSettings(filteredSettings: Record<string, unk
     ? (directSettings[GITHUB_AUTH_STATE_KEY] as GithubAuthState)
     : null;
   delete directSettings[GITHUB_AUTH_STATE_KEY];
-  const notionToken = Object.prototype.hasOwnProperty.call(directSettings, NOTION_OAUTH_TOKEN_KEY)
-    ? directSettings[NOTION_OAUTH_TOKEN_KEY]
+  const notionToken = Object.prototype.hasOwnProperty.call(directSettings, NOTION_TOKEN_KEY)
+    ? directSettings[NOTION_TOKEN_KEY]
     : null;
-  delete directSettings[NOTION_OAUTH_TOKEN_KEY];
+  delete directSettings[NOTION_TOKEN_KEY];
   const feishuToken = Object.prototype.hasOwnProperty.call(directSettings, FEISHU_OAUTH_TOKEN_KEY)
     ? directSettings[FEISHU_OAUTH_TOKEN_KEY]
     : null;
@@ -246,7 +246,7 @@ async function applyImportedStorageSettings(filteredSettings: Record<string, unk
   }
 
   if (Object.keys(feishuConfig).length) await saveFeishuOAuthConfig(feishuConfig);
-  if (notionToken) await replaceNotionOAuthToken(notionToken);
+  if (notionToken) await replaceNotionConnectionToken(notionToken);
   if (feishuToken) await replaceFeishuOAuthToken(feishuToken);
   if (obsidianApiKey != null) await saveObsidianSettings({ apiKey: obsidianApiKey });
   if (githubAuthState) await replaceGithubAuthState(githubAuthState);

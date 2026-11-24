@@ -1,6 +1,6 @@
 import { createSyncJobStore } from '@services/sync/sync-job-store';
 import { createNotionSyncOrchestrator } from '@services/sync/notion/notion-sync-orchestrator.ts';
-import { getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
+import { getNotionConnectionToken } from '@services/sync/notion/auth/token-store';
 import { backgroundStorage as notionBackgroundStorage } from '@services/conversations/background/storage';
 import * as notionDbManager from '@services/sync/notion/notion-db-manager.ts';
 import * as notionSyncService from '@services/sync/notion/notion-sync-service.ts';
@@ -120,7 +120,7 @@ type BackgroundServices = {
 export function createBackgroundServices(deps: { getInstanceId: () => string }): BackgroundServices {
   const notionSyncJobStore = createSyncJobStore('notion');
   const notionSyncOrchestrator = createNotionSyncOrchestrator({
-    tokenStore: { getToken: getNotionOAuthToken },
+    tokenStore: { getToken: getNotionConnectionToken },
     storage: notionBackgroundStorage,
     conversationKinds,
     dbManager: notionDbManager,

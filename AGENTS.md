@@ -69,7 +69,9 @@ collectors -> services/shared
 - Local CLI / Native Messaging 只是 Extension 的本机入口：Extension/IndexedDB 仍是唯一业务真源，
   不创建第二套业务数据库；installer 只操作有限、声明过的当前用户 registration target，
   machine-safe response 不泄露 Provider/Reader secret。
-- Notion 受管数据库字段与 section 不支持用户自定义其 schema/结构。
+- Notion OAuth 与手动连接共用凭据及同步链路；官网回调不代表授权成功，
+  旧回调不得覆盖手动连接或恢复的凭据。
+  Notion 受管数据库字段与 section 不支持用户自定义其 schema/结构。
   旧 `Date: date` 且缺少 `Last Activity` 时直接重命名；
   managed section list/retrieve 失败必须传播或重试，不能当作“未找到”后创建重复 section。
 - IndexedDB 业务层统一借用 canonical connection；受 revision 跟踪的业务变更与 revision 必须同

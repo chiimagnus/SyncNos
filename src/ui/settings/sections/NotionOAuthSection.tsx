@@ -1,6 +1,7 @@
 import type { NotionPageOption } from '@viewmodels/settings/utils';
 import { useEffect, useState, type KeyboardEvent } from 'react';
 import { t } from '@i18n';
+import { ArrowUpRight } from 'lucide-react';
 import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
 import {
   buttonClassName,
@@ -28,9 +29,6 @@ export function NotionOAuthSection(props: {
   notionChatDatabaseId: string;
   notionArticleDatabaseId: string;
   notionVideoDatabaseId: string;
-  notionChatDatabaseLabel: string;
-  notionArticleDatabaseLabel: string;
-  notionVideoDatabaseLabel: string;
   notionPageOptions: NotionPageOption[];
   notionPageSearchEmpty: boolean;
   notionLogoUrl: string;
@@ -38,6 +36,7 @@ export function NotionOAuthSection(props: {
   onToggleAutoSyncEnabled: (enabled: boolean) => void;
   onToggleAdvancedOpen: () => void;
   onConnectOrDisconnect: () => void;
+  onConnectInternal: (token: string) => Promise<boolean>;
   onClearError: () => void;
   onSaveNotionParentPage: (id: string) => Promise<boolean>;
   onChangeNotionChatDatabaseId: (id: string) => void;
@@ -61,9 +60,6 @@ export function NotionOAuthSection(props: {
     notionChatDatabaseId,
     notionArticleDatabaseId,
     notionVideoDatabaseId,
-    notionChatDatabaseLabel,
-    notionArticleDatabaseLabel,
-    notionVideoDatabaseLabel,
     notionPageOptions,
     notionPageSearchEmpty,
     notionLogoUrl,
@@ -71,6 +67,7 @@ export function NotionOAuthSection(props: {
     onToggleAutoSyncEnabled,
     onToggleAdvancedOpen,
     onConnectOrDisconnect,
+    onConnectInternal,
     onClearError,
     onSaveNotionParentPage,
     onChangeNotionChatDatabaseId,
@@ -82,6 +79,20 @@ export function NotionOAuthSection(props: {
   } = props;
 
   const [parentPageInput, setParentPageInput] = useState<string | null>(null);
+  const [tokenInput, setTokenInput] = useState<string | null>(null);
+  const manualConnection = !notionConnected && tokenInput !== null;
+  useEffect(() => {
+    if (notionConnected || !syncEnabled) setTokenInput(null);
+  }, [notionConnected, syncEnabled]);
+
+  const closeManualConnection = () => {
+    onClearError();
+    setTokenInput(null);
+    window.requestAnimationFrame(() => document.getElementById('notionConnect')?.focus());
+  };
+  const connectWithToken = async () => {
+    if (tokenInput?.trim() && (await onConnectInternal(tokenInput.trim()))) closeManualConnection();
+  };
   const selectingByLink = notionConnected && parentPageInput !== null;
   const linkOption = '__notion_page_link__';
   const pageSelectionDisabled = busy || !notionConnected || loadingNotionPages;
@@ -98,10 +109,10 @@ export function NotionOAuthSection(props: {
     if (parentPageInput?.trim() && (await onSaveNotionParentPage(parentPageInput))) closePageInput();
   };
 
-  const onEnterToSaveDatabaseId = (e: KeyboardEvent<HTMLInputElement>, kind: 'chat' | 'article' | 'video') => {
+  const onEnterToSaveDatabaseId = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
-    onSaveNotionDatabaseId(kind);
+    e.currentTarget.blur();
   };
 
   return (
@@ -125,23 +136,101 @@ export function NotionOAuthSection(props: {
             </span>
           }
         >
-          <button
-            onClick={onConnectOrDisconnect}
-            disabled={busy || (!notionConnected && pollingNotion)}
-            type="button"
-            className={notionConnected ? dangerButtonClassName : primaryButtonClassName}
-          >
-            {notionConnected ? t('disconnect') : pollingNotion ? t('connectingDots') : t('connect')}
-          </button>
+          {manualConnection ? (
+            <button type="button" className={buttonClassName} onClick={closeManualConnection} disabled={busy}>
+              {t('cancelButton')}
+            </button>
+          ) : (
+            <button
+              id="notionConnect"
+              onClick={onConnectOrDisconnect}
+              disabled={busy || (!notionConnected && pollingNotion)}
+              type="button"
+              className={notionConnected ? dangerButtonClassName : primaryButtonClassName}
+            >
+              {notionConnected ? t('disconnect') : pollingNotion ? t('connectingDots') : t('connect')}
+            </button>
+          )}
         </SettingsFormRow>
-        {notionAuthErrorText ? (
+        {manualConnection ? (
+          <>
+            <SettingsFormRow
+              label={t('notionInternalToken')}
+              controlId="notionInternalToken"
+              description={t('notionInternalTokenHint')}
+              align="start"
+            >
+              <div className="tw-flex tw-min-w-0 tw-flex-col tw-items-end tw-gap-2">
+                <input
+                  id="notionInternalToken"
+                  type="password"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  autoFocus
+                  spellCheck={false}
+                  value={tokenInput}
+                  onInput={(e) => setTokenInput(e.currentTarget.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape' && !busy) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      closeManualConnection();
+                    } else if (e.key === 'Enter' && !busy && tokenInput.trim()) {
+                      e.preventDefault();
+                      void connectWithToken();
+                    }
+                  }}
+                  disabled={busy}
+                  placeholder={t('notionInternalToken')}
+                  className={settingsTextInputClassName}
+                />
+                <button
+                  type="button"
+                  className={primaryButtonClassName}
+                  disabled={busy || !tokenInput.trim()}
+                  onClick={() => void connectWithToken()}
+                >
+                  {busy ? t('connectingDots') : t('connect')}
+                </button>
+              </div>
+            </SettingsFormRow>
+            <div className="settings-group-link">
+              <a
+                href="https://app.notion.com/developers/connections"
+                target="_blank"
+                rel="noreferrer"
+                className="tw-mr-auto tw-inline-flex tw-items-center tw-gap-1 tw-text-xs tw-font-bold tw-text-[var(--accent)] hover:tw-underline focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)]"
+              >
+                {t('notionOpenDeveloperPortal')}
+                <ArrowUpRight size={13} aria-hidden="true" />
+              </a>
+              <SettingsDocsLink path="sync/notion" />
+            </div>
+          </>
+        ) : null}
+        {!manualConnection && notionAuthErrorText ? (
           <p role="alert" className="settings-group-note">
             {notionAuthErrorText}
           </p>
         ) : null}
-        <div className="settings-group-link">
-          <SettingsDocsLink path="sync/notion" />
-        </div>
+        {!manualConnection ? (
+          <div className="settings-group-link tw-items-center tw-gap-2">
+            {!notionConnected ? (
+              <button
+                type="button"
+                className="tw-mr-auto tw-cursor-pointer tw-appearance-none tw-border-0 tw-bg-transparent tw-p-0 tw-text-xs tw-font-bold tw-text-[var(--accent)] hover:tw-underline focus-visible:tw-outline focus-visible:tw-outline-2 focus-visible:tw-outline-offset-2 focus-visible:tw-outline-[var(--focus-ring)] disabled:tw-cursor-not-allowed disabled:tw-opacity-50"
+                disabled={busy}
+                onClick={() => {
+                  onClearError();
+                  setTokenInput('');
+                }}
+              >
+                {t('notionManualConnect')}
+              </button>
+            ) : null}
+            <SettingsDocsLink path="sync/notion" />
+          </div>
+        ) : null}
       </SettingsGroup>
       <SettingsGroup title={t('settingsDestination')}>
         <SettingsFormRow
@@ -238,7 +327,10 @@ export function NotionOAuthSection(props: {
             </div>
           )}
         </SettingsFormRow>
-        <SettingsFormRow label={t('settingsAdvanced')} info={t('notionAdvancedDbIdHint')}>
+        <SettingsFormRow
+          label={t('settingsAdvanced')}
+          description={notionAdvancedOpen ? t('notionAdvancedDbIdHint') : undefined}
+        >
           <button
             type="button"
             className={buttonClassName}
@@ -258,10 +350,10 @@ export function NotionOAuthSection(props: {
                   value={notionChatDatabaseId}
                   onChange={(e) => onChangeNotionChatDatabaseId(e.target.value)}
                   onBlur={() => onSaveNotionDatabaseId('chat')}
-                  onKeyDown={(e) => onEnterToSaveDatabaseId(e, 'chat')}
+                  onKeyDown={onEnterToSaveDatabaseId}
                   disabled={busy || !notionConnected}
                   spellCheck={false}
-                  placeholder={notionChatDatabaseLabel}
+                  placeholder={t('notionDatabaseLinkPlaceholder')}
                   aria-label={t('notionDbIdAiChats')}
                   className={settingsTextInputClassName}
                 />
@@ -282,10 +374,10 @@ export function NotionOAuthSection(props: {
                   value={notionArticleDatabaseId}
                   onChange={(e) => onChangeNotionArticleDatabaseId(e.target.value)}
                   onBlur={() => onSaveNotionDatabaseId('article')}
-                  onKeyDown={(e) => onEnterToSaveDatabaseId(e, 'article')}
+                  onKeyDown={onEnterToSaveDatabaseId}
                   disabled={busy || !notionConnected}
                   spellCheck={false}
-                  placeholder={notionArticleDatabaseLabel}
+                  placeholder={t('notionDatabaseLinkPlaceholder')}
                   aria-label={t('notionDbIdWebArticles')}
                   className={settingsTextInputClassName}
                 />
@@ -306,10 +398,10 @@ export function NotionOAuthSection(props: {
                   value={notionVideoDatabaseId}
                   onChange={(e) => onChangeNotionVideoDatabaseId(e.target.value)}
                   onBlur={() => onSaveNotionDatabaseId('video')}
-                  onKeyDown={(e) => onEnterToSaveDatabaseId(e, 'video')}
+                  onKeyDown={onEnterToSaveDatabaseId}
                   disabled={busy || !notionConnected}
                   spellCheck={false}
-                  placeholder={notionVideoDatabaseLabel}
+                  placeholder={t('notionDatabaseLinkPlaceholder')}
                   aria-label={t('notionDbIdVideos')}
                   className={settingsTextInputClassName}
                 />

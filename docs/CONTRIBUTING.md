@@ -59,6 +59,8 @@ Zen / Safari 有改动时再运行 `npm run check:zen` / `npm run check:safari`�
 模拟平台测试不能冒充真实平台 E2E。
 首次安装、OAuth 和权限相关验收使用独立临时浏览器 Profile 与独立构建产物，
 不得读取、复制或覆盖日常 Profile；只有用户明确要求验收其现有配置时才例外。
+验收结束后关闭并删除本次创建的临时 Profile、构建和测试文件，撤销专用测试凭据并清理远端测试数据；
+只保留必要且脱敏的验收证据，不触碰用户已有资源。
 
 `check:dist` 约束解压后的完整目录体积、manifest 声明的 content script JS 总体积和 Popup 启动
 JS/CSS，并拒绝冗余 KaTeX TTF/WOFF。

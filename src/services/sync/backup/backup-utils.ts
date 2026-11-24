@@ -1,7 +1,7 @@
 import { DATA_REVISION_WAKE_STORAGE_KEY } from '@services/data-revisions/wake';
 import { POPUP_SYNC_SELECTION_HANDOFF_KEY } from '@services/conversations/popup-sync-selection-handoff';
 import { CLI_INSTANCE_ID_STORAGE_KEY, CLI_INTEGRATION_ENABLED_STORAGE_KEY } from '@services/cli/cli-integration';
-import { NOTION_OAUTH_TOKEN_KEY, parseNotionOAuthToken } from '@services/sync/notion/auth/token-store';
+import { NOTION_TOKEN_KEY, parseNotionConnectionToken } from '@services/sync/notion/auth/token-store';
 import { FEISHU_OAUTH_TOKEN_KEY, parseFeishuOAuthToken } from '@services/sync/feishu/auth/token-store';
 import { GITHUB_AUTH_STATE_KEY, parseGithubAuthState } from '@services/sync/github/auth/auth-store';
 import { OBSIDIAN_STORAGE_KEYS } from '@services/sync/obsidian/settings-store';
@@ -21,7 +21,7 @@ export const LAST_BACKUP_EXPORT_AT_STORAGE_KEY = 'last_backup_export_at';
 const IMAGE_CACHE_INDEX_SCHEMA_VERSION = 1;
 
 const STORAGE_BACKUP_SENSITIVE_KEYS_EXACT = new Set<string>([
-  NOTION_OAUTH_TOKEN_KEY,
+  NOTION_TOKEN_KEY,
   FEISHU_OAUTH_TOKEN_KEY,
   'feishu_oauth_client_secret',
   OBSIDIAN_STORAGE_KEYS.apiKey,
@@ -269,10 +269,10 @@ export function validateSensitiveBackupStorage(storageLocal: unknown): { ok: boo
   const input = storageLocal && typeof storageLocal === 'object' ? (storageLocal as Record<string, unknown>) : {};
 
   if (
-    Object.prototype.hasOwnProperty.call(input, NOTION_OAUTH_TOKEN_KEY) &&
-    !parseNotionOAuthToken(input[NOTION_OAUTH_TOKEN_KEY])
+    Object.prototype.hasOwnProperty.call(input, NOTION_TOKEN_KEY) &&
+    !parseNotionConnectionToken(input[NOTION_TOKEN_KEY])
   ) {
-    return { ok: false, error: 'Invalid Notion OAuth token in Full Backup' };
+    return { ok: false, error: 'Invalid Notion connection token in Full Backup' };
   }
   if (
     Object.prototype.hasOwnProperty.call(input, FEISHU_OAUTH_TOKEN_KEY) &&

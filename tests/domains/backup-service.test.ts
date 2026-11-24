@@ -1396,6 +1396,7 @@ describe('backup service', () => {
         workspaceId: 'workspace-1',
         workspaceName: 'Workspace',
         createdAt: 1,
+        connectionMethod: 'internal',
       },
       feishu_oauth_token_v1: {
         accessToken: 'SOURCE_FEISHU_ACCESS',
@@ -1427,7 +1428,7 @@ describe('backup service', () => {
     const config = JSON.parse(new TextDecoder().decode(entries.get('config/storage-local.json')!));
     expect(manifest.config.includesSensitiveData).toBe(true);
     expect(config.storageLocal).toMatchObject({
-      notion_oauth_token_v1: { accessToken: 'SOURCE_NOTION_ACCESS' },
+      notion_oauth_token_v1: { accessToken: 'SOURCE_NOTION_ACCESS', connectionMethod: 'internal' },
       feishu_oauth_token_v1: {
         accessToken: 'SOURCE_FEISHU_ACCESS',
         refreshToken: 'SOURCE_FEISHU_REFRESH',
@@ -1443,6 +1444,8 @@ describe('backup service', () => {
     expect(config.storageLocal.syncnos_cli_integration_enabled_v1).toBeUndefined();
 
     chromeMock.__store.notion_oauth_token_v1 = { accessToken: 'TARGET_NOTION_ACCESS' };
+    chromeMock.__store.notion_oauth_pending_state = 'TARGET_PENDING';
+    chromeMock.__store.notion_oauth_last_error = 'TARGET_ERROR';
     chromeMock.__store.feishu_oauth_token_v1 = { accessToken: 'TARGET_FEISHU_ACCESS' };
     chromeMock.__store.feishu_oauth_client_secret = 'TARGET_FEISHU_CLIENT_SECRET';
     chromeMock.__store.obsidian_api_key = 'TARGET_OBSIDIAN_SECRET';
@@ -1458,7 +1461,12 @@ describe('backup service', () => {
 
     await importBackupZipMerge(entries);
 
-    expect(chromeMock.__store.notion_oauth_token_v1).toMatchObject({ accessToken: 'SOURCE_NOTION_ACCESS' });
+    expect(chromeMock.__store.notion_oauth_token_v1).toMatchObject({
+      accessToken: 'SOURCE_NOTION_ACCESS',
+      connectionMethod: 'internal',
+    });
+    expect(chromeMock.__store.notion_oauth_pending_state).toBe('');
+    expect(chromeMock.__store.notion_oauth_last_error).toBe('');
     expect(chromeMock.__store.feishu_oauth_token_v1).toMatchObject({
       accessToken: 'SOURCE_FEISHU_ACCESS',
       refreshToken: 'SOURCE_FEISHU_REFRESH',

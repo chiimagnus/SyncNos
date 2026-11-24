@@ -1,6 +1,7 @@
 import { buildAiOptions } from '@services/sync/notion/notion-ai.ts';
 import { notionFetch } from '@services/sync/notion/notion-api.ts';
 import type { ConversationKindDbSpec } from '@services/protocols/conversation-kind-contract.ts';
+import { normalizeNotionIdInput } from '@services/sync/notion/notion-id-utils';
 import {
   cacheNotionManagedDatabaseId,
   getNotionDatabaseId,
@@ -62,6 +63,35 @@ function isMissingDatabaseError(error: unknown): boolean {
 
 async function getDatabase(accessToken: string, databaseId: string) {
   return notionFetch({ accessToken, method: 'GET', path: `/v1/databases/${databaseId}` });
+}
+
+export async function resolveNotionDatabaseId(
+  accessToken: string,
+  input: string,
+  parentPageId: string,
+): Promise<string> {
+  const id = normalizeNotionIdInput(input);
+  if (!id) throw Object.assign(new Error('Enter a database link or ID.'), { code: 'invalid_notion_database_id' });
+  if (!parentPageId) {
+    throw Object.assign(new Error('Choose a destination page first.'), { code: 'notion_parent_page_required' });
+  }
+  let db;
+  try {
+    db = await getDatabase(accessToken, id);
+  } catch (error) {
+    if (!isMissingDatabaseError(error)) throw error;
+  }
+  if (db?.object !== 'database' || !isUsableDatabase(db) || normalizeNotionId(db.id) !== id) {
+    throw Object.assign(new Error('Database is unavailable. Use its full-page link and check access.'), {
+      code: 'notion_database_unavailable',
+    });
+  }
+  if (!matchesParentPage(db, parentPageId)) {
+    throw Object.assign(new Error('Choose a database under the destination page.'), {
+      code: 'notion_database_wrong_parent',
+    });
+  }
+  return id;
 }
 
 async function searchDatabases(accessToken: string, { query, parentPageId }: { query: string; parentPageId: string }) {
