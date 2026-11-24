@@ -17,11 +17,12 @@ description: 连接 Notion，并把 SyncNos 内容同步到你选择的页面下
 如果无法使用默认授权服务，或者希望完全使用自己的 Notion 集成，可以手动连接。
 此方式不依赖 SyncNos 的授权服务器，但仍需能够访问 Notion。
 
-1. 打开 [Notion 开发者平台](https://app.notion.com/developers/connections)，创建一个内部集成（Internal integration），选择目标工作区。
-   你需要拥有该工作区的所有者权限。
-2. 在集成设置中开启读取、新增和更新内容权限（Read、Insert、Update content）。
-3. 打开要同步到的 Notion 页面，点击右上角 **⋯ → 添加连接**，选择刚创建的集成。
-4. 在集成的配置页面复制内部集成令牌（Internal integration token）。
+1. 打开 [Notion 开发者平台](https://app.notion.com/developers/connections)，点击 **新连接**，
+   选择 **API 令牌**（内部连接）和目标工作区。你需要拥有该工作区的所有者权限。
+2. 在连接配置中开启读取、插入和更新内容权限（Read、Insert、Update content）。
+3. 打开要同步到的 Notion 页面，通过右上角 **⋯ → 更多 → 连接 → 添加连接**
+   （More → Connections → Add a new connection），选择刚创建的连接。
+4. 返回开发者平台的连接配置，复制 **集成令牌**。
 5. 返回 **SyncNos → 设置 → Notion → 手动连接…**，粘贴令牌并点击 **连接**。
 6. 选择 **目标页面**，手动同步一次确认写入正常。
 
@@ -35,6 +36,9 @@ SyncNos 只能访问当前集成已获授权的页面。
 或在下拉菜单中选择 **通过链接选择…**，粘贴已授权页面的链接。
 
 SyncNos 会在选定页面下自动整理内容，不需要手动创建或修改数据库。
+如需指定已有数据库，展开 **高级选项**，在对应内容类型的输入框粘贴数据库的整页链接或 ID。
+数据库必须位于选定的目标页面下。留空或点击 **重置** 即恢复自动选择。
+
 更换目标页面后，后续同步会写入新的位置。
 
 ## 断开与排障

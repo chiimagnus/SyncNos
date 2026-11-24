@@ -17,11 +17,13 @@ Enable auto-sync only if you want it.
 If the default authorization service is unavailable, or you prefer to use your own Notion integration,
 connect manually instead. This does not depend on the SyncNos authorization server, but still requires access to Notion.
 
-1. Open the [Notion developer portal](https://app.notion.com/developers/connections), create an internal integration, and choose your workspace.
+1. Open the [Notion developer portal](https://app.notion.com/developers/connections), create a
+   **New connection**, select **API token** (internal connection), and choose your workspace.
    You must be a workspace owner.
-2. Enable the Read content, Insert content, and Update content capabilities in the integration settings.
-3. Open your destination page in Notion, choose **⋯ → Add connections**, and select your new integration.
-4. Copy the internal integration token from the integration's configuration page.
+2. Enable the Read content, Insert content, and Update content capabilities in the connection settings.
+3. Open your destination page in Notion, choose **⋯ → More → Connections → Add a new connection**,
+   and select your new connection.
+4. Return to the connection's configuration page and copy the integration token.
 5. In **SyncNos → Settings → Notion → Connect manually…**, paste the token and click **Connect**.
 6. Choose the **Destination page** and run one manual sync to confirm the result.
 
@@ -35,7 +37,11 @@ If your destination is missing, add the integration to the page in Notion and re
 or select **Choose by link…** in the destination menu and paste the shared page's link.
 
 SyncNos organizes content under the selected page automatically. You do not need to create or
-edit a database yourself. Changing the destination page sends future syncs to the new location.
+edit a database yourself. To reuse a particular database, open **Advanced options** and paste its
+full-page link or ID into the field for that content type. It must be under the selected destination
+page. Clear the field or click **Reset** to restore automatic selection.
+
+Changing the destination page sends future syncs to the new location.
 
 ## Disconnect and troubleshoot
 

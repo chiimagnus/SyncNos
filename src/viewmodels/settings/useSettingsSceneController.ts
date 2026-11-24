@@ -22,7 +22,6 @@ import {
   NOTION_MESSAGE_TYPES,
   OBSIDIAN_MESSAGE_TYPES,
 } from '@services/protocols/message-contracts';
-import { conversationKinds } from '@services/protocols/conversation-kinds';
 import { MARKDOWN_READING_PROFILE_STORAGE_KEY } from '@services/protocols/markdown-reading-profile-storage';
 import { AI_CHAT_INCLUDE_THINKING_STORAGE_KEY } from '@services/shared/thinking-block';
 import { send } from '@services/shared/runtime';
@@ -90,12 +89,6 @@ const NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY = autoSyncEnabledStorageKey('notion')
 const OBSIDIAN_AUTO_SYNC_ENABLED_STORAGE_KEY = autoSyncEnabledStorageKey('obsidian');
 const FEISHU_AUTO_SYNC_ENABLED_STORAGE_KEY = autoSyncEnabledStorageKey('feishu');
 const GITHUB_AUTO_SYNC_ENABLED_STORAGE_KEY = autoSyncEnabledStorageKey('github');
-function getKindDbTitle(kindId: string) {
-  const title = String(conversationKinds.getNotionDbSpecByKindId(kindId)?.title || '').trim();
-  if (!title) throw new Error(`missing Notion database spec for kind: ${kindId}`);
-  return title;
-}
-
 function isFirefoxFamilyBrowser() {
   try {
     const ua = String(globalThis.navigator?.userAgent || '').toLowerCase();
@@ -348,9 +341,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [includeSensitiveBackupData, setIncludeSensitiveBackupData] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const backupImportRef = useRef<HTMLDivElement | null>(null);
-  const chatDbTitle = useMemo(() => getKindDbTitle('chat'), []);
-  const articleDbTitle = useMemo(() => getKindDbTitle('article'), []);
-  const videoDbTitle = useMemo(() => getKindDbTitle('video'), []);
   const [notionAdvancedOpen, setNotionAdvancedOpen] = useState(false);
   const [notionChatDatabaseId, setNotionChatDatabaseId] = useState<string>('');
   const [notionArticleDatabaseId, setNotionArticleDatabaseId] = useState<string>('');
@@ -1616,12 +1606,16 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
       await runTask(
         async () => {
-          const config = unwrap(
-            await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.SAVE_CONFIG, {
-              databaseIds: { [kind]: String(raw || '') },
-            }),
-          );
-          applyNotionConfig(config);
+          const response = await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.SAVE_CONFIG, {
+            databaseIds: { [kind]: String(raw || '') },
+          });
+          const extra = response?.error?.extra;
+          const code = extra && typeof extra === 'object' && 'code' in extra ? extra.code : '';
+          if (code === 'invalid_notion_database_id') throw new Error(t('notionDatabaseInvalid'));
+          if (code === 'notion_database_unavailable') throw new Error(t('notionDatabaseUnavailable'));
+          if (code === 'notion_database_wrong_parent') throw new Error(t('notionDatabaseWrongParent'));
+          if (code === 'notion_parent_page_required') throw new Error(t('notionDatabaseChooseDestination'));
+          applyNotionConfig(unwrap(response));
         },
         { fallbackMessage: 'save notion database id failed' },
       );
@@ -2278,9 +2272,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     setNotionArticleDatabaseId,
     notionVideoDatabaseId,
     setNotionVideoDatabaseId,
-    notionChatDatabaseLabel: chatDbTitle,
-    notionArticleDatabaseLabel: articleDbTitle,
-    notionVideoDatabaseLabel: videoDbTitle,
     onSaveNotionDatabaseId,
     onResetNotionDatabaseId,
     notionParentPageId,

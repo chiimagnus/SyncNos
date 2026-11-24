@@ -57,9 +57,6 @@ function notionProps(overrides: Partial<NotionProps> = {}): NotionProps {
     notionChatDatabaseId: '',
     notionArticleDatabaseId: '',
     notionVideoDatabaseId: '',
-    notionChatDatabaseLabel: 'chat-db',
-    notionArticleDatabaseLabel: 'article-db',
-    notionVideoDatabaseLabel: 'video-db',
     notionPageOptions: [],
     notionPageSearchEmpty: false,
     notionLogoUrl: 'https://example.com/notion.png',
@@ -128,6 +125,29 @@ afterEach(() => {
 });
 
 describe('Settings OAuth sections', () => {
+  it('explains database link input for each advanced field and saves once when Enter blurs it', async () => {
+    const onSaveNotionDatabaseId = vi.fn();
+    await render(
+      createElement(
+        NotionOAuthSection,
+        notionProps({
+          notionConnected: true,
+          notionAdvancedOpen: true,
+          onSaveNotionDatabaseId,
+        }),
+      ),
+    );
+    const fields = [...document.querySelectorAll<HTMLInputElement>('#notion-advanced-settings input')];
+    expect(fields).toHaveLength(3);
+    expect(fields.every((input) => input.placeholder === 'notionDatabaseLinkPlaceholder')).toBe(true);
+    expect(document.body.textContent).toContain('notionAdvancedDbIdHint');
+    act(() => {
+      fields[0].focus();
+      fields[0].dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    });
+    expect(onSaveNotionDatabaseId).toHaveBeenCalledTimes(1);
+    expect(onSaveNotionDatabaseId).toHaveBeenCalledWith('chat');
+  });
   it('keeps manual credentials hidden by default and submits only on explicit connection', async () => {
     const onConnectInternal = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
     const props = notionProps({ onConnectInternal });

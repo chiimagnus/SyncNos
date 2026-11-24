@@ -29,9 +29,6 @@ export function NotionOAuthSection(props: {
   notionChatDatabaseId: string;
   notionArticleDatabaseId: string;
   notionVideoDatabaseId: string;
-  notionChatDatabaseLabel: string;
-  notionArticleDatabaseLabel: string;
-  notionVideoDatabaseLabel: string;
   notionPageOptions: NotionPageOption[];
   notionPageSearchEmpty: boolean;
   notionLogoUrl: string;
@@ -63,9 +60,6 @@ export function NotionOAuthSection(props: {
     notionChatDatabaseId,
     notionArticleDatabaseId,
     notionVideoDatabaseId,
-    notionChatDatabaseLabel,
-    notionArticleDatabaseLabel,
-    notionVideoDatabaseLabel,
     notionPageOptions,
     notionPageSearchEmpty,
     notionLogoUrl,
@@ -115,10 +109,10 @@ export function NotionOAuthSection(props: {
     if (parentPageInput?.trim() && (await onSaveNotionParentPage(parentPageInput))) closePageInput();
   };
 
-  const onEnterToSaveDatabaseId = (e: KeyboardEvent<HTMLInputElement>, kind: 'chat' | 'article' | 'video') => {
+  const onEnterToSaveDatabaseId = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
-    onSaveNotionDatabaseId(kind);
+    e.currentTarget.blur();
   };
 
   return (
@@ -333,7 +327,10 @@ export function NotionOAuthSection(props: {
             </div>
           )}
         </SettingsFormRow>
-        <SettingsFormRow label={t('settingsAdvanced')} info={t('notionAdvancedDbIdHint')}>
+        <SettingsFormRow
+          label={t('settingsAdvanced')}
+          description={notionAdvancedOpen ? t('notionAdvancedDbIdHint') : undefined}
+        >
           <button
             type="button"
             className={buttonClassName}
@@ -353,10 +350,10 @@ export function NotionOAuthSection(props: {
                   value={notionChatDatabaseId}
                   onChange={(e) => onChangeNotionChatDatabaseId(e.target.value)}
                   onBlur={() => onSaveNotionDatabaseId('chat')}
-                  onKeyDown={(e) => onEnterToSaveDatabaseId(e, 'chat')}
+                  onKeyDown={onEnterToSaveDatabaseId}
                   disabled={busy || !notionConnected}
                   spellCheck={false}
-                  placeholder={notionChatDatabaseLabel}
+                  placeholder={t('notionDatabaseLinkPlaceholder')}
                   aria-label={t('notionDbIdAiChats')}
                   className={settingsTextInputClassName}
                 />
@@ -377,10 +374,10 @@ export function NotionOAuthSection(props: {
                   value={notionArticleDatabaseId}
                   onChange={(e) => onChangeNotionArticleDatabaseId(e.target.value)}
                   onBlur={() => onSaveNotionDatabaseId('article')}
-                  onKeyDown={(e) => onEnterToSaveDatabaseId(e, 'article')}
+                  onKeyDown={onEnterToSaveDatabaseId}
                   disabled={busy || !notionConnected}
                   spellCheck={false}
-                  placeholder={notionArticleDatabaseLabel}
+                  placeholder={t('notionDatabaseLinkPlaceholder')}
                   aria-label={t('notionDbIdWebArticles')}
                   className={settingsTextInputClassName}
                 />
@@ -401,10 +398,10 @@ export function NotionOAuthSection(props: {
                   value={notionVideoDatabaseId}
                   onChange={(e) => onChangeNotionVideoDatabaseId(e.target.value)}
                   onBlur={() => onSaveNotionDatabaseId('video')}
-                  onKeyDown={(e) => onEnterToSaveDatabaseId(e, 'video')}
+                  onKeyDown={onEnterToSaveDatabaseId}
                   disabled={busy || !notionConnected}
                   spellCheck={false}
-                  placeholder={notionVideoDatabaseLabel}
+                  placeholder={t('notionDatabaseLinkPlaceholder')}
                   aria-label={t('notionDbIdVideos')}
                   className={settingsTextInputClassName}
                 />

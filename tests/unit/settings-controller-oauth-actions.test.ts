@@ -261,6 +261,32 @@ describe('Settings OAuth actions', () => {
     expect(latestSnapshot!.notionConnected).toBe(false);
   });
 
+  it('shows the saved database ID after submitting a full link and localizes invalid-database errors', async () => {
+    notionConnected = true;
+    await renderController();
+    const id = 'a'.repeat(32);
+    const link = `https://app.notion.com/p/example/${id}?v=${'b'.repeat(32)}`;
+    const original = runtimeMocks.send.getMockImplementation()!;
+    runtimeMocks.send.mockImplementation(async (type, payload) =>
+      type === NOTION_MESSAGE_TYPES.SAVE_CONFIG
+        ? ok({ parentPageId: 'parent', parentPageTitle: 'Destination', databaseIds: { chat: id } })
+        : original(type, payload),
+    );
+    await invoke(() => latestSnapshot!.setNotionChatDatabaseId(link));
+    await invoke(() => latestSnapshot!.onSaveNotionDatabaseId('chat'));
+    expect(callsOf(NOTION_MESSAGE_TYPES.SAVE_CONFIG).at(-1)?.[1]).toEqual({ databaseIds: { chat: link } });
+    expect(latestSnapshot!.notionChatDatabaseId).toBe(id);
+
+    runtimeMocks.send.mockImplementation(async (type, payload) =>
+      type === NOTION_MESSAGE_TYPES.SAVE_CONFIG
+        ? { ok: false, data: null, error: { message: 'wrong parent', extra: { code: 'notion_database_wrong_parent' } } }
+        : original(type, payload),
+    );
+    await invoke(() => latestSnapshot!.setNotionChatDatabaseId('c'.repeat(32)));
+    await invoke(() => latestSnapshot!.onSaveNotionDatabaseId('chat'));
+    expect(latestSnapshot!.error).toBe('notionDatabaseWrongParent');
+  });
+
   it('Notion Connect delegates START_AUTH to background without direct pending writes or URL opening', async () => {
     await renderController();
     storageMocks.set.mockClear();

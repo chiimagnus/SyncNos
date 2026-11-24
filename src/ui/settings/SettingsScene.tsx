@@ -88,9 +88,6 @@ export function SettingsScene(props: SettingsSceneProps) {
     setNotionArticleDatabaseId,
     notionVideoDatabaseId,
     setNotionVideoDatabaseId,
-    notionChatDatabaseLabel,
-    notionArticleDatabaseLabel,
-    notionVideoDatabaseLabel,
     notionPageOptions,
     notionPageSearchEmpty,
     notionStatusText,
@@ -281,9 +278,6 @@ export function SettingsScene(props: SettingsSceneProps) {
             notionChatDatabaseId={notionChatDatabaseId}
             notionArticleDatabaseId={notionArticleDatabaseId}
             notionVideoDatabaseId={notionVideoDatabaseId}
-            notionChatDatabaseLabel={notionChatDatabaseLabel}
-            notionArticleDatabaseLabel={notionArticleDatabaseLabel}
-            notionVideoDatabaseLabel={notionVideoDatabaseLabel}
             notionPageOptions={notionPageOptions}
             notionPageSearchEmpty={notionPageSearchEmpty}
             notionLogoUrl={getURL('icons/notion.svg' as any)}

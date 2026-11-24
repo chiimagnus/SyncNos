@@ -351,6 +351,67 @@ describe('background-router notion sync', () => {
     },
   );
 
+  it('validates database links before saving and ignores view IDs for all three content types', async () => {
+    const parent = '1'.repeat(32);
+    const chromeMock = mockChromeStorage({ parentPageId: parent });
+    const router = createRouter({
+      chromeMock,
+      notionServices: {
+        tokenStore: { getToken: getNotionConnectionToken },
+        storage: null,
+        dbManager: null,
+        syncService: null,
+        jobStore: createInMemoryJobStore(),
+      },
+    });
+    const kinds = ['chat', 'article', 'video'] as const;
+    const ids = { chat: 'a'.repeat(32), article: 'b'.repeat(32), video: 'c'.repeat(32) };
+    const view = 'd'.repeat(32);
+    const links = Object.fromEntries(
+      kinds.map((kind) => [kind, `https://app.notion.com/p/example/${ids[kind]}?v=${view}&source=copy_link`]),
+    );
+    const request = { type: 'notionSaveConfig', databaseIds: links };
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(init?.method).toBe('GET');
+      expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer t');
+      const id = url.split('/').at(-1);
+      expect(Object.values(ids)).toContain(id);
+      return notionHttpResponse({ object: 'database', id, parent: { type: 'page_id', page_id: parent } });
+    });
+    (globalThis as any).fetch = fetchMock;
+    expect(await router.dispatch(request)).toMatchObject({ ok: true, data: { databaseIds: ids } });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(await router.dispatch(request)).toMatchObject({ ok: true, data: { databaseIds: ids } });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const prior = { ...chromeMock.__store };
+    const invalid = await router.dispatch({
+      type: 'notionSaveConfig',
+      databaseIds: { chat: `https://www.notion.so/?v=${view}` },
+    });
+    expect(invalid).toMatchObject({ ok: false, error: { extra: { code: 'invalid_notion_database_id' } } });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(chromeMock.__store).toEqual(prior);
+
+    const candidate = 'e'.repeat(32);
+    const patch = { type: 'notionSaveConfig', databaseIds: { chat: '', article: candidate } };
+    for (const [body, status, code] of [
+      [{ object: 'page', id: candidate }, 200, 'notion_database_unavailable'],
+      [{ object: 'database', id: candidate, archived: true }, 200, 'notion_database_unavailable'],
+      [{ object: 'database', id: view, parent: { page_id: parent } }, 200, 'notion_database_unavailable'],
+      [{ object: 'database', id: candidate, parent: { page_id: view } }, 200, 'notion_database_wrong_parent'],
+      [{ code: 'object_not_found' }, 404, 'notion_database_unavailable'],
+      [{ code: 'rate_limited' }, 429, 'rate_limited'],
+    ] as const) {
+      fetchMock.mockResolvedValueOnce(notionHttpResponse(body, status));
+      expect(await router.dispatch(patch)).toMatchObject({ ok: false, error: { extra: { code } } });
+      expect(chromeMock.__store).toEqual(prior);
+    }
+    expect(await router.dispatch({ type: 'notionResetDatabaseId', kindId: 'article' })).toMatchObject({
+      ok: true,
+      data: { databaseIds: { ...ids, article: '' } },
+    });
+  });
+
   it('returns a safe Notion auth summary without token, raw pending state, or error text', async () => {
     const chromeMock = mockChromeStorage();
     chromeMock.__store.notion_oauth_pending_state = 'raw-pending-state';
