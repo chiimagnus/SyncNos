@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { autoUpdate, computePosition, flip, offset, shift, size } from '@floating-ui/dom';
-import { ChevronLeft, ChevronRight, Palette, Pause, Play, Square, Type, Volume2 } from 'lucide-react';
+import { ChevronRight, Palette, Pause, Play, Square, Type, Volume2 } from 'lucide-react';
 
 import { t } from '@i18n';
 import {
@@ -122,17 +122,25 @@ export function ReaderHeaderToolbar({
     if (!openPanel || !anchor || !floating) return;
     let disposed = false;
     const updatePosition = () => {
+      const rect = anchor.getBoundingClientRect();
+      const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+      const requiredWidth = floating.getBoundingClientRect().width + 18;
+      const sideFits = rect.left >= requiredWidth || viewportWidth - rect.right >= requiredWidth;
       void computePosition(anchor, floating, {
         strategy: 'fixed',
-        placement: 'left-start',
+        placement: sideFits ? 'left-start' : 'bottom-end',
         middleware: [
-          offset(6),
-          flip({ fallbackPlacements: ['right-start'], padding: 12 }),
-          shift({ padding: 12, crossAxis: true }),
+          offset(sideFits ? 6 : 2),
+          flip({
+            fallbackPlacements: sideFits ? ['right-start'] : ['top-end'],
+            crossAxis: sideFits,
+            padding: 12,
+          }),
+          shift({ padding: 12, crossAxis: sideFits }),
           size({
             padding: 12,
             apply({ availableHeight, elements }) {
-              elements.floating.style.maxHeight = `${Math.max(100, Math.floor(availableHeight))}px`;
+              elements.floating.style.maxHeight = `${Math.max(0, Math.floor(availableHeight))}px`;
             },
           }),
         ],
@@ -147,14 +155,13 @@ export function ReaderHeaderToolbar({
     };
   }, [openPanel, panelRef]);
 
-  useEffect(() => {
-    if (!openPanel || !focusOnOpenRef.current) return;
+  useLayoutEffect(() => {
+    if (!openPanel || !position || !focusOnOpenRef.current) return;
     focusOnOpenRef.current = false;
-    const raf = window.requestAnimationFrame(() => {
-      panelRef.current?.querySelector<HTMLElement>('button, input, select, [tabindex]')?.focus();
-    });
-    return () => window.cancelAnimationFrame(raf);
-  }, [openPanel, panelRef]);
+    panelRef.current
+      ?.querySelector<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex="0"]')
+      ?.focus({ preventScroll: true });
+  }, [openPanel, position, panelRef]);
 
   useEffect(() => {
     if (!openPanel) return;
@@ -208,8 +215,10 @@ export function ReaderHeaderToolbar({
       aria-label={labels.toolbarAria}
       className={['tw-flex tw-flex-col tw-gap-1', className || ''].join(' ').trim()}
       data-reader-header-toolbar="true"
-      onMouseEnter={clearCloseTimer}
-      onMouseLeave={scheduleClose}
+      onPointerEnter={clearCloseTimer}
+      onPointerLeave={(event) => {
+        if (event.pointerType === 'mouse' && event.buttons === 0) scheduleClose();
+      }}
     >
       {items.map(({ id, label, Icon }) => (
         <button
@@ -221,8 +230,13 @@ export function ReaderHeaderToolbar({
           data-reader-header-trigger={id}
           aria-label={label}
           className={readerTriggerClassName()}
-          onMouseEnter={(event) => openSubmenu(id, event.currentTarget)}
-          onClick={(event) => openSubmenu(id, event.currentTarget)}
+          onPointerEnter={(event) => {
+            if (event.pointerType === 'mouse' && event.buttons === 0) openSubmenu(id, event.currentTarget);
+          }}
+          onClick={(event) => {
+            if (activeRef.current === id) closeSubmenu(true);
+            else openSubmenu(id, event.currentTarget, event.detail === 0);
+          }}
           onKeyDown={(event) => onItemKeyDown(event, id)}
         >
           <span className="tw-inline-flex tw-items-center tw-gap-2">
@@ -245,9 +259,9 @@ export function ReaderHeaderToolbar({
               'tw-overflow-y-auto tw-overscroll-contain tw-bg-[var(--bg-card)] tw-p-3 tw-text-[var(--text-primary)]',
             ].join(' ')}
             style={{ left: position?.x ?? 0, top: position?.y ?? 0, visibility: position ? 'visible' : 'hidden' }}
-            onMouseEnter={clearCloseTimer}
-            onMouseLeave={(event) => {
-              if (event.buttons === 0) scheduleClose();
+            onPointerEnter={clearCloseTimer}
+            onPointerLeave={(event) => {
+              if (event.pointerType === 'mouse' && event.buttons === 0) scheduleClose();
             }}
             onKeyDown={(event) => {
               if (event.defaultPrevented) return;
@@ -265,18 +279,6 @@ export function ReaderHeaderToolbar({
               }
             }}
           >
-            <div className="tw-mb-3 tw-flex tw-items-center tw-gap-2 tw-border-b tw-border-[var(--border)] tw-pb-2">
-              <button
-                type="button"
-                data-reader-submenu-back="true"
-                aria-label={t('backButton')}
-                className="webclipper-btn webclipper-btn--icon webclipper-btn--icon-xxs tw-shrink-0"
-                onClick={() => closeSubmenu(true)}
-              >
-                <ChevronLeft size={15} aria-hidden="true" />
-              </button>
-              <span className="tw-min-w-0 tw-flex-1 tw-truncate tw-text-xs tw-font-bold">{currentLabel}</span>
-            </div>
             {openPanel === 'text' ? (
               <TextLayoutPanel prefs={prefs} update={update} preview={preview} commitPreview={commitPreview} />
             ) : null}
