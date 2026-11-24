@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { ChevronLeft, X } from 'lucide-react';
 import './settings.css';
 import { getURL } from '@services/shared/runtime';
@@ -25,43 +25,46 @@ import { GitHubSettingsSection } from '@ui/settings/sections/GitHubSettingsSecti
 export type SettingsSceneProps = {
   activeSection: SettingsSectionKey;
   focusKey?: string;
+  hasExplicitSection: boolean;
+  onBackToList: () => void;
   onSelectSection: (key: SettingsSectionKey) => void;
   onClose?: () => void;
 };
 
 export function SettingsScene(props: SettingsSceneProps) {
-  const { activeSection, focusKey = '', onSelectSection, onClose } = props;
+  const { activeSection, focusKey = '', hasExplicitSection, onSelectSection, onBackToList, onClose } = props;
 
   const isNarrow = useIsNarrowScreen();
-  const [listFor, setListFor] = useState<string | null>(null);
-  const routeKey = activeSection + ':' + focusKey;
-  const showList = listFor === routeKey;
+  const showList = isNarrow && !hasExplicitSection;
   const detailScrollRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const navigationFocus = useRef(false);
+  const navigationFocus = useRef<SettingsSectionKey | 'detail' | null>(null);
 
   useEffect(() => {
-    setListFor(null);
     if (detailScrollRef.current && focusKey !== 'import') detailScrollRef.current.scrollTop = 0;
   }, [activeSection, focusKey]);
 
   useEffect(() => {
-    if (showList || !navigationFocus.current) return;
-    navigationFocus.current = false;
-    titleRef.current?.focus({ preventScroll: true });
-  }, [activeSection, showList]);
-
-  useEffect(() => {
-    if (!isNarrow || !showList) return;
-    const selected = document.querySelector<HTMLButtonElement>('.settings-sidebar [aria-current="page"]');
-    selected?.focus({ preventScroll: true });
-    selected?.scrollIntoView?.({ block: 'nearest' });
-  }, [isNarrow, showList]);
+    const target = navigationFocus.current;
+    if (!target || !isNarrow) return;
+    navigationFocus.current = null;
+    if (showList && target !== 'detail') {
+      const selected = document.querySelector<HTMLButtonElement>('[data-settings-section="' + target + '"]');
+      selected?.focus({ preventScroll: true });
+      selected?.scrollIntoView?.({ block: 'nearest' });
+    } else if (!showList && target === 'detail') {
+      titleRef.current?.focus({ preventScroll: true });
+    }
+  }, [activeSection, isNarrow, showList]);
 
   const setActiveSection = (key: SettingsSectionKey) => {
-    navigationFocus.current = isNarrow && (showList || key !== activeSection);
-    setListFor(null);
+    navigationFocus.current = isNarrow ? 'detail' : null;
     onSelectSection(key);
+  };
+
+  const backToList = () => {
+    navigationFocus.current = activeSection;
+    onBackToList();
   };
 
   const {
@@ -598,12 +601,7 @@ export function SettingsScene(props: SettingsSceneProps) {
         <section className="settings-detail" aria-label={settingsSectionLabel(activeSection)}>
           {isNarrow ? (
             <header className="settings-detail-header">
-              <button
-                type="button"
-                className="settings-info"
-                aria-label={t('settingsBack')}
-                onClick={() => setListFor(routeKey)}
-              >
+              <button type="button" className="settings-info" aria-label={t('settingsBack')} onClick={backToList}>
                 <ChevronLeft size={21} aria-hidden="true" />
               </button>
               <h1 ref={titleRef} tabIndex={-1}>
