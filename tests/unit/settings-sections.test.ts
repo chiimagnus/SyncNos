@@ -170,6 +170,14 @@ describe('settings section definitions', () => {
       root.render(createElement(AboutSection));
     });
 
+    const product = document.querySelector('section[aria-label="About SyncNos"]');
+    expect(product).toBeTruthy();
+    expect(product?.querySelector('h2')).toBeNull();
+    expect(product?.querySelector('#aboutVersion')?.parentElement?.firstChild?.textContent?.trim()).toBe('SyncNos');
+    expect(document.querySelector('section[aria-label="Support SyncNos"]')).toBeTruthy();
+    expect(document.body.textContent).not.toContain('SyncNos WebClipper');
+    expect(document.querySelector('section[aria-label="Author"] .settings-account small')).toBeNull();
+
     const help = document.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/"]');
     expect(help?.getAttribute('aria-label')).toBe('Help docs');
     expect(help?.querySelector('svg.lucide-arrow-up-right')).toBeTruthy();

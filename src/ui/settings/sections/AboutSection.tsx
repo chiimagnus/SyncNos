@@ -18,13 +18,13 @@ export function AboutSection() {
 
   return (
     <>
-      <SettingsGroup title={t('aboutSectionAria')}>
+      <SettingsGroup ariaLabel={t('aboutSectionAria')}>
         <SettingsFormRow
           label={
             <span className="settings-account">
               <img src={getURL('icons/icon-128.png' as any) || undefined} alt="" draggable={false} />
               <span>
-                SyncNos WebClipper
+                SyncNos
                 <small id="aboutVersion">{version ? t('versionPrefix') + ' ' + version : t('versionPrefix')}</small>
               </span>
             </span>
@@ -66,9 +66,7 @@ export function AboutSection() {
                 alt="Chii Magnus avatar"
                 draggable={false}
               />
-              <span>
-                𝓒𝓱𝓲𝓲 𝓜𝓪𝓰𝓷𝓾𝓼<small>{t('authorTagline')}</small>
-              </span>
+              <span>𝓒𝓱𝓲𝓲 𝓜𝓪𝓰𝓷𝓾𝓼</span>
             </span>
           }
         >

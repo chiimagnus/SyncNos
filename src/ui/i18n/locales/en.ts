@@ -255,7 +255,6 @@ export const en = {
   githubFeedback: 'GitHub Feedback & Feature Requests',
   changelog: 'Changelog',
   versionPrefix: 'Version',
-  authorTagline: 'Time Machine Creator~',
   angelsCta: 'Come take a look! Here are our lovely angel sponsors',
   angelsLinkLabel: 'SyncNos Angels Sponsors',
   supportHeading: 'Support',
@@ -612,11 +611,11 @@ export const en = {
     'Syncing to Feishu can take a while. Opening the tab view helps the extension keep running in the background and avoids interrupted sync jobs.',
 
   // AboutSection
-  aboutSectionAria: 'About SyncNos WebClipper',
+  aboutSectionAria: 'About SyncNos',
   linksAria: 'Links',
   authorSectionAria: 'Author',
   donateSectionAria: 'Donate QR code',
-  supportSectionAria: 'Support SyncNos WebClipper',
+  supportSectionAria: 'Support SyncNos',
 } as const;
 
 export type TranslationKey = keyof typeof en;

@@ -252,7 +252,6 @@ export const zh: { [K in TranslationKey]: string } = {
   githubFeedback: 'GitHub 问题反馈、功能需求',
   changelog: '更新日志',
   versionPrefix: '版本',
-  authorTagline: '时光机创造者~',
   angelsCta: '快来看看吧！这是可爱的天使赞助者们',
   angelsLinkLabel: 'SyncNos 天使赞助者们',
   supportHeading: '支持',
@@ -606,9 +605,9 @@ export const zh: { [K in TranslationKey]: string } = {
     '由于同步到飞书的时间可能会比较长，建议打开标签页视图版本，这样可以确保插件在后台持续运行，避免同步任务被中断。',
 
   // AboutSection
-  aboutSectionAria: '关于 SyncNos WebClipper',
+  aboutSectionAria: '关于 SyncNos',
   linksAria: '链接',
   authorSectionAria: '作者',
   donateSectionAria: '赞赏二维码',
-  supportSectionAria: '支持 SyncNos WebClipper',
+  supportSectionAria: '支持 SyncNos',
 };

@@ -6,14 +6,14 @@ export function SettingsGroup({
   note,
   ariaLabel,
 }: {
-  title: string;
+  title?: string;
   children: ReactNode;
   note?: string;
   ariaLabel?: string;
 }) {
   return (
     <section className="settings-group" aria-label={ariaLabel ?? title}>
-      <h2 className="settings-group-title">{title}</h2>
+      {title ? <h2 className="settings-group-title">{title}</h2> : null}
       <div className="settings-group-body">{children}</div>
       {note ? <p className="settings-group-note">{note}</p> : null}
     </section>
