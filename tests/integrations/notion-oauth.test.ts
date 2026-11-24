@@ -1,8 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   getNotionOAuthDefaults,
   handleNotionOAuthCallbackNavigation,
+  NOTION_OAUTH_NETWORK_ERROR,
+  NOTION_OAUTH_SERVICE_ERROR,
   setupNotionOAuthNavigationListener,
   startNotionOAuthAttempt,
 } from '@services/sync/notion/auth/oauth';
@@ -116,6 +118,10 @@ async function flushMicrotasks() {
   for (let index = 0; index < 10; index += 1) await Promise.resolve();
 }
 
+beforeEach(() => {
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 200 }));
+});
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -143,6 +149,10 @@ describe('notion oauth (ts)', () => {
 
     const started = await startNotionOAuthAttempt();
 
+    expect(fetch).toHaveBeenCalledWith(
+      getNotionOAuthDefaults().tokenExchangeProxyUrl,
+      expect.objectContaining({ method: 'OPTIONS', cache: 'no-store', signal: expect.any(AbortSignal) }),
+    );
     expect(started.state).toMatch(/^[0-9a-f]{32}$/);
     expect(chromeMock.__store.notion_oauth_pending_state).toBe(started.state);
     expect(chromeMock.__store.notion_oauth_last_error).toBe('');
@@ -156,6 +166,47 @@ describe('notion oauth (ts)', () => {
     );
     expect(opened.searchParams.get('state')).toBe(started.state);
     randomSpy.mockRestore();
+  });
+
+  it('does not open Notion authorization when the worker is unreachable and allows retry', async () => {
+    const chromeMock = installChrome();
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+    await expect(startNotionOAuthAttempt()).rejects.toThrow(NOTION_OAUTH_NETWORK_ERROR);
+    expect(chromeMock.__store.notion_oauth_pending_state).toBe('');
+    expect(chromeMock.__store.notion_oauth_last_error).toBe(NOTION_OAUTH_NETWORK_ERROR);
+    expect(chromeMock.__createdTabs).toHaveLength(0);
+
+    const started = await startNotionOAuthAttempt();
+    expect(chromeMock.__store.notion_oauth_pending_state).toBe(started.state);
+    expect(chromeMock.__store.notion_oauth_last_error).toBe('');
+    expect(chromeMock.__createdTabs).toHaveLength(1);
+  });
+
+  it('distinguishes an HTTP error from a network error before authorization', async () => {
+    const chromeMock = installChrome();
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 503 }));
+
+    await expect(startNotionOAuthAttempt()).rejects.toThrow(NOTION_OAUTH_SERVICE_ERROR);
+    expect(chromeMock.__store.notion_oauth_pending_state).toBe('');
+    expect(chromeMock.__store.notion_oauth_last_error).toBe(NOTION_OAUTH_SERVICE_ERROR);
+    expect(chromeMock.__createdTabs).toHaveLength(0);
+  });
+
+  it('reports a network failure when the connection drops after consent', async () => {
+    const chromeMock = installChrome({ notion_oauth_pending_state: 's1' });
+    const { redirectUri } = getNotionOAuthDefaults();
+    const fetchImpl = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+    const handled = await handleNotionOAuthCallbackNavigation(
+      { url: `${redirectUri}?code=c&state=s1`, tabId: 7 },
+      { fetchImpl },
+    );
+
+    expect(handled).toBe(true);
+    expect(chromeMock.__store.notion_oauth_pending_state).toBe('');
+    expect(chromeMock.__store.notion_oauth_last_error).toBe(NOTION_OAUTH_NETWORK_ERROR);
+    expect(chromeMock.__store.notion_oauth_token_v1).toBeUndefined();
+    expect(chromeMock.__store.__tabsRemoved).toBeUndefined();
   });
 
   it('START fails closed without Web Crypto and does not create durable pending state or a tab', async () => {

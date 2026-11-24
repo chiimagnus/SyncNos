@@ -215,6 +215,8 @@ export const zh: { [K in TranslationKey]: string } = {
 
   // NotionOAuthSection
   notionOAuth: 'Notion',
+  notionOAuthNetworkUnavailable: '无法访问 SyncNos 授权服务。请检查网络连接；如果当前网络无法访问该服务，请开启网络代理后重试。',
+  notionOAuthServiceUnavailable: 'SyncNos 授权服务暂时不可用，请稍后重试。',
   disconnect: '断开连接',
   connectingDots: '连接中\u2026',
   connect: '连接',

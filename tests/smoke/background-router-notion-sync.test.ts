@@ -356,7 +356,8 @@ describe('background-router notion sync', () => {
       },
     });
 
-    const res = await router.dispatch({ type: 'notionStartAuth' });
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 200 }));
+    const res = await router.dispatch({ type: 'notionStartAuth' }).finally(() => fetchMock.mockRestore());
     expect(res.ok).toBe(true);
     expect(String(res.data?.state || '')).toMatch(/^[0-9a-f]{32}$/);
     expect(chromeMock.__store.notion_oauth_pending_state).toBe(res.data?.state);

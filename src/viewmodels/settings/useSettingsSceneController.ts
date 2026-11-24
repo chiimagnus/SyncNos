@@ -31,6 +31,7 @@ import { downloadBlobFile, openOrFocusExtensionAppTab } from '@services/shared/w
 import type { Conversation } from '@services/conversations/domain/models';
 import { setSyncProviderEnabled, syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
 import { GITHUB_AUTH_STATE_KEY } from '@services/sync/github/auth/auth-store';
+import { NOTION_OAUTH_NETWORK_ERROR, NOTION_OAUTH_SERVICE_ERROR } from '@services/sync/notion/auth/oauth';
 import { autoSyncEnabledStorageKey, setAutoSyncEnabled } from '@services/sync/auto-sync/auto-sync-settings';
 import {
   ANTI_HOTLINK_RULES_SETTINGS_STORAGE_KEY,
@@ -1085,7 +1086,16 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       const requestGeneration = notionStartGenerationRef.current + 1;
       notionStartGenerationRef.current = requestGeneration;
       const pendingObservationRevisionAtStart = notionPendingObservationRevisionRef.current;
-      const started = unwrap(await send<ApiResponse<{ state: string }>>(NOTION_MESSAGE_TYPES.START_AUTH, {}));
+      const response = await send<ApiResponse<{ state: string }>>(NOTION_MESSAGE_TYPES.START_AUTH, {});
+      const authError = response?.error?.message;
+      if (!response?.ok && (authError === NOTION_OAUTH_NETWORK_ERROR || authError === NOTION_OAUTH_SERVICE_ERROR)) {
+        if (notionStartGenerationRef.current === requestGeneration) {
+          applyNotionPendingStorageObservation('');
+          applyNotionErrorStorageObservation(authError);
+        }
+        return;
+      }
+      const started = unwrap(response);
       const state = String(started?.state || '').trim();
       if (!state) throw new Error('notion oauth start returned invalid state');
       if (notionStartGenerationRef.current !== requestGeneration) return;
@@ -1103,7 +1113,14 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       setNotionLastError('');
       setNotionPollingState(true);
     });
-  }, [applyNotionAuthStatus, readNotionAuthStatus, runTask, setNotionPollingState]);
+  }, [
+    applyNotionAuthStatus,
+    applyNotionErrorStorageObservation,
+    applyNotionPendingStorageObservation,
+    readNotionAuthStatus,
+    runTask,
+    setNotionPollingState,
+  ]);
 
   const onToggleNotionSyncEnabled = useCallback(
     async (enabled: boolean) => {
@@ -2172,6 +2189,13 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     if (notionPendingState) return t('statusWaiting');
     return t('statusNotConnected');
   }, [notionConnected, notionLastError, notionPendingState, notionWorkspaceName]);
+  const notionAuthErrorText = !notionConnected
+    ? notionLastError === NOTION_OAUTH_NETWORK_ERROR
+      ? t('notionOAuthNetworkUnavailable')
+      : notionLastError === NOTION_OAUTH_SERVICE_ERROR
+        ? t('notionOAuthServiceUnavailable')
+        : ''
+    : '';
 
   useEffect(() => {
     if (activeSection !== 'backup') return;
@@ -2224,6 +2248,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     notionPageOptions,
     notionPageSearchEmpty: notionPages?.length === 0,
     notionStatusText,
+    notionAuthErrorText,
     onNotionConnectOrDisconnect,
     onSaveNotionParentPage,
     onLoadNotionPages,

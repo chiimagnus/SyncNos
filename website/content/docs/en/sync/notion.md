@@ -24,4 +24,7 @@ edit a database yourself. Changing the destination page sends future syncs to th
 **Disconnect** removes the current SyncNos connection. To revoke authorization completely,
 also remove SyncNos from Notion's connection settings.
 
+If SyncNos cannot reach its authorization service, check your connection. If your network cannot
+access the service, enable a network proxy and reconnect.
+
 Sync failures do not affect local content. Fix the connection and retry.

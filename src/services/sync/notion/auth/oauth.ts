@@ -8,6 +8,8 @@ const DEFAULT_NOTION_OAUTH_CLIENT_ID = '2a8d872b-594c-8060-9a2b-00377c27ec32';
 
 const KEY_PENDING_STATE = 'notion_oauth_pending_state';
 const KEY_LAST_ERROR = 'notion_oauth_last_error';
+export const NOTION_OAUTH_NETWORK_ERROR = 'notion_oauth_network_unavailable';
+export const NOTION_OAUTH_SERVICE_ERROR = 'notion_oauth_service_unavailable';
 
 let authMutationQueue: Promise<void> = Promise.resolve();
 
@@ -57,34 +59,32 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
   }
 }
 
+async function requestOAuthWorker(init: RequestInit, fetchImpl = fetch, timeoutMs = 12_000) {
+  const url = getNotionOAuthDefaults().tokenExchangeProxyUrl;
+  try {
+    return await (fetchImpl === fetch ? fetchWithTimeout(url, init, timeoutMs) : fetchImpl(url, init));
+  } catch (cause) {
+    throw new Error(NOTION_OAUTH_NETWORK_ERROR, { cause });
+  }
+}
+
 async function exchangeNotionCodeForToken(code: string, { fetchImpl = fetch }: { fetchImpl?: typeof fetch } = {}) {
   const cfg = getNotionOAuthDefaults();
-  if (!cfg.tokenExchangeProxyUrl) throw toError('token exchange proxy url not configured');
 
   let lastError: unknown = null;
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     try {
-      const response = await (fetchImpl === fetch
-        ? fetchWithTimeout(
-            cfg.tokenExchangeProxyUrl,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-              },
-              body: JSON.stringify({ code, redirectUri: cfg.redirectUri }),
-            },
-            12_000,
-          )
-        : fetchImpl(cfg.tokenExchangeProxyUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
-            },
-            body: JSON.stringify({ code, redirectUri: cfg.redirectUri }),
-          }));
+      const response = await requestOAuthWorker(
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({ code, redirectUri: cfg.redirectUri }),
+        },
+        fetchImpl,
+      );
 
       const text = await response.text();
       if (!response.ok) throw toError(`token exchange failed: HTTP ${response.status} ${text}`);
@@ -93,8 +93,7 @@ async function exchangeNotionCodeForToken(code: string, { fetchImpl = fetch }: {
       return json;
     } catch (error) {
       lastError = error;
-      const message = String((error as any)?.message || error || '');
-      const transient = /aborted|timeout|network|fetch/i.test(message);
+      const transient = error instanceof Error && error.message === NOTION_OAUTH_NETWORK_ERROR;
       if (attempt >= 2 || !transient) break;
       await sleep(700);
     }
@@ -134,6 +133,14 @@ export async function startNotionOAuthAttempt(): Promise<{ state: string }> {
     url.searchParams.set('owner', cfg.owner);
     url.searchParams.set('redirect_uri', cfg.redirectUri);
     url.searchParams.set('state', state);
+
+    try {
+      const response = await requestOAuthWorker({ method: 'OPTIONS', cache: 'no-store' }, fetch, 6_000);
+      if (!response.ok) throw new Error(NOTION_OAUTH_SERVICE_ERROR);
+    } catch (error) {
+      await storageSet({ [KEY_PENDING_STATE]: '', [KEY_LAST_ERROR]: (error as Error).message });
+      throw error;
+    }
 
     await storageSet({ [KEY_PENDING_STATE]: state, [KEY_LAST_ERROR]: '' });
     try {

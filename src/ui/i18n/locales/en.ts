@@ -218,6 +218,8 @@ export const en = {
 
   // NotionOAuthSection
   notionOAuth: 'Notion',
+  notionOAuthNetworkUnavailable: 'Cannot reach the SyncNos authorization service. Check your connection; if your network cannot access this service, enable a network proxy and try again.',
+  notionOAuthServiceUnavailable: 'The SyncNos authorization service is temporarily unavailable. Try again later.',
   disconnect: 'Disconnect',
   connectingDots: 'Connecting\u2026',
   connect: 'Connect',

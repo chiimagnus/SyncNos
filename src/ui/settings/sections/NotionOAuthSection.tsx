@@ -19,6 +19,7 @@ export function NotionOAuthSection(props: {
   syncEnabled: boolean;
   autoSyncEnabled: boolean;
   notionStatusText: string;
+  notionAuthErrorText: string;
   notionConnected: boolean;
   pollingNotion: boolean;
   loadingNotionPages: boolean;
@@ -51,6 +52,7 @@ export function NotionOAuthSection(props: {
     syncEnabled,
     autoSyncEnabled,
     notionStatusText,
+    notionAuthErrorText,
     notionConnected,
     pollingNotion,
     loadingNotionPages,
@@ -132,6 +134,11 @@ export function NotionOAuthSection(props: {
             {notionConnected ? t('disconnect') : pollingNotion ? t('connectingDots') : t('connect')}
           </button>
         </SettingsFormRow>
+        {notionAuthErrorText ? (
+          <p role="alert" className="settings-group-note">
+            {notionAuthErrorText}
+          </p>
+        ) : null}
         <div className="settings-group-link">
           <SettingsDocsLink path="sync/notion" />
         </div>
