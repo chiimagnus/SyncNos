@@ -1,37 +1,6 @@
 import { useId, type ReactNode } from 'react';
-import { Info } from 'lucide-react';
-import { getCurrentLocale, t } from '@i18n';
-import { buildSettingsDocsUrl, type SettingsDocsPath } from '@ui/settings/SettingsDocsLink';
-import { tooltipAttrs } from '@ui/shared/AppTooltip';
-
-function SettingsInfo({ label, detail, docsPath }: { label: string; detail: string; docsPath?: SettingsDocsPath }) {
-  const icon = <Info size={16} aria-hidden="true" />;
-  if (docsPath) {
-    return (
-      <a
-        className="settings-info"
-        href={buildSettingsDocsUrl(docsPath, getCurrentLocale())}
-        target="_blank"
-        rel="noreferrer"
-        aria-label={t('settingsDocsLink') + ': ' + label}
-        {...tooltipAttrs(detail + '\n' + t('settingsDocsLink') + ' ↗', 'bottom-start')}
-      >
-        {icon}
-      </a>
-    );
-  }
-  return (
-    <span
-      className="settings-info"
-      role="img"
-      tabIndex={0}
-      aria-label={detail}
-      {...tooltipAttrs(detail, 'bottom-start')}
-    >
-      {icon}
-    </span>
-  );
-}
+import { SettingsInfo } from './SettingsInfo';
+import type { SettingsDocsPath } from '@ui/settings/SettingsDocsLink';
 
 export function SettingsFormRow({
   label,
