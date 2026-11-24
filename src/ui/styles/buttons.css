@@ -67,6 +67,7 @@
   appearance: none;
   box-sizing: border-box;
   display: inline-grid;
+  flex-shrink: 0;
   align-items: center;
   justify-items: start;
   width: 38px;

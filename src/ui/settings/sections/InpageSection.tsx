@@ -4,7 +4,6 @@ import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
 import {
   buttonClassName,
   cardClassName,
-  checkboxClassName,
   settingsControlWidthClassName,
   settingsTextInputClassName,
 } from '@ui/settings/ui';
@@ -182,7 +181,8 @@ export function InpageSection(props: {
             checked={aiChatDollarMentionEnabled}
             disabled={busy}
             onChange={(e) => onToggleAiChatDollarMentionEnabled(!!e.target.checked)}
-            className={checkboxClassName}
+            role="switch"
+            className="webclipper-switch"
           />
           {t('aiChatDollarMentionLabel')}
         </label>
@@ -206,7 +206,8 @@ export function InpageSection(props: {
             checked={chatgptApiCaptureEnabled}
             disabled={busy}
             onChange={(event) => onToggleChatgptApiCaptureEnabled(event.target.checked)}
-            className={checkboxClassName}
+            role="switch"
+            className="webclipper-switch"
             aria-label={t('chatgptApiCaptureAdvancedLabel')}
           />
           {t('chatgptApiCaptureAdvancedLabel')}
@@ -226,7 +227,8 @@ export function InpageSection(props: {
             checked={aiChatIncludeThinkingEnabled}
             disabled={busy}
             onChange={(event) => onToggleAiChatIncludeThinkingEnabled(event.target.checked)}
-            className={checkboxClassName}
+            role="switch"
+            className="webclipper-switch"
           />
           {t('aiChatThinkingIncludeLabel')}
         </label>
@@ -245,7 +247,8 @@ export function InpageSection(props: {
             checked={aiChatAutoSaveEnabled}
             disabled={busy}
             onChange={(e) => onToggleAiChatAutoSaveEnabled(!!e.target.checked)}
-            className={checkboxClassName}
+            role="switch"
+            className="webclipper-switch"
           />
           {t('aiChatAutoSaveLabel')}
         </label>
@@ -255,7 +258,8 @@ export function InpageSection(props: {
             checked={aiChatCacheImagesEnabled}
             disabled={busy}
             onChange={(e) => onToggleAiChatCacheImagesEnabled(!!e.target.checked)}
-            className={checkboxClassName}
+            role="switch"
+            className="webclipper-switch"
           />
           <span className="tw-inline-flex tw-items-center tw-gap-2">
             <span>{t('aiChatCacheImagesLabel')}</span>
@@ -270,7 +274,8 @@ export function InpageSection(props: {
             checked={webArticleCacheImagesEnabled}
             disabled={busy}
             onChange={(e) => onToggleWebArticleCacheImagesEnabled(!!e.target.checked)}
-            className={checkboxClassName}
+            role="switch"
+            className="webclipper-switch"
           />
           <span className="tw-inline-flex tw-items-center tw-gap-2">
             <span>{t('webArticleCacheImagesLabel')}</span>

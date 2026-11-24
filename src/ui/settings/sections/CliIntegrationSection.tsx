@@ -1,6 +1,6 @@
 import { t } from '@i18n';
 import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
-import { cardClassName, checkboxClassName } from '@ui/settings/ui';
+import { cardClassName } from '@ui/settings/ui';
 
 const SKILL_REPOSITORY_BASE_URL = 'https://github.com/chiimagnus/SyncNos/tree/main/skills';
 
@@ -40,7 +40,8 @@ export function CliIntegrationSection(props: {
             checked={cliIntegrationEnabled}
             disabled={busy || !cliIntegrationAvailable}
             onChange={(e) => onToggleCliIntegration(!!e.target.checked)}
-            className={checkboxClassName}
+            role="switch"
+            className="webclipper-switch"
           />
           {t('localCliIntegrationLabel')}
         </label>

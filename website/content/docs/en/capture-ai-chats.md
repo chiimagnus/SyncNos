@@ -24,7 +24,7 @@ previously saved history. Keep long Grok conversations in the foreground and wai
 for the reply to finish before capturing.
 Some Notion AI attachment details may be unavailable.
 
-Control image caching under **Settings → General → Auto-save AI chat images locally**.
+Control image caching under **Settings → General → Auto-cache AI chat images**.
 Disabling it does not prevent text from being saved.
 
 ## ChatGPT Advanced capture

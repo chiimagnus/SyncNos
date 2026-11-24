@@ -671,6 +671,41 @@ describe('inpage anti-hotlink advanced editor', () => {
     expect(document.querySelector('section[aria-label="Local CLI Integration"]')).toBeNull();
   });
 
+  it('uses switches for all persistent General preferences without changing their values or callbacks', () => {
+    const onToggleAiChatDollarMentionEnabled = vi.fn();
+    const onToggleChatgptApiCaptureEnabled = vi.fn();
+    const onToggleAiChatIncludeThinkingEnabled = vi.fn();
+    const onToggleAiChatAutoSaveEnabled = vi.fn();
+    const onToggleAiChatCacheImagesEnabled = vi.fn();
+    const onToggleWebArticleCacheImagesEnabled = vi.fn();
+    const callbacks = {
+      onToggleAiChatDollarMentionEnabled,
+      onToggleChatgptApiCaptureEnabled,
+      onToggleAiChatIncludeThinkingEnabled,
+      onToggleAiChatAutoSaveEnabled,
+      onToggleAiChatCacheImagesEnabled,
+      onToggleWebArticleCacheImagesEnabled,
+    };
+    renderInpage(callbacks);
+    const switches = Array.from(document.querySelectorAll<HTMLInputElement>('input[role="switch"]'));
+    expect(switches).toHaveLength(6);
+    expect(switches.map((control) => control.checked)).toEqual([true, false, true, true, true, true]);
+    switches.forEach((control, index) => {
+      expect(control.type).toBe('checkbox');
+      expect(control.classList.contains('webclipper-switch')).toBe(true);
+      expect(control.closest('label')).toBeTruthy();
+      const next = !control.checked;
+      act(() => control.click());
+      expect(Object.values(callbacks)[index]).toHaveBeenCalledWith(next);
+    });
+    renderInpage({ ...callbacks, busy: true });
+    switches.forEach((control, index) => {
+      expect(control.disabled).toBe(true);
+      act(() => control.click());
+      expect(Object.values(callbacks)[index]).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('links the $ mention setting to its help docs', () => {
     renderInpage();
 
@@ -697,13 +732,11 @@ describe('inpage anti-hotlink advanced editor', () => {
     renderInpage({ onToggleChatgptApiCaptureEnabled });
 
     const section = document.querySelector('section[aria-label="ChatGPT Advanced capture"]');
-    const toggle = section?.querySelector(
-      'input[aria-label="Use the ChatGPT API for the current conversation"]',
-    ) as HTMLInputElement | null;
+    const toggle = section?.querySelector('input[aria-label="Use ChatGPT API"]') as HTMLInputElement | null;
     expect(toggle).toBeTruthy();
     expect(toggle?.checked).toBe(false);
     expect(section?.textContent).toContain('Off by default');
-    expect(section?.textContent).toContain('no same-save DOM fallback');
+    expect(section?.textContent).toContain('will not retry using the page during the same capture');
     expect(
       section?.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/capture-ai-chats/"]')?.textContent,
     ).toContain('Help docs');
@@ -754,7 +787,8 @@ describe('inpage anti-hotlink advanced editor', () => {
     renderCli({ onToggleCliIntegration });
 
     const section = document.querySelector('section[aria-label="Local CLI Integration"]');
-    const checkbox = section?.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+    const checkbox = section?.querySelector('input[role="switch"]') as HTMLInputElement | null;
+    expect(checkbox?.classList.contains('webclipper-switch')).toBe(true);
     expect(section?.textContent).toContain('Enable SyncNos CLI');
     expect(section?.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/cli/"]')).toBeTruthy();
     expect(checkbox).toBeTruthy();
@@ -961,6 +995,7 @@ describe('backup feedback', () => {
     ) as HTMLInputElement | null;
     expect(checkbox).toBeTruthy();
     expect(checkbox?.checked).toBe(false);
+    expect(checkbox?.getAttribute('role')).toBeNull();
     expect(checkbox?.className || '').toContain('tw-accent-[var(--accent)]');
     expect(document.body.textContent || '').toContain('OAuth tokens');
 
