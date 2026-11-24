@@ -1,4 +1,5 @@
 import { conversationKinds } from '@services/protocols/conversation-kinds';
+import { normalizeNotionId } from '@services/shared/notion-id';
 import { normalizeNotionDatabaseIdInput } from '@services/sync/notion/notion-id-utils';
 import { storageGet, storageRemove, storageSet } from '@platform/storage/local';
 
@@ -66,12 +67,25 @@ export async function getNotionParentPage(): Promise<{ id: string; title: string
   };
 }
 
+export async function requireNotionParentPageId(): Promise<string> {
+  const { id } = await getNotionParentPage();
+  if (!id) {
+    throw notionSettingsError(
+      'notion_parent_page_required',
+      'Choose a parent page in Settings → Notion before syncing.',
+    );
+  }
+  return id;
+}
+
 export async function setNotionParentPage(input: { id?: unknown; title?: unknown }): Promise<NotionSettingsConfig> {
   const nextId = safeString(input?.id);
   const nextTitle = safeString(input?.title);
   const current = await getNotionParentPage();
 
-  if (current.id !== nextId) await storageRemove(getDatabaseStorageKeys());
+  const currentIdentity = normalizeNotionId(current.id) || current.id;
+  const nextIdentity = normalizeNotionId(nextId) || nextId;
+  if (currentIdentity !== nextIdentity) await storageRemove(getDatabaseStorageKeys());
 
   if (!nextId) {
     await storageRemove([NOTION_PARENT_PAGE_ID_STORAGE_KEY, NOTION_PARENT_PAGE_TITLE_STORAGE_KEY]);

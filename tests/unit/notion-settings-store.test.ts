@@ -72,6 +72,15 @@ describe('Notion settings store', () => {
     expect(store[videoKey]).toBeUndefined();
   });
 
+  it('preserves database overrides when only the parent ID representation changes', async () => {
+    const compact = '0123456789abcdef0123456789abcdef';
+    const dashed = '01234567-89ab-cdef-0123-456789abcdef';
+    installStorage({ notion_parent_page_id: compact });
+    await setNotionDatabaseId('chat', 'a'.repeat(32));
+    const config = await setNotionParentPage({ id: dashed, title: 'Same page' });
+    expect(config.databaseIds.chat).toBe('a'.repeat(32));
+  });
+
   it('normalizes database ids, rejects invalid ids, and resets by kind', async () => {
     installStorage({ notion_parent_page_id: 'parent-a', notion_parent_page_title: 'Parent A' });
     const rawId = '01234567-89AB-CDEF-0123-456789ABCDEF';

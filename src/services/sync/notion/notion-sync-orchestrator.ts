@@ -1,7 +1,7 @@
 import type { NotionServices } from '@services/sync/notion/notion-services.ts';
 import { extractNotionWorkspaceSlugFromUrl } from '@services/sync/notion/notion-url-utils';
 import { computeNewMessages, extractCursor, lastMessageCursor } from '@services/sync/notion/notion-sync-cursor.ts';
-import { getNotionParentPage } from '@services/sync/notion/settings-store';
+import { requireNotionParentPageId } from '@services/sync/notion/settings-store';
 import {
   buildNotionCommentsBlocks,
   computeNotionCommentsDigest,
@@ -302,10 +302,6 @@ async function buildNonArticleBlocksForSync({
   };
 }
 
-async function getNotionParentPageId() {
-  return (await getNotionParentPage()).id;
-}
-
 export function createNotionSyncOrchestrator(services: NotionServices) {
   const ownership = createSyncRunOwnership();
   const {
@@ -377,8 +373,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
       const accessToken = token?.accessToken || '';
       if (!accessToken) throw new Error('notion not connected');
 
-      const parentPageId = await getNotionParentPageId();
-      if (!parentPageId) throw new Error('missing parentPageId');
+      const parentPageId = await requireNotionParentPageId();
 
       const dbIdByKindId = new Map();
       const dbIdPromiseByKindId = new Map();
@@ -1205,6 +1200,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
     syncConversations,
     isRunActive: () => ownership.isRunActive(),
     runExclusiveMaintenance,
+    runExclusiveConfigMutation: ownership.runExclusiveMutation,
     reconcileStartupSyncJob,
   };
 }

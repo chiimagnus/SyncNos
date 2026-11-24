@@ -131,6 +131,7 @@ function createServices() {
     },
     notionSyncOrchestrator: {
       runExclusiveMaintenance: vi.fn(),
+      runExclusiveConfigMutation: vi.fn(),
       isRunActive: vi.fn(() => false),
       reconcileStartupSyncJob: () => mocks.reconcileStartupSyncJob('notion'),
     },

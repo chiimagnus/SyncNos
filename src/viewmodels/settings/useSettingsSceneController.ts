@@ -249,7 +249,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [notionLastError, setNotionLastError] = useState<string>('');
   const [notionParentPageId, setNotionParentPageId] = useState<string>('');
   const [notionParentPageTitle, setNotionParentPageTitle] = useState<string>('');
-  const [notionPages, setNotionPages] = useState<NotionPageOption[]>([]);
+  const [notionPages, setNotionPages] = useState<NotionPageOption[] | null>(null);
   const [loadingNotionPages, setLoadingNotionPages] = useState(false);
   const [pollingNotion, setPollingNotion] = useState(false);
   const notionConnectedRef = useRef<boolean | null>(null);
@@ -460,7 +460,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         setNotionPollingState(false);
       } else {
         setLoadingNotionPages(false);
-        setNotionPages([]);
+        setNotionPages(null);
       }
       return true;
     },
@@ -1070,7 +1070,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         notionLastErrorRef.current = '';
         setNotionPendingState('');
         setNotionLastError('');
-        setNotionPages([]);
+        setNotionPages(null);
         setNotionParentPageId('');
         setNotionParentPageTitle('');
         setNotionChatDatabaseId('');
@@ -1509,37 +1509,17 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
 
   const onLoadNotionPages = useCallback(async () => {
     setLoadingNotionPages(true);
+    setNotionPages(null);
     await runTask(
       async () => {
-        const savedId = String(notionParentPageId || '').trim();
-        const savedTitle = String(notionParentPageTitle || '').trim();
-
         const res = unwrap(await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.LIST_PARENT_PAGES, {}));
         const pages = Array.isArray(res?.pages) ? (res.pages as NotionPageOption[]) : [];
-        const resolvedSaved = res?.resolvedSaved ? (res.resolvedSaved as NotionPageOption) : null;
-
         setNotionPages(pages);
-
-        const nextId = savedId || pages[0]?.id || '';
-        const nextTitle = (resolvedSaved?.title || (savedId ? savedTitle : pages[0]?.title) || '').trim();
-
-        if (nextId) setNotionParentPageId(nextId);
-        if (nextTitle) setNotionParentPageTitle(nextTitle);
-
-        if (nextId && (nextId !== savedId || nextTitle !== savedTitle)) {
-          const config = unwrap(
-            await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.SAVE_CONFIG, {
-              parentPageId: nextId,
-              parentPageTitle: nextTitle,
-            }),
-          );
-          applyNotionConfig(config);
-        }
       },
       { useBusy: false, fallbackMessage: 'failed to load pages' },
     );
     setLoadingNotionPages(false);
-  }, [applyNotionConfig, notionParentPageId, notionParentPageTitle, runTask]);
+  }, [runTask]);
 
   useEffect(() => {
     if (!notionConnected) {
@@ -1548,32 +1528,24 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     }
 
     if (notionPagesAutoLoadRef.current) return;
-    if (notionPageOptions.length) {
-      notionPagesAutoLoadRef.current = true;
-      return;
-    }
-
     notionPagesAutoLoadRef.current = true;
     void onLoadNotionPages();
-  }, [notionConnected, notionPageOptions.length, onLoadNotionPages]);
+  }, [notionConnected, onLoadNotionPages]);
 
   const onSaveNotionParentPage = useCallback(
     async (id: string) => {
       const next = String(id || '').trim();
-      if (!next) return;
-      await runTask(async () => {
-        const match = notionPages.find((page) => page && String(page.id || '').trim() === next) ?? null;
-        const title = String(match?.title || '').trim();
+      if (!next) return false;
+      return runTask(async () => {
         const config = unwrap(
           await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.SAVE_CONFIG, {
             parentPageId: next,
-            parentPageTitle: title,
           }),
         );
         applyNotionConfig(config);
       });
     },
-    [applyNotionConfig, notionPages, runTask],
+    [applyNotionConfig, runTask],
   );
 
   const onToggleNotionAdvancedOpen = useCallback(() => {
@@ -2248,6 +2220,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     onResetNotionDatabaseId,
     notionParentPageId,
     notionPageOptions,
+    notionPageSearchEmpty: notionPages?.length === 0,
     notionStatusText,
     onNotionConnectOrDisconnect,
     onSaveNotionParentPage,

@@ -1,5 +1,5 @@
 import type { NotionPageOption } from '@viewmodels/settings/utils';
-import type { KeyboardEvent } from 'react';
+import { useState, type KeyboardEvent } from 'react';
 import { t } from '@i18n';
 import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
 import {
@@ -31,12 +31,13 @@ export function NotionOAuthSection(props: {
   notionArticleDatabaseLabel: string;
   notionVideoDatabaseLabel: string;
   notionPageOptions: NotionPageOption[];
+  notionPageSearchEmpty: boolean;
   notionLogoUrl: string;
   onToggleSyncEnabled: (enabled: boolean) => void;
   onToggleAutoSyncEnabled: (enabled: boolean) => void;
   onToggleAdvancedOpen: () => void;
   onConnectOrDisconnect: () => void;
-  onSaveNotionParentPage: (id: string) => void;
+  onSaveNotionParentPage: (id: string) => Promise<boolean>;
   onChangeNotionChatDatabaseId: (id: string) => void;
   onChangeNotionArticleDatabaseId: (id: string) => void;
   onChangeNotionVideoDatabaseId: (id: string) => void;
@@ -61,6 +62,7 @@ export function NotionOAuthSection(props: {
     notionArticleDatabaseLabel,
     notionVideoDatabaseLabel,
     notionPageOptions,
+    notionPageSearchEmpty,
     notionLogoUrl,
     onToggleSyncEnabled,
     onToggleAutoSyncEnabled,
@@ -74,6 +76,11 @@ export function NotionOAuthSection(props: {
     onResetNotionDatabaseId,
     onLoadNotionPages,
   } = props;
+
+  const [parentPageInput, setParentPageInput] = useState('');
+  const saveParentPageInput = async () => {
+    if (await onSaveNotionParentPage(parentPageInput)) setParentPageInput('');
+  };
 
   const onEnterToSaveDatabaseId = (e: KeyboardEvent<HTMLInputElement>, kind: 'chat' | 'article' | 'video') => {
     if (e.key !== 'Enter') return;
@@ -116,7 +123,15 @@ export function NotionOAuthSection(props: {
         </div>
       </SettingsGroup>
       <SettingsGroup title={t('settingsDestination')}>
-        <SettingsFormRow label={t('parentPage')} info={t('settingsNotionDestinationInfo')}>
+        <SettingsFormRow
+          label={t('parentPage')}
+          info={t('settingsNotionDestinationInfo')}
+          description={
+            notionConnected && !loadingNotionPages && !notionParentPageId && notionPageSearchEmpty
+              ? t('notionNoParentPages')
+              : undefined
+          }
+        >
           <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
             <SelectMenu<string>
               buttonId="notionPages"
@@ -127,7 +142,7 @@ export function NotionOAuthSection(props: {
               ariaLabel={t('parentPage')}
               minWidth={180}
               maxHeight={320}
-              onChange={(next) => onSaveNotionParentPage(next)}
+              onChange={(next) => void onSaveNotionParentPage(next)}
               options={[
                 {
                   value: '',
@@ -153,6 +168,34 @@ export function NotionOAuthSection(props: {
             </button>
           </div>
         </SettingsFormRow>
+        {notionConnected ? (
+          <SettingsFormRow label={t('notionParentPageLink')} controlId="notionParentPageLink">
+            <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
+              <input
+                id="notionParentPageLink"
+                value={parentPageInput}
+                onChange={(e) => setParentPageInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter' || !parentPageInput.trim() || busy || loadingNotionPages) return;
+                  e.preventDefault();
+                  void saveParentPageInput();
+                }}
+                disabled={busy || loadingNotionPages}
+                spellCheck={false}
+                placeholder="https://www.notion.so/…"
+                className={settingsTextInputClassName}
+              />
+              <button
+                type="button"
+                className={buttonClassName}
+                onClick={() => void saveParentPageInput()}
+                disabled={busy || loadingNotionPages || !parentPageInput.trim()}
+              >
+                {t('saveButton')}
+              </button>
+            </div>
+          </SettingsFormRow>
+        ) : null}
         <SettingsFormRow label={t('settingsAdvanced')} info={t('notionAdvancedDbIdHint')}>
           <button
             type="button"

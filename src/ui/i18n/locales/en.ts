@@ -222,6 +222,8 @@ export const en = {
   connectingDots: 'Connecting\u2026',
   connect: 'Connect',
   parentPage: 'Parent Page',
+  notionParentPageLink: 'Page link or ID',
+  notionNoParentPages: 'No pages found. Share a page with SyncNos in Notion, then refresh or paste its link.',
   clickRefresh: 'Click refresh \u2192',
   refresh: 'Refresh',
   refreshPagesAria: 'Refresh pages',

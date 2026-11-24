@@ -76,6 +76,7 @@ export type NotionSyncOrchestrator = SyncOwnershipSurface &
     syncConversations: (input: { conversationIds?: unknown[]; instanceId: string; jobId?: string }) => Promise<unknown>;
     getSyncJobStatus: () => Promise<unknown>;
     clearSyncJobStatus: () => Promise<unknown>;
+    runExclusiveConfigMutation: ExclusiveMaintenance;
   };
 
 export type ObsidianSyncOrchestrator = SyncOwnershipSurface & {

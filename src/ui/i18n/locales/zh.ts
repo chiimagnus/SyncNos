@@ -219,6 +219,8 @@ export const zh: { [K in TranslationKey]: string } = {
   connectingDots: '连接中\u2026',
   connect: '连接',
   parentPage: '父页面',
+  notionParentPageLink: '页面链接或 ID',
+  notionNoParentPages: '未找到页面。请在 Notion 中授权 SyncNos 访问页面，再刷新或粘贴页面链接。',
   clickRefresh: '点击刷新 \u2192',
   refresh: '刷新',
   refreshPagesAria: '刷新页面列表',

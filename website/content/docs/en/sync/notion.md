@@ -11,6 +11,8 @@ description: Connect Notion and sync SyncNos content under a page you choose.
 4. Run one manual sync and confirm the result.
 
 Enable auto-sync only if you want it. SyncNos can access only the Notion content you authorize.
+If the parent-page list is empty, share a page with SyncNos in Notion and refresh.
+You can also paste the authorized page's link into **Page link or ID** and save without waiting for search indexing.
 
 ## Sync location
 

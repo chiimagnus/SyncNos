@@ -5,7 +5,7 @@ import {
   OBSIDIAN_MESSAGE_TYPES,
 } from '@platform/messaging/message-contracts';
 import { getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
-import { getNotionParentPage } from '@services/sync/notion/settings-store';
+import { requireNotionParentPageId } from '@services/sync/notion/settings-store';
 import { getFeishuOAuthToken } from '@services/sync/feishu/auth/token-store';
 import { ensureSyncProviderEnabled } from '@services/sync/sync-provider-gate';
 import { normalizeSyncConversationIds } from '@services/sync/sync-conversation-ids';
@@ -102,8 +102,7 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
       const token = await getNotionOAuthToken().catch(() => null);
       if (!token?.accessToken) return router.err('notion not connected');
 
-      const parentPageId = (await getNotionParentPage()).id;
-      if (!parentPageId) return router.err('missing parentPageId');
+      await requireNotionParentPageId();
 
       const jobId = createSyncJobId();
       const run = deps.notionSyncOrchestrator.syncConversations({ conversationIds, instanceId, jobId });

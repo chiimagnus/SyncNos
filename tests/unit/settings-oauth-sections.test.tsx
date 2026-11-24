@@ -58,12 +58,13 @@ function notionProps(overrides: Partial<NotionProps> = {}): NotionProps {
     notionArticleDatabaseLabel: 'article-db',
     notionVideoDatabaseLabel: 'video-db',
     notionPageOptions: [],
+    notionPageSearchEmpty: false,
     notionLogoUrl: 'https://example.com/notion.png',
     onToggleSyncEnabled: noOp,
     onToggleAutoSyncEnabled: noOp,
     onToggleAdvancedOpen: noOp,
     onConnectOrDisconnect: noOp,
-    onSaveNotionParentPage: noOp,
+    onSaveNotionParentPage: async () => true,
     onChangeNotionChatDatabaseId: noOp,
     onChangeNotionArticleDatabaseId: noOp,
     onChangeNotionVideoDatabaseId: noOp,
@@ -176,6 +177,20 @@ describe('Settings OAuth sections', () => {
       expect(document.querySelectorAll('.settings-group').length).toBeGreaterThan(1);
       expect(onToggleAutoSyncEnabled).toHaveBeenCalledTimes(1);
     }
+  });
+
+  it('shows a recovery path when Notion is connected but the parent list is empty', async () => {
+    await render(createElement(NotionOAuthSection, notionProps({ notionConnected: true })));
+    expect(document.body.textContent).not.toContain('notionNoParentPages');
+    await render(
+      createElement(NotionOAuthSection, notionProps({ notionConnected: true, notionPageSearchEmpty: true })),
+    );
+    expect(document.body.textContent).toContain('notionNoParentPages');
+    expect(document.querySelector('label[for="notionParentPageLink"]')?.textContent).toBe('notionParentPageLink');
+    expect(document.querySelector<HTMLInputElement>('#notionParentPageLink')?.disabled).toBe(false);
+    await render(createElement(NotionOAuthSection, notionProps({ notionConnected: true, loadingNotionPages: true })));
+    expect(document.body.textContent).not.toContain('notionNoParentPages');
+    expect(document.querySelector<HTMLInputElement>('#notionParentPageLink')?.disabled).toBe(true);
   });
 
   it('keeps provider text fields and select triggers on the compact settings control width', async () => {
