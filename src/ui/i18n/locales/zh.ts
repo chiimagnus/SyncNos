@@ -40,16 +40,12 @@ export const zh: { [K in TranslationKey]: string } = {
   settingsAutoSaveInfo: '自动保存在支持自动保存的站点中的 AI 对话。ChatGPT 和 Google AI Studio 需要手动采集。',
   settingsMentionInfo: '在支持的 AI 对话输入框中输入 $，即可搜索已保存条目。按 Tab 或 Enter 插入。',
   settingsImageCacheInfo: '将内容图片缓存到本地，便于离线阅读和导出。图片下载失败不会阻止正文保存。',
-  settingsArticleCacheInfo: '将网页文章图片缓存到本地，可能增加本地存储占用。',
-  settingsSyncInfo: '关闭后不再作为同步目标。原有连接、配置和自动同步偏好仍会保留，已同步内容不会被删除。',
-  settingsAutoSyncInfo: '自动将新保存或更新的内容加入此服务的同步流程。需要先完成连接及目标配置。',
   settingsCliInfo: '允许本机应用通过 Native Messaging 访问 SyncNos。是否可用取决于浏览器支持。',
   settingsUsernamePlaceholder: '输入用户名',
   settingsNotionDestinationInfo: 'SyncNos 在此页面下自动发现或创建受管数据库。',
   settingsFeishuSecretInfo: '用于飞书授权，请勿公开分享。',
   settingsFeishuProxyInfo: '用于交换授权令牌的 Worker 地址。',
   settingsObsidianUrlInfo: 'Obsidian Local REST API 插件的地址。',
-  settingsGithubRepositoryInfo: '仅可同步到已授权且允许写入内容的仓库。',
 
   // LanguageSection
   languageHeading: '语言',

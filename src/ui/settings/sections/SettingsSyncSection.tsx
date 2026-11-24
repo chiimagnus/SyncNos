@@ -30,7 +30,6 @@ export function SettingsSyncSection({
           checked={syncEnabled}
           disabled={busy}
           onChange={onToggleSyncEnabled}
-          info={t('settingsSyncInfo')}
         />
         {syncEnabled ? (
           <SettingsSwitchRow
@@ -39,7 +38,6 @@ export function SettingsSyncSection({
             checked={autoSyncEnabled}
             disabled={busy}
             onChange={onToggleAutoSyncEnabled}
-            info={t('settingsAutoSyncInfo')}
           />
         ) : null}
       </SettingsGroup>

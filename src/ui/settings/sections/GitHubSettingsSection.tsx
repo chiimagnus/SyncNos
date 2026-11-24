@@ -219,7 +219,7 @@ export function GitHubSettingsSection(props: {
               </div>
             ) : null}
 
-            <SettingsFormRow label={t('githubRepositoryLabel')} info={t('settingsGithubRepositoryInfo')}>
+            <SettingsFormRow label={t('githubRepositoryLabel')}>
               <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
                 <SelectMenu<string>
                   buttonId="githubRepository"

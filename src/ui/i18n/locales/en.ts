@@ -38,16 +38,12 @@ export const en = {
   settingsAutoSaveInfo: 'Automatically save chats on supported sites. ChatGPT and Google AI Studio require manual capture.',
   settingsMentionInfo: 'Type $ in supported AI chat inputs to search saved items. Press Tab or Enter to insert.',
   settingsImageCacheInfo: 'Cache content images locally for offline reading and export. Image failures do not prevent text from being saved.',
-  settingsArticleCacheInfo: 'Cache article images locally. This may increase local storage usage.',
-  settingsSyncInfo: 'Turn off to disable this destination. Your connection, configuration, and auto-sync preference are retained. Synced content is not deleted.',
-  settingsAutoSyncInfo: 'Automatically queue newly saved or updated content for this service. Connection and destination configuration are required.',
   settingsCliInfo: 'Allow local applications to access SyncNos through Native Messaging. Availability depends on browser support.',
   settingsUsernamePlaceholder: 'Enter username',
   settingsNotionDestinationInfo: 'SyncNos discovers or creates managed databases under this page.',
   settingsFeishuSecretInfo: 'Used for Feishu authorization. Keep it private.',
   settingsFeishuProxyInfo: 'Worker endpoint for authorization token exchange.',
   settingsObsidianUrlInfo: 'The address of your Obsidian Local REST API plugin.',
-  settingsGithubRepositoryInfo: 'Sync requires an authorized repository with content write access.',
 
   // LanguageSection
   languageHeading: 'Language',

@@ -185,7 +185,6 @@ export function InpageSection(props: {
           checked={webArticleCacheImagesEnabled}
           disabled={busy}
           onChange={onToggleWebArticleCacheImagesEnabled}
-          info={t('settingsArticleCacheInfo')}
           badge={t('betaTag')}
         />
         <SettingsFormRow label={t('antiHotlinkRulesLabel')} info={t('antiHotlinkRulesHint')}>
