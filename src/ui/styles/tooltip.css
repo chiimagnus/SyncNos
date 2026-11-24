@@ -1,6 +1,8 @@
 .react-tooltip.webclipper-tooltip {
   --rt-opacity: 1;
-  max-width: 320px;
+  max-width: min(320px, calc(100vw - 24px));
+  overflow-wrap: anywhere;
+  white-space: pre-line;
   border: 1px solid rgb(67 71 82 / 64%);
   border-radius: var(--radius-inline);
   background: rgb(27 30 36 / 95%);

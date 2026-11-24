@@ -370,12 +370,7 @@ export default function AppShell() {
       if (!showSettingsSheet) return;
       const onKey = (e: KeyboardEvent) => {
         if (e.key === 'Escape' && !e.defaultPrevented) {
-          if (
-            document.querySelector(
-              '.settings-scene [data-settings-info-panel], .settings-scene [role="menu"]:not([hidden])',
-            )
-          )
-            return;
+          if (document.querySelector('.settings-scene [role="menu"]:not([hidden])')) return;
           const target = e.target;
           if (target instanceof Element && target.closest('[data-shortcut-recording="true"]')) return;
           e.preventDefault();

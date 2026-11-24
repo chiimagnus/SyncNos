@@ -220,36 +220,16 @@
   color: var(--text-secondary);
   cursor: pointer;
 }
-.settings-info:hover,
-.settings-info[aria-expanded='true'] {
+.settings-info:hover {
   background: color-mix(in srgb, var(--text-primary) 7%, transparent);
   color: var(--text-primary);
+}
+.settings-info[role='img'] {
+  cursor: help;
 }
 .settings-info:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
-}
-.settings-info-panel {
-  z-index: 80;
-  width: 300px;
-  max-width: calc(100vw - 24px);
-  overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-card);
-  background: var(--bg-card);
-  color: var(--text-primary);
-  box-shadow: var(--card-shadow);
-  padding: 13px 15px;
-  font-size: 13px;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-.settings-info-panel p {
-  margin: 6px 0;
-  color: var(--text-secondary);
-}
-.settings-info-panel a {
-  margin-top: 5px;
 }
 .settings-expanded {
   padding: 0 0 13px;
@@ -377,9 +357,6 @@
 .settings-group-body,
 .settings-expanded {
   min-width: 0;
-}
-.settings-info-panel:focus {
-  outline: none;
 }
 
 .settings-scene[data-narrow='true'] .settings-sidebar nav {

@@ -18,7 +18,6 @@ export const zh: { [K in TranslationKey]: string } = {
   settingsSectionsAria: '设置分区',
   settingsDialogAria: '设置',
   settingsDocsLink: '帮助文档',
-  settingsMoreInfo: '了解更多',
   settingsBack: '返回设置列表',
   settingsPreferences: '偏好设置',
   settingsSyncServices: '同步服务',

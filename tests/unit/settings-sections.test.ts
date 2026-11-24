@@ -749,44 +749,44 @@ describe('inpage anti-hotlink advanced editor', () => {
     });
   });
 
-  const openInfo = (label: string) => {
-    const trigger = Array.from(document.querySelectorAll<HTMLButtonElement>('.settings-info')).find(
-      (button) => button.getAttribute('aria-label') === 'Learn more: ' + label,
-    )!;
-    expect(trigger).toBeTruthy();
-    act(() => trigger.dispatchEvent(new window.MouseEvent('click', { bubbles: true, detail: 1 })));
-    expect(trigger.getAttribute('aria-expanded')).toBe('true');
-    return document.querySelector('[data-settings-info-panel]');
+  const findInfo = (label: string) => {
+    const row = Array.from(document.querySelectorAll('.settings-form-row')).find(
+      (row) => row.querySelector('.settings-form-row__label > span')?.textContent === label,
+    );
+    const info = row?.querySelector<HTMLElement>('.settings-info');
+    expect(info?.getAttribute('data-tooltip-id')).toBe('webclipper-tooltip');
+    expect(info?.getAttribute('data-tooltip-place')).toBe('bottom-start');
+    expect(info?.querySelector('svg')).toBeTruthy();
+    return info!;
   };
 
-  it('links the $ mention setting to its help docs', async () => {
+  it('uses the shared tooltip and a real localized link for the $ mention setting', () => {
     renderInpage();
 
-    const panel = openInfo('Insert saved items with $');
-    expect(
-      panel?.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/dollar-mention/"]')?.textContent,
-    ).toContain('Help docs');
-    expect(panel?.textContent).toContain('Tab or Enter');
-    act(() =>
-      document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })),
-    );
-    expect(document.querySelector('[data-settings-info-panel]')).toBeNull();
-    await flushReactScheduler();
+    const info = findInfo('Insert saved items with $');
+    expect(info.getAttribute('href')).toBe('https://chiimagnus.github.io/SyncNos/docs/en/dollar-mention/');
+    expect(info.getAttribute('target')).toBe('_blank');
+    expect(info.getAttribute('data-tooltip-content')).toContain('Tab or Enter');
+    expect(info.getAttribute('data-tooltip-content')).toContain('Help docs');
   });
 
-  it('keeps the AI thinking capture preference in General settings', async () => {
+  it('keeps the AI thinking capture preference in General settings', () => {
     const onToggleAiChatIncludeThinkingEnabled = vi.fn();
     renderInpage({ onToggleAiChatIncludeThinkingEnabled });
 
     const toggle = document.querySelector<HTMLInputElement>('input[aria-label="Save thinking content"]');
     expect(toggle?.checked).toBe(true);
-    expect(openInfo('Save thinking content')?.textContent).toContain('future saves');
+    const info = findInfo('Save thinking content');
+    expect(info.getAttribute('data-tooltip-content')).toContain('future saves');
+    expect(info.tabIndex).toBe(0);
+    expect(info.getAttribute('aria-label')).toContain('future saves');
+    expect(info.tagName).toBe('SPAN');
+    expect(info.hasAttribute('aria-haspopup')).toBe(false);
     act(() => toggle!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
     expect(onToggleAiChatIncludeThinkingEnabled).toHaveBeenCalledWith(false);
-    await flushReactScheduler();
   });
 
-  it('keeps ChatGPT Advanced capture in General settings', async () => {
+  it('keeps ChatGPT Advanced capture in General settings', () => {
     const onToggleChatgptApiCaptureEnabled = vi.fn();
     renderInpage({ onToggleChatgptApiCaptureEnabled });
 
@@ -794,16 +794,15 @@ describe('inpage anti-hotlink advanced editor', () => {
     expect(toggle).toBeTruthy();
     expect(toggle?.checked).toBe(false);
     expect(toggle?.closest('.settings-form-row')?.textContent).toContain('Manual capture only');
-    const panel = openInfo('Use ChatGPT API');
-    expect(panel?.textContent).toContain('Off by default');
-    expect(panel?.textContent).toContain('will not retry using the page during the same capture');
-    expect(
-      panel?.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/capture-ai-chats/"]')?.textContent,
-    ).toContain('Help docs');
+    const info = findInfo('Use ChatGPT API');
+    expect(info.getAttribute('data-tooltip-content')).toContain('Off by default');
+    expect(info.getAttribute('data-tooltip-content')).toContain(
+      'will not retry using the page during the same capture',
+    );
+    expect(info.getAttribute('href')).toBe('https://chiimagnus.github.io/SyncNos/docs/en/capture-ai-chats/');
 
     act(() => toggle!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
     expect(onToggleChatgptApiCaptureEnabled).toHaveBeenCalledWith(true);
-    await flushReactScheduler();
   });
 
   it('renders browser-managed keyboard shortcuts in the dedicated section', async () => {
@@ -851,9 +850,9 @@ describe('inpage anti-hotlink advanced editor', () => {
     const checkbox = section?.querySelector('input[role="switch"]') as HTMLInputElement | null;
     expect(checkbox?.classList.contains('webclipper-switch')).toBe(true);
     expect(section?.textContent).toContain('Enable SyncNos CLI');
-    expect(
-      openInfo('Enable SyncNos CLI')?.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/cli/"]'),
-    ).toBeTruthy();
+    expect(findInfo('Enable SyncNos CLI').getAttribute('href')).toBe(
+      'https://chiimagnus.github.io/SyncNos/docs/en/cli/',
+    );
     expect(checkbox).toBeTruthy();
     expect(checkbox?.disabled).toBe(false);
     expect(document.body.textContent || '').toContain('Skills directory used by your AI agent');
