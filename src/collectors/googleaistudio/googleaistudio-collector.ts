@@ -540,9 +540,7 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
       if (!message) continue;
       if (message.captureMergePolicy === 'preserve-existing-markdown') {
         accumulator.completeness = 'partial';
-        if (!accumulator.reasons.includes('inline_images_incomplete')) {
-          accumulator.reasons.push('inline_images_incomplete');
-        }
+        addPreparedReason(accumulator, 'inline_images_incomplete');
       }
       records.push({
         key: descriptor.key,
@@ -593,7 +591,7 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
     });
 
     try {
-      const sweep = await runVirtualizedSweep(
+      await runVirtualizedSweep(
         runtime,
         {
           getScrollSeed: getConversationRoot,
@@ -621,9 +619,6 @@ export function createGoogleAiStudioCollectorDef(env: CollectorEnv): CollectorDe
           now: options.now,
         },
       );
-      accumulator.completeness = accumulator.reasons.includes('inline_images_incomplete')
-        ? 'partial'
-        : sweep.completeness;
     } finally {
       const restored = restorer.restore();
       if (!restored.restored) {

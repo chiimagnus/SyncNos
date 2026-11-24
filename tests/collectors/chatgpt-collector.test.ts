@@ -1826,6 +1826,8 @@ A --> B</code></pre>
     dom.window.history.replaceState({}, '', '/c/current-conversation-2026?model=gpt-5&foo=bar');
     const after = def.collector.__test.sampleIdentityGuard(root);
     expect(before.durableId).toBe('current-conversation-2026');
+    expect(before.anchors).toEqual([]);
+    expect(after.anchors).toEqual([]);
     expect(after.durableId).toBe(before.durableId);
     expect(after.route).toBe(before.route);
   });

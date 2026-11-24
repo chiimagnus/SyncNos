@@ -251,6 +251,7 @@ const VIRTUALIZED_REASON_CODES = new Set([
   'boundary_stalled',
   'boundary_unstable',
   'final_live_changed',
+  'inline_images_incomplete',
 ]);
 
 export function addPreparedReason<T>(accumulator: PreparedAccumulator<T>, reason: string): void {
@@ -453,7 +454,6 @@ export type VirtualizedPassOptions = {
   deadline?: number;
   stopAtKey?: string;
   scanUpwards?: boolean;
-  holdAtTop?: boolean;
 };
 
 const PASS_DEFAULTS = Object.freeze({
@@ -528,7 +528,7 @@ export async function runVirtualizedPass<T>(
   let reachedTop = false;
   let reachedBottom = false;
   let stoppedAtKey = false;
-  const upwards = options.scanUpwards === true || !!options.stopAtKey;
+  const upwards = options.scanUpwards === true;
   let steps = 0;
   let maxScrollExtent = 0;
   let previousTop = 0;
@@ -536,8 +536,8 @@ export async function runVirtualizedPass<T>(
   let boundaryRecoveries = 0;
   let lastPendingTopMessageCount = -1;
   let upwardRecoveries = 0;
-  const departedWindows = new Map<string, number>();
-  let previousWindowKeys = '';
+  const visitedWindows = new Map<string, number>();
+  let previousWindowSignature = '';
   const unresolvedKeys = new Set<string>();
   const result = (keys: string[] = []): VirtualizedPassResult => ({
     reachedTop,
@@ -548,38 +548,12 @@ export async function runVirtualizedPass<T>(
     reasons,
     unresolvedKeys: keys,
   });
-  const readBoundaryState = (boundary: VirtualizedBoundary): VirtualizedBoundaryState | null => {
+  const readBoundaryState = (boundary: VirtualizedBoundary): VirtualizedBoundaryState => {
     if (!adapter.readBoundaryState) return 'confirmed';
-    try {
-      const state = adapter.readBoundaryState(boundary);
-      if (state === 'confirmed' || state === 'pending' || state === 'unverified') return state;
-      addReason('pass_failed');
-      return null;
-    } catch (_error) {
-      addReason('pass_failed');
-      return null;
-    }
-  };
-  const readUnresolvedKeys = (): string[] | null => {
-    try {
-      const output: string[] = [];
-      for (const key of adapter.readUnresolvedKeys?.() || []) {
-        const normalized = String(key || '').trim();
-        if (normalized) output.push(normalized);
-      }
-      return output;
-    } catch (_error) {
-      addReason('pass_failed');
-      return null;
-    }
-  };
-  const rememberUnresolvedKeys = (keys: string[]) => {
-    for (const key of keys) unresolvedKeys.add(key);
-  };
-  const clearResolvedKeys = () => {
-    for (const record of accumulator.records) {
-      unresolvedKeys.delete(record.key);
-    }
+    const state = adapter.readBoundaryState(boundary);
+    if (state !== 'confirmed' && state !== 'pending' && state !== 'unverified')
+      throw new Error('invalid boundary state');
+    return state;
   };
 
   if (!originalIdentity) {
@@ -617,8 +591,7 @@ export async function runVirtualizedPass<T>(
         .readDescriptorKeys()
         .map((key) => String(key || '').trim())
         .filter(Boolean);
-      const currentUnresolvedKeys = readUnresolvedKeys();
-      if (!currentUnresolvedKeys) return null;
+      const currentUnresolvedKeys = adapter.readUnresolvedKeys?.() ?? [];
       const currentPendingKeys = adapter.readPendingKeys ? adapter.readPendingKeys() : currentUnresolvedKeys;
       latest = { metrics, keys, unresolvedKeys: currentUnresolvedKeys };
       const signature = contentFreeWindowSignature(originalIdentity, metrics, keys);
@@ -634,16 +607,15 @@ export async function runVirtualizedPass<T>(
     if (
       latest &&
       !latest.unresolvedKeys.length &&
-      !(options.holdAtTop && isAtScrollTop(latest.metrics) && readBoundaryState('top') === 'pending')
+      !(upwards && isAtScrollTop(latest.metrics) && readBoundaryState('top') === 'pending')
     )
       addReason('step_timeout');
     return latest;
   };
 
-  const scrollOlder = (left: number, top: number): ScrollMetrics => {
+  const scrollOlder = (left: number, top: number): void => {
     adapter.onUpwardScroll?.(root);
     writeScrollPosition(runtime, root, left, top);
-    return readScrollMetrics(runtime, root);
   };
 
   const recoverRegressedBottom = async (metrics: ScrollMetrics): Promise<StableWindow | null> => {
@@ -668,59 +640,51 @@ export async function runVirtualizedPass<T>(
     let progressDeadline = now() + boundaryTimeoutMs;
     const waitingKeys = previousWindow ? new Set(previousWindow.keys) : null;
     while (!deadlineExceeded()) {
-      if (!options.holdAtTop || !previousWindow) scrollOlder(0, 0);
+      if (!waitingKeys) scrollOlder(0, 0);
       const stable = await stabilize();
       if (!stable) return null;
       maxScrollExtent = Math.max(maxScrollExtent, stable.metrics.scrollHeight);
-      const keys = stable.keys.join('\u001f');
-      const firstKnown = waitingKeys ? stable.keys.findIndex((key) => waitingKeys.has(key)) : -1;
-      const hasOlderMessages = firstKnown > 0 && stable.keys.slice(0, firstKnown).some((key) => !waitingKeys!.has(key));
-      const newWindow = stable.metrics.top > 0 && waitingKeys && stable.keys.some((key) => !waitingKeys.has(key));
-      if (options.holdAtTop && previousWindow && (hasOlderMessages || newWindow)) return stable;
-      const signature = options.holdAtTop
-        ? keys
-        : contentFreeWindowSignature(originalIdentity, stable.metrics, stable.keys);
-      if ((!options.holdAtTop || !previousWindow) && signature !== lastSignature) {
-        lastSignature = signature;
-        progressDeadline = now() + boundaryTimeoutMs;
+      const atTop = isAtScrollTop(stable.metrics);
+      if (waitingKeys) {
+        const firstKnown = stable.keys.findIndex((key) => waitingKeys.has(key));
+        if (firstKnown > 0 || (!atTop && stable.keys.some((key) => !waitingKeys.has(key)))) return stable;
+        // The upward scan has already reached the loader. Let the native virtualizer finish;
+        // the next harvested window owns top confirmation.
+        if (readBoundaryState('top') !== 'pending') {
+          visitedWindows.clear();
+          previousWindowSignature = '';
+          return stable;
+        }
+      } else {
+        const signature = contentFreeWindowSignature(originalIdentity, stable.metrics, stable.keys);
+        if (signature !== lastSignature) {
+          lastSignature = signature;
+          progressDeadline = now() + boundaryTimeoutMs;
+        }
+        if (atTop) {
+          const state = readBoundaryState('top');
+          if (state === 'confirmed') {
+            adapter.onTopConfirmed?.(accumulator);
+            reachedTop = true;
+            return stable;
+          }
+          if (state === 'unverified') return null;
+          if (signature === lastPendingSignature) {
+            const maxTop = Math.max(0, stable.metrics.scrollHeight - stable.metrics.clientHeight);
+            const reentryTop = Math.min(maxTop, Math.max(1, Math.floor(stable.metrics.clientHeight * overlapRatio)));
+            if (reentryTop > 0) {
+              writeScrollPosition(runtime, root, stable.metrics.left, reentryTop);
+              await sleep(Math.max(1, pollMs));
+              if (!validateAfterAwait()) return null;
+            }
+          }
+          lastPendingSignature = signature;
+        }
       }
       if (now() > progressDeadline) {
         addReason('boundary_stalled');
         return null;
       }
-      if (!isAtScrollTop(stable.metrics)) {
-        if (options.holdAtTop && previousWindow && readBoundaryState('top') !== 'pending') {
-          // Native history loading may relocate the viewport; resume scanning the newly laid-out page.
-          return stable;
-        }
-        await sleep(Math.max(1, pollMs));
-        if (!validateAfterAwait()) return null;
-        continue;
-      }
-      const state = readBoundaryState('top');
-      if (!state) return null;
-      if (state === 'confirmed') {
-        try {
-          adapter.onTopConfirmed?.(accumulator);
-        } catch (_error) {
-          addReason('pass_failed');
-          return null;
-        }
-        reachedTop = true;
-        return stable;
-      }
-      // Unknown is not loading, and neither a scroll offset nor a timeout proves history exhaustion.
-      if (state === 'unverified') return null;
-      if (!options.holdAtTop && signature === lastPendingSignature) {
-        const maxTop = Math.max(0, stable.metrics.scrollHeight - stable.metrics.clientHeight);
-        const reentryTop = Math.min(maxTop, Math.max(1, Math.floor(stable.metrics.clientHeight * overlapRatio)));
-        if (reentryTop > 0) {
-          writeScrollPosition(runtime, root, stable.metrics.left, reentryTop);
-          await sleep(Math.max(1, pollMs));
-          if (!validateAfterAwait()) return null;
-        }
-      }
-      lastPendingSignature = signature;
       await sleep(Math.max(1, pollMs));
       if (!validateAfterAwait()) return null;
     }
@@ -742,7 +706,6 @@ export async function runVirtualizedPass<T>(
         boundaryRecoveries = 0;
         if (isAtScrollBottom(stable.metrics)) {
           const state = readBoundaryState('bottom');
-          if (!state) return { stable: null, confirmed: false };
           if (state === 'unverified') return { stable, confirmed: false };
           if (state === 'confirmed') return { stable, confirmed: true };
         } else return { stable, confirmed: false };
@@ -772,18 +735,20 @@ export async function runVirtualizedPass<T>(
 
     while (steps < maxSteps) {
       if (deadlineExceeded() || !validateAfterAwait()) break;
-      const knownKeys = new Set(accumulator.records.map((record) => record.key));
-      const hasOverlap = !knownKeys.size || stable.keys.some((key) => knownKeys.has(key));
-      if (!hasOverlap && overlapRecoveries < maxOverlapRecoveries && !upwards && stable.metrics.top > previousTop + 1) {
-        overlapRecoveries += 1;
-        const recoveryTop = Math.floor((previousTop + stable.metrics.top) / 2);
-        writeScrollPosition(runtime, root, stable.metrics.left, recoveryTop);
-        stable = await stabilize();
-        if (!stable) break;
-        continue;
+      if (!upwards && accumulator.records.length) {
+        const knownKeys = new Set(accumulator.records.map((record) => record.key));
+        const hasOverlap = stable.keys.some((key) => knownKeys.has(key));
+        if (!hasOverlap && overlapRecoveries < maxOverlapRecoveries && stable.metrics.top > previousTop + 1) {
+          overlapRecoveries += 1;
+          const recoveryTop = Math.floor((previousTop + stable.metrics.top) / 2);
+          writeScrollPosition(runtime, root, stable.metrics.left, recoveryTop);
+          stable = await stabilize();
+          if (!stable) break;
+          continue;
+        }
+        if (!hasOverlap) addReason('order_unanchored');
       }
-      if (!hasOverlap && knownKeys.size) addReason('order_unanchored');
-      rememberUnresolvedKeys(stable.unresolvedKeys);
+      for (const key of stable.unresolvedKeys) unresolvedKeys.add(key);
 
       if (deadlineExceeded()) break;
       const checkpoint = accumulator.records;
@@ -799,29 +764,25 @@ export async function runVirtualizedPass<T>(
         if (accumulator.reasons.includes('identity_changed')) invalidateAccumulatorIdentity(accumulator);
         break;
       }
-      clearResolvedKeys();
+      if (unresolvedKeys.size) {
+        for (const record of accumulator.records) unresolvedKeys.delete(record.key);
+      }
       steps += 1;
-      if (upwards && options.holdAtTop) {
-        const topState = readBoundaryState('top');
-        if (!topState) break;
-        const windowKeys = `${topState}|${contentFreeWindowSignature(originalIdentity, stable.metrics, stable.keys)}`;
-        if (windowKeys !== previousWindowKeys) {
-          if (previousWindowKeys) departedWindows.set(previousWindowKeys, accumulator.records.length);
-          const previousCount = departedWindows.get(windowKeys);
-          if (previousCount !== undefined && previousCount === accumulator.records.length) {
-            if (topState !== 'pending' || !isAtScrollTop(stable.metrics)) {
-              addReason('scroll_stalled');
-              break;
-            }
-            const loaded = await acquireLogicalTop(stable);
-            if (!loaded) break;
-            stable = loaded;
-            continue;
-          }
-          previousWindowKeys = windowKeys;
+      if (upwards) {
+        const signature = contentFreeWindowSignature(originalIdentity, stable.metrics, stable.keys);
+        if (
+          !isAtScrollTop(stable.metrics) &&
+          signature !== previousWindowSignature &&
+          visitedWindows.get(signature) === accumulator.records.length
+        ) {
+          addReason('scroll_stalled');
+          break;
         }
+        visitedWindows.set(signature, accumulator.records.length);
+        previousWindowSignature = signature;
       }
       if (
+        upwards &&
         options.stopAtKey &&
         reachedBottom &&
         accumulator.records.some((record) => record.key === options.stopAtKey) &&
@@ -836,44 +797,32 @@ export async function runVirtualizedPass<T>(
         maxScrollExtent = Math.max(maxScrollExtent, metrics.scrollHeight);
         if (isAtScrollTop(metrics)) {
           const topState = readBoundaryState('top');
-          if (!topState) break;
           if (topState === 'unverified') break;
           if (topState === 'confirmed') {
-            try {
-              adapter.onTopConfirmed?.(accumulator);
-              reachedTop = true;
-            } catch (_error) {
-              addReason('pass_failed');
-            }
+            adapter.onTopConfirmed?.(accumulator);
+            reachedTop = true;
             break;
           }
-          if (steps >= maxSteps) {
-            addReason('step_budget_exhausted');
-            break;
-          }
-          if (options.holdAtTop && accumulator.records.length === lastPendingTopMessageCount) {
+          if (steps >= maxSteps) break;
+          if (accumulator.records.length === lastPendingTopMessageCount) {
             addReason('boundary_stalled');
             break;
           }
           lastPendingTopMessageCount = accumulator.records.length;
-          const top = await acquireLogicalTop(options.holdAtTop ? stable : undefined);
+          const top = await acquireLogicalTop(stable);
           if (!top) break;
           stable = top;
           previousTop = stable.metrics.top;
           // Newly loaded turns at the logical top must be harvested before declaring success.
           continue;
         }
-        previousTop = metrics.top;
         const stepSize = Math.max(1, Math.floor(metrics.clientHeight * overlapRatio));
         const nextTop = Math.max(0, metrics.top - stepSize);
-        if (nextTop >= metrics.top) {
-          addReason('scroll_stalled');
-          break;
-        }
         const knownAfterHarvest = new Set(accumulator.records.map((record) => record.key));
         const beforeDistance = metrics.scrollHeight - metrics.clientHeight - metrics.top;
         const beforeAnchors = adapter.readScrollAnchors?.(root);
-        const requestedMetrics = scrollOlder(metrics.left, nextTop);
+        scrollOlder(metrics.left, nextTop);
+        const touchedTop = isAtScrollTop(readScrollMetrics(runtime, root));
         const nextWindow = await stabilize();
         if (!nextWindow) break;
         const afterDistance =
@@ -883,35 +832,27 @@ export async function runVirtualizedPass<T>(
           firstKnown > 0 && nextWindow.keys.slice(0, firstKnown).some((key) => !knownAfterHarvest.has(key));
         const requestedAdvance = metrics.top - nextTop;
         const observedAdvance = afterDistance - beforeDistance;
-        const afterAnchors = adapter.readScrollAnchors?.(root);
         const extentStable =
           Math.abs(nextWindow.metrics.scrollHeight - metrics.scrollHeight) <= 2 &&
           Math.abs(nextWindow.metrics.clientHeight - metrics.clientHeight) <= 2;
-        const anchoredAdvance =
-          beforeAnchors &&
-          afterAnchors &&
-          Array.from(beforeAnchors).some(([key, before]) => {
-            const after = afterAnchors.get(key);
-            if (!after) return false;
+        let movedTowardsOlder = extentStable
+          ? observedAdvance > 1 && observedAdvance <= requestedAdvance + 2
+          : observedAdvance > 1 && Math.abs(observedAdvance - requestedAdvance) <= 2;
+        if (!extentStable && beforeAnchors?.size) {
+          const afterAnchors = adapter.readScrollAnchors?.(root);
+          for (const [key, before] of beforeAnchors) {
+            const after = afterAnchors?.get(key);
+            if (!after) continue;
             const advance = after.top - before.top;
-            return (
-              advance > 1 && advance <= requestedAdvance + 2 && Math.abs(after.bottom - before.bottom - advance) <= 2
-            );
-          });
-        const exactAdvance = observedAdvance > 1 && Math.abs(observedAdvance - requestedAdvance) <= 2;
-        const hasCommonAnchor =
-          beforeAnchors && afterAnchors && Array.from(beforeAnchors.keys()).some((key) => afterAnchors.has(key));
-        const movedTowardsOlder = options.holdAtTop
-          ? extentStable
-            ? observedAdvance > 1 && observedAdvance <= requestedAdvance + 2
-            : hasCommonAnchor
-              ? anchoredAdvance
-              : exactAdvance
-          : exactAdvance;
+            movedTowardsOlder =
+              advance > 1 && advance <= requestedAdvance + 2 && Math.abs(after.bottom - before.bottom - advance) <= 2;
+            if (movedTowardsOlder) break;
+          }
+        }
         if (hasOlderMessages) upwardRecoveries = 0;
         if (!movedTowardsOlder && !hasOlderMessages) {
           // A mounted history sentinel is not an in-flight request. Only wait at an edge we actually reached.
-          if (options.holdAtTop && isAtScrollTop(requestedMetrics)) {
+          if (touchedTop) {
             if (isAtScrollTop(nextWindow.metrics)) {
               stable = nextWindow;
               continue;
@@ -924,7 +865,7 @@ export async function runVirtualizedPass<T>(
             }
           }
           // Rebase against the current layout with a bounded budget per older-message frontier.
-          if (options.holdAtTop && upwardRecoveries < 2) {
+          if (upwardRecoveries < 2) {
             upwardRecoveries += 1;
             stable = nextWindow;
             continue;
@@ -947,7 +888,6 @@ export async function runVirtualizedPass<T>(
         }
         boundaryRecoveries = 0;
         const boundaryState = readBoundaryState('bottom');
-        if (!boundaryState) break;
         if (boundaryState === 'confirmed') {
           reachedBottom = true;
           break;
@@ -968,10 +908,6 @@ export async function runVirtualizedPass<T>(
       const stepSize = Math.max(1, Math.floor(metrics.clientHeight * overlapRatio));
       const maxTop = Math.max(0, metrics.scrollHeight - metrics.clientHeight);
       const nextTop = Math.min(maxTop, metrics.top + stepSize);
-      if (nextTop <= metrics.top) {
-        addReason('scroll_stalled');
-        break;
-      }
       writeScrollPosition(runtime, root, metrics.left, nextTop);
       stable = await stabilize();
       if (!stable) break;
@@ -999,30 +935,6 @@ export type VirtualizedSweepResult = {
   reasons: string[];
 };
 
-const INCOMPLETE_REASONS = new Set([
-  'invalid_reason',
-  'missing_identity',
-  'unstable_identity',
-  'restore_failed',
-  'step_timeout',
-  'step_budget_exhausted',
-  'total_deadline_exhausted',
-  'root_detached',
-  'root_replaced',
-  'identity_changed',
-  'order_unanchored',
-  'order_conflict',
-  'unresolved_turn',
-  'pass_failed',
-  'extraction_error',
-  'scroll_stalled',
-  'top_not_reached',
-  'bottom_not_reached',
-  'boundary_stalled',
-  'boundary_unstable',
-  'final_live_changed',
-]);
-
 export async function runVirtualizedSweep<T>(
   runtime: Pick<ScrollRuntime, 'document' | 'window'>,
   adapter: VirtualizedPassAdapter<T>,
@@ -1036,7 +948,7 @@ export async function runVirtualizedSweep<T>(
     EMERGENCY_TOTAL_DEADLINE_MS,
   );
   const now = options.now || Date.now;
-  const deadline = Number.isFinite(totalDeadlineMs) ? now() + totalDeadlineMs : Number.POSITIVE_INFINITY;
+  const deadline = now() + totalDeadlineMs;
   const sweepIdentity = String(adapter.sampleIdentity() || '').trim();
   const validateSweepIdentity = (): boolean => {
     const currentIdentity = String(adapter.sampleIdentity() || '').trim();
@@ -1063,14 +975,12 @@ export async function runVirtualizedSweep<T>(
   if (pass.unresolvedKeys.length) addPreparedReason(accumulator, 'unresolved_turn');
   if (!pass.reachedTop && !pass.stoppedAtKey) addPreparedReason(accumulator, 'top_not_reached');
   if (!pass.reachedBottom) addPreparedReason(accumulator, 'bottom_not_reached');
-  const hasBlockingReason = accumulator.reasons.some((reason) => INCOMPLETE_REASONS.has(reason));
   const complete =
     pass.reachedTop &&
     pass.reachedBottom &&
     !pass.stoppedAtKey &&
     accumulator.identityVerified &&
-    !pass.unresolvedKeys.length &&
-    !hasBlockingReason;
+    !accumulator.reasons.length;
   accumulator.completeness = complete ? 'complete' : 'partial';
   accumulator.sweepMetrics = {
     steps: pass.steps,

@@ -148,6 +148,8 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
 
   function sampleIdentityGuard(root: any): PreparedIdentityGuard {
     const durableId = findConversationIdFromUrl() || findShareIdFromUrl();
+    const route = normalizedRoute();
+    if (durableId) return { route, durableId, anchors: [], topAnchor: '' };
     const anchors: string[] = [];
     const seen = new Set<string>();
     const push = (value: unknown) => {
@@ -161,16 +163,12 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       const turnId = turnKeyOf(turn);
       if (turnId) push(`turn:${turnId}`);
     }
-    const perTurn = new Map<string, number>();
     for (const wrapper of getTurnWrappers(root)) {
-      const turnId = turnKeyOf(wrapper);
-      const withinTurn = perTurn.get(turnId) || 0;
-      perTurn.set(turnId, withinTurn + 1);
       const role = roleFromWrapper(wrapper);
       push(stableManualMessageKey(wrapper, role, extractChatgptImageUrlsForRole(wrapper, role)));
     }
     const topAnchor = anchors[0] || '';
-    return { route: normalizedRoute(), durableId, anchors, topAnchor };
+    return { route, durableId, anchors, topAnchor };
   }
 
   function identityConversationKey(guard: PreparedIdentityGuard): string {
@@ -567,9 +565,10 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     turnKey: string;
     withinTurn: number;
     cot: CotAssociation | null;
+    imageUrls: string[];
+    includeInputs: boolean;
   }): ChatgptExtractionInput {
-    const { wrapper, role, key, turnKey, withinTurn, cot } = input;
-    const imageUrls = extractChatgptImageUrlsForRole(wrapper, role);
+    const { wrapper, role, key, turnKey, withinTurn, cot, imageUrls, includeInputs } = input;
     const node = role === 'user' ? userContentNode(wrapper) : assistantContentNode(wrapper);
     const text = env.normalize.normalizeText(node?.innerText || node?.textContent || '');
     const hasRichGraphic = role === 'assistant' && chatgptMarkdown.hasRichGraphic(node);
@@ -609,9 +608,10 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         hasFinalAssistantSurface &&
         (!!text || !!cotText || !!cotMarkdown || imageUrls.length > 0 || !!iframe || hasRichGraphic),
       visible: isVisibleWindow(wrapper),
-      outerHtml:
-        role === 'assistant' &&
-        serializedRoot?.querySelector?.('input[type="checkbox"], input[type="radio"], input[type="range"], option')
+      outerHtml: !includeInputs
+        ? ''
+        : role === 'assistant' &&
+            serializedRoot?.querySelector?.('input[type="checkbox"], input[type="radio"], input[type="range"], option')
           ? String(chatgptMarkdown.cloneWithControlState(serializedRoot)?.outerHTML || serializedRoot?.outerHTML || '')
           : String(serializedRoot?.outerHTML || ''),
       imageUrls,
@@ -655,6 +655,8 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         turnKey,
         withinTurn,
         cot: cotByOwner.get(wrapper) || null,
+        imageUrls,
+        includeInputs,
       });
       const {
         outerHtml: _outerHtml,
@@ -674,10 +676,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     return readCurrentManualWindow().descriptors;
   }
 
-  let manualExtractionCount = 0;
-
   function extractManualMessage(input: ChatgptExtractionInput, sequence: number): any | null {
-    manualExtractionCount += 1;
     const holder = env.document.createElement('div');
     holder.innerHTML = input.outerHtml;
     const wrapper = holder.firstElementChild as any;
@@ -766,14 +765,12 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     readIdentity: () => sampleIdentityGuard(getConversationRoot()),
     readScrollSeed: () => getConversationScrollSeed(),
     readDescriptors: readCurrentDescriptors,
-    readDescriptorKeys: () => readCurrentDescriptors().map((descriptor) => descriptor.key),
-    readUnresolvedKeys: () =>
-      readCurrentDescriptors()
+    readUnresolvedKeys: (descriptors = readCurrentDescriptors()) =>
+      descriptors
         .filter((descriptor) => descriptor.visible && !descriptor.rendered)
         .map((descriptor) => descriptor.key),
     readBoundaryState: readManualBoundaryState,
     readWindow: () => readCurrentManualWindow(true),
-    getExtractionCount: () => manualExtractionCount,
   };
 
   async function harvestRenderedInto(
@@ -781,7 +778,8 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     sourceRoot: any,
     options: { newestFirst?: boolean } = {},
   ): Promise<{ added: number; updated: number }> {
-    mergeIdentityAnchors(accumulator.identityGuard, manualAdapter.readIdentity());
+    if (!accumulator.identityGuard.durableId)
+      mergeIdentityAnchors(accumulator.identityGuard, manualAdapter.readIdentity());
     const detachedSnapshot = !!sourceRoot && sourceRoot !== getConversationRoot();
     const { descriptors, inputsByKey, unresolvedIdentity } = sourceRoot
       ? readCurrentManualWindow(true, sourceRoot)
@@ -794,13 +792,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       if (detachedSnapshot && !descriptor.rendered) continue;
       const existing = existingByKey.get(descriptor.key);
       if (existing && existing.fingerprint === descriptor.fingerprint) {
-        records.push({
-          key: existing.key,
-          turnKey: existing.turnKey,
-          withinTurn: existing.withinTurn,
-          fingerprint: existing.fingerprint,
-          payload: existing.payload,
-        });
+        records.push(existing);
         continue;
       }
       const input = inputsByKey.get(descriptor.key);
@@ -926,10 +918,14 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
     let unstagedChanges = 0;
     const stagedFingerprints = new Map<string, string>();
     let stagingFailure: unknown;
+    let windowDescriptors: ChatgptDescriptor[] = [];
     const adapter = {
       getScrollSeed: manualAdapter.readScrollSeed,
       sampleIdentity,
-      readDescriptorKeys: manualAdapter.readDescriptorKeys,
+      readDescriptorKeys: () => {
+        windowDescriptors = manualAdapter.readDescriptors();
+        return windowDescriptors.map((descriptor) => descriptor.key);
+      },
       readScrollAnchors: (scrollRoot: Element) => {
         const transcript = getConversationRoot();
         const viewport =
@@ -954,7 +950,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
           );
         }
       },
-      readUnresolvedKeys: manualAdapter.readUnresolvedKeys,
+      readUnresolvedKeys: () => manualAdapter.readUnresolvedKeys(windowDescriptors),
       readBoundaryState: manualAdapter.readBoundaryState,
       onTopConfirmed: (target: PreparedAccumulator<any>) => {
         const canonicalGuard = manualAdapter.readIdentity();
@@ -1018,7 +1014,6 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
         sleep: options.sleep,
         now: options.now,
         scanUpwards: true,
-        holdAtTop: true,
         ...(savedTailMessageKey ? { stopAtKey: savedTailMessageKey } : null),
       });
       if (observer) collectMounted(observer.takeRecords());
@@ -1034,8 +1029,7 @@ export function createChatgptCollectorDef(env: CollectorEnv): CollectorDefinitio
       const index = accumulator.records.findIndex((record) => record.key === savedTailMessageKey);
       accumulator.records = accumulator.records.slice(index);
     }
-    accumulator.completeness = sweep.completeness;
-    if (lateWindowChanged && sweep.completeness === 'complete') {
+    if (lateWindowChanged && accumulator.completeness === 'complete') {
       accumulator.completeness = 'partial';
       addPreparedReason(accumulator, 'final_live_changed');
     }
