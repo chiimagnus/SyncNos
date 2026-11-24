@@ -62,11 +62,11 @@ describe('settings section definitions', () => {
       'general',
       'shortcuts',
       'cli',
-      'backup',
       'notion',
       'feishu',
       'obsidian',
       'github',
+      'backup',
       'aboutyou',
       'aboutme',
     ]);
@@ -102,34 +102,51 @@ describe('settings section definitions', () => {
     }
   });
 
-  it('groups sections into integrations, behavior, and about areas', () => {
+  it('groups sections into preferences, integrations, data, and about', () => {
     expect(SETTINGS_SECTION_GROUPS.map((group) => group.sections.map((section) => section.key))).toEqual([
       ['general', 'shortcuts', 'cli'],
-      ['backup', 'notion', 'feishu', 'obsidian', 'github'],
-      ['aboutyou', 'aboutme'],
+      ['notion', 'feishu', 'obsidian', 'github'],
+      ['backup', 'aboutyou'],
+      ['aboutme'],
     ]);
   });
 
-  it('hides group titles and separates sidebar groups', () => {
+  it('shows the approved sidebar groups, selected section, and searchable settings labels', async () => {
     setupDom();
     const root = ReactDOM.createRoot(document.getElementById('root')!);
-
+    const onSelectSection = vi.fn();
     act(() => {
-      root.render(createElement(SettingsSidebarNav, { activeSection: 'general', onSelectSection: () => {} }));
+      root.render(createElement(SettingsSidebarNav, { activeSection: 'general', onSelectSection }));
     });
 
-    const groupList = document.querySelector('nav')?.firstElementChild;
-    const groups = groupList ? Array.from(groupList.children) : [];
-    expect(groups).toHaveLength(3);
-    expect(groups.map((group) => group.querySelectorAll('button').length)).toEqual([3, 5, 2]);
-    expect(Array.from(groups[0]?.querySelectorAll('button') || []).map((button) => button.textContent?.trim())).toEqual(
-      ['General', 'Keyboard shortcuts', 'CLI & AI SKILL'],
-    );
-    expect(groups.slice(1).every((group) => group.firstElementChild?.classList.contains('tw-h-px'))).toBe(true);
-    expect(groups.slice(1).every((group) => group.firstElementChild?.getAttribute('aria-hidden') === 'true')).toBe(
-      true,
-    );
-    expect(groups.every((group) => group.querySelectorAll('[aria-hidden="true"]').length <= 1)).toBe(true);
+    const groups = Array.from(document.querySelectorAll('nav .settings-nav-group'));
+    expect(groups).toHaveLength(4);
+    expect(groups.map((group) => group.querySelectorAll('button').length)).toEqual([3, 4, 2, 1]);
+    expect(groups.slice(0, 3).map((group) => group.querySelector('h2')?.textContent)).toEqual([
+      'Preferences',
+      'Sync services',
+      'Data',
+    ]);
+    expect(document.querySelector('[aria-current="page"]')?.textContent).toBe('General');
+    expect(document.querySelectorAll('nav button svg, nav button img')).toHaveLength(10);
+    expect(document.querySelector('img[src=""]')).toBeNull();
+    const search = document.querySelector<HTMLInputElement>('input[aria-label="Search settings"]')!;
+    const setSearch = (value: string) =>
+      act(() => {
+        Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!.call(search, value);
+        search.dispatchEvent(new window.Event('input', { bubbles: true }));
+      });
+    setSearch('thinking content');
+    expect(Array.from(document.querySelectorAll('nav button')).map((button) => button.textContent)).toEqual([
+      'General',
+    ]);
+    act(() => search.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    expect(onSelectSection).toHaveBeenCalledWith('general');
+    setSearch('not-a-real-setting');
+    expect(document.querySelector('nav button')).toBeNull();
+    expect(document.querySelector('nav [role="status"]')?.textContent).toContain('No matching settings');
+    setSearch('');
+    expect(document.querySelectorAll('nav button')).toHaveLength(10);
 
     act(() => root.unmount());
     cleanupDom();
@@ -504,7 +521,7 @@ describe('settings section definitions', () => {
     act(() => chatAttachmentInput!.dispatchEvent(new window.FocusEvent('focusout', { bubbles: true })));
     expect(onChangeChatAttachmentFolder).not.toHaveBeenCalled();
     const section = document.querySelector('section[aria-label="Obsidian"]');
-    const header = section?.firstElementChild;
+    const header = section?.querySelector('.settings-form-row');
     const testButton = Array.from(header?.querySelectorAll('button') || []).find(
       (button) => button.textContent?.trim() === 'Test',
     ) as HTMLButtonElement | undefined;
@@ -531,6 +548,7 @@ function setupDom() {
   Object.defineProperty(globalThis, 'document', { configurable: true, value: dom.window.document });
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: dom.window.navigator });
   Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: dom.window.HTMLElement });
+  Object.defineProperty(globalThis, 'Element', { configurable: true, value: dom.window.Element });
   Object.defineProperty(globalThis, 'Node', { configurable: true, value: dom.window.Node });
   Object.defineProperty(globalThis, 'MutationObserver', {
     configurable: true,
@@ -556,6 +574,7 @@ function cleanupDom() {
   delete (globalThis as any).document;
   delete (globalThis as any).navigator;
   delete (globalThis as any).HTMLElement;
+  delete (globalThis as any).Element;
   delete (globalThis as any).Node;
   delete (globalThis as any).MutationObserver;
   delete (globalThis as any).Event;
@@ -667,8 +686,9 @@ describe('inpage anti-hotlink advanced editor', () => {
     renderInpage();
 
     expect(document.querySelector('section[aria-label="Keyboard shortcuts"]')).toBeNull();
-    expect(document.querySelector('section[aria-label="Language"]')).toBeTruthy();
-    expect(document.querySelector('section[aria-label="Local CLI Integration"]')).toBeNull();
+    expect(document.querySelector('#interface-locale')?.closest('.settings-group')).toBeTruthy();
+    expect(document.querySelectorAll('.settings-group')).toHaveLength(3);
+    expect(document.querySelector('section[aria-label="Local access"]')).toBeNull();
   });
 
   it('uses switches for all persistent General preferences without changing their values or callbacks', () => {
@@ -679,21 +699,24 @@ describe('inpage anti-hotlink advanced editor', () => {
     const onToggleAiChatCacheImagesEnabled = vi.fn();
     const onToggleWebArticleCacheImagesEnabled = vi.fn();
     const callbacks = {
+      onToggleAiChatAutoSaveEnabled,
+      onToggleAiChatIncludeThinkingEnabled,
       onToggleAiChatDollarMentionEnabled,
       onToggleChatgptApiCaptureEnabled,
-      onToggleAiChatIncludeThinkingEnabled,
-      onToggleAiChatAutoSaveEnabled,
       onToggleAiChatCacheImagesEnabled,
       onToggleWebArticleCacheImagesEnabled,
     };
     renderInpage(callbacks);
     const switches = Array.from(document.querySelectorAll<HTMLInputElement>('input[role="switch"]'));
     expect(switches).toHaveLength(6);
-    expect(switches.map((control) => control.checked)).toEqual([true, false, true, true, true, true]);
+    expect(switches.map((control) => control.checked)).toEqual([true, true, true, false, true, true]);
     switches.forEach((control, index) => {
       expect(control.type).toBe('checkbox');
       expect(control.classList.contains('webclipper-switch')).toBe(true);
-      expect(control.closest('label')).toBeTruthy();
+      expect(control.closest('.settings-form-row__control')).toBeTruthy();
+      expect(Array.from(control.labels || []).find((label) => label.htmlFor === control.id)?.textContent).toBe(
+        control.getAttribute('aria-label'),
+      );
       const next = !control.checked;
       act(() => control.click());
       expect(Object.values(callbacks)[index]).toHaveBeenCalledWith(next);
@@ -706,43 +729,61 @@ describe('inpage anti-hotlink advanced editor', () => {
     });
   });
 
-  it('links the $ mention setting to its help docs', () => {
+  const openInfo = (label: string) => {
+    const trigger = Array.from(document.querySelectorAll<HTMLButtonElement>('.settings-info')).find(
+      (button) => button.getAttribute('aria-label') === 'Learn more: ' + label,
+    )!;
+    expect(trigger).toBeTruthy();
+    act(() => trigger.dispatchEvent(new window.MouseEvent('click', { bubbles: true, detail: 1 })));
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    return document.querySelector('[data-settings-info-panel]');
+  };
+
+  it('links the $ mention setting to its help docs', async () => {
     renderInpage();
 
-    const section = document.querySelector('section[aria-label="$ Mention"]');
+    const panel = openInfo('Insert saved items with $');
     expect(
-      section?.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/dollar-mention/"]')?.textContent,
+      panel?.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/dollar-mention/"]')?.textContent,
     ).toContain('Help docs');
+    expect(panel?.textContent).toContain('Tab or Enter');
+    act(() =>
+      document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })),
+    );
+    expect(document.querySelector('[data-settings-info-panel]')).toBeNull();
+    await flushReactScheduler();
   });
 
-  it('keeps the AI thinking capture preference in General settings', () => {
+  it('keeps the AI thinking capture preference in General settings', async () => {
     const onToggleAiChatIncludeThinkingEnabled = vi.fn();
     renderInpage({ onToggleAiChatIncludeThinkingEnabled });
 
-    const section = document.querySelector('section[aria-label="AI thinking"]');
-    const toggle = section?.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+    const toggle = document.querySelector<HTMLInputElement>('input[aria-label="Save thinking content"]');
     expect(toggle?.checked).toBe(true);
-    expect(section?.textContent).toContain('future saves');
+    expect(openInfo('Save thinking content')?.textContent).toContain('future saves');
     act(() => toggle!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
     expect(onToggleAiChatIncludeThinkingEnabled).toHaveBeenCalledWith(false);
+    await flushReactScheduler();
   });
 
-  it('keeps ChatGPT Advanced capture in General settings', () => {
+  it('keeps ChatGPT Advanced capture in General settings', async () => {
     const onToggleChatgptApiCaptureEnabled = vi.fn();
     renderInpage({ onToggleChatgptApiCaptureEnabled });
 
-    const section = document.querySelector('section[aria-label="ChatGPT Advanced capture"]');
-    const toggle = section?.querySelector('input[aria-label="Use ChatGPT API"]') as HTMLInputElement | null;
+    const toggle = document.querySelector<HTMLInputElement>('input[aria-label="Use ChatGPT API"]');
     expect(toggle).toBeTruthy();
     expect(toggle?.checked).toBe(false);
-    expect(section?.textContent).toContain('Off by default');
-    expect(section?.textContent).toContain('will not retry using the page during the same capture');
+    expect(toggle?.closest('.settings-form-row')?.textContent).toContain('Manual capture only');
+    const panel = openInfo('Use ChatGPT API');
+    expect(panel?.textContent).toContain('Off by default');
+    expect(panel?.textContent).toContain('will not retry using the page during the same capture');
     expect(
-      section?.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/capture-ai-chats/"]')?.textContent,
+      panel?.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/capture-ai-chats/"]')?.textContent,
     ).toContain('Help docs');
 
     act(() => toggle!.dispatchEvent(new window.MouseEvent('click', { bubbles: true })));
     expect(onToggleChatgptApiCaptureEnabled).toHaveBeenCalledWith(true);
+    await flushReactScheduler();
   });
 
   it('renders browser-managed keyboard shortcuts in the dedicated section', async () => {
@@ -779,18 +820,20 @@ describe('inpage anti-hotlink advanced editor', () => {
     await renderShortcuts({ status: 'unsupported', managerAccess: 'unsupported' });
 
     expect(document.body.textContent || '').toContain('This browser cannot read extension keyboard shortcuts.');
-    expect(document.querySelector('section[aria-label="Local CLI Integration"]')).toBeNull();
+    expect(document.querySelector('section[aria-label="Local access"]')).toBeNull();
   });
 
-  it('renders Local CLI Integration in its dedicated section with Skill install guidance', () => {
+  it('renders Local CLI Integration in its dedicated section with Skill install guidance', async () => {
     const onToggleCliIntegration = vi.fn();
     renderCli({ onToggleCliIntegration });
 
-    const section = document.querySelector('section[aria-label="Local CLI Integration"]');
+    const section = document.querySelector('section[aria-label="Local access"]');
     const checkbox = section?.querySelector('input[role="switch"]') as HTMLInputElement | null;
     expect(checkbox?.classList.contains('webclipper-switch')).toBe(true);
     expect(section?.textContent).toContain('Enable SyncNos CLI');
-    expect(section?.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/cli/"]')).toBeTruthy();
+    expect(
+      openInfo('Enable SyncNos CLI')?.querySelector('a[href="https://chiimagnus.github.io/SyncNos/docs/en/cli/"]'),
+    ).toBeTruthy();
     expect(checkbox).toBeTruthy();
     expect(checkbox?.disabled).toBe(false);
     expect(document.body.textContent || '').toContain('Skills directory used by your AI agent');
@@ -807,11 +850,12 @@ describe('inpage anti-hotlink advanced editor', () => {
       checkbox!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     });
     expect(onToggleCliIntegration).toHaveBeenCalledWith(true);
+    await flushReactScheduler();
   });
 
   it('disables Local CLI Integration when Native Messaging is unavailable', () => {
     renderCli({ cliIntegrationAvailable: false });
-    const section = document.querySelector('section[aria-label="Local CLI Integration"]');
+    const section = document.querySelector('section[aria-label="Local access"]');
     const checkbox = section?.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
     expect(checkbox?.disabled).toBe(true);
     expect(section?.textContent).toContain('Native Messaging is unavailable');

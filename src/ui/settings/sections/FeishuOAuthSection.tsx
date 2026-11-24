@@ -3,12 +3,12 @@ import type { KeyboardEvent } from 'react';
 import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
 import {
   buttonClassName,
-  cardClassName,
   dangerButtonClassName,
   primaryButtonClassName,
   settingsTextInputClassName,
 } from '@ui/settings/ui';
-import { SettingsFormRow } from '@ui/settings/sections/SettingsFormRow';
+import { SettingsFormRow, SettingsSwitchRow } from './SettingsFormRow';
+import { SettingsGroup } from './SettingsGroup';
 
 export function FeishuOAuthSection(props: {
   busy: boolean;
@@ -85,17 +85,18 @@ export function FeishuOAuthSection(props: {
 
   return (
     <>
-      <section className={cardClassName} aria-label={t('feishuOAuth')}>
-        <div className="tw-flex tw-items-center tw-gap-2">
-          <img className="tw-h-5 tw-w-5 tw-shrink-0" src={feishuLogoUrl} alt="" aria-hidden="true" />
-          <div className="tw-min-w-0 tw-flex-1 tw-text-[var(--text-primary)]">
-            <span className="tw-text-base tw-font-extrabold">{t('feishuOAuth')}</span>
-            <span className="tw-mx-2 tw-text-[var(--text-secondary)]" aria-hidden="true">
-              |
+      <SettingsGroup title={t('settingsAccount')} ariaLabel={t('feishuOAuth')}>
+        <SettingsFormRow
+          label={
+            <span className="settings-account">
+              <img src={feishuLogoUrl} alt="" />
+              <span>
+                {t('feishuOAuth')}
+                <small>{feishuStatusText}</small>
+              </span>
             </span>
-            <span className="tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">{feishuStatusText}</span>
-          </div>
-          <SettingsDocsLink path="sync/feishu" />
+          }
+        >
           <button
             onClick={onConnectOrDisconnect}
             disabled={busy || (!feishuConnected && pollingFeishu)}
@@ -104,8 +105,7 @@ export function FeishuOAuthSection(props: {
           >
             {feishuConnected ? t('disconnect') : pollingFeishu ? t('connectingDots') : t('connect')}
           </button>
-        </div>
-
+        </SettingsFormRow>
         {feishuLastError ? (
           <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--error)]">
             {t('statusError')}: {feishuLastError}
@@ -116,39 +116,33 @@ export function FeishuOAuthSection(props: {
           </div>
         ) : null}
 
-        <div className="tw-mt-3" aria-label={t('feishuSyncEnabledLabel')}>
-          <SettingsFormRow label={t('feishuSyncEnabledLabel')}>
-            <input
-              id="feishuSyncEnabledToggle"
-              type="checkbox"
-              role="switch"
-              className="webclipper-switch"
-              checked={syncEnabled}
-              disabled={busy}
-              aria-label={t('feishuSyncEnabledLabel')}
-              onChange={(e) => onToggleSyncEnabled(e.target.checked)}
-            />
-          </SettingsFormRow>
+        <div className="settings-group-link">
+          <SettingsDocsLink path="sync/feishu" />
         </div>
-
+      </SettingsGroup>
+      <SettingsGroup title={t('settingsSync')}>
+        <SettingsSwitchRow
+          label={t('feishuSyncEnabledLabel')}
+          id="feishuSyncEnabledToggle"
+          checked={syncEnabled}
+          disabled={busy}
+          onChange={onToggleSyncEnabled}
+          info={t('settingsSyncInfo')}
+        />
         {syncEnabled ? (
-          <div className="tw-mt-3" aria-label={t('feishuAutoSyncEnabledLabel')}>
-            <SettingsFormRow label={t('feishuAutoSyncEnabledLabel')}>
-              <input
-                id="feishuAutoSyncEnabledToggle"
-                type="checkbox"
-                role="switch"
-                className="webclipper-switch"
-                checked={autoSyncEnabled}
-                disabled={busy}
-                aria-label={t('feishuAutoSyncEnabledLabel')}
-                onChange={(e) => onToggleAutoSyncEnabled(e.target.checked)}
-              />
-            </SettingsFormRow>
-          </div>
+          <SettingsSwitchRow
+            label={t('feishuAutoSyncEnabledLabel')}
+            id="feishuAutoSyncEnabledToggle"
+            checked={autoSyncEnabled}
+            disabled={busy}
+            onChange={onToggleAutoSyncEnabled}
+            dependent
+            info={t('settingsAutoSyncInfo')}
+          />
         ) : null}
-
-        <div id="feishu-advanced-settings" className="tw-mt-3 tw-grid tw-gap-2">
+      </SettingsGroup>
+      <SettingsGroup title={t('settingsAuthorization')}>
+        <div id="feishu-advanced-settings">
           <SettingsFormRow label={t('feishuOAuthClientIdLabel')}>
             <input
               value={feishuClientId}
@@ -163,7 +157,7 @@ export function FeishuOAuthSection(props: {
             />
           </SettingsFormRow>
 
-          <SettingsFormRow label={t('feishuOAuthClientSecretLabel')}>
+          <SettingsFormRow label={t('feishuOAuthClientSecretLabel')} info={t('settingsFeishuSecretInfo')}>
             <div className="tw-flex tw-w-full tw-gap-2">
               <input
                 value={feishuClientSecret}
@@ -190,7 +184,7 @@ export function FeishuOAuthSection(props: {
             </div>
           </SettingsFormRow>
 
-          <SettingsFormRow label={t('feishuTokenExchangeProxyUrlLabel')}>
+          <SettingsFormRow label={t('feishuTokenExchangeProxyUrlLabel')} info={t('settingsFeishuProxyInfo')}>
             <input
               value={feishuTokenExchangeProxyUrl}
               onChange={(e) => onChangeTokenExchangeProxyUrl(e.target.value)}
@@ -204,55 +198,50 @@ export function FeishuOAuthSection(props: {
             />
           </SettingsFormRow>
         </div>
-      </section>
+      </SettingsGroup>
+      <SettingsGroup title={t('settingsFolders')} ariaLabel={t('feishuPaths')}>
+        <SettingsFormRow label={t('aiChatsFolder')}>
+          <input
+            value={feishuChatFolder}
+            onChange={(e) => onChangeChatFolder(e.target.value)}
+            onBlur={onSavePaths}
+            onKeyDown={onEnterToSavePaths}
+            disabled={busy}
+            spellCheck={false}
+            placeholder="SyncNos-AIChats"
+            aria-label={t('aiChatsFolder')}
+            className={settingsTextInputClassName}
+          />
+        </SettingsFormRow>
 
-      <section className={cardClassName} aria-label={t('feishuPaths')}>
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('feishuPaths')}</h2>
+        <SettingsFormRow label={t('webClipperFolder')}>
+          <input
+            value={feishuArticleFolder}
+            onChange={(e) => onChangeArticleFolder(e.target.value)}
+            onBlur={onSavePaths}
+            onKeyDown={onEnterToSavePaths}
+            disabled={busy}
+            spellCheck={false}
+            placeholder="SyncNos-WebArticles"
+            aria-label={t('webClipperFolder')}
+            className={settingsTextInputClassName}
+          />
+        </SettingsFormRow>
 
-        <div className="tw-mt-3 tw-grid tw-gap-2">
-          <SettingsFormRow label={t('aiChatsFolder')}>
-            <input
-              value={feishuChatFolder}
-              onChange={(e) => onChangeChatFolder(e.target.value)}
-              onBlur={onSavePaths}
-              onKeyDown={onEnterToSavePaths}
-              disabled={busy}
-              spellCheck={false}
-              placeholder="SyncNos-AIChats"
-              aria-label={t('aiChatsFolder')}
-              className={settingsTextInputClassName}
-            />
-          </SettingsFormRow>
-
-          <SettingsFormRow label={t('webClipperFolder')}>
-            <input
-              value={feishuArticleFolder}
-              onChange={(e) => onChangeArticleFolder(e.target.value)}
-              onBlur={onSavePaths}
-              onKeyDown={onEnterToSavePaths}
-              disabled={busy}
-              spellCheck={false}
-              placeholder="SyncNos-WebArticles"
-              aria-label={t('webClipperFolder')}
-              className={settingsTextInputClassName}
-            />
-          </SettingsFormRow>
-
-          <SettingsFormRow label={t('videoScriptsFolder')}>
-            <input
-              value={feishuVideoFolder}
-              onChange={(e) => onChangeVideoFolder(e.target.value)}
-              onBlur={onSavePaths}
-              onKeyDown={onEnterToSavePaths}
-              disabled={busy}
-              spellCheck={false}
-              placeholder="SyncNos-Videos"
-              aria-label={t('videoScriptsFolder')}
-              className={settingsTextInputClassName}
-            />
-          </SettingsFormRow>
-        </div>
-      </section>
+        <SettingsFormRow label={t('videoScriptsFolder')}>
+          <input
+            value={feishuVideoFolder}
+            onChange={(e) => onChangeVideoFolder(e.target.value)}
+            onBlur={onSavePaths}
+            onKeyDown={onEnterToSavePaths}
+            disabled={busy}
+            spellCheck={false}
+            placeholder="SyncNos-Videos"
+            aria-label={t('videoScriptsFolder')}
+            className={settingsTextInputClassName}
+          />
+        </SettingsFormRow>
+      </SettingsGroup>
     </>
   );
 }

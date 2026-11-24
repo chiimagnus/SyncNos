@@ -14,7 +14,10 @@ import { formatTime } from '@viewmodels/settings/utils';
 import { useIsNarrowScreen } from '@ui/shared/hooks/useIsNarrowScreen';
 import { openConversation as openConversationInApp } from '@ui/conversations/open-conversation';
 import { setPendingOpenConversationId } from '@ui/conversations/pending-open';
-import { buttonClassName, cardClassName, checkboxClassName, conversationJumpLinkClassName } from '@ui/settings/ui';
+import { buttonClassName, checkboxClassName, conversationJumpLinkClassName } from '@ui/settings/ui';
+
+import { SettingsFormRow } from './SettingsFormRow';
+import { SettingsGroup } from './SettingsGroup';
 
 function ImportStatsList(props: { stats: any }) {
   const stats = props.stats;
@@ -101,95 +104,101 @@ export function BackupSection(props: {
   };
 
   return (
-    <section className={cardClassName} aria-label={t('databaseBackup')}>
-      <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('databaseBackup')}</h2>
-
-      <label className="tw-mt-2.5 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
-        <input
-          type="checkbox"
-          checked={includeSensitiveData}
-          disabled={busy}
-          onChange={(event) => onChangeIncludeSensitiveData(event.target.checked)}
-          aria-label={t('backupIncludeSensitiveData')}
-          className={checkboxClassName}
-        />
-        {t('backupIncludeSensitiveData')}
-      </label>
-      <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-        {t('backupIncludeSensitiveDataHint')}
-      </div>
-
-      <div
-        ref={backupImportRef}
-        id="settings-backup-import"
-        className="tw-mt-3 tw-flex tw-flex-wrap tw-items-center tw-gap-2.5"
-      >
-        <button className={buttonClassName} onClick={onExport} disabled={busy}>
-          {t('exportZip')}
-        </button>
-        <button
-          className={buttonClassName}
-          disabled={busy}
-          onClick={() => {
-            if (busy) return;
-            if (onImportClick) onImportClick();
-            else fileInputRef.current?.click();
-          }}
+    <>
+      <SettingsGroup title={t('databaseBackup')}>
+        <SettingsFormRow
+          label={t('backupIncludeSensitiveData')}
+          controlId="settings-backup-private"
+          description={t('backupIncludeSensitiveDataHint')}
         >
-          {importLabel || t('importDots')}
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".zip,application/zip"
-          className="tw-hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) onImportFile(file);
-          }}
-        />
-      </div>
-      {exportStatus ? (
-        <div
-          role={exportErrorDetail ? 'alert' : undefined}
-          className={`tw-mt-2 tw-text-xs tw-font-semibold ${exportErrorDetail ? 'tw-text-[var(--error)]' : 'tw-text-[var(--text-secondary)]'}`}
-        >
-          {exportStatus}
-          {exportErrorDetail ? (
-            <div className="tw-mt-1 tw-break-words tw-font-normal">
-              {t('backupTechnicalDetail')} {exportErrorDetail}
-            </div>
-          ) : null}
+          <input
+            id="settings-backup-private"
+            type="checkbox"
+            checked={includeSensitiveData}
+            disabled={busy}
+            onChange={(event) => onChangeIncludeSensitiveData(event.target.checked)}
+            aria-label={t('backupIncludeSensitiveData')}
+            className={checkboxClassName}
+          />
+        </SettingsFormRow>
+        <SettingsFormRow label={t('exportZip')}>
+          <button type="button" className={buttonClassName} onClick={onExport} disabled={busy}>
+            {t('exportZip')}
+          </button>
+        </SettingsFormRow>
+        {exportStatus ? (
+          <div
+            role={exportErrorDetail ? 'alert' : undefined}
+            className={`tw-pb-3 tw-text-xs tw-font-semibold ${exportErrorDetail ? 'tw-text-[var(--error)]' : 'tw-text-[var(--text-secondary)]'}`}
+          >
+            {exportStatus}
+            {exportErrorDetail ? (
+              <div className="tw-mt-1 tw-break-words tw-font-normal">
+                {t('backupTechnicalDetail')} {exportErrorDetail}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        {lastBackupExportAt ? (
+          <div className="tw-pb-3 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
+            {t('lastExport')} {formatTime(lastBackupExportAt)}
+          </div>
+        ) : null}
+      </SettingsGroup>
+      <SettingsGroup title={t('settingsRestore')}>
+        <div ref={backupImportRef} id="settings-backup-import">
+          <SettingsFormRow label={t('importDots')}>
+            <button
+              type="button"
+              className={buttonClassName}
+              disabled={busy}
+              onClick={() => {
+                if (busy) return;
+                if (onImportClick) onImportClick();
+                else fileInputRef.current?.click();
+              }}
+            >
+              {importLabel || t('importDots')}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".zip,application/zip"
+              className="tw-hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) onImportFile(file);
+              }}
+            />
+          </SettingsFormRow>
         </div>
-      ) : null}
-      {lastBackupExportAt ? (
-        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-          {t('lastExport')} {formatTime(lastBackupExportAt)}
-        </div>
-      ) : null}
-      {importStatus ? (
-        <div
-          role={importErrorDetail ? 'alert' : undefined}
-          className={`tw-mt-1.5 tw-text-xs tw-font-semibold ${importErrorDetail ? 'tw-text-[var(--error)]' : 'tw-text-[var(--text-secondary)]'}`}
-        >
-          {importStatus}
-          {importErrorDetail ? (
-            <div className="tw-mt-1 tw-break-words tw-font-normal">
-              {t('backupTechnicalDetail')} {importErrorDetail}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
+        {importStatus ? (
+          <div
+            role={importErrorDetail ? 'alert' : undefined}
+            className={`tw-pb-3 tw-text-xs tw-font-semibold ${importErrorDetail ? 'tw-text-[var(--error)]' : 'tw-text-[var(--text-secondary)]'}`}
+          >
+            {importStatus}
+            {importErrorDetail ? (
+              <div className="tw-mt-1 tw-break-words tw-font-normal">
+                {t('backupTechnicalDetail')} {importErrorDetail}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        {importStats ? (
+          <div className="tw-pb-3">
+            <ImportStatsList stats={importStats} />
+          </div>
+        ) : null}
+      </SettingsGroup>
       {orphanMessageGroups.length || orphanLoadError ? (
-        <div className="tw-mt-4 tw-border-t tw-border-[var(--border)] tw-pt-3">
-          <h3 className="tw-m-0 tw-text-sm tw-font-bold tw-text-[var(--text-primary)]">{t('backupOrphanedHeading')}</h3>
-          <p className="tw-mt-1 tw-text-xs tw-text-[var(--text-secondary)]">{t('backupOrphanedHint')}</p>
+        <SettingsGroup title={t('backupOrphanedHeading')} note={t('backupOrphanedHint')}>
           {orphanLoadError ? (
             <p role="alert" className="tw-mt-1 tw-break-words tw-text-xs tw-text-[var(--error)]">
               {t('backupOrphanedLoadFailed')} {orphanLoadError}
             </p>
           ) : null}
-          <div className="tw-mt-3 tw-grid tw-gap-2.5">
+          <div className="tw-grid tw-gap-2.5 tw-py-3">
             {orphanMessageGroups.map((group) => {
               const title = `#${group.originalConversationId}`;
               const source = RECOVERED_CONVERSATION_SOURCE;
@@ -257,11 +266,8 @@ export function BackupSection(props: {
               );
             })}
           </div>
-        </div>
+        </SettingsGroup>
       ) : null}
-      <div className="tw-mt-2.5">
-        <ImportStatsList stats={importStats} />
-      </div>
-    </section>
+    </>
   );
 }

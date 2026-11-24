@@ -1,12 +1,8 @@
 import { t, type LocalePreference } from '@i18n';
 import { SUPPORTED_AI_CHAT_SITES } from '@collectors/ai-chat-sites';
-import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
-import {
-  buttonClassName,
-  cardClassName,
-  settingsControlWidthClassName,
-  settingsTextInputClassName,
-} from '@ui/settings/ui';
+import { SettingsGroup } from './SettingsGroup';
+import { SettingsFormRow, SettingsSwitchRow } from './SettingsFormRow';
+import { buttonClassName, settingsControlWidthClassName, settingsTextInputClassName } from '@ui/settings/ui';
 import { buttonTintClassName } from '@ui/shared/button-styles';
 import { SelectMenu } from '@ui/shared/SelectMenu';
 import {
@@ -16,34 +12,6 @@ import {
 } from '@ui/settings/sections/AntiHotlinkDomainsEditor';
 
 type InpageDisplayMode = 'supported' | 'all' | 'off';
-
-function UserNameCard(props: { value: string; onChange: (next: string) => void; onSave: () => void }) {
-  const { value, onChange, onSave } = props;
-  return (
-    <section className={cardClassName} aria-label={t('aboutYouUserNameSectionAria')}>
-      <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
-        {t('aboutYouUserNameSectionTitle')}
-      </h2>
-      <input
-        className={`${settingsTextInputClassName} tw-mt-3 tw-px-3 tw-py-2 tw-font-semibold`}
-        value={value}
-        onChange={(e) => onChange(String((e.target as any)?.value || ''))}
-        onBlur={onSave}
-        onKeyDown={(e) => {
-          if (e.key !== 'Enter') return;
-          e.preventDefault();
-          onSave();
-        }}
-        placeholder={t('aboutYouUserNamePlaceholder')}
-        autoComplete="off"
-        spellCheck={false}
-      />
-      <div className="tw-mt-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-        {t('aboutYouUserNameHint')}
-      </div>
-    </section>
-  );
-}
 
 export function InpageSection(props: {
   busy: boolean;
@@ -114,177 +82,113 @@ export function InpageSection(props: {
   const dollarMentionSitesLabel = dollarMentionSites.join(' / ');
 
   return (
-    <div className="tw-grid tw-gap-4">
-      <UserNameCard value={userName} onChange={onChangeUserName} onSave={onSaveUserName} />
-
-      <section className={cardClassName} aria-label={t('languageHeading')}>
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">{t('languageHeading')}</h2>
-        <div className="tw-mt-2.5">
-          <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
-            <span className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">{t('languageLabel')}</span>
-            <SelectMenu<LocalePreference>
-              value={localePreference}
-              onChange={onChangeLocalePreference}
-              disabled={busy}
-              ariaLabel={t('languageLabel')}
-              minWidth={180}
-              className={settingsControlWidthClassName}
-              buttonId="interface-locale"
-              buttonClassName={[buttonTintClassName(), 'tw-w-full'].join(' ')}
-              options={[
-                { value: 'system', label: t('localeSystem') },
-                { value: 'en', label: t('localeEnglish') },
-                { value: 'zh', label: t('localeChinese') },
-              ]}
-            />
-          </div>
-        </div>
-      </section>
-
-      <section className={cardClassName} aria-label={t('inpageButtonHeading')}>
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
-          {t('inpageButtonHeading')}
-        </h2>
-        <div className="tw-mt-2.5 tw-grid tw-gap-1.5">
-          <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
-            <label className="tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
-              {t('inpageDisplayModeLabel')}
-            </label>
-            <SelectMenu<InpageDisplayMode>
-              value={displayMode}
-              onChange={onChangeDisplayMode}
-              disabled={busy}
-              ariaLabel={t('inpageDisplayModeLabel')}
-              minWidth={180}
-              className={settingsControlWidthClassName}
-              buttonClassName={[buttonTintClassName(), 'tw-w-full'].join(' ')}
-              options={[
-                { value: 'supported', label: t('inpageDisplayModeSupported') },
-                { value: 'all', label: t('inpageDisplayModeAll') },
-                { value: 'off', label: t('inpageDisplayModeOff') },
-              ]}
-            />
-          </div>
-        </div>
-      </section>
-
-      <section className={cardClassName} aria-label={t('aiChatDollarMentionHeading')}>
-        <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
-          <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
-            {t('aiChatDollarMentionHeading')}
-          </h2>
-          <SettingsDocsLink path="dollar-mention" />
-        </div>
-        <label className="tw-mt-2.5 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
+    <>
+      <SettingsGroup title={t('settingsPersonalInterface')}>
+        <SettingsFormRow label={t('aboutYouUserNameSectionTitle')} info={t('aboutYouUserNameHint')}>
           <input
-            type="checkbox"
-            checked={aiChatDollarMentionEnabled}
-            disabled={busy}
-            onChange={(e) => onToggleAiChatDollarMentionEnabled(!!e.target.checked)}
-            role="switch"
-            className="webclipper-switch"
+            className={settingsTextInputClassName}
+            aria-label={t('aboutYouUserNameSectionTitle')}
+            value={userName}
+            onChange={(event) => onChangeUserName(event.target.value)}
+            onBlur={onSaveUserName}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                onSaveUserName();
+              }
+            }}
+            placeholder={t('settingsUsernamePlaceholder')}
+            autoComplete="off"
+            spellCheck={false}
           />
-          {t('aiChatDollarMentionLabel')}
-        </label>
-        {!!dollarMentionSitesLabel && (
-          <div className="tw-mt-2 tw-text-[11px] tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-80">
-            {dollarMentionSitesLabel}
-          </div>
-        )}
-      </section>
-
-      <section className={cardClassName} aria-label={t('chatgptApiCaptureAdvancedHeading')}>
-        <div className="tw-flex tw-items-center tw-justify-between tw-gap-3">
-          <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
-            {t('chatgptApiCaptureAdvancedHeading')}
-          </h2>
-          <SettingsDocsLink path="capture-ai-chats" />
-        </div>
-        <label className="tw-mt-2.5 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
-          <input
-            type="checkbox"
-            checked={chatgptApiCaptureEnabled}
+        </SettingsFormRow>
+        <SettingsFormRow label={t('languageLabel')}>
+          <SelectMenu<LocalePreference>
+            value={localePreference}
+            onChange={onChangeLocalePreference}
             disabled={busy}
-            onChange={(event) => onToggleChatgptApiCaptureEnabled(event.target.checked)}
-            role="switch"
-            className="webclipper-switch"
-            aria-label={t('chatgptApiCaptureAdvancedLabel')}
+            ariaLabel={t('languageLabel')}
+            minWidth={160}
+            className={settingsControlWidthClassName}
+            buttonId="interface-locale"
+            buttonClassName={[buttonTintClassName(), 'tw-w-full'].join(' ')}
+            options={[
+              { value: 'system', label: t('localeSystem') },
+              { value: 'en', label: t('localeEnglish') },
+              { value: 'zh', label: t('localeChinese') },
+            ]}
           />
-          {t('chatgptApiCaptureAdvancedLabel')}
-        </label>
-        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-          {t('chatgptApiCaptureAdvancedHint')}
-        </div>
-      </section>
-
-      <section className={cardClassName} aria-label={t('aiChatThinkingHeading')}>
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
-          {t('aiChatThinkingHeading')}
-        </h2>
-        <label className="tw-mt-2.5 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
-          <input
-            type="checkbox"
-            checked={aiChatIncludeThinkingEnabled}
+        </SettingsFormRow>
+        <SettingsFormRow label={t('inpageButtonHeading')}>
+          <SelectMenu<InpageDisplayMode>
+            value={displayMode}
+            onChange={onChangeDisplayMode}
             disabled={busy}
-            onChange={(event) => onToggleAiChatIncludeThinkingEnabled(event.target.checked)}
-            role="switch"
-            className="webclipper-switch"
+            ariaLabel={t('inpageDisplayModeLabel')}
+            minWidth={160}
+            className={settingsControlWidthClassName}
+            buttonClassName={[buttonTintClassName(), 'tw-w-full'].join(' ')}
+            options={[
+              { value: 'supported', label: t('inpageDisplayModeSupported') },
+              { value: 'all', label: t('inpageDisplayModeAll') },
+              { value: 'off', label: t('inpageDisplayModeOff') },
+            ]}
           />
-          {t('aiChatThinkingIncludeLabel')}
-        </label>
-        <div className="tw-mt-1.5 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-90">
-          {t('aiChatThinkingIncludeHint')}
-        </div>
-      </section>
-
-      <section className={cardClassName} aria-label={t('aiChatAutoSaveHeading')}>
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
-          {t('aiChatAutoSaveHeading')}
-        </h2>
-        <label className="tw-mt-2.5 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
-          <input
-            type="checkbox"
-            checked={aiChatAutoSaveEnabled}
-            disabled={busy}
-            onChange={(e) => onToggleAiChatAutoSaveEnabled(!!e.target.checked)}
-            role="switch"
-            className="webclipper-switch"
-          />
-          {t('aiChatAutoSaveLabel')}
-        </label>
-        <label className="tw-mt-3 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
-          <input
-            type="checkbox"
-            checked={aiChatCacheImagesEnabled}
-            disabled={busy}
-            onChange={(e) => onToggleAiChatCacheImagesEnabled(!!e.target.checked)}
-            role="switch"
-            className="webclipper-switch"
-          />
-          <span className="tw-inline-flex tw-items-center tw-gap-2">
-            <span>{t('aiChatCacheImagesLabel')}</span>
-            <span className="tw-inline-flex tw-items-center tw-rounded-md tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-1.5 tw-py-0.5 tw-text-[10px] tw-font-black tw-tracking-wide tw-text-[var(--text-secondary)]">
-              {t('betaTag')}
-            </span>
-          </span>
-        </label>
-        <label className="tw-mt-3 tw-flex tw-items-center tw-gap-2 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
-          <input
-            type="checkbox"
-            checked={webArticleCacheImagesEnabled}
-            disabled={busy}
-            onChange={(e) => onToggleWebArticleCacheImagesEnabled(!!e.target.checked)}
-            role="switch"
-            className="webclipper-switch"
-          />
-          <span className="tw-inline-flex tw-items-center tw-gap-2">
-            <span>{t('webArticleCacheImagesLabel')}</span>
-            <span className="tw-inline-flex tw-items-center tw-rounded-md tw-border tw-border-[var(--border)] tw-bg-[var(--bg-sunken)] tw-px-1.5 tw-py-0.5 tw-text-[10px] tw-font-black tw-tracking-wide tw-text-[var(--text-secondary)]">
-              {t('betaTag')}
-            </span>
-          </span>
-        </label>
-        <div className="tw-mt-3">
+        </SettingsFormRow>
+      </SettingsGroup>
+      <SettingsGroup title={t('settingsAiChats')}>
+        <SettingsSwitchRow
+          label={t('aiChatAutoSaveLabel')}
+          checked={aiChatAutoSaveEnabled}
+          disabled={busy}
+          onChange={onToggleAiChatAutoSaveEnabled}
+          description={t('settingsAutoSaveLimit')}
+          info={t('settingsAutoSaveInfo')}
+          docsPath="capture-ai-chats"
+        />
+        <SettingsSwitchRow
+          label={t('aiChatThinkingIncludeLabel')}
+          checked={aiChatIncludeThinkingEnabled}
+          disabled={busy}
+          onChange={onToggleAiChatIncludeThinkingEnabled}
+          info={t('aiChatThinkingIncludeHint')}
+        />
+        <SettingsSwitchRow
+          label={t('aiChatDollarMentionLabel')}
+          checked={aiChatDollarMentionEnabled}
+          disabled={busy}
+          onChange={onToggleAiChatDollarMentionEnabled}
+          info={[t('settingsMentionInfo'), dollarMentionSitesLabel].filter(Boolean).join(' ')}
+          docsPath="dollar-mention"
+        />
+        <SettingsSwitchRow
+          label={t('chatgptApiCaptureAdvancedLabel')}
+          checked={chatgptApiCaptureEnabled}
+          disabled={busy}
+          onChange={onToggleChatgptApiCaptureEnabled}
+          description={t('settingsManualCaptureOnly')}
+          info={t('chatgptApiCaptureAdvancedHint')}
+          docsPath="capture-ai-chats"
+        />
+      </SettingsGroup>
+      <SettingsGroup title={t('settingsImageCaching')}>
+        <SettingsSwitchRow
+          label={t('aiChatCacheImagesLabel')}
+          checked={aiChatCacheImagesEnabled}
+          disabled={busy}
+          onChange={onToggleAiChatCacheImagesEnabled}
+          info={t('settingsImageCacheInfo')}
+          badge={t('betaTag')}
+        />
+        <SettingsSwitchRow
+          label={t('webArticleCacheImagesLabel')}
+          checked={webArticleCacheImagesEnabled}
+          disabled={busy}
+          onChange={onToggleWebArticleCacheImagesEnabled}
+          info={t('settingsArticleCacheInfo')}
+          badge={t('betaTag')}
+        />
+        <SettingsFormRow label={t('antiHotlinkRulesLabel')} info={t('antiHotlinkRulesHint')}>
           <button
             type="button"
             className={buttonClassName}
@@ -295,21 +199,23 @@ export function InpageSection(props: {
           >
             {antiHotlinkAdvancedOpen ? t('advancedHide') : t('advancedShow')}
           </button>
-        </div>
+        </SettingsFormRow>
         {antiHotlinkAdvancedOpen ? (
-          <AntiHotlinkDomainsEditor
-            id="anti-hotlink-domains-editor"
-            busy={busy}
-            rules={antiHotlinkRules}
-            errors={antiHotlinkRuleErrors}
-            onChangeRule={onChangeAntiHotlinkRule}
-            onAddRule={onAddAntiHotlinkRule}
-            onRemoveRule={onRemoveAntiHotlinkRule}
-            onApplyRules={onApplyAntiHotlinkRules}
-            onResetRules={onResetAntiHotlinkRules}
-          />
+          <div className="settings-expanded">
+            <AntiHotlinkDomainsEditor
+              id="anti-hotlink-domains-editor"
+              busy={busy}
+              rules={antiHotlinkRules}
+              errors={antiHotlinkRuleErrors}
+              onChangeRule={onChangeAntiHotlinkRule}
+              onAddRule={onAddAntiHotlinkRule}
+              onRemoveRule={onRemoveAntiHotlinkRule}
+              onApplyRules={onApplyAntiHotlinkRules}
+              onResetRules={onResetAntiHotlinkRules}
+            />
+          </div>
         ) : null}
-      </section>
-    </div>
+      </SettingsGroup>
+    </>
   );
 }

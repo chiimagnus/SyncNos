@@ -1,6 +1,8 @@
 import { t } from '@i18n';
 import type { TranslationKey } from '@i18n/locales/en';
-import { buttonClassName, cardClassName } from '@ui/settings/ui';
+import { buttonClassName } from '@ui/settings/ui';
+import { SettingsGroup } from './SettingsGroup';
+import { SettingsFormRow } from './SettingsFormRow';
 import { InAppShortcutsPanel } from '@ui/settings/sections/InAppShortcutsPanel';
 import type {
   KeyboardShortcutAction,
@@ -29,57 +31,46 @@ export function KeyboardShortcutsSection(props: KeyboardShortcutsSectionProps) {
   const shortcutByAction = new Map(items.map((item) => [item.action, item.shortcut]));
 
   return (
-    <div className="tw-grid tw-gap-4">
-      <section className={cardClassName} aria-label={t('keyboardShortcutsHeading')}>
-        <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
-          {t('keyboardShortcutsBrowserHeading')}
-        </h2>
-        <div className="tw-mt-3 tw-grid tw-divide-y tw-divide-[var(--border)]">
-          {ACTION_ROWS.map(({ action, labelKey }) => {
-            const shortcut = shortcutByAction.get(action) || '';
-            return (
-              <div
-                key={action}
-                className="tw-flex tw-min-w-0 tw-items-center tw-justify-between tw-gap-3 tw-py-2 first:tw-pt-0 last:tw-pb-0"
-              >
-                <span className="tw-min-w-0 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]">
-                  {t(labelKey)}
+    <>
+      <SettingsGroup title={t('keyboardShortcutsBrowserHeading')} ariaLabel={t('keyboardShortcutsHeading')}>
+        {ACTION_ROWS.map(({ action, labelKey }) => {
+          const shortcut = shortcutByAction.get(action) || '';
+          return (
+            <SettingsFormRow key={action} label={t(labelKey)}>
+              {loading ? (
+                <span className="tw-shrink-0 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-70">
+                  {t('loadingDots')}
                 </span>
-                {loading ? (
-                  <span className="tw-shrink-0 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-70">
-                    {t('loadingDots')}
-                  </span>
-                ) : unsupported ? (
-                  <span
-                    className="tw-shrink-0 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]"
-                    aria-hidden="true"
-                  >
-                    —
-                  </span>
-                ) : shortcut ? (
-                  <kbd className="tw-max-w-[55%] tw-shrink-0 tw-overflow-hidden tw-text-ellipsis tw-whitespace-nowrap tw-font-mono tw-text-xs tw-font-medium tw-text-[var(--text-secondary)]">
-                    {shortcut}
-                  </kbd>
-                ) : (
-                  <span className="tw-shrink-0 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-80">
-                    {t('keyboardShortcutsUnassigned')}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
+              ) : unsupported ? (
+                <span
+                  className="tw-shrink-0 tw-text-sm tw-font-semibold tw-text-[var(--text-secondary)]"
+                  aria-hidden="true"
+                >
+                  —
+                </span>
+              ) : shortcut ? (
+                <kbd className="tw-min-w-0 tw-overflow-hidden tw-text-ellipsis tw-whitespace-nowrap tw-font-mono tw-text-xs tw-font-medium tw-text-[var(--text-secondary)]">
+                  {shortcut}
+                </kbd>
+              ) : (
+                <span className="tw-shrink-0 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)] tw-opacity-80">
+                  {t('keyboardShortcutsUnassigned')}
+                </span>
+              )}
+            </SettingsFormRow>
+          );
+        })}
 
         {!loading && unsupported ? (
-          <p className="tw-mb-0 tw-mt-3 tw-text-xs tw-font-semibold tw-leading-relaxed tw-text-[var(--text-secondary)]">
+          <p className="tw-mb-0 tw-pb-3 tw-text-xs tw-font-semibold tw-leading-relaxed tw-text-[var(--text-secondary)]">
             {t('keyboardShortcutsUnsupported')}
           </p>
         ) : !loading && managerAccess === 'manual' ? (
-          <p className="tw-mb-0 tw-mt-3 tw-text-xs tw-font-semibold tw-leading-relaxed tw-text-[var(--text-secondary)]">
+          <p className="tw-mb-0 tw-pb-3 tw-text-xs tw-font-semibold tw-leading-relaxed tw-text-[var(--text-secondary)]">
             {t('keyboardShortcutsManualHint')}
           </p>
         ) : !loading && managerAccess === 'openable' ? (
-          <div className="tw-mt-3">
+          <div className="settings-group-actions">
             <button
               type="button"
               className={buttonClassName}
@@ -90,8 +81,8 @@ export function KeyboardShortcutsSection(props: KeyboardShortcutsSectionProps) {
             </button>
           </div>
         ) : null}
-      </section>
+      </SettingsGroup>
       <InAppShortcutsPanel />
-    </div>
+    </>
   );
 }

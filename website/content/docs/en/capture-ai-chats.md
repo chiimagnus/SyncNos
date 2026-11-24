@@ -16,7 +16,7 @@ description: Save AI chats with manual capture, auto-save, or ChatGPT Advanced c
 2. Choose **Fetch AI Chat** in the popup, or use the in-page button, context menu, or a configured shortcut.
 3. Check the result in the [local library](/docs/en/library/).
 
-On supported platforms, enable **Settings → General → Auto-save** to save new messages.
+On supported platforms, enable **Settings → General → AI chats → Auto-save AI chats** to save new messages.
 To retrieve older history, run a manual capture.
 
 Long chats may not be captured in full, but an incomplete capture will not overwrite
@@ -24,13 +24,13 @@ previously saved history. Keep long Grok conversations in the foreground and wai
 for the reply to finish before capturing.
 Some Notion AI attachment details may be unavailable.
 
-Control image caching under **Settings → General → Auto-cache AI chat images**.
+Control image caching under **Settings → General → Image caching → Auto-cache AI chat images**.
 Disabling it does not prevent text from being saved.
 
 ## ChatGPT Advanced capture
 
 Normal capture mainly saves messages available from the current page.
-To retrieve older messages, enable **Settings → General → ChatGPT Advanced capture**.
+To retrieve older messages, enable **Settings → General → AI chats → Use ChatGPT API**.
 
 You must be signed in to ChatGPT. Shared links and temporary chats are not supported.
 Advanced capture tries to retrieve older messages, including available reasoning summaries

@@ -33,7 +33,7 @@ export function AntiHotlinkDomainsEditor(props: {
     <section
       id={id}
       ref={rootRef as any}
-      className="tw-mt-3 tw-grid tw-gap-3 tw-pl-4 tw-border-l-2 tw-border-[var(--border)]"
+      className="tw-mt-2 tw-grid tw-min-w-0 tw-gap-3"
       aria-label={t('antiHotlinkRulesLabel')}
       onBlurCapture={(e) => {
         const root = rootRef.current;
@@ -61,7 +61,7 @@ export function AntiHotlinkDomainsEditor(props: {
                 }`}
               >
                 <div className="tw-flex tw-flex-wrap tw-items-center tw-gap-3">
-                  <label className="tw-flex tw-min-w-[260px] tw-flex-[1.1] tw-items-center tw-gap-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
+                  <label className="tw-flex tw-min-w-0 tw-flex-[1_1_220px] tw-items-center tw-gap-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
                     <span className="tw-shrink-0 tw-w-12">{t('antiHotlinkDomainLabel')}</span>
                     <input
                       value={String(row?.domain || '')}
@@ -76,7 +76,7 @@ export function AntiHotlinkDomainsEditor(props: {
                     />
                   </label>
 
-                  <label className="tw-flex tw-min-w-[340px] tw-flex-[1.6] tw-items-center tw-gap-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
+                  <label className="tw-flex tw-min-w-0 tw-flex-[1_1_220px] tw-items-center tw-gap-2 tw-text-xs tw-font-semibold tw-text-[var(--text-secondary)]">
                     <span className="tw-shrink-0 tw-w-16">{t('antiHotlinkRefererLabel')}</span>
                     <input
                       value={String(row?.referer || '')}
@@ -102,7 +102,7 @@ export function AntiHotlinkDomainsEditor(props: {
                   </button>
                 </div>
 
-                <div className="tw-grid tw-gap-1 tw-pl-14">
+                <div className="tw-grid tw-min-w-0 tw-gap-1 tw-break-words">
                   {domainError ? (
                     <div className="tw-text-xs tw-font-semibold tw-text-red-500">{domainError}</div>
                   ) : null}

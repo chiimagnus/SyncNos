@@ -368,11 +368,11 @@ export function InsightPanel(props: {
         />
       </header>
 
-      <section className="tw-grid tw-gap-3 md:tw-grid-cols-2 xl:tw-grid-cols-4" aria-label={t('insightOverviewAria')}>
+      <section className="settings-insight-summary tw-grid tw-gap-3" aria-label={t('insightOverviewAria')}>
         <div
           className={[
             cardClassName,
-            'tw-flex tw-min-h-[124px] tw-flex-col tw-justify-between',
+            'tw-flex tw-min-h-[88px] tw-flex-col tw-justify-between',
             'tw-border-[color-mix(in_srgb,var(--accent)_34%,var(--border))]',
             'tw-bg-[color-mix(in_srgb,var(--accent)_12%,var(--bg-card))]',
           ].join(' ')}
@@ -391,7 +391,7 @@ export function InsightPanel(props: {
         <div
           className={[
             cardClassName,
-            'tw-flex tw-min-h-[124px] tw-flex-col tw-justify-between',
+            'tw-flex tw-min-h-[88px] tw-flex-col tw-justify-between',
             'tw-border-[color-mix(in_srgb,var(--info)_34%,var(--border))]',
             'tw-bg-[color-mix(in_srgb,var(--info)_10%,var(--bg-card))]',
           ].join(' ')}
@@ -408,7 +408,7 @@ export function InsightPanel(props: {
         <div
           className={[
             cardClassName,
-            'tw-flex tw-min-h-[124px] tw-flex-col tw-justify-between',
+            'tw-flex tw-min-h-[88px] tw-flex-col tw-justify-between',
             'tw-border-[color-mix(in_srgb,var(--secondary)_34%,var(--border))]',
             'tw-bg-[color-mix(in_srgb,var(--secondary)_10%,var(--bg-card))]',
           ].join(' ')}
@@ -427,7 +427,7 @@ export function InsightPanel(props: {
         <div
           className={[
             cardClassName,
-            'tw-flex tw-min-h-[124px] tw-flex-col tw-justify-between',
+            'tw-flex tw-min-h-[88px] tw-flex-col tw-justify-between',
             'tw-border-[color-mix(in_srgb,var(--success)_34%,var(--border))]',
             'tw-bg-[color-mix(in_srgb,var(--success)_10%,var(--bg-card))]',
           ].join(' ')}
@@ -445,7 +445,7 @@ export function InsightPanel(props: {
         </div>
       </section>
 
-      <div className="tw-grid tw-gap-4 lg:tw-grid-cols-3">
+      <div className="settings-insight-charts tw-grid tw-gap-4">
         <section className={`${cardClassName} tw-h-full tw-min-w-0`} aria-label={t('insightChatSectionAria')}>
           <h2 className="tw-m-0 tw-text-base tw-font-extrabold tw-text-[var(--text-primary)]">
             {t('insightChatSectionTitle')}

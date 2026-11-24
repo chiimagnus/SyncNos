@@ -3,7 +3,7 @@ title: $ insert
 description: Search local items from supported AI editors and insert saved content.
 ---
 
-Enable **Insert saved items with $** under **Settings → General → $ Mention**.
+Enable **Insert saved items with $** under **Settings → General → AI chats**.
 
 ## Use it
 

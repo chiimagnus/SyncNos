@@ -11,18 +11,26 @@ export type SettingsSectionKey =
   | 'aboutme';
 
 export type SettingsSectionGroup = {
+  key: 'preferences' | 'sync' | 'data' | 'about';
   sections: ReadonlyArray<{ key: SettingsSectionKey }>;
 };
 
 export const SETTINGS_SECTION_GROUPS: ReadonlyArray<SettingsSectionGroup> = [
   {
+    key: 'preferences',
     sections: [{ key: 'general' }, { key: 'shortcuts' }, { key: 'cli' }],
   },
   {
-    sections: [{ key: 'backup' }, { key: 'notion' }, { key: 'feishu' }, { key: 'obsidian' }, { key: 'github' }],
+    key: 'sync',
+    sections: [{ key: 'notion' }, { key: 'feishu' }, { key: 'obsidian' }, { key: 'github' }],
   },
   {
-    sections: [{ key: 'aboutyou' }, { key: 'aboutme' }],
+    key: 'data',
+    sections: [{ key: 'backup' }, { key: 'aboutyou' }],
+  },
+  {
+    key: 'about',
+    sections: [{ key: 'aboutme' }],
   },
 ];
 

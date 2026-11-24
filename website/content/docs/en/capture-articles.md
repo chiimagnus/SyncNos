@@ -14,7 +14,7 @@ After saving, use [highlights & comments](/docs/en/comments/) or [reader tools](
 
 ## Images
 
-Control image caching under **Settings → General → Auto-cache article images**.
+Control image caching under **Settings → General → Image caching → Auto-cache article images**.
 Retry missing images from **More → Cache images** in the detail view.
 
 ## Xiaohongshu comments
