@@ -130,7 +130,7 @@ const resolveManifest: UserManifestFn = (env) => {
 
   return {
     name: isSafari ? '__MSG_name__' : '__MSG_extName__',
-    version: '1.16.5',
+    version: '1.17.1',
     description: isSafari ? '__MSG_description__' : '__MSG_extDescription__',
     default_locale: 'en',
     permissions,
