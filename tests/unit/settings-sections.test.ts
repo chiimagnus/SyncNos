@@ -129,6 +129,29 @@ describe('settings section definitions', () => {
     ]);
     expect(document.querySelector('[aria-current="page"]')?.textContent).toBe('General');
     expect(document.querySelectorAll('nav button svg, nav button img')).toHaveLength(10);
+    const icons = Array.from(document.querySelectorAll<HTMLElement>('.settings-nav-icon'));
+    expect(icons).toHaveLength(10);
+    expect(icons.every((icon) => !icon.hasAttribute('style'))).toBe(true);
+    expect(icons.filter((icon) => icon.querySelector('svg')).length).toBe(6);
+    for (const icon of icons) {
+      const glyph = icon.querySelector('svg');
+      if (glyph) {
+        expect(glyph.getAttribute('stroke')).toBe('currentColor');
+        expect(glyph.getAttribute('fill')).toBe('none');
+        expect(glyph.getAttribute('width')).toBe('18');
+      }
+    }
+    for (const provider of ['notion', 'github'] as const) {
+      const logo = document.querySelector(`[data-settings-section="${provider}"] img`);
+      expect(logo?.classList.contains('webclipper-provider-logo--invert-in-dark')).toBe(true);
+      act(() => root.render(createElement(SettingsSidebarNav, { activeSection: provider, onSelectSection })));
+      expect(
+        document
+          .querySelector(`[data-settings-section="${provider}"] img`)
+          ?.classList.contains('webclipper-provider-logo--invert-in-dark'),
+      ).toBe(false);
+    }
+    act(() => root.render(createElement(SettingsSidebarNav, { activeSection: 'general', onSelectSection })));
     expect(document.querySelector('img[src=""]')).toBeNull();
     expect(document.querySelector('input[type="search"]')).toBeNull();
     const notion = document.querySelector<HTMLButtonElement>('[data-settings-section="notion"]')!;

@@ -26,27 +26,22 @@ const icons = {
   aboutme: Info,
 };
 
-const iconColors: Record<SettingsSectionKey, string> = {
-  general: '#687280',
-  shortcuts: '#566273',
-  cli: '#333a42',
-  backup: '#47866b',
-  aboutyou: '#567aa4',
-  aboutme: '#7788a6',
-  notion: '#fff',
-  feishu: '#3984ce',
-  obsidian: '#7960bb',
-  github: '#fff',
-};
-
-function SectionIcon({ section }: { section: SettingsSectionKey }) {
+function SectionIcon({ section, active }: { section: SettingsSectionKey; active: boolean }) {
   const Icon = section in icons ? icons[section as keyof typeof icons] : undefined;
   return (
-    <span className="settings-nav-icon" style={{ backgroundColor: iconColors[section] }} aria-hidden="true">
+    <span className="settings-nav-icon" aria-hidden="true">
       {Icon ? (
-        <Icon size={15} strokeWidth={1.8} />
+        <Icon size={18} strokeWidth={1.8} />
       ) : (
-        <img src={getURL(`icons/${section}.svg` as any) || undefined} alt="" />
+        <img
+          src={getURL(`icons/${section}.svg` as any) || undefined}
+          className={
+            !active && (section === 'notion' || section === 'github')
+              ? 'webclipper-provider-logo--invert-in-dark'
+              : undefined
+          }
+          alt=""
+        />
       )}
     </span>
   );
@@ -90,7 +85,7 @@ export function SettingsSidebarNav({
                 aria-current={activeSection === key ? 'page' : undefined}
                 onClick={() => onSelectSection(key)}
               >
-                <SectionIcon section={key} />
+                <SectionIcon section={key} active={activeSection === key} />
                 <span className="tw-min-w-0 tw-flex-1">{settingsSectionLabel(key)}</span>
                 {narrow ? <ChevronRight size={14} aria-hidden="true" className="tw-shrink-0 tw-opacity-60" /> : null}
               </button>
