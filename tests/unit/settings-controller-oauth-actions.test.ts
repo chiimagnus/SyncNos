@@ -210,6 +210,57 @@ afterEach(() => {
 });
 
 describe('Settings OAuth actions', () => {
+  it('connects manually through the background and reloads safe account status and destination choices', async () => {
+    const original = runtimeMocks.send.getMockImplementation()!;
+    let connected = false;
+    runtimeMocks.send.mockImplementation(async (type, payload) => {
+      if (type === NOTION_MESSAGE_TYPES.CONNECT_INTERNAL) {
+        connected = true;
+        return ok({ connected: true, connectionMethod: 'internal', workspaceName: 'Workspace' });
+      }
+      if (type === NOTION_MESSAGE_TYPES.GET_AUTH_STATUS && connected) {
+        return ok({ connected: true, connectionMethod: 'internal', workspaceName: 'Workspace' });
+      }
+      return original(type, payload);
+    });
+    notionPages = [{ id: 'destination', title: 'Destination' }];
+    storageState.notion_oauth_last_error = 'notion_oauth_network_unavailable';
+    await renderController();
+    await invoke(async () => {
+      expect(await latestSnapshot!.onConnectNotionInternal('fixture-token')).toBe(true);
+    });
+    expect(callsOf(NOTION_MESSAGE_TYPES.CONNECT_INTERNAL).at(-1)?.[1]).toEqual({ token: 'fixture-token' });
+    expect(callsOf(NOTION_MESSAGE_TYPES.START_AUTH)).toHaveLength(0);
+    expect(latestSnapshot!.notionStatusText).toBe('notionInternalConnected (Workspace)');
+    expect(latestSnapshot!.notionAuthErrorText).toBe('');
+    expect(latestSnapshot!.notionPageOptions).toEqual(notionPages);
+    expect(latestSnapshot!.notionParentPageId).toBe('');
+    expect(JSON.stringify(storageMocks.set.mock.calls)).not.toContain('fixture-token');
+  });
+
+  it.each([
+    ['notion_internal_token_invalid', 'notionInternalTokenInvalid'],
+    ['notion_internal_token_required', 'notionInternalTokenRequired'],
+    ['notion_api_unreachable', 'notionApiUnreachable'],
+    ['notion_internal_token_permission', 'notionInternalTokenPermission'],
+    ['notion_api_rate_limited', 'notionApiRateLimited'],
+    ['notion_api_unavailable', 'notionApiUnavailable'],
+    ['unexpected-fixture-secret', 'notionInternalConnectFailed'],
+  ])('localizes manual connection failure %s without exposing raw errors', async (code, label) => {
+    const original = runtimeMocks.send.getMockImplementation()!;
+    runtimeMocks.send.mockImplementation(async (type, payload) =>
+      type === NOTION_MESSAGE_TYPES.CONNECT_INTERNAL
+        ? { ok: false, error: { message: code } }
+        : original(type, payload),
+    );
+    await renderController();
+    await invoke(async () => {
+      expect(await latestSnapshot!.onConnectNotionInternal('fixture-token')).toBe(false);
+    });
+    expect(latestSnapshot!.error).toBe(label);
+    expect(latestSnapshot!.notionConnected).toBe(false);
+  });
+
   it('Notion Connect delegates START_AUTH to background without direct pending writes or URL opening', async () => {
     await renderController();
     storageMocks.set.mockClear();

@@ -99,6 +99,7 @@ export function SettingsScene(props: SettingsSceneProps) {
     onSaveNotionDatabaseId,
     onResetNotionDatabaseId,
     onNotionConnectOrDisconnect,
+    onConnectNotionInternal,
     onSaveNotionParentPage,
     onLoadNotionPages,
 
@@ -298,6 +299,7 @@ export function SettingsScene(props: SettingsSceneProps) {
             onConnectOrDisconnect={() => {
               void onNotionConnectOrDisconnect();
             }}
+            onConnectInternal={onConnectNotionInternal}
             onClearError={clearError}
             onSaveNotionParentPage={onSaveNotionParentPage}
             onChangeNotionChatDatabaseId={setNotionChatDatabaseId}

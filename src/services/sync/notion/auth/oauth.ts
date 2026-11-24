@@ -2,14 +2,28 @@ import { storageGet, storageRemove, storageSet } from '@platform/storage/local';
 import { tabsCreate, tabsRemove } from '@platform/webext/tabs';
 import { webNavigationOnCommittedAddListener } from '@platform/webext/web-navigation';
 import { createSecureOAuthState, isExactOAuthRedirect } from '@services/sync/oauth-guard';
-import { NOTION_OAUTH_TOKEN_KEY, type NotionOAuthTokenV1 } from '@services/sync/notion/auth/token-store';
+import {
+  getNotionConnectionToken,
+  NOTION_TOKEN_KEY,
+  NOTION_PENDING_STATE_KEY as KEY_PENDING_STATE,
+  NOTION_LAST_ERROR_KEY as KEY_LAST_ERROR,
+  type NotionConnectionTokenV1,
+} from '@services/sync/notion/auth/token-store';
+import { notionFetch } from '@services/sync/notion/notion-api';
 
 const DEFAULT_NOTION_OAUTH_CLIENT_ID = '2a8d872b-594c-8060-9a2b-00377c27ec32';
 
-const KEY_PENDING_STATE = 'notion_oauth_pending_state';
-const KEY_LAST_ERROR = 'notion_oauth_last_error';
 export const NOTION_OAUTH_NETWORK_ERROR = 'notion_oauth_network_unavailable';
 export const NOTION_OAUTH_SERVICE_ERROR = 'notion_oauth_service_unavailable';
+export const NOTION_INTERNAL_AUTH_ERRORS = {
+  alreadyConnected: 'notion_already_connected',
+  invalidToken: 'notion_internal_token_invalid',
+  wrongTokenType: 'notion_internal_token_required',
+  network: 'notion_api_unreachable',
+  permission: 'notion_internal_token_permission',
+  rateLimited: 'notion_api_rate_limited',
+  service: 'notion_api_unavailable',
+} as const;
 
 let authMutationQueue: Promise<void> = Promise.resolve();
 
@@ -125,6 +139,9 @@ async function removeTab(tabId: number) {
 
 export async function startNotionOAuthAttempt(): Promise<{ state: string }> {
   return enqueueAuthMutation(async () => {
+    if ((await getNotionConnectionToken())?.connectionMethod === 'internal') {
+      throw internalAuthError(NOTION_INTERNAL_AUTH_ERRORS.alreadyConnected);
+    }
     const state = createSecureOAuthState();
     const cfg = getNotionOAuthDefaults();
     const url = new URL(cfg.authorizationUrl);
@@ -153,8 +170,61 @@ export async function startNotionOAuthAttempt(): Promise<{ state: string }> {
   });
 }
 
+function internalAuthError(code: (typeof NOTION_INTERNAL_AUTH_ERRORS)[keyof typeof NOTION_INTERNAL_AUTH_ERRORS]) {
+  return Object.assign(new Error(code), { code });
+}
+
+export async function connectNotionInternalToken(input: unknown): Promise<void> {
+  return enqueueAuthMutation(async () => {
+    if ((await getNotionConnectionToken())?.accessToken) {
+      throw internalAuthError(NOTION_INTERNAL_AUTH_ERRORS.alreadyConnected);
+    }
+    const accessToken = typeof input === 'string' ? input.trim() : '';
+    if (!accessToken || /[^\x21-\x7e]/.test(accessToken)) {
+      throw internalAuthError(NOTION_INTERNAL_AUTH_ERRORS.invalidToken);
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12_000);
+    let user: any;
+    try {
+      user = await notionFetch({ accessToken, method: 'GET', path: '/v1/users/me', signal: controller.signal });
+    } catch (error) {
+      const status = Number((error as { status?: number })?.status || 0);
+      if (status === 400 || status === 401) throw internalAuthError(NOTION_INTERNAL_AUTH_ERRORS.invalidToken);
+      if (status === 403) throw internalAuthError(NOTION_INTERNAL_AUTH_ERRORS.permission);
+      if (status === 429) throw internalAuthError(NOTION_INTERNAL_AUTH_ERRORS.rateLimited);
+      if (controller.signal.aborted || error instanceof TypeError) {
+        throw internalAuthError(NOTION_INTERNAL_AUTH_ERRORS.network);
+      }
+      throw internalAuthError(NOTION_INTERNAL_AUTH_ERRORS.service);
+    } finally {
+      clearTimeout(timer);
+    }
+    if (
+      user?.object !== 'user' ||
+      typeof user.id !== 'string' ||
+      !user.id ||
+      user?.type !== 'bot' ||
+      user?.bot?.owner?.type !== 'workspace'
+    ) {
+      throw internalAuthError(NOTION_INTERNAL_AUTH_ERRORS.wrongTokenType);
+    }
+    if ((await getNotionConnectionToken())?.accessToken) {
+      throw internalAuthError(NOTION_INTERNAL_AUTH_ERRORS.alreadyConnected);
+    }
+    const token: NotionConnectionTokenV1 = {
+      accessToken,
+      workspaceId: typeof user.bot.workspace_id === 'string' ? user.bot.workspace_id : '',
+      workspaceName: typeof user.bot.workspace_name === 'string' ? user.bot.workspace_name : '',
+      createdAt: Date.now(),
+      connectionMethod: 'internal',
+    };
+    await storageSet({ [NOTION_TOKEN_KEY]: token, [KEY_PENDING_STATE]: '', [KEY_LAST_ERROR]: '' });
+  });
+}
+
 export async function clearNotionOAuthAttemptAndToken(): Promise<void> {
-  return enqueueAuthMutation(() => storageRemove([NOTION_OAUTH_TOKEN_KEY, KEY_PENDING_STATE, KEY_LAST_ERROR]));
+  return enqueueAuthMutation(() => storageRemove([NOTION_TOKEN_KEY, KEY_PENDING_STATE, KEY_LAST_ERROR]));
 }
 
 export type NotionOAuthCallbackDetails = {
@@ -201,7 +271,7 @@ export async function handleNotionOAuthCallbackNavigation(
     return true;
   }
 
-  const token: NotionOAuthTokenV1 = {
+  const token: NotionConnectionTokenV1 = {
     accessToken: String(tokenJson.access_token || ''),
     workspaceId: String(tokenJson.workspace?.id || ''),
     workspaceName: String(tokenJson.workspace?.name || ''),
@@ -210,7 +280,7 @@ export async function handleNotionOAuthCallbackNavigation(
   const committed = await enqueueAuthMutation(async () => {
     if ((await readPendingState()) !== state) return false;
     await storageSet({
-      [NOTION_OAUTH_TOKEN_KEY]: token,
+      [NOTION_TOKEN_KEY]: token,
       [KEY_PENDING_STATE]: '',
       [KEY_LAST_ERROR]: '',
     });

@@ -1,10 +1,13 @@
 import { NOTION_MESSAGE_TYPES } from '@platform/messaging/message-contracts';
+import { getURL } from '@platform/runtime/runtime';
 import {
   clearNotionOAuthAttemptAndToken,
+  connectNotionInternalToken,
   getNotionOAuthAttemptSummary,
+  NOTION_INTERNAL_AUTH_ERRORS,
   startNotionOAuthAttempt,
 } from '@services/sync/notion/auth/oauth';
-import { getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
+import { getNotionConnectionToken } from '@services/sync/notion/auth/token-store';
 import { listNotionParentPages, resolveNotionParentPage } from '@services/sync/notion/notion-parent-pages.ts';
 import {
   clearAllNotionSettings,
@@ -19,7 +22,7 @@ import {
 type AnyRouter = {
   ok: (data: unknown) => any;
   err: (message: string, extra?: unknown) => any;
-  register: (type: string, handler: (msg: any) => Promise<any> | any) => void;
+  register: (type: string, handler: (msg: any, sender?: any) => Promise<any> | any) => void;
 };
 
 type Deps = {
@@ -33,15 +36,35 @@ function handlerError(router: AnyRouter, error: unknown, fallback: string) {
   return code ? router.err(message, { code }) : router.err(message);
 }
 
+async function readAuthStatus() {
+  const [token, attempt] = await Promise.all([getNotionConnectionToken(), getNotionOAuthAttemptSummary()]);
+  return {
+    connected: !!token?.accessToken,
+    workspaceName: String(token?.workspaceName || ''),
+    ...(token?.connectionMethod === 'internal' ? { connectionMethod: 'internal' as const } : {}),
+    pending: attempt.pending,
+    errorPresent: attempt.errorPresent,
+  };
+}
+
 export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
-  router.register(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, async () => {
-    const [token, attempt] = await Promise.all([getNotionOAuthToken(), getNotionOAuthAttemptSummary()]);
-    return router.ok({
-      connected: !!(token && token.accessToken),
-      workspaceName: token?.workspaceName ? String(token.workspaceName) : '',
-      pending: attempt.pending,
-      errorPresent: attempt.errorPresent,
-    });
+  router.register(NOTION_MESSAGE_TYPES.GET_AUTH_STATUS, async () => router.ok(await readAuthStatus()));
+
+  router.register(NOTION_MESSAGE_TYPES.CONNECT_INTERNAL, async (msg, sender) => {
+    const base = getURL('');
+    if (!base || !String(sender?.url || '').startsWith(base)) {
+      return router.err('Notion connection must be configured in SyncNos settings.', { code: 'INVALID_ARGUMENT' });
+    }
+    try {
+      return await deps.runExclusiveConfigMutation(async () => {
+        await connectNotionInternalToken(msg?.token);
+        return router.ok(await readAuthStatus());
+      });
+    } catch (error) {
+      const code = Object.values(NOTION_INTERNAL_AUTH_ERRORS).find((value) => value === (error as any)?.code);
+      // Credential validation failures must never return a raw request or response body.
+      return router.err(code || 'notion_internal_connect_failed', { code: code || 'notion_internal_connect_failed' });
+    }
   });
 
   router.register(NOTION_MESSAGE_TYPES.START_AUTH, async () => {
@@ -69,7 +92,7 @@ export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
           const current = await getNotionSettingsConfig();
           const input = hasParentId ? String(msg?.parentPageId ?? '').trim() : current.parentPageId;
           if (hasParentId && input) {
-            const token = await getNotionOAuthToken();
+            const token = await getNotionConnectionToken();
             if (!token?.accessToken) return router.err('notion not connected');
             const page = await resolveNotionParentPage(token.accessToken, input);
             await setNotionParentPage(page);
@@ -107,7 +130,7 @@ export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
   });
 
   router.register(NOTION_MESSAGE_TYPES.LIST_PARENT_PAGES, async () => {
-    const token = await getNotionOAuthToken();
+    const token = await getNotionConnectionToken();
     const accessToken = token?.accessToken ? String(token.accessToken) : '';
     if (!accessToken) return router.err('notion not connected');
 

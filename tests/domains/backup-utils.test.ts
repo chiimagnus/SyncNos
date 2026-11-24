@@ -136,7 +136,7 @@ describe('backup backup-utils', () => {
   it('rejects malformed portable credentials before a Full Backup can be imported or exported', () => {
     expect(validateSensitiveBackupStorage({ notion_oauth_token_v1: { accessToken: 'x' } })).toEqual({
       ok: false,
-      error: 'Invalid Notion OAuth token in Full Backup',
+      error: 'Invalid Notion connection token in Full Backup',
     });
     expect(
       validateSensitiveBackupStorage({

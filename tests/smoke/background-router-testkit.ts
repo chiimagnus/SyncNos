@@ -6,7 +6,7 @@ import { registerWebArticleHandlers } from '../../src/collectors/web/article-fet
 import { createBackgroundRouter } from '../../src/platform/messaging/background-router';
 import { registerUiMessageHandlers } from '../../src/platform/messaging/ui-background-handlers';
 import { createNotionSyncOrchestrator } from '@services/sync/notion/notion-sync-orchestrator.ts';
-import { getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
+import { getNotionConnectionToken } from '@services/sync/notion/auth/token-store';
 import { backgroundStorage } from '@services/conversations/background/storage';
 import * as notionDbManager from '@services/sync/notion/notion-db-manager.ts';
 import { createSyncJobStore } from '@services/sync/sync-job-store';
@@ -36,7 +36,7 @@ export function createTestBackgroundRouter(
 
   const notionSyncJobStore = createSyncJobStore('notion');
   const notionSyncOrchestrator = createNotionSyncOrchestrator({
-    tokenStore: { getToken: getNotionOAuthToken },
+    tokenStore: { getToken: getNotionConnectionToken },
     storage: backgroundStorage,
     conversationKinds,
     dbManager: notionDbManager,

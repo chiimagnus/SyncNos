@@ -31,7 +31,11 @@ import { downloadBlobFile, openOrFocusExtensionAppTab } from '@services/shared/w
 import type { Conversation } from '@services/conversations/domain/models';
 import { setSyncProviderEnabled, syncProviderEnabledStorageKey } from '@services/sync/sync-provider-gate';
 import { GITHUB_AUTH_STATE_KEY } from '@services/sync/github/auth/auth-store';
-import { NOTION_OAUTH_NETWORK_ERROR, NOTION_OAUTH_SERVICE_ERROR } from '@services/sync/notion/auth/oauth';
+import {
+  NOTION_INTERNAL_AUTH_ERRORS,
+  NOTION_OAUTH_NETWORK_ERROR,
+  NOTION_OAUTH_SERVICE_ERROR,
+} from '@services/sync/notion/auth/oauth';
 import { autoSyncEnabledStorageKey, setAutoSyncEnabled } from '@services/sync/auto-sync/auto-sync-settings';
 import {
   ANTI_HOTLINK_RULES_SETTINGS_STORAGE_KEY,
@@ -246,6 +250,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   // Notion
   const [notionConnected, setNotionConnected] = useState<boolean | null>(null);
   const [notionWorkspaceName, setNotionWorkspaceName] = useState<string>('');
+  const [notionInternalConnection, setNotionInternalConnection] = useState(false);
   const [notionPendingState, setNotionPendingState] = useState<string>('');
   const [notionLastError, setNotionLastError] = useState<string>('');
   const [notionParentPageId, setNotionParentPageId] = useState<string>('');
@@ -456,6 +461,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       notionConnectedRef.current = connected;
       setNotionConnected(connected);
       setNotionWorkspaceName(String(raw?.workspaceName || ''));
+      setNotionInternalConnection(connected && raw?.connectionMethod === 'internal');
       if (connected) {
         notionStartGenerationRef.current += 1;
         setNotionPollingState(false);
@@ -1121,6 +1127,38 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     runTask,
     setNotionPollingState,
   ]);
+
+  const onConnectNotionInternal = useCallback(
+    async (token: string) =>
+      runTask(async () => {
+        let response: ApiResponse<unknown>;
+        try {
+          response = await send<ApiResponse<unknown>>(NOTION_MESSAGE_TYPES.CONNECT_INTERNAL, { token });
+        } catch {
+          throw new Error(t('notionInternalConnectFailed'));
+        }
+        if (!response?.ok) {
+          const code = response?.error?.message;
+          const messages: Record<string, string> = {
+            [NOTION_INTERNAL_AUTH_ERRORS.alreadyConnected]: t('notionAlreadyConnected'),
+            [NOTION_INTERNAL_AUTH_ERRORS.invalidToken]: t('notionInternalTokenInvalid'),
+            [NOTION_INTERNAL_AUTH_ERRORS.wrongTokenType]: t('notionInternalTokenRequired'),
+            [NOTION_INTERNAL_AUTH_ERRORS.network]: t('notionApiUnreachable'),
+            [NOTION_INTERNAL_AUTH_ERRORS.permission]: t('notionInternalTokenPermission'),
+            [NOTION_INTERNAL_AUTH_ERRORS.rateLimited]: t('notionApiRateLimited'),
+            [NOTION_INTERNAL_AUTH_ERRORS.service]: t('notionApiUnavailable'),
+          };
+          throw new Error(messages[String(code)] || t('notionInternalConnectFailed'));
+        }
+        const status = await readNotionAuthStatus();
+        if (!status?.connected || status.connectionMethod !== 'internal') {
+          throw new Error(t('notionInternalConnectFailed'));
+        }
+        applyNotionPendingStorageObservation('');
+        applyNotionErrorStorageObservation('');
+      }),
+    [runTask, readNotionAuthStatus, applyNotionPendingStorageObservation, applyNotionErrorStorageObservation],
+  );
 
   const onToggleNotionSyncEnabled = useCallback(
     async (enabled: boolean) => {
@@ -2183,12 +2221,13 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     if (notionConnected == null) return t('statusUnknown');
     if (notionConnected) {
       const workspace = String(notionWorkspaceName || '').trim();
-      return workspace ? `${t('statusConnected')} ✅ (${workspace})` : `${t('statusConnected')} ✅`;
+      const status = notionInternalConnection ? t('notionInternalConnected') : `${t('statusConnected')} ✅`;
+      return workspace ? `${status} (${workspace})` : status;
     }
     if (notionLastError) return t('statusError');
     if (notionPendingState) return t('statusWaiting');
     return t('statusNotConnected');
-  }, [notionConnected, notionLastError, notionPendingState, notionWorkspaceName]);
+  }, [notionConnected, notionInternalConnection, notionLastError, notionPendingState, notionWorkspaceName]);
   const notionAuthErrorText = !notionConnected
     ? notionLastError === NOTION_OAUTH_NETWORK_ERROR
       ? t('notionOAuthNetworkUnavailable')
@@ -2250,6 +2289,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     notionStatusText,
     notionAuthErrorText,
     onNotionConnectOrDisconnect,
+    onConnectNotionInternal,
     onSaveNotionParentPage,
     onLoadNotionPages,
 

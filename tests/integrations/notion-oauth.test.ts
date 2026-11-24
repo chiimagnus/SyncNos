@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   getNotionOAuthDefaults,
+  connectNotionInternalToken,
+  clearNotionOAuthAttemptAndToken,
+  NOTION_INTERNAL_AUTH_ERRORS,
   handleNotionOAuthCallbackNavigation,
   NOTION_OAUTH_NETWORK_ERROR,
   NOTION_OAUTH_SERVICE_ERROR,
@@ -124,6 +127,139 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+const internalBot = {
+  object: 'user',
+  id: 'bot-id',
+  type: 'bot',
+  bot: {
+    owner: { type: 'workspace', workspace: true },
+    workspace_id: 'workspace-id',
+    workspace_name: 'Test workspace',
+  },
+};
+
+describe('Notion internal integration connection', () => {
+  it('validates through Notion directly, commits the shared credential and cancels any old OAuth attempt', async () => {
+    const chromeMock = installChrome({ notion_oauth_pending_state: 'old-state', notion_oauth_last_error: 'old-error' });
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(internalBot)));
+    await connectNotionInternalToken('  fixture-token  ');
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledWith(
+      'https://api.notion.com/v1/users/me',
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({ Authorization: 'Bearer fixture-token', 'Notion-Version': '2022-06-28' }),
+        signal: expect.any(AbortSignal),
+      }),
+    );
+    expect(chromeMock.__store.notion_oauth_token_v1).toMatchObject({
+      accessToken: 'fixture-token',
+      connectionMethod: 'internal',
+      workspaceId: 'workspace-id',
+      workspaceName: 'Test workspace',
+    });
+    expect(chromeMock.__store.notion_oauth_pending_state).toBe('');
+    expect(chromeMock.__store.notion_oauth_last_error).toBe('');
+    expect(chromeMock.__createdTabs).toHaveLength(0);
+    expect(
+      await handleNotionOAuthCallbackNavigation({
+        url: getNotionOAuthDefaults().redirectUri + '?code=old&state=old-state',
+      }),
+    ).toBe(false);
+    await expect(startNotionOAuthAttempt()).rejects.toThrow(NOTION_INTERNAL_AUTH_ERRORS.alreadyConnected);
+    await expect(connectNotionInternalToken('replacement')).rejects.toThrow(
+      NOTION_INTERNAL_AUTH_ERRORS.alreadyConnected,
+    );
+    expect(fetch).toHaveBeenCalledTimes(1);
+    await clearNotionOAuthAttemptAndToken();
+    expect(chromeMock.__store.notion_oauth_token_v1).toBeUndefined();
+  });
+
+  it.each([undefined, '', '  ', 'invalid token', '令牌', 'bad\nheader'])(
+    'rejects invalid input without sending it: %s',
+    async (token) => {
+      const chromeMock = installChrome();
+      await expect(connectNotionInternalToken(token)).rejects.toThrow(NOTION_INTERNAL_AUTH_ERRORS.invalidToken);
+      expect(fetch).not.toHaveBeenCalled();
+      expect(chromeMock.__store.notion_oauth_token_v1).toBeUndefined();
+    },
+  );
+
+  it.each([
+    [401, NOTION_INTERNAL_AUTH_ERRORS.invalidToken],
+    [403, NOTION_INTERNAL_AUTH_ERRORS.permission],
+    [429, NOTION_INTERNAL_AUTH_ERRORS.rateLimited],
+    [503, NOTION_INTERNAL_AUTH_ERRORS.service],
+  ])('classifies HTTP %s without exposing server response content', async (status, code) => {
+    const chromeMock = installChrome({ notion_oauth_pending_state: 'pending' });
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('sensitive-fixture-response', { status }));
+    await expect(connectNotionInternalToken('fixture-token')).rejects.toMatchObject({ code, message: code });
+    expect(chromeMock.__store.notion_oauth_token_v1).toBeUndefined();
+    expect(chromeMock.__store.notion_oauth_pending_state).toBe('pending');
+  });
+
+  it.each([
+    { object: 'user', id: 'person', type: 'person' },
+    { ...internalBot, bot: { owner: { type: 'user' } } },
+    { object: 'list' },
+  ])('rejects credentials that do not identify a workspace-owned bot', async (body) => {
+    const chromeMock = installChrome();
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(body)));
+    await expect(connectNotionInternalToken('fixture-token')).rejects.toThrow(
+      NOTION_INTERNAL_AUTH_ERRORS.wrongTokenType,
+    );
+    expect(chromeMock.__store.notion_oauth_token_v1).toBeUndefined();
+  });
+
+  it('preserves pending OAuth on manual network failure and allows a later retry', async () => {
+    const chromeMock = installChrome({ notion_oauth_pending_state: 'pending', notion_oauth_last_error: 'old-error' });
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError('network failure'));
+    await expect(connectNotionInternalToken('fixture-token')).rejects.toThrow(NOTION_INTERNAL_AUTH_ERRORS.network);
+    expect(chromeMock.__store.notion_oauth_token_v1).toBeUndefined();
+    expect(chromeMock.__store.notion_oauth_pending_state).toBe('pending');
+    expect(chromeMock.__store.notion_oauth_last_error).toBe('old-error');
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(internalBot)));
+    await connectNotionInternalToken('fixture-token');
+    expect(chromeMock.__store.notion_oauth_token_v1).toMatchObject({ connectionMethod: 'internal' });
+  });
+
+  it('does not overwrite a connected OAuth account', async () => {
+    const original = { accessToken: 'oauth-token', workspaceName: 'Original', workspaceId: 'original', createdAt: 1 };
+    const chromeMock = installChrome({ notion_oauth_token_v1: original });
+    await expect(connectNotionInternalToken('new-token')).rejects.toThrow(NOTION_INTERNAL_AUTH_ERRORS.alreadyConnected);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(chromeMock.__store.notion_oauth_token_v1).toEqual(original);
+  });
+
+  it('does not let an in-flight OAuth exchange overwrite a successful manual connection', async () => {
+    const chromeMock = installChrome({ notion_oauth_pending_state: 'old-state' });
+    const response = deferred<any>();
+    const oauth = handleNotionOAuthCallbackNavigation(
+      { url: getNotionOAuthDefaults().redirectUri + '?code=old&state=old-state', tabId: 7 },
+      { fetchImpl: vi.fn(() => response.promise) as any },
+    );
+    await flushMicrotasks();
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(internalBot)));
+    await connectNotionInternalToken('fixture-token');
+    response.resolve({ ok: true, status: 200, text: async () => JSON.stringify({ access_token: 'old-oauth-token' }) });
+    await oauth;
+    expect(chromeMock.__store.notion_oauth_token_v1).toMatchObject({
+      accessToken: 'fixture-token',
+      connectionMethod: 'internal',
+    });
+    expect(chromeMock.__store.__tabsRemoved).toBeUndefined();
+  });
+
+  it('does not partially commit a failed credential write', async () => {
+    const chromeMock = installChrome({ notion_oauth_pending_state: 'pending' });
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(internalBot)));
+    chromeMock.__failNextSet = true;
+    await expect(connectNotionInternalToken('fixture-token')).rejects.toThrow('storage.set failed');
+    expect(chromeMock.__store.notion_oauth_token_v1).toBeUndefined();
+    expect(chromeMock.__store.notion_oauth_pending_state).toBe('pending');
+  });
 });
 
 describe('notion oauth (ts)', () => {

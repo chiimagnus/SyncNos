@@ -4,7 +4,7 @@ import {
   NOTION_MESSAGE_TYPES,
   OBSIDIAN_MESSAGE_TYPES,
 } from '@platform/messaging/message-contracts';
-import { getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
+import { getNotionConnectionToken } from '@services/sync/notion/auth/token-store';
 import { requireNotionParentPageId } from '@services/sync/notion/settings-store';
 import { getFeishuOAuthToken } from '@services/sync/feishu/auth/token-store';
 import { ensureSyncProviderEnabled } from '@services/sync/sync-provider-gate';
@@ -99,7 +99,7 @@ export function registerSyncHandlers(router: AnyRouter, deps: Deps) {
       if (!conversationIds.length) return router.err('no conversationIds');
 
       const instanceId = deps.getInstanceId();
-      const token = await getNotionOAuthToken().catch(() => null);
+      const token = await getNotionConnectionToken().catch(() => null);
       if (!token?.accessToken) return router.err('notion not connected');
 
       await requireNotionParentPageId();

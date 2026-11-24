@@ -67,6 +67,7 @@ function notionProps(overrides: Partial<NotionProps> = {}): NotionProps {
     onToggleAutoSyncEnabled: noOp,
     onToggleAdvancedOpen: noOp,
     onConnectOrDisconnect: noOp,
+    onConnectInternal: async () => true,
     onClearError: noOp,
     onSaveNotionParentPage: async () => true,
     onChangeNotionChatDatabaseId: noOp,
@@ -127,6 +128,55 @@ afterEach(() => {
 });
 
 describe('Settings OAuth sections', () => {
+  it('keeps manual credentials hidden by default and submits only on explicit connection', async () => {
+    const onConnectInternal = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    const props = notionProps({ onConnectInternal });
+    await render(createElement(NotionOAuthSection, props));
+    const button = (label: string) =>
+      Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find((b) => b.textContent === label)!;
+    expect(document.querySelector('#notionInternalToken')).toBeNull();
+    expect(document.querySelector('#notionConnect')).toBeTruthy();
+    act(() => button('notionManualConnect').click());
+    expect(document.querySelector('#notionConnect')).toBeNull();
+    const input = document.querySelector<HTMLInputElement>('#notionInternalToken')!;
+    expect(input.type).toBe('password');
+    expect(input.value).toBe('');
+    expect(document.activeElement).toBe(input);
+    expect(button('connect').disabled).toBe(true);
+    act(() => {
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!.call(input, 'fixture-token');
+      input.dispatchEvent(new window.Event('input', { bubbles: true }));
+      input.blur();
+    });
+    expect(onConnectInternal).not.toHaveBeenCalled();
+    await act(async () => button('connect').click());
+    expect(onConnectInternal).toHaveBeenCalledWith('fixture-token');
+    expect(document.querySelector<HTMLInputElement>('#notionInternalToken')?.value).toBe('fixture-token');
+    await act(async () => button('connect').click());
+    expect(onConnectInternal).toHaveBeenCalledTimes(2);
+    expect(document.querySelector('#notionInternalToken')).toBeNull();
+    await render(createElement(NotionOAuthSection, { ...props, notionConnected: true }));
+    expect(button('notionManualConnect')).toBeUndefined();
+    expect(button('disconnect')).toBeTruthy();
+  });
+
+  it('clears an unfinished token on cancellation and never pre-fills it when reopened', async () => {
+    const onConnectInternal = vi.fn();
+    await render(createElement(NotionOAuthSection, notionProps({ onConnectInternal })));
+    const button = (label: string) =>
+      Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find((b) => b.textContent === label)!;
+    act(() => button('notionManualConnect').click());
+    const input = document.querySelector<HTMLInputElement>('#notionInternalToken')!;
+    act(() => {
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!.call(input, 'fixture-token');
+      input.dispatchEvent(new window.Event('input', { bubbles: true }));
+      input.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    });
+    expect(document.querySelector('#notionInternalToken')).toBeNull();
+    expect(onConnectInternal).not.toHaveBeenCalled();
+    act(() => button('notionManualConnect').click());
+    expect(document.querySelector<HTMLInputElement>('#notionInternalToken')?.value).toBe('');
+  });
   it('shows an actionable Notion authorization network error and leaves Connect available', async () => {
     const onConnectOrDisconnect = vi.fn();
     await render(

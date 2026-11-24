@@ -14,6 +14,7 @@ interface NotionFetchArgs {
   path: string;
   body?: unknown;
   notionVersion?: string;
+  signal?: AbortSignal;
 }
 
 function safeJsonParse(text: string): unknown {
@@ -35,7 +36,7 @@ function parseRetryAfterMs(res: Response): number {
   return delta > 0 ? delta : 0;
 }
 
-async function notionFetch({ accessToken, method, path, body, notionVersion }: NotionFetchArgs) {
+async function notionFetch({ accessToken, method, path, body, notionVersion, signal }: NotionFetchArgs) {
   if (!accessToken) throw new Error('missing notion access token');
   const url = `https://api.notion.com${path}`;
   const res = await fetch(url, {
@@ -47,6 +48,7 @@ async function notionFetch({ accessToken, method, path, body, notionVersion }: N
       Accept: 'application/json',
     },
     body: body ? JSON.stringify(body) : undefined,
+    ...(signal ? { signal } : {}),
   });
   const text = await res.text();
   if (!res.ok) {
