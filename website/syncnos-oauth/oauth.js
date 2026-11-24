@@ -29,7 +29,7 @@
     var state = params.get('state') || '';
     var error = params.get('error') || '';
     var errorDescription = params.get('error_description') || '';
-    var isWebClipper = state.indexOf('webclipper_') === 0;
+    var isWebClipper = /^[0-9a-f]{32}$/.test(state) || state.indexOf('webclipper_') === 0;
     var isHealthIOS = state.indexOf('syncnos_health_ios_') === 0;
 
     if (isWebClipper) {
@@ -38,8 +38,11 @@
       if (error) {
         setStatus('error', 'WebClipper 授权失败', errorDescription ? error + ': ' + errorDescription : error);
       } else if (code) {
-        setStatus('success', 'WebClipper 授权已回传', '页面将自动关闭；若未关闭，请手动关闭并返回 WebClipper。');
-        window.setTimeout(tryCloseCurrentPage, 1200);
+        setStatus(
+          'loading',
+          'SyncNos 已收到授权回调',
+          '扩展正在完成授权；成功后将自动关闭此页。若未关闭，请返回扩展查看连接状态。',
+        );
       } else {
         setStatus('error', 'WebClipper 回调参数缺失', '请返回扩展重新发起 Connect。');
       }
@@ -88,13 +91,13 @@
     }
 
     query('[data-test-webclipper]')?.addEventListener('click', function () {
-      openCallback('webclipper_test_state', { code: codeInput?.value || 'test_code_12345' });
+      openCallback('0123456789abcdef0123456789abcdef', { code: codeInput?.value || 'test_code_12345' });
     });
     query('[data-test-ios]')?.addEventListener('click', function () {
       openCallback('syncnos_health_ios_test_state', { code: codeInput?.value || 'test_code_12345' });
     });
     query('[data-test-error-button]')?.addEventListener('click', function () {
-      openCallback('webclipper_test_state', {
+      openCallback('0123456789abcdef0123456789abcdef', {
         error: errorInput?.value || 'access_denied',
         error_description: errorDescriptionInput?.value || '',
       });
