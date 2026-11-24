@@ -48,6 +48,7 @@ function notionProps(overrides: Partial<NotionProps> = {}): NotionProps {
     syncEnabled: true,
     autoSyncEnabled: false,
     notionStatusText: 'statusNotConnected',
+    notionAuthErrorText: '',
     notionConnected: false,
     pollingNotion: false,
     loadingNotionPages: false,
@@ -126,6 +127,25 @@ afterEach(() => {
 });
 
 describe('Settings OAuth sections', () => {
+  it('shows an actionable Notion authorization network error and leaves Connect available', async () => {
+    const onConnectOrDisconnect = vi.fn();
+    await render(
+      createElement(
+        NotionOAuthSection,
+        notionProps({
+          notionStatusText: 'statusError',
+          notionAuthErrorText: 'notionOAuthNetworkUnavailable',
+          onConnectOrDisconnect,
+        }),
+      ),
+    );
+    expect(document.querySelector('[role="alert"]')?.textContent).toBe('notionOAuthNetworkUnavailable');
+    const connect = Array.from(document.querySelectorAll('button')).find((button) => button.textContent === 'connect')!;
+    expect(connect.disabled).toBe(false);
+    act(() => connect.click());
+    expect(onConnectOrDisconnect).toHaveBeenCalledOnce();
+  });
+
   it('uses switches for both provider and automatic sync, preserving checked and disabled states', async () => {
     const onToggleSyncEnabled = vi.fn();
     const onToggleAutoSyncEnabled = vi.fn();

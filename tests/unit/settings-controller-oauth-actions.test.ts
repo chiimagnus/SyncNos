@@ -226,6 +226,35 @@ describe('Settings OAuth actions', () => {
     expect(latestSnapshot!.notionStatusText).toBe('statusWaiting');
   });
 
+  it.each([
+    ['notion_oauth_network_unavailable', 'notionOAuthNetworkUnavailable'],
+    ['notion_oauth_service_unavailable', 'notionOAuthServiceUnavailable'],
+  ])('maps failed Notion preflight %s to an actionable persistent message', async (code, label) => {
+    const original = runtimeMocks.send.getMockImplementation()!;
+    runtimeMocks.send.mockImplementation(async (type, payload) =>
+      type === NOTION_MESSAGE_TYPES.START_AUTH
+        ? { ok: false, data: null, error: { message: code } }
+        : original(type, payload),
+    );
+    await renderController();
+    await invoke(() => latestSnapshot!.onNotionConnectOrDisconnect());
+    expect(latestSnapshot!.notionStatusText).toBe('statusError');
+    expect(latestSnapshot!.notionAuthErrorText).toBe(label);
+    expect(latestSnapshot!.error).toBeNull();
+    expect(latestSnapshot!.pollingNotion).toBe(false);
+    runtimeMocks.send.mockImplementation(original);
+    await invoke(() => latestSnapshot!.onNotionConnectOrDisconnect());
+    expect(latestSnapshot!.notionAuthErrorText).toBe('');
+    expect(latestSnapshot!.pollingNotion).toBe(true);
+  });
+
+  it('restores a network error reported by the background after reopening Settings', async () => {
+    storageState.notion_oauth_last_error = 'notion_oauth_network_unavailable';
+    await renderController();
+    expect(latestSnapshot!.notionStatusText).toBe('statusError');
+    expect(latestSnapshot!.notionAuthErrorText).toBe('notionOAuthNetworkUnavailable');
+  });
+
   it('rejects duplicate Notion START while waiting and allows retry after the 60s UI timeout', async () => {
     vi.useFakeTimers();
     await renderController();

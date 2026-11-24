@@ -94,6 +94,7 @@ export function SettingsScene(props: SettingsSceneProps) {
     notionPageOptions,
     notionPageSearchEmpty,
     notionStatusText,
+    notionAuthErrorText,
     onToggleNotionAdvancedOpen,
     onSaveNotionDatabaseId,
     onResetNotionDatabaseId,
@@ -270,6 +271,7 @@ export function SettingsScene(props: SettingsSceneProps) {
             syncEnabled={notionSyncEnabled}
             autoSyncEnabled={notionAutoSyncEnabled}
             notionStatusText={notionStatusText}
+            notionAuthErrorText={notionAuthErrorText}
             notionConnected={!!notionConnected}
             pollingNotion={pollingNotion}
             loadingNotionPages={loadingNotionPages}
