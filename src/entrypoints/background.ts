@@ -87,6 +87,7 @@ export default defineBackground(() => {
   registerChatgptApiHandlers(router);
   registerNotionSettingsHandlers(router, {
     runExclusiveMaintenance: services.notionSyncOrchestrator.runExclusiveMaintenance,
+    runExclusiveConfigMutation: services.notionSyncOrchestrator.runExclusiveConfigMutation,
   });
   registerFeishuSettingsHandlers(router, {
     runExclusiveMaintenance: services.feishuSyncOrchestrator.runExclusiveMaintenance,

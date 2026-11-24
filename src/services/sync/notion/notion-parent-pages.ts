@@ -1,4 +1,6 @@
 import { getPageTitle, notionFetch } from '@services/sync/notion/notion-api.ts';
+import { normalizeNotionId } from '@services/shared/notion-id';
+import { normalizeNotionDatabaseIdInput } from '@services/sync/notion/notion-id-utils';
 
 type NotionParentPageOption = { id: string; title: string };
 
@@ -70,9 +72,37 @@ async function retrievePage(accessToken: string, pageId: string) {
     });
     if (!page || page.object !== 'page' || isPageArchived(page)) return null;
     return page;
-  } catch (_e) {
-    return null;
+  } catch (error: any) {
+    if (error?.status === 404 || error?.status === 410) return null;
+    throw error;
   }
+}
+
+export async function resolveNotionParentPage(accessToken: string, input: string): Promise<NotionParentPageOption> {
+  let id = normalizeNotionId(input);
+  if (!id) {
+    try {
+      const url = new URL(input);
+      if (url.protocol === 'https:' || url.protocol === 'http:') {
+        // A view ID or block ID in the query/fragment is not the destination page.
+        id = normalizeNotionDatabaseIdInput(url.pathname.split('/').filter(Boolean).at(-1) || '');
+      }
+    } catch (_error) {
+      // The input is neither an ID nor a URL.
+    }
+  }
+  if (!id) {
+    throw Object.assign(new Error('Enter a Notion page link or page ID.'), { code: 'invalid_notion_parent_page' });
+  }
+
+  const page = await retrievePage(accessToken, id);
+  const option = page ? toOption(page) : null;
+  if (!option || normalizeNotionId(option.id) !== id) {
+    throw Object.assign(new Error('Share an existing Notion page with SyncNos and try again.'), {
+      code: 'notion_parent_page_unavailable',
+    });
+  }
+  return option;
 }
 
 export async function listNotionParentPages(

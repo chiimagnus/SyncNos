@@ -92,6 +92,7 @@ export function SettingsScene(props: SettingsSceneProps) {
     notionArticleDatabaseLabel,
     notionVideoDatabaseLabel,
     notionPageOptions,
+    notionPageSearchEmpty,
     notionStatusText,
     onToggleNotionAdvancedOpen,
     onSaveNotionDatabaseId,
@@ -281,6 +282,7 @@ export function SettingsScene(props: SettingsSceneProps) {
             notionArticleDatabaseLabel={notionArticleDatabaseLabel}
             notionVideoDatabaseLabel={notionVideoDatabaseLabel}
             notionPageOptions={notionPageOptions}
+            notionPageSearchEmpty={notionPageSearchEmpty}
             notionLogoUrl={getURL('icons/notion.svg' as any)}
             onToggleSyncEnabled={(enabled) => {
               void onToggleNotionSyncEnabled(enabled);
@@ -294,9 +296,8 @@ export function SettingsScene(props: SettingsSceneProps) {
             onConnectOrDisconnect={() => {
               void onNotionConnectOrDisconnect();
             }}
-            onSaveNotionParentPage={(id) => {
-              void onSaveNotionParentPage(id);
-            }}
+            onClearError={clearError}
+            onSaveNotionParentPage={onSaveNotionParentPage}
             onChangeNotionChatDatabaseId={setNotionChatDatabaseId}
             onChangeNotionArticleDatabaseId={setNotionArticleDatabaseId}
             onChangeNotionVideoDatabaseId={setNotionVideoDatabaseId}

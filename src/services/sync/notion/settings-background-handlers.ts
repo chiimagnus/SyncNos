@@ -5,7 +5,7 @@ import {
   startNotionOAuthAttempt,
 } from '@services/sync/notion/auth/oauth';
 import { getNotionOAuthToken } from '@services/sync/notion/auth/token-store';
-import { listNotionParentPages } from '@services/sync/notion/notion-parent-pages.ts';
+import { listNotionParentPages, resolveNotionParentPage } from '@services/sync/notion/notion-parent-pages.ts';
 import {
   clearAllNotionSettings,
   getNotionParentPage,
@@ -24,6 +24,7 @@ type AnyRouter = {
 
 type Deps = {
   runExclusiveMaintenance: <T>(mutation: () => Promise<T>) => Promise<T>;
+  runExclusiveConfigMutation: <T>(mutation: () => Promise<T>) => Promise<T>;
 };
 
 function handlerError(router: AnyRouter, error: unknown, fallback: string) {
@@ -61,24 +62,34 @@ export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
 
   router.register(NOTION_MESSAGE_TYPES.SAVE_CONFIG, async (msg) => {
     try {
-      const hasParentId = Object.prototype.hasOwnProperty.call(msg || {}, 'parentPageId');
-      const hasParentTitle = Object.prototype.hasOwnProperty.call(msg || {}, 'parentPageTitle');
-      if (hasParentId || hasParentTitle) {
-        const current = await getNotionSettingsConfig();
-        await setNotionParentPage({
-          id: hasParentId ? msg?.parentPageId : current.parentPageId,
-          title: hasParentTitle ? msg?.parentPageTitle : current.parentPageTitle,
-        });
-      }
-
-      const databaseIds = msg?.databaseIds && typeof msg.databaseIds === 'object' ? msg.databaseIds : null;
-      if (databaseIds) {
-        for (const kindId of NOTION_DATABASE_KIND_IDS) {
-          if (!Object.prototype.hasOwnProperty.call(databaseIds, kindId)) continue;
-          await setNotionDatabaseId(kindId, databaseIds[kindId]);
+      return await deps.runExclusiveConfigMutation(async () => {
+        const hasParentId = Object.prototype.hasOwnProperty.call(msg || {}, 'parentPageId');
+        const hasParentTitle = Object.prototype.hasOwnProperty.call(msg || {}, 'parentPageTitle');
+        if (hasParentId || hasParentTitle) {
+          const current = await getNotionSettingsConfig();
+          const input = hasParentId ? String(msg?.parentPageId ?? '').trim() : current.parentPageId;
+          if (hasParentId && input) {
+            const token = await getNotionOAuthToken();
+            if (!token?.accessToken) return router.err('notion not connected');
+            const page = await resolveNotionParentPage(token.accessToken, input);
+            await setNotionParentPage(page);
+          } else {
+            await setNotionParentPage({
+              id: input,
+              title: hasParentTitle ? msg?.parentPageTitle : current.parentPageTitle,
+            });
+          }
         }
-      }
-      return router.ok(await getNotionSettingsConfig());
+
+        const databaseIds = msg?.databaseIds && typeof msg.databaseIds === 'object' ? msg.databaseIds : null;
+        if (databaseIds) {
+          for (const kindId of NOTION_DATABASE_KIND_IDS) {
+            if (!Object.prototype.hasOwnProperty.call(databaseIds, kindId)) continue;
+            await setNotionDatabaseId(kindId, databaseIds[kindId]);
+          }
+        }
+        return router.ok(await getNotionSettingsConfig());
+      });
     } catch (error) {
       return handlerError(router, error, 'failed to save Notion config');
     }
@@ -86,8 +97,10 @@ export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
 
   router.register(NOTION_MESSAGE_TYPES.RESET_DATABASE_ID, async (msg) => {
     try {
-      await resetNotionDatabaseId(msg?.kindId);
-      return router.ok(await getNotionSettingsConfig());
+      return await deps.runExclusiveConfigMutation(async () => {
+        await resetNotionDatabaseId(msg?.kindId);
+        return router.ok(await getNotionSettingsConfig());
+      });
     } catch (error) {
       return handlerError(router, error, 'failed to reset Notion database id');
     }

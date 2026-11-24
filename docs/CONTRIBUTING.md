@@ -57,6 +57,8 @@ Safari/Xcode 集成使用 `npm run setup:safari:xcode`。
 `npm run gate` 比 `gate:ci` 多构建 Chromium production artifact 并执行 `check:dist`。
 Zen / Safari 有改动时再运行 `npm run check:zen` / `npm run check:safari`。
 模拟平台测试不能冒充真实平台 E2E。
+首次安装、OAuth 和权限相关验收使用独立临时浏览器 Profile 与独立构建产物，
+不得读取、复制或覆盖日常 Profile；只有用户明确要求验收其现有配置时才例外。
 
 `check:dist` 约束解压后的完整目录体积、manifest 声明的 content script JS 总体积和 Popup 启动
 JS/CSS，并拒绝冗余 KaTeX TTF/WOFF。

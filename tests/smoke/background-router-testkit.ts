@@ -54,6 +54,7 @@ export function createTestBackgroundRouter(
   });
   registerNotionSettingsHandlers(router, {
     runExclusiveMaintenance: notionSyncOrchestrator.runExclusiveMaintenance,
+    runExclusiveConfigMutation: notionSyncOrchestrator.runExclusiveConfigMutation,
   });
   registerObsidianSettingsHandlers(router, { getInstanceId: () => instanceId, testObsidianConnection });
   registerUiMessageHandlers(router, { ensureLocaleReady: async () => undefined, findSavedConversationForPage });

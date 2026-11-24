@@ -1,5 +1,5 @@
 import type { NotionPageOption } from '@viewmodels/settings/utils';
-import type { KeyboardEvent } from 'react';
+import { useEffect, useState, type KeyboardEvent } from 'react';
 import { t } from '@i18n';
 import { SettingsDocsLink } from '@ui/settings/SettingsDocsLink';
 import {
@@ -31,12 +31,14 @@ export function NotionOAuthSection(props: {
   notionArticleDatabaseLabel: string;
   notionVideoDatabaseLabel: string;
   notionPageOptions: NotionPageOption[];
+  notionPageSearchEmpty: boolean;
   notionLogoUrl: string;
   onToggleSyncEnabled: (enabled: boolean) => void;
   onToggleAutoSyncEnabled: (enabled: boolean) => void;
   onToggleAdvancedOpen: () => void;
   onConnectOrDisconnect: () => void;
-  onSaveNotionParentPage: (id: string) => void;
+  onClearError: () => void;
+  onSaveNotionParentPage: (id: string) => Promise<boolean>;
   onChangeNotionChatDatabaseId: (id: string) => void;
   onChangeNotionArticleDatabaseId: (id: string) => void;
   onChangeNotionVideoDatabaseId: (id: string) => void;
@@ -61,11 +63,13 @@ export function NotionOAuthSection(props: {
     notionArticleDatabaseLabel,
     notionVideoDatabaseLabel,
     notionPageOptions,
+    notionPageSearchEmpty,
     notionLogoUrl,
     onToggleSyncEnabled,
     onToggleAutoSyncEnabled,
     onToggleAdvancedOpen,
     onConnectOrDisconnect,
+    onClearError,
     onSaveNotionParentPage,
     onChangeNotionChatDatabaseId,
     onChangeNotionArticleDatabaseId,
@@ -74,6 +78,23 @@ export function NotionOAuthSection(props: {
     onResetNotionDatabaseId,
     onLoadNotionPages,
   } = props;
+
+  const [parentPageInput, setParentPageInput] = useState<string | null>(null);
+  const selectingByLink = notionConnected && parentPageInput !== null;
+  const linkOption = '__notion_page_link__';
+  const pageSelectionDisabled = busy || !notionConnected || loadingNotionPages;
+  useEffect(() => {
+    if (!notionConnected || !syncEnabled) setParentPageInput(null);
+  }, [notionConnected, syncEnabled]);
+
+  const closePageInput = () => {
+    onClearError();
+    setParentPageInput(null);
+    window.requestAnimationFrame(() => document.getElementById('notionPages')?.focus());
+  };
+  const saveParentPageInput = async () => {
+    if (parentPageInput?.trim() && (await onSaveNotionParentPage(parentPageInput))) closePageInput();
+  };
 
   const onEnterToSaveDatabaseId = (e: KeyboardEvent<HTMLInputElement>, kind: 'chat' | 'article' | 'video') => {
     if (e.key !== 'Enter') return;
@@ -116,42 +137,99 @@ export function NotionOAuthSection(props: {
         </div>
       </SettingsGroup>
       <SettingsGroup title={t('settingsDestination')}>
-        <SettingsFormRow label={t('parentPage')} info={t('settingsNotionDestinationInfo')}>
-          <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
-            <SelectMenu<string>
-              buttonId="notionPages"
-              className={`${settingsControlWidthClassName} tw-min-w-0`}
-              buttonClassName={`${buttonClassName} tw-w-full`}
-              value={String(notionParentPageId || '')}
-              disabled={busy || !notionConnected || loadingNotionPages}
-              ariaLabel={t('parentPage')}
-              minWidth={180}
-              maxHeight={320}
-              onChange={(next) => onSaveNotionParentPage(next)}
-              options={[
-                {
-                  value: '',
-                  label: notionConnected ? t('parentPage') : t('connectNotionFirst'),
-                  disabled: true,
-                },
-                ...notionPageOptions.map((p) => ({
-                  value: p.id,
-                  label: p.title,
-                })),
-              ]}
-            />
-            <button
-              type="button"
-              title={t('refresh')}
-              onClick={onLoadNotionPages}
-              disabled={busy || !notionConnected || loadingNotionPages}
-              className="webclipper-btn webclipper-btn--icon"
-              aria-label={t('refreshPagesAria')}
-              aria-busy={loadingNotionPages}
-            >
-              {loadingNotionPages ? '⏳' : '↻'}
-            </button>
-          </div>
+        <SettingsFormRow
+          label={t('parentPage')}
+          info={t('settingsNotionDestinationInfo')}
+          description={
+            selectingByLink
+              ? t('notionParentPageLinkHint')
+              : notionConnected && !loadingNotionPages && !notionParentPageId && notionPageSearchEmpty
+                ? t('notionNoParentPages')
+                : undefined
+          }
+        >
+          {selectingByLink ? (
+            <div className="tw-flex tw-min-w-0 tw-flex-col tw-items-end tw-gap-2">
+              <input
+                id="notionParentPageLink"
+                aria-label={t('notionParentPageLink')}
+                autoFocus
+                value={parentPageInput}
+                onInput={(e) => setParentPageInput(e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape' && !busy) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    closePageInput();
+                  } else if (e.key === 'Enter' && parentPageInput.trim() && !pageSelectionDisabled) {
+                    e.preventDefault();
+                    void saveParentPageInput();
+                  }
+                }}
+                disabled={pageSelectionDisabled}
+                spellCheck={false}
+                placeholder={t('notionParentPageLink')}
+                className={settingsTextInputClassName}
+              />
+              <div className="tw-flex tw-flex-wrap tw-justify-end tw-gap-2">
+                <button type="button" className={buttonClassName} onClick={closePageInput} disabled={busy}>
+                  {t('cancelButton')}
+                </button>
+                <button
+                  type="button"
+                  className={primaryButtonClassName}
+                  onClick={() => void saveParentPageInput()}
+                  disabled={pageSelectionDisabled || !parentPageInput.trim()}
+                >
+                  {t('saveButton')}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="tw-flex tw-min-w-0 tw-items-center tw-gap-2">
+              <SelectMenu<string>
+                buttonId="notionPages"
+                className={`${settingsControlWidthClassName} tw-min-w-0`}
+                buttonClassName={`${buttonClassName} tw-w-full`}
+                value={String(notionParentPageId || '')}
+                disabled={pageSelectionDisabled}
+                ariaLabel={t('parentPage')}
+                minWidth={180}
+                maxHeight={320}
+                onChange={(next) => {
+                  if (next === linkOption) setParentPageInput('');
+                  else void onSaveNotionParentPage(next);
+                }}
+                options={[
+                  {
+                    value: '',
+                    label: !notionConnected
+                      ? t('connectNotionFirst')
+                      : loadingNotionPages
+                        ? t('loadingDots')
+                        : t('notionChooseParentPage'),
+                    disabled: true,
+                  },
+                  ...notionPageOptions.map((p) => ({
+                    value: p.id,
+                    label: p.title,
+                  })),
+                  { value: linkOption, label: t('notionChoosePageByLink') },
+                ]}
+              />
+              <button
+                type="button"
+                title={t('refresh')}
+                onClick={onLoadNotionPages}
+                disabled={pageSelectionDisabled}
+                className="webclipper-btn webclipper-btn--icon"
+                aria-label={t('refreshPagesAria')}
+                aria-busy={loadingNotionPages}
+              >
+                {loadingNotionPages ? '⏳' : '↻'}
+              </button>
+            </div>
+          )}
         </SettingsFormRow>
         <SettingsFormRow label={t('settingsAdvanced')} info={t('notionAdvancedDbIdHint')}>
           <button

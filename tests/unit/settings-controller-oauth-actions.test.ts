@@ -62,6 +62,7 @@ let latestSnapshot: Snapshot | null = null;
 let root: ReactDOM.Root | null = null;
 let dom: JSDOM | null = null;
 let notionConnected = false;
+let notionPages: Array<{ id: string; title: string }> = [];
 let feishuConnected = false;
 let feishuSafeConfig = { clientId: '', clientSecretPresent: false, tokenExchangeProxyUrl: '' };
 let storageState: Record<string, unknown> = {};
@@ -119,6 +120,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   latestSnapshot = null;
   notionConnected = false;
+  notionPages = [];
   feishuConnected = false;
   feishuSafeConfig = { clientId: '', clientSecretPresent: false, tokenExchangeProxyUrl: '' };
   storageState = {};
@@ -143,6 +145,7 @@ beforeEach(() => {
     }
     if (type === NOTION_MESSAGE_TYPES.START_AUTH) return ok({ state: 'background-state' });
     if (type === NOTION_MESSAGE_TYPES.DISCONNECT) return ok({ disconnected: true });
+    if (type === NOTION_MESSAGE_TYPES.LIST_PARENT_PAGES) return ok({ pages: notionPages, resolvedSaved: null });
     if (type === NOTION_MESSAGE_TYPES.GET_CONFIG) {
       return ok({ parentPageId: '', parentPageTitle: '', databaseIds: { chat: '', article: '', video: '' } });
     }
@@ -239,6 +242,45 @@ describe('Settings OAuth actions', () => {
 
     await invoke(() => latestSnapshot!.onNotionConnectOrDisconnect());
     expect(callsOf(NOTION_MESSAGE_TYPES.START_AUTH)).toHaveLength(2);
+  });
+
+  it('loads destination choices without silently selecting one, and shows a direct destination only after durable save', async () => {
+    notionConnected = true;
+    notionPages = [{ id: 'first', title: 'First' }];
+    await renderController();
+    expect(latestSnapshot!.notionPageOptions).toEqual(notionPages);
+    expect(latestSnapshot!.notionPageSearchEmpty).toBe(false);
+    expect(latestSnapshot!.notionParentPageId).toBe('');
+    expect(callsOf(NOTION_MESSAGE_TYPES.SAVE_CONFIG)).toHaveLength(0);
+
+    const link = 'https://www.notion.so/destination-' + 'a'.repeat(32);
+    const original = runtimeMocks.send.getMockImplementation()!;
+    runtimeMocks.send.mockImplementation(async (type, payload) =>
+      type === NOTION_MESSAGE_TYPES.SAVE_CONFIG
+        ? {
+            ok: false,
+            data: null,
+            error: { message: 'page not shared', extra: { code: 'notion_parent_page_unavailable' } },
+          }
+        : original(type, payload),
+    );
+    await invoke(async () => {
+      expect(await latestSnapshot!.onSaveNotionParentPage(link)).toBe(false);
+    });
+    expect(latestSnapshot!.notionParentPageId).toBe('');
+    expect(latestSnapshot!.error).toBe('notionParentPageUnavailable');
+
+    runtimeMocks.send.mockImplementation(async (type, payload) =>
+      type === NOTION_MESSAGE_TYPES.SAVE_CONFIG
+        ? ok({ parentPageId: 'a'.repeat(32), parentPageTitle: 'Destination', databaseIds: {} })
+        : original(type, payload),
+    );
+    await invoke(async () => {
+      expect(await latestSnapshot!.onSaveNotionParentPage(link)).toBe(true);
+    });
+    expect(callsOf(NOTION_MESSAGE_TYPES.SAVE_CONFIG).at(-1)?.[1]).toEqual({ parentPageId: link });
+    expect(latestSnapshot!.notionParentPageId).toBe('a'.repeat(32));
+    expect(latestSnapshot!.notionPageOptions).toContainEqual({ id: 'a'.repeat(32), title: 'Destination' });
   });
 
   it('Notion Disconnect resets local state without triggering a full Settings refresh', async () => {
