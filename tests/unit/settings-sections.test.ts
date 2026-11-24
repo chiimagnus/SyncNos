@@ -157,11 +157,15 @@ describe('settings section definitions', () => {
     expect(externalLinks).toHaveLength(4);
     expect(Array.from(externalLinks).every((link) => link.tagName === 'A')).toBe(true);
     expect(Array.from(externalLinks).every((link) => link.getAttribute('target') === '_blank')).toBe(true);
-    for (const link of externalLinks) {
+    for (const link of [help!, ...externalLinks]) {
       expect(link.getAttribute('aria-label')).toBeTruthy();
-      expect(link.querySelector('svg.lucide-arrow-up-right[aria-hidden="true"]')).toBeTruthy();
+      expect(link.querySelector('svg.lucide-arrow-up-right[aria-hidden="true"]')?.classList).toContain(
+        'tw-text-[var(--accent)]',
+      );
       expect(link.textContent).toBe('');
-      expect(link.getAttribute('data-tooltip-content')).toBe(link.getAttribute('aria-label'));
+      expect(link.hasAttribute('data-tooltip-id')).toBe(false);
+      expect(link.hasAttribute('data-tooltip-content')).toBe(false);
+      expect(link.hasAttribute('title')).toBe(false);
     }
     expect(document.querySelector('[id^="btnAbout"]')).toBeNull();
     expect(document.querySelector('img[src=""]')).toBeNull();
@@ -866,12 +870,17 @@ describe('inpage anti-hotlink advanced editor', () => {
     expect(document.body.textContent || '').toContain('Skills directory used by your AI agent');
     expect(document.body.textContent || '').not.toContain('Codex');
     expect(document.body.textContent || '').not.toContain('~/.codex');
-    expect(
-      document.querySelector('a[href="https://github.com/chiimagnus/SyncNos/tree/main/skills/syncnos"]'),
-    ).toBeTruthy();
-    expect(
-      document.querySelector('a[href="https://github.com/chiimagnus/SyncNos/tree/main/skills/syncnos-zh"]'),
-    ).toBeTruthy();
+    for (const name of ['syncnos', 'syncnos-zh']) {
+      const link = document.querySelector(
+        'a[href="https://github.com/chiimagnus/SyncNos/tree/main/skills/' + name + '"]',
+      );
+      expect(link?.getAttribute('aria-label')).toBeTruthy();
+      expect(link?.getAttribute('target')).toBe('_blank');
+      expect(link?.querySelector('svg.lucide-arrow-up-right')?.classList).toContain('tw-text-[var(--accent)]');
+      expect(link?.hasAttribute('data-tooltip-id')).toBe(false);
+      expect(link?.hasAttribute('data-tooltip-content')).toBe(false);
+      expect(link?.hasAttribute('title')).toBe(false);
+    }
 
     act(() => {
       checkbox!.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
