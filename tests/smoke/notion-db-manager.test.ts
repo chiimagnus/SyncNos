@@ -67,7 +67,8 @@ describe('notion-db-manager', () => {
     const calls: any[] = [];
     notionFetchImpl = async (req: any) => {
       calls.push(req);
-      if (req.method === 'POST' && req.path === '/v1/search') return { results: [] };
+      if (req.method === 'GET' && req.path === '/v1/blocks/p/children?page_size=100')
+        return { results: [], has_more: false };
       if (req.method === 'POST' && req.path === '/v1/databases') return { id: '11111111111111111111111111111111' };
       throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
     };
@@ -91,7 +92,8 @@ describe('notion-db-manager', () => {
     const calls: any[] = [];
     notionFetchImpl = async (req: any) => {
       calls.push(req);
-      if (req.method === 'POST' && req.path === '/v1/search') return { results: [] };
+      if (req.method === 'GET' && req.path === '/v1/blocks/p/children?page_size=100')
+        return { results: [], has_more: false };
       if (req.method === 'POST' && req.path === '/v1/databases') return { id: '22222222222222222222222222222222' };
       throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
     };
@@ -268,218 +270,201 @@ describe('notion-db-manager', () => {
     await expect(ensureChatDatabase()).rejects.toThrow('schema patch failed');
   });
 
-  it('clears stale cached database id and recreates database on object_not_found', async () => {
-    const calls: any[] = [];
-    notionFetchImpl = async (req: any) => {
-      calls.push(req);
-      if (req.method === 'GET' && req.path === '/v1/databases/77777777777777777777777777777777') {
-        const error: any = new Error('database missing');
-        error.status = 404;
-        error.code = 'object_not_found';
-        throw error;
-      }
-      if (req.method === 'POST' && req.path === '/v1/search') return { results: [] };
-      if (req.method === 'POST' && req.path === '/v1/databases') return { id: '55555555555555555555555555555555' };
-      throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
+  function database(id: string, dbSpec = CHAT_DB_SPEC, title = dbSpec.title, parent = 'p') {
+    return {
+      object: 'database',
+      id,
+      parent: { type: 'page_id', page_id: parent },
+      title: [{ plain_text: title }],
+      properties: Object.fromEntries(
+        Object.entries(dbSpec.properties).map(([name, spec]) => [name, { type: Object.keys(spec as object)[0] }]),
+      ),
     };
+  }
 
-    const chromeMock = mockChromeStorage({ initial: { [CHAT_DB_STORAGE_KEY]: '77777777777777777777777777777777' } });
+  function child(id: string, title: string) {
+    return { id, type: 'child_database', child_database: { title } };
+  }
+
+  it.each([401, 403, 404, 429, 500, 503])('preserves a bound database after HTTP %s', async (status) => {
+    const id = '7'.repeat(32);
+    const chromeMock = mockChromeStorage({ initial: { [CHAT_DB_STORAGE_KEY]: id } });
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
-
-    const res = await ensureChatDatabase();
-    expect(res.databaseId).toBe('55555555555555555555555555555555');
-    expect(chromeMock.__removed.some((keys) => keys.includes(CHAT_DB_STORAGE_KEY))).toBe(true);
-    expect(calls.some((c) => c.method === 'GET' && c.path === '/v1/databases/77777777777777777777777777777777')).toBe(
-      true,
-    );
+    const calls: any[] = [];
+    notionFetchImpl = async (req) => {
+      calls.push(req);
+      throw Object.assign(new Error('unavailable'), { status, retryAfterMs: 6000 });
+    };
+    await expect(ensureChatDatabase()).rejects.toThrow('unavailable');
+    expect(chromeMock.__store[CHAT_DB_STORAGE_KEY]).toBe(id);
+    expect(chromeMock.__removed).toEqual([]);
+    expect(calls.map((c) => c.path)).toEqual(['/v1/databases/' + id]);
   });
 
-  it('does not reuse cached databases that are already in trash', async () => {
-    const calls: any[] = [];
-    notionFetchImpl = async (req: any) => {
-      calls.push(req);
-      if (req.method === 'GET' && req.path === '/v1/databases/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa') {
+  it.each(['archived', 'in_trash', 'wrong_parent'])(
+    'does not replace a bound database with state %s',
+    async (state) => {
+      const id = 'a'.repeat(32);
+      const chromeMock = mockChromeStorage({ initial: { [CHAT_DB_STORAGE_KEY]: id } });
+      // @ts-expect-error test global
+      globalThis.chrome = chromeMock;
+      const calls: any[] = [];
+      notionFetchImpl = async (req) => {
+        calls.push(req);
         return {
-          id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-          object: 'database',
-          archived: false,
-          in_trash: true,
-          properties: { Name: { type: 'title' } },
+          ...database(id, CHAT_DB_SPEC, 'Renamed'),
+          ...(state === 'wrong_parent' ? { parent: { type: 'page_id', page_id: 'other' } } : { [state]: true }),
         };
-      }
-      if (req.method === 'POST' && req.path === '/v1/search') return { results: [] };
-      if (req.method === 'POST' && req.path === '/v1/databases') return { id: '55555555555555555555555555555555' };
-      throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
-    };
+      };
+      await expect(ensureChatDatabase()).rejects.toThrow('configured Notion database');
+      expect(chromeMock.__store[CHAT_DB_STORAGE_KEY]).toBe(id);
+      expect(chromeMock.__removed).toEqual([]);
+      expect(calls).toHaveLength(1);
+    },
+  );
 
-    const chromeMock = mockChromeStorage({ initial: { [CHAT_DB_STORAGE_KEY]: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' } });
+  it.each(['chat', 'article', 'video'])(
+    'reuses the unique renamed %s database in the actual parent page',
+    async (kindId) => {
+      const spec = conversationKinds.getNotionDbSpecByKindId(kindId)!;
+      const id = '1'.repeat(32);
+      const unrelated = '2'.repeat(32);
+      const other = '3'.repeat(32);
+      const chromeMock = mockChromeStorage();
+      // @ts-expect-error test global
+      globalThis.chrome = chromeMock;
+      const calls: any[] = [];
+      notionFetchImpl = async (req) => {
+        calls.push(req);
+        if (req.path === '/v1/blocks/p/children?page_size=100')
+          return { results: [child(unrelated, 'Unrelated')], has_more: true, next_cursor: 'next' };
+        if (req.path === '/v1/blocks/p/children?page_size=100&start_cursor=next')
+          return { results: [child(id, spec.title + '000'), child(other, spec.title)], has_more: false };
+        if (req.path === '/v1/databases/' + unrelated)
+          return { ...database(unrelated, spec, 'Unrelated'), properties: { Name: { type: 'title' } } };
+        if (req.path === '/v1/databases/' + id) return database(id, spec, spec.title + '000');
+        if (req.path === '/v1/databases/' + other) return database(other, spec, spec.title, 'other-parent');
+        throw new Error('unexpected request: ' + req.path);
+      };
+      const input = { accessToken: 't', parentPageId: 'p', kindId, dbSpec: spec };
+      await expect(notionDbManager.ensureDatabase(input)).resolves.toMatchObject({ databaseId: id, reused: true });
+      expect(chromeMock.__store[spec.storageKey]).toBe(id);
+      calls.length = 0;
+      await expect(notionDbManager.ensureDatabase(input)).resolves.toMatchObject({ databaseId: id, reused: true });
+      expect(calls.map((c) => c.path)).toEqual(['/v1/databases/' + id]);
+    },
+  );
+
+  it('reuses a bound database even after its title is completely changed', async () => {
+    const id = 'b'.repeat(32);
+    // @ts-expect-error test global
+    globalThis.chrome = mockChromeStorage({ initial: { [CHAT_DB_STORAGE_KEY]: id } });
+    notionFetchImpl = async (req) => {
+      expect(req.path).toBe('/v1/databases/' + id);
+      expect(req.method).toBe('GET');
+      return database(id, CHAT_DB_SPEC, 'My conversations');
+    };
+    await expect(ensureChatDatabase()).resolves.toMatchObject({ databaseId: id, reused: true });
+  });
+
+  it.each([
+    { titles: ['SyncNos-AI Chats', 'SyncNos-AI Chats'] },
+    { titles: ['SyncNos-AI Chats', 'SyncNos-AI Chats000'] },
+    { titles: ['My conversations'] },
+  ])('refuses ambiguous or unidentifiable database candidates ($titles)', async ({ titles }) => {
+    const chromeMock = mockChromeStorage();
     // @ts-expect-error test global
     globalThis.chrome = chromeMock;
-
-    const res = await ensureChatDatabase();
-    expect(res.databaseId).toBe('55555555555555555555555555555555');
-    expect(chromeMock.__removed.some((keys) => keys.includes(CHAT_DB_STORAGE_KEY))).toBe(true);
-    expect(calls.some((c) => c.method === 'POST' && c.path === '/v1/databases')).toBe(true);
+    const databases = titles.map((title, i) => database(String(i + 1).repeat(32), CHAT_DB_SPEC, title));
+    const calls: any[] = [];
+    notionFetchImpl = async (req) => {
+      calls.push(req);
+      if (req.path.startsWith('/v1/blocks/'))
+        return { results: databases.map((db) => child(db.id, db.title[0].plain_text)), has_more: false };
+      const db = databases.find((d) => req.path === '/v1/databases/' + d.id);
+      if (db) return db;
+      throw new Error('unexpected request: ' + req.path);
+    };
+    await expect(ensureChatDatabase()).rejects.toMatchObject({ code: 'notion_database_ambiguous' });
+    expect(chromeMock.__store[CHAT_DB_STORAGE_KEY]).toBeUndefined();
+    expect(calls.every((req) => req.method === 'GET')).toBe(true);
   });
 
-  it('ignores trashed exact-title search results and creates a fresh database', async () => {
+  it.each([
+    { results: [], has_more: true, next_cursor: null },
+    { results: null, has_more: false },
+    { results: [], has_more: true, next_cursor: 'same' },
+  ])('never creates from incomplete or malformed child listing: %j', async (response) => {
     const calls: any[] = [];
-    notionFetchImpl = async (req: any) => {
-      calls.push(req);
-      if (req.method === 'POST' && req.path === '/v1/search') {
-        return {
-          results: [
-            {
-              id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-              object: 'database',
-              archived: false,
-              in_trash: true,
-              title: [{ plain_text: 'SyncNos-AI Chats' }],
-            },
-          ],
-        };
-      }
-      if (req.method === 'POST' && req.path === '/v1/databases') return { id: '55555555555555555555555555555555' };
-      throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
-    };
-
     // @ts-expect-error test global
     globalThis.chrome = mockChromeStorage();
-
-    const res = await ensureChatDatabase();
-    expect(res.databaseId).toBe('55555555555555555555555555555555');
-    expect(calls.some((c) => c.method === 'POST' && c.path === '/v1/databases')).toBe(true);
+    notionFetchImpl = async (req) => {
+      calls.push(req);
+      return response;
+    };
+    await expect(ensureChatDatabase()).rejects.toThrow(/Notion block children/);
+    expect(calls.every((req) => req.method === 'GET')).toBe(true);
   });
 
-  it('does not reuse cached database when parent page changed', async () => {
+  it('does not create a database if a child lookup fails', async () => {
+    const id = '1'.repeat(32);
+    // @ts-expect-error test global
+    globalThis.chrome = mockChromeStorage();
     const calls: any[] = [];
-    const chromeMock = mockChromeStorage({ initial: { [CHAT_DB_STORAGE_KEY]: '44444444444444444444444444444444' } });
-    notionFetchImpl = async (req: any) => {
+    notionFetchImpl = async (req) => {
       calls.push(req);
-      if (req.method === 'GET' && req.path === '/v1/databases/44444444444444444444444444444444') {
+      if (req.path.startsWith('/v1/blocks/')) return { results: [child(id, 'Unrelated')], has_more: false };
+      throw Object.assign(new Error('access denied'), { status: 404 });
+    };
+    await expect(ensureChatDatabase()).rejects.toThrow('access denied');
+    expect(calls.every((req) => req.method === 'GET')).toBe(true);
+  });
+
+  it('recovers a database created remotely before the response was lost', async () => {
+    const id = '1'.repeat(32);
+    const chromeMock = mockChromeStorage();
+    // @ts-expect-error test global
+    globalThis.chrome = chromeMock;
+    let created = false;
+    let creates = 0;
+    notionFetchImpl = async (req) => {
+      if (req.path.startsWith('/v1/blocks/'))
         return {
-          id: '44444444444444444444444444444444',
-          object: 'database',
-          archived: false,
-          in_trash: false,
-          parent: { type: 'page_id', page_id: 'p_old' },
-          properties: {
-            Name: { type: 'title' },
-            'Last Activity': { type: 'date' },
-            URL: { type: 'url' },
-            AI: { type: 'multi_select' },
-          },
-        };
-      }
-      if (req.method === 'POST' && req.path === '/v1/search') {
-        return {
-          results: [
-            {
-              id: '66666666666666666666666666666666',
-              object: 'database',
-              archived: false,
-              in_trash: false,
-              parent: { type: 'page_id', page_id: 'p_new' },
-              title: [{ plain_text: 'SyncNos-AI Chats' }],
-            },
-          ],
+          results: created ? [child(id, CHAT_DB_SPEC.title)] : [],
           has_more: false,
-          next_cursor: null,
         };
+      if (req.method === 'POST' && req.path === '/v1/databases') {
+        creates += 1;
+        created = true;
+        throw new Error('response lost');
       }
-      if (req.method === 'GET' && req.path === '/v1/databases/66666666666666666666666666666666') {
-        return {
-          id: '66666666666666666666666666666666',
-          object: 'database',
-          archived: false,
-          in_trash: false,
-          parent: { type: 'page_id', page_id: 'p_new' },
-          properties: {
-            Name: { type: 'title' },
-            'Last Activity': { type: 'date' },
-            URL: { type: 'url' },
-            AI: { type: 'multi_select' },
-          },
-        };
-      }
-      throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
+      if (req.path === '/v1/databases/' + id) return database(id);
+      throw new Error('unexpected request: ' + req.path);
     };
-
-    // @ts-expect-error test global
-    globalThis.chrome = chromeMock;
-
-    const res = await ensureChatDatabase({ parentPageId: 'p_new' });
-    expect(res.databaseId).toBe('66666666666666666666666666666666');
-    expect(res.reused).toBe(true);
-    expect(chromeMock.__removed.some((keys) => keys.includes(CHAT_DB_STORAGE_KEY))).toBe(true);
-    expect(calls.some((c) => c.method === 'POST' && c.path === '/v1/databases')).toBe(false);
+    await expect(ensureChatDatabase()).rejects.toThrow('response lost');
+    await expect(ensureChatDatabase()).resolves.toMatchObject({ databaseId: id, reused: true });
+    expect(creates).toBe(1);
+    expect(chromeMock.__store[CHAT_DB_STORAGE_KEY]).toBe(id);
   });
 
-  it('searches multiple pages and reuses later exact match under same parent', async () => {
-    const calls: any[] = [];
-    notionFetchImpl = async (req: any) => {
-      calls.push(req);
-      if (req.method === 'POST' && req.path === '/v1/search') {
-        const cursor = String(req?.body?.start_cursor || '').trim();
-        if (!cursor) {
-          return {
-            results: [
-              {
-                id: '88888888888888888888888888888888',
-                object: 'database',
-                archived: false,
-                in_trash: false,
-                parent: { type: 'page_id', page_id: 'p_other' },
-                title: [{ plain_text: 'SyncNos-AI Chats' }],
-              },
-            ],
-            has_more: true,
-            next_cursor: 'cursor_2',
-          };
-        }
-        if (cursor === 'cursor_2') {
-          return {
-            results: [
-              {
-                id: '99999999999999999999999999999999',
-                object: 'database',
-                archived: false,
-                in_trash: false,
-                parent: { type: 'page_id', page_id: 'p_target' },
-                title: [{ plain_text: 'SyncNos-AI Chats' }],
-              },
-            ],
-            has_more: false,
-            next_cursor: null,
-          };
-        }
-      }
-      if (req.method === 'GET' && req.path === '/v1/databases/99999999999999999999999999999999') {
-        return {
-          id: '99999999999999999999999999999999',
-          object: 'database',
-          archived: false,
-          in_trash: false,
-          parent: { type: 'page_id', page_id: 'p_target' },
-          properties: {
-            Name: { type: 'title' },
-            'Last Activity': { type: 'date' },
-            URL: { type: 'url' },
-            AI: { type: 'multi_select' },
-          },
-        };
-      }
-      throw new Error(`unexpected notionFetch: ${req.method} ${req.path}`);
-    };
-
+  it('does not mutate a database whose non-chat managed field has the wrong type', async () => {
+    const id = '1'.repeat(32);
     // @ts-expect-error test global
-    globalThis.chrome = mockChromeStorage();
-
-    const res = await ensureChatDatabase({ parentPageId: 'p_target' });
-    expect(res.databaseId).toBe('99999999999999999999999999999999');
-    expect(res.reused).toBe(true);
-    expect(calls.some((c) => c.method === 'POST' && c.path === '/v1/databases')).toBe(false);
-    expect(calls.filter((c) => c.method === 'POST' && c.path === '/v1/search').length).toBe(2);
+    globalThis.chrome = mockChromeStorage({ initial: { [ARTICLE_DB_SPEC.storageKey]: id } });
+    const db = database(id, ARTICLE_DB_SPEC);
+    db.properties.Author = { type: 'number' };
+    notionFetchImpl = async (req) => {
+      expect(req.method).toBe('GET');
+      return db;
+    };
+    await expect(
+      notionDbManager.ensureDatabase({
+        accessToken: 't',
+        parentPageId: 'p',
+        kindId: 'article',
+        dbSpec: ARTICLE_DB_SPEC,
+      }),
+    ).rejects.toThrow('Author must be rich_text');
   });
 });

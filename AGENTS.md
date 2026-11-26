@@ -71,6 +71,9 @@ collectors -> services/shared
   machine-safe response 不泄露 Provider/Reader secret。
 - Notion OAuth 与手动连接共用凭据及同步链路；官网回调不代表授权成功，
   旧回调不得覆盖手动连接或恢复的凭据。
+  断开授权只清理凭据；已绑定数据库 ID 不随授权或远端读取失败失效。
+  只有明确修改目标或重置绑定才可更换 ID；未绑定时按目标页面实际子数据库发现，
+  候选不明确或读取失败不得创建替代数据库或页面。
   Notion 受管数据库字段与 section 不支持用户自定义其 schema/结构。
   旧 `Date: date` 且缺少 `Last Activity` 时直接重命名；
   managed section list/retrieve 失败必须传播或重试，不能当作“未找到”后创建重复 section。

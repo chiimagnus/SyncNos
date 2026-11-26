@@ -39,7 +39,6 @@ type NotionDbManager = {
     kindId: string;
     dbSpec: ConversationKindDbSpec;
   }) => Promise<{ databaseId: string }>;
-  clearCachedDatabaseId: (kindId: string) => Promise<any>;
 };
 
 type NotionSyncService = {

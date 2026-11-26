@@ -94,8 +94,8 @@ Notion supports two connection methods:
 - Manual connection uses a user-provided internal integration token directly with the official
   Notion API. It does not use the token-exchange proxy.
 
-Both methods store credentials locally. Disconnect removes the local connection and destination
-settings without deleting synced Notion content; revoking access is a separate action in Notion.
+Both methods store credentials locally. Disconnect removes local credentials and retains
+destination settings and synced Notion content; revoking access is a separate action in Notion.
 
 ### Feishu (Lark)
 

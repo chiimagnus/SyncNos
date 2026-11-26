@@ -6,8 +6,7 @@ import {
   getNotionDatabaseId,
   getNotionSettingsConfig,
   resetNotionDatabaseId,
-  setNotionDatabaseId,
-  setNotionParentPage,
+  saveNotionSettingsConfig,
 } from '@services/sync/notion/settings-store';
 
 function installStorage(initial: Record<string, unknown> = {}) {
@@ -56,28 +55,50 @@ describe('Notion settings store', () => {
       [videoKey]: '3'.repeat(32),
     });
 
-    await setNotionParentPage({ id: 'parent-a', title: 'Renamed A' });
+    await saveNotionSettingsConfig({ id: 'parent-a', title: 'Renamed A' }, {});
     expect(store[chatKey]).toBe('1'.repeat(32));
     expect(store[articleKey]).toBe('2'.repeat(32));
     expect(store[videoKey]).toBe('3'.repeat(32));
 
-    const changed = await setNotionParentPage({ id: 'parent-b', title: 'Parent B' });
+    const changed = await saveNotionSettingsConfig({ id: 'parent-b', title: 'Parent B' }, {});
     expect(changed).toEqual({
       parentPageId: 'parent-b',
       parentPageTitle: 'Parent B',
       databaseIds: { chat: '', article: '', video: '' },
     });
-    expect(store[chatKey]).toBeUndefined();
-    expect(store[articleKey]).toBeUndefined();
-    expect(store[videoKey]).toBeUndefined();
+    expect(store[chatKey]).toBe('');
+    expect(store[articleKey]).toBe('');
+    expect(store[videoKey]).toBe('');
+  });
+
+  it('saves a new parent and all database bindings together, or leaves them unchanged on invalid input', async () => {
+    const store = installStorage({ notion_parent_page_id: 'parent-a', notion_parent_page_title: 'Parent A' });
+    const parent = { id: 'parent-b', title: 'Parent B' };
+    const ids = { chat: 'a'.repeat(32), article: 'b'.repeat(32), video: 'c'.repeat(32) };
+    await expect(saveNotionSettingsConfig(parent, ids)).resolves.toEqual({
+      parentPageId: parent.id,
+      parentPageTitle: parent.title,
+      databaseIds: ids,
+    });
+    const snapshot = { ...store };
+    await expect(
+      saveNotionSettingsConfig(
+        { id: 'parent-c', title: 'Parent C' },
+        {
+          chat: 'd'.repeat(32),
+          article: 'invalid',
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'invalid_notion_database_id' });
+    expect(store).toEqual(snapshot);
   });
 
   it('preserves database overrides when only the parent ID representation changes', async () => {
     const compact = '0123456789abcdef0123456789abcdef';
     const dashed = '01234567-89ab-cdef-0123-456789abcdef';
     installStorage({ notion_parent_page_id: compact });
-    await setNotionDatabaseId('chat', 'a'.repeat(32));
-    const config = await setNotionParentPage({ id: dashed, title: 'Same page' });
+    await cacheNotionManagedDatabaseId('chat', 'a'.repeat(32));
+    const config = await saveNotionSettingsConfig({ id: dashed, title: 'Same page' }, {});
     expect(config.databaseIds.chat).toBe('a'.repeat(32));
   });
 
@@ -87,10 +108,10 @@ describe('Notion settings store', () => {
     const normalized = '0123456789abcdef0123456789abcdef';
 
     await expect(
-      setNotionDatabaseId('chat', `https://www.notion.so/Workspace-${rawId}?v=${'f'.repeat(32)}`),
+      cacheNotionManagedDatabaseId('chat', `https://www.notion.so/Workspace-${rawId}?v=${'f'.repeat(32)}`),
     ).resolves.toBe(normalized);
     await expect(getNotionDatabaseId('chat')).resolves.toBe(normalized);
-    await expect(setNotionDatabaseId('article', 'not-a-notion-id')).rejects.toMatchObject({
+    await expect(cacheNotionManagedDatabaseId('article', 'not-a-notion-id')).rejects.toMatchObject({
       code: 'invalid_notion_database_id',
     });
     await expect(cacheNotionManagedDatabaseId('video', 'db1')).rejects.toMatchObject({
