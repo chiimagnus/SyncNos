@@ -37,10 +37,6 @@ function getDatabaseSpec(kindIdInput: unknown) {
   return { kindId, storageKey };
 }
 
-function getDatabaseStorageKeys(): string[] {
-  return NOTION_DATABASE_KIND_IDS.map((kindId) => getDatabaseSpec(kindId).storageKey);
-}
-
 export async function getNotionSettingsConfig(): Promise<NotionSettingsConfig> {
   const specs = NOTION_DATABASE_KIND_IDS.map((kindId) => getDatabaseSpec(kindId));
   const values = await storageGet([
@@ -78,23 +74,29 @@ export async function requireNotionParentPageId(): Promise<string> {
   return id;
 }
 
-export async function setNotionParentPage(input: { id?: unknown; title?: unknown }): Promise<NotionSettingsConfig> {
-  const nextId = safeString(input?.id);
-  const nextTitle = safeString(input?.title);
+export async function saveNotionSettingsConfig(
+  parent: { id: string; title: string },
+  databaseIds: Partial<Record<NotionDatabaseKindId, string>>,
+): Promise<NotionSettingsConfig> {
   const current = await getNotionParentPage();
-
   const currentIdentity = normalizeNotionId(current.id) || current.id;
-  const nextIdentity = normalizeNotionId(nextId) || nextId;
-  if (currentIdentity !== nextIdentity) await storageRemove(getDatabaseStorageKeys());
-
-  if (!nextId) {
-    await storageRemove([NOTION_PARENT_PAGE_ID_STORAGE_KEY, NOTION_PARENT_PAGE_TITLE_STORAGE_KEY]);
-  } else {
-    await storageSet({
-      [NOTION_PARENT_PAGE_ID_STORAGE_KEY]: nextId,
-      [NOTION_PARENT_PAGE_TITLE_STORAGE_KEY]: nextTitle,
-    });
+  const nextIdentity = normalizeNotionId(parent.id) || parent.id;
+  const payload: Record<string, string> = {
+    [NOTION_PARENT_PAGE_ID_STORAGE_KEY]: parent.id,
+    [NOTION_PARENT_PAGE_TITLE_STORAGE_KEY]: parent.id ? parent.title : '',
+  };
+  for (const kindId of NOTION_DATABASE_KIND_IDS) {
+    const { storageKey } = getDatabaseSpec(kindId);
+    if (Object.prototype.hasOwnProperty.call(databaseIds, kindId)) {
+      const raw = safeString(databaseIds[kindId]);
+      const id = normalizeNotionIdInput(raw);
+      if (raw && !id) throw notionSettingsError('invalid_notion_database_id', 'invalid Notion database id');
+      payload[storageKey] = id || '';
+    } else if (currentIdentity !== nextIdentity) {
+      payload[storageKey] = '';
+    }
   }
+  await storageSet(payload);
   return getNotionSettingsConfig();
 }
 
@@ -102,19 +104,6 @@ export async function getNotionDatabaseId(kindIdInput: unknown): Promise<string>
   const spec = getDatabaseSpec(kindIdInput);
   const values = await storageGet([spec.storageKey]);
   return safeString(values[spec.storageKey]);
-}
-
-export async function setNotionDatabaseId(kindIdInput: unknown, input: unknown): Promise<string> {
-  const spec = getDatabaseSpec(kindIdInput);
-  const raw = safeString(input);
-  if (!raw) {
-    await storageRemove([spec.storageKey]);
-    return '';
-  }
-  const databaseId = normalizeNotionIdInput(raw);
-  if (!databaseId) throw notionSettingsError('invalid_notion_database_id', 'invalid Notion database id');
-  await storageSet({ [spec.storageKey]: databaseId });
-  return databaseId;
 }
 
 export async function cacheNotionManagedDatabaseId(kindIdInput: unknown, input: unknown): Promise<string> {
@@ -128,12 +117,4 @@ export async function cacheNotionManagedDatabaseId(kindIdInput: unknown, input: 
 export async function resetNotionDatabaseId(kindIdInput: unknown): Promise<void> {
   const spec = getDatabaseSpec(kindIdInput);
   await storageRemove([spec.storageKey]);
-}
-
-export async function clearAllNotionSettings(): Promise<void> {
-  await storageRemove([
-    NOTION_PARENT_PAGE_ID_STORAGE_KEY,
-    NOTION_PARENT_PAGE_TITLE_STORAGE_KEY,
-    ...getDatabaseStorageKeys(),
-  ]);
 }

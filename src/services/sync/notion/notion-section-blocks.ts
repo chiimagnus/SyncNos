@@ -51,15 +51,19 @@ export function buildToggleHeadingBlock(title: string, level: ToggleHeadingLevel
 export async function listBlockChildren(accessToken: string, blockId: string): Promise<any[]> {
   const out: any[] = [];
   let cursor: string | null = null;
+  const seenCursors = new Set<string>();
   for (;;) {
     const qs = cursor ? `?page_size=100&start_cursor=${encodeURIComponent(String(cursor))}` : '?page_size=100';
 
     const res = await notionFetch({ accessToken, method: 'GET', path: `/v1/blocks/${blockId}/children${qs}` });
-    const results = Array.isArray(res?.results) ? res.results : [];
-    out.push(...results);
-    if (!res?.has_more) break;
-    cursor = res?.next_cursor ? String(res.next_cursor) : null;
-    if (!cursor) break;
+    if (!Array.isArray(res?.results) || typeof res.has_more !== 'boolean') {
+      throw new Error('Invalid Notion block children response.');
+    }
+    out.push(...res.results);
+    if (!res.has_more) break;
+    cursor = typeof res.next_cursor === 'string' ? res.next_cursor : null;
+    if (!cursor || seenCursors.has(cursor)) throw new Error('Incomplete Notion block children pagination.');
+    seenCursors.add(cursor);
   }
   return out;
 }

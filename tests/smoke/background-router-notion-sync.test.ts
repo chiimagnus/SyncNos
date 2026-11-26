@@ -6,7 +6,9 @@ import { createNotionSyncOrchestrator } from '@services/sync/notion/notion-sync-
 import { conversationKinds } from '@services/protocols/conversation-kinds.ts';
 import { SYNC_JOB_STORAGE_KEYS } from '@services/sync/sync-job-store';
 import { notionFetch } from '@services/sync/notion/notion-api.ts';
-import { getNotionConnectionToken } from '@services/sync/notion/auth/token-store';
+import { getNotionConnectionToken, replaceNotionConnectionToken } from '@services/sync/notion/auth/token-store';
+import { ensureDatabase } from '@services/sync/notion/notion-db-manager';
+import { createPageInDatabase } from '@services/sync/notion/notion-sync-service';
 import { messagesToBlocks as renderNotionMessageBlocks } from '@services/sync/notion/notion-sync-service.ts';
 
 function mockChromeStorage({ parentPageId = 'parent_page' } = {}) {
@@ -347,7 +349,128 @@ describe('background-router notion sync', () => {
       expect(createPageInDatabase).toHaveBeenCalledWith(accessToken, expect.objectContaining({ databaseId: 'db1' }));
       expect(await router.dispatch({ type: 'notionDisconnect' })).toMatchObject({ ok: true });
       expect(chromeMock.__store.notion_oauth_token_v1).toBeUndefined();
-      expect(chromeMock.__store.notion_parent_page_id).toBeUndefined();
+      expect(chromeMock.__store.notion_parent_page_id).toBe(dashed);
+      expect(chromeMock.__store[cacheKey]).toBe('a'.repeat(32));
+    },
+  );
+
+  it.each(['oauth', 'internal'] as const)(
+    'reuses all three renamed databases after a %s reconnection without creating replacements',
+    async (connectionMethod) => {
+      const parent = '1'.repeat(32);
+      const kinds = ['chat', 'article', 'video'] as const;
+      const databases = kinds.map((kind, index) => {
+        const spec = conversationKinds.getNotionDbSpecByKindId(kind)!;
+        return {
+          object: 'database',
+          id: ['a', 'b', 'c'][index].repeat(32),
+          parent: { type: 'page_id', page_id: parent },
+          title: [{ plain_text: spec.title + '000' }],
+          properties: Object.fromEntries(
+            Object.entries(spec.properties).map(([name, value]) => [name, { type: Object.keys(value as object)[0] }]),
+          ),
+        };
+      });
+      const chromeMock = mockChromeStorage({ parentPageId: parent });
+      const extensionUrl = 'chrome-extension://fixture-extension/';
+      Object.assign(chromeMock.runtime, { getURL: (path: string) => extensionUrl + path });
+      const jobStore = createInMemoryJobStore();
+      const createdIn: string[] = [];
+      let token = 't';
+      let discoveryReads = 0;
+      const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+        expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer ' + token);
+        const { pathname } = new URL(url);
+        if (pathname === '/v1/users/me')
+          return notionHttpResponse({
+            object: 'user',
+            id: 'bot-id',
+            type: 'bot',
+            bot: { owner: { type: 'workspace' }, workspace_name: 'Fixture' },
+          });
+        if (pathname === '/v1/blocks/' + parent + '/children') {
+          discoveryReads++;
+          return notionHttpResponse({
+            results: databases.map((db) => ({
+              id: db.id,
+              type: 'child_database',
+              child_database: { title: db.title[0].plain_text },
+            })),
+            has_more: false,
+          });
+        }
+        if (init?.method === 'GET' && pathname.startsWith('/v1/databases/')) {
+          const database = databases.find((db) => pathname.endsWith(db.id));
+          if (database) return notionHttpResponse(database);
+        }
+        if (init?.method === 'POST' && pathname === '/v1/pages') {
+          const id = JSON.parse(String(init.body)).parent.database_id;
+          expect(databases.map((db) => db.id)).toContain(id);
+          createdIn.push(id);
+          return notionHttpResponse({ id: 'page-' + createdIn.length });
+        }
+        throw new Error('Unexpected Notion request: ' + init?.method + ' ' + pathname);
+      });
+      globalThis.fetch = fetchMock as any;
+      const router = createRouter({
+        chromeMock,
+        notionServices: {
+          tokenStore: { getToken: getNotionConnectionToken },
+          dbManager: { ensureDatabase },
+          storage: {
+            getSyncMappingByConversation: async (id: number) => ({
+              conversation: {
+                id,
+                title: 'Fixture ' + id,
+                source: 'chatgpt',
+                sourceType: kinds[(id - 1) % 3],
+                url: 'https://example.com/' + id,
+                lastActivityAt: 1000,
+              },
+              mapping: null,
+            }),
+            getMessagesByConversationId: async () => [
+              { messageKey: 'm1', role: 'user', contentMarkdown: 'fixture', sequence: 1 },
+            ],
+            getArticleCommentsByConversationId: async () => [],
+            attachOrphanArticleCommentsToConversation: async () => ({ updated: 0 }),
+            setConversationNotionPageId: async () => true,
+            setSyncCursor: async () => true,
+            patchSyncMapping: async () => true,
+          },
+          syncService: {
+            createPageInDatabase,
+            appendChildren: async (_t: string, _pageId: string, blocks: any[]) => notionAppendResult(blocks),
+            messagesToBlocks: () => [],
+          },
+          jobStore,
+        },
+      });
+      expect((await startNotionSync(router, jobStore, [1, 2, 3])).okCount).toBe(3);
+      expect(discoveryReads).toBe(3);
+      expect(createdIn.slice().sort()).toEqual(databases.map((db) => db.id));
+      expect(await router.dispatch({ type: 'notionDisconnect' })).toMatchObject({ ok: true });
+      token = 'reconnected-token';
+      if (connectionMethod === 'internal') {
+        expect(
+          await router.dispatch({ type: 'notionConnectInternal', token }, { url: extensionUrl + 'app.html' }),
+        ).toMatchObject({ ok: true });
+      } else {
+        await replaceNotionConnectionToken({
+          accessToken: token,
+          workspaceId: 'w',
+          workspaceName: 'Fixture',
+          createdAt: Date.now(),
+        });
+      }
+      expect((await startNotionSync(router, jobStore, [4, 5, 6])).okCount).toBe(3);
+      expect(discoveryReads).toBe(3);
+      expect(createdIn.slice(3).sort()).toEqual(databases.map((db) => db.id));
+      expect(
+        fetchMock.mock.calls.some(
+          ([url, init]) => init?.method === 'POST' && new URL(url).pathname === '/v1/databases',
+        ),
+      ).toBe(false);
     },
   );
 
@@ -460,7 +583,7 @@ describe('background-router notion sync', () => {
     expect(chromeMock.__createdTabs).toHaveLength(1);
   });
 
-  it('disconnect clears notion token and cached notion routing keys', async () => {
+  it('disconnect clears notion credentials but preserves the destination and all database bindings', async () => {
     const chromeMock = mockChromeStorage();
     chromeMock.storage.local.set(
       {
@@ -473,6 +596,14 @@ describe('background-router notion sync', () => {
       },
       () => {},
     );
+
+    const bindings = Object.fromEntries(
+      ['chat', 'article', 'video'].map((kind, i) => [
+        conversationKinds.getNotionDbSpecByKindId(kind)!.storageKey,
+        String(i + 1).repeat(32),
+      ]),
+    );
+    chromeMock.storage.local.set(bindings, () => {});
 
     const router = createRouter({
       chromeMock,
@@ -490,12 +621,14 @@ describe('background-router notion sync', () => {
 
     const removedFlatten = chromeMock.__removed.flat();
     expect(removedFlatten).toContain('notion_oauth_token_v1');
-    expect(removedFlatten).toContain('notion_parent_page_id');
+    expect(removedFlatten).not.toContain('notion_parent_page_id');
+    expect(chromeMock.__store.notion_parent_page_id).toBe('parent_page');
     for (const kindId of ['chat', 'article', 'video']) {
       const storageKey = conversationKinds.getNotionDbSpecByKindId(kindId)?.storageKey;
       expect(storageKey).toBeTruthy();
-      expect(removedFlatten).toContain(storageKey);
+      expect(removedFlatten).not.toContain(storageKey);
     }
+    expect(chromeMock.__store).toMatchObject(bindings);
     expect(removedFlatten).toContain('notion_oauth_pending_state');
     expect(removedFlatten).toContain('notion_oauth_last_error');
     expect(removedFlatten).not.toContain(SYNC_JOB_STORAGE_KEYS.notion);
@@ -579,7 +712,7 @@ describe('background-router notion sync', () => {
     expect(disconnected.ok).toBe(true);
     expect(jobStore.__getJob()).toBeNull();
     expect(chromeMock.__store.notion_oauth_token_v1).toBeUndefined();
-    expect(chromeMock.__store.notion_parent_page_id).toBeUndefined();
+    expect(chromeMock.__store.notion_parent_page_id).toBe('parent_page');
     expect(chromeMock.__removed.flat()).not.toContain(SYNC_JOB_STORAGE_KEYS.notion);
   });
 
@@ -624,60 +757,70 @@ describe('background-router notion sync', () => {
       error: { extra: { code: 'notion_sync_job_persist_failed' } },
     });
     expect(chromeMock.__store.notion_oauth_token_v1).toBeUndefined();
-    expect(chromeMock.__store.notion_parent_page_id).toBeUndefined();
+    expect(chromeMock.__store.notion_parent_page_id).toBe('parent_page');
     expect(canonicalJob).toMatchObject({ id: 'residual-running', status: 'running' });
   });
 
-  it('recreates page when existing page is missing', async () => {
-    const calls: any[] = [];
-    const chromeMock = mockChromeStorage();
-    const jobStore = createInMemoryJobStore();
+  it.each([null, 401, 403, 404, 429, 500, 503])(
+    'recreates only confirmed archived pages; read error %s never creates',
+    async (status) => {
+      const calls: any[] = [];
+      const chromeMock = mockChromeStorage();
+      const jobStore = createInMemoryJobStore();
 
-    const router = createRouter({
-      chromeMock,
-      notionServices: {
-        tokenStore: { getToken: async () => ({ accessToken: 't' }) },
-        dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
-        storage: {
-          patchSyncMapping: async () => true,
-          getSyncMappingByConversation: async () => ({
-            conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt', notionPageId: 'p_old' },
-            mapping: { notionPageId: 'p_old', lastSyncedMessageKey: 'm0' },
-          }),
-          getMessagesByConversationId: async () => [
-            { messageKey: 'm1', role: 'user', contentMarkdown: 'hi', sequence: 1 },
-          ],
-          setConversationNotionPageId: async (_id: number, pageId: string) => calls.push({ op: 'setPageId', pageId }),
-          setSyncCursor: async (_id: number, cursor: any) => calls.push({ op: 'setCursor', cursor }),
-        },
-        syncService: {
-          getPage: async () => {
-            throw new Error('notion api failed: GET /v1/pages/p_old HTTP 404');
+      const router = createRouter({
+        chromeMock,
+        notionServices: {
+          tokenStore: { getToken: async () => ({ accessToken: 't' }) },
+          dbManager: { ensureDatabase: async () => ({ databaseId: 'db1' }) },
+          storage: {
+            patchSyncMapping: async () => true,
+            getSyncMappingByConversation: async () => ({
+              conversation: { id: 1, title: 'Hello', url: 'https://x', source: 'chatgpt', notionPageId: 'p_old' },
+              mapping: { notionPageId: 'p_old', lastSyncedMessageKey: 'm0' },
+            }),
+            getMessagesByConversationId: async () => [
+              { messageKey: 'm1', role: 'user', contentMarkdown: 'hi', sequence: 1 },
+            ],
+            setConversationNotionPageId: async (_id: number, pageId: string) => calls.push({ op: 'setPageId', pageId }),
+            setSyncCursor: async (_id: number, cursor: any) => calls.push({ op: 'setCursor', cursor }),
           },
-          createPageInDatabase: async () => ({ id: 'p_new' }),
-          updatePageProperties: async () => ({ ok: true }),
-          appendChildren: async (_t: string, _pageId: string, _blocks: any[]) => {
-            calls.push({ op: 'append', pageId: _pageId });
-            return notionAppendResult(_blocks);
+          syncService: {
+            getPage: async () => {
+              if (status !== null) throw Object.assign(new Error('page read failed'), { status });
+              return { id: 'p_old', archived: true, parent: { type: 'database_id', database_id: 'db1' } };
+            },
+            createPageInDatabase: async () => ({ id: 'p_new' }),
+            updatePageProperties: async () => ({ ok: true }),
+            appendChildren: async (_t: string, _pageId: string, _blocks: any[]) => {
+              calls.push({ op: 'append', pageId: _pageId });
+              return notionAppendResult(_blocks);
+            },
+            messagesToBlocks: (messages: any[]) => [{ kind: 'blocks', count: messages.length }],
+            isPageUsableForDatabase: () => false,
           },
-          messagesToBlocks: (messages: any[]) => [{ kind: 'blocks', count: messages.length }],
-          isPageUsableForDatabase: () => false,
+          jobStore,
         },
-        jobStore,
-      },
-    });
+      });
 
-    const res = await router.dispatch({ type: 'notionSyncConversations', conversationIds: [1] });
-    expect(res.ok).toBe(true);
-    expect(res.data?.started).toBe(true);
+      const res = await router.dispatch({ type: 'notionSyncConversations', conversationIds: [1] });
+      expect(res.ok).toBe(true);
+      expect(res.data?.started).toBe(true);
 
-    const job = await waitForJobDone(jobStore);
-    expect(job.okCount).toBe(1);
-    expect(job.perConversation[0].mode).toBe('created');
-    expect(calls.some((c) => c.op === 'setPageId' && c.pageId === 'p_new')).toBe(true);
-    expect(calls.some((c) => c.op === 'append' && c.pageId === 'p_new')).toBe(true);
-    expect(calls.some((c) => c.op === 'setCursor')).toBe(true);
-  });
+      const job = await waitForJobDone(jobStore);
+      if (status !== null) {
+        expect(job.failCount).toBe(1);
+        expect(job.perConversation[0].error).toContain('page read failed');
+        expect(calls).toEqual([]);
+        return;
+      }
+      expect(job.okCount).toBe(1);
+      expect(job.perConversation[0].mode).toBe('created');
+      expect(calls.some((c) => c.op === 'setPageId' && c.pageId === 'p_new')).toBe(true);
+      expect(calls.some((c) => c.op === 'append' && c.pageId === 'p_new')).toBe(true);
+      expect(calls.some((c) => c.op === 'setCursor')).toBe(true);
+    },
+  );
 
   it('appends only new messages when cursor matches', async () => {
     const calls: any[] = [];
@@ -1928,10 +2071,9 @@ describe('background-router notion sync', () => {
     expect(job.perConversation[0].warnings?.[0]?.code).toBe('notion_image_upload_degraded');
   });
 
-  it('recovers once by clearing cached database id when create page returns database object_not_found', async () => {
+  it('does not rebind the database when page creation returns database object_not_found', async () => {
     const createCalls: string[] = [];
     const ensureCalls: string[] = [];
-    let clearCacheCalls = 0;
     const chromeMock = mockChromeStorage();
     const jobStore = createInMemoryJobStore();
 
@@ -1947,9 +2089,6 @@ describe('background-router notion sync', () => {
             }
             ensureCalls.push('db_new');
             return { databaseId: 'db_new' };
-          },
-          clearCachedDatabaseId: async () => {
-            clearCacheCalls += 1;
           },
         },
         storage: {
@@ -1985,13 +2124,12 @@ describe('background-router notion sync', () => {
     });
 
     const job = await startNotionSync(router, jobStore, [1]);
-    expect(job.perConversation[0].mode).toBe('created');
-    expect(createCalls).toEqual(['db_stale', 'db_new']);
-    expect(ensureCalls).toEqual(['db_stale', 'db_new']);
-    expect(clearCacheCalls).toBe(1);
+    expect(job.failCount).toBe(1);
+    expect(createCalls).toEqual(['db_stale']);
+    expect(ensureCalls).toEqual(['db_stale']);
   });
 
-  it('reuses the rebuilt database for later conversations in the same batch after stale database recovery', async () => {
+  it('preserves the same database binding across concurrent failed page creations', async () => {
     const createCalls: string[] = [];
     const ensureCalls: string[] = [];
     const chromeMock = mockChromeStorage();
@@ -2010,7 +2148,6 @@ describe('background-router notion sync', () => {
             ensureCalls.push('db_new');
             return { databaseId: 'db_new' };
           },
-          clearCachedDatabaseId: async () => true,
         },
         storage: {
           patchSyncMapping: async () => true,
@@ -2050,9 +2187,9 @@ describe('background-router notion sync', () => {
     });
 
     const job = await startNotionSync(router, jobStore, [1, 2]);
-    expect(job.okCount).toBe(2);
-    expect(createCalls).toEqual(['db_stale', 'db_stale', 'db_new', 'db_new']);
-    expect(ensureCalls).toEqual(['db_stale', 'db_new']);
+    expect(job.failCount).toBe(2);
+    expect(createCalls).toEqual(['db_stale', 'db_stale']);
+    expect(ensureCalls).toEqual(['db_stale']);
   });
 
   it('returns structured already-running metadata for a live detached/orchestrator run', async () => {

@@ -36,8 +36,9 @@ Select an authorized Notion page under **Destination page**.
 If the page is missing from the list, check that it is shared with your current connection and
 refresh; you can also choose **Choose by link…**, paste the page link, and save.
 
-SyncNos automatically creates or reuses databases for AI chats, web articles, and videos under
-the destination page. Run one manual sync to verify the result before enabling auto-sync.
+SyncNos looks for existing AI chat, web article, and video databases directly under the
+destination page before creating any. Bound databases are identified by ID, even after renaming.
+Run one manual sync to verify the result before enabling auto-sync.
 
 ### Reuse an existing database
 
@@ -49,15 +50,17 @@ Links are automatically converted to database IDs.
 The database must be directly under the destination page and compatible with SyncNos's schema.
 Sync may add required properties, so do not select an unrelated database.
 Clear the field or click **Reset** to find or create a database automatically.
+If candidates are ambiguous or inaccessible, sync stops; check access or specify the intended link.
 
 Changing the destination page clears the database settings. Existing remote content is not moved
 or deleted; subsequent syncs use the new destination.
 
 ## Disconnect and troubleshoot
 
-**Disconnect** removes local credentials and destination settings, not synced content.
-To switch connection methods or change the token, disconnect first, reconnect, and choose
-the destination again. Manage the connection in Notion to revoke access or reset the token.
+**Disconnect** removes local credentials but preserves the destination, database bindings,
+and synced content. To switch connection methods or change the token, disconnect first,
+reconnect, and authorize the original destination. Manage the connection in Notion to revoke
+access or reset the token.
 
 - Cannot reach the SyncNos authorization service: check your network, enable a proxy if needed,
   or connect manually.
@@ -66,4 +69,6 @@ the destination again. Manage the connection in Notion to revoke access or reset
 - Invalid token or insufficient access: copy the internal integration token again and check
   the connection's capabilities and destination page access.
 
-Sync failures do not delete local content. Fix the connection or permissions and retry.
+If a bound database or synced page cannot be read, SyncNos does not create a replacement.
+Restore access, restore the page, or explicitly choose a different database in Advanced.
+Sync failures do not delete local content.

@@ -261,6 +261,15 @@ describe('Settings OAuth actions', () => {
     expect(latestSnapshot!.notionConnected).toBe(false);
   });
 
+  it('does not save untouched database drafts on blur', async () => {
+    notionConnected = true;
+    await renderController();
+    for (const kind of ['chat', 'article', 'video'] as const) {
+      await invoke(() => latestSnapshot!.onSaveNotionDatabaseId(kind));
+    }
+    expect(callsOf(NOTION_MESSAGE_TYPES.SAVE_CONFIG)).toHaveLength(0);
+  });
+
   it('shows the saved database ID after submitting a full link and localizes invalid-database errors', async () => {
     notionConnected = true;
     await renderController();

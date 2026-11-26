@@ -345,6 +345,7 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const [notionChatDatabaseId, setNotionChatDatabaseId] = useState<string>('');
   const [notionArticleDatabaseId, setNotionArticleDatabaseId] = useState<string>('');
   const [notionVideoDatabaseId, setNotionVideoDatabaseId] = useState<string>('');
+  const savedNotionDatabaseIds = useRef({ chat: '', article: '', video: '' });
 
   // Inpage
   const [inpageDisplayMode, setInpageDisplayMode] = useState<InpageDisplayMode>('all');
@@ -762,9 +763,14 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
     const notionConfig = unwrap(notionConfigRes);
     setNotionParentPageId(String(notionConfig?.parentPageId || ''));
     setNotionParentPageTitle(String(notionConfig?.parentPageTitle || ''));
-    setNotionChatDatabaseId(String(notionConfig?.databaseIds?.chat || ''));
-    setNotionArticleDatabaseId(String(notionConfig?.databaseIds?.article || ''));
-    setNotionVideoDatabaseId(String(notionConfig?.databaseIds?.video || ''));
+    savedNotionDatabaseIds.current = {
+      chat: String(notionConfig?.databaseIds?.chat || ''),
+      article: String(notionConfig?.databaseIds?.article || ''),
+      video: String(notionConfig?.databaseIds?.video || ''),
+    };
+    setNotionChatDatabaseId(savedNotionDatabaseIds.current.chat);
+    setNotionArticleDatabaseId(savedNotionDatabaseIds.current.article);
+    setNotionVideoDatabaseId(savedNotionDatabaseIds.current.video);
     setNotionSyncEnabled(local?.[NOTION_SYNC_PROVIDER_ENABLED_KEY] !== false);
     setNotionAutoSyncEnabled(local?.[NOTION_AUTO_SYNC_ENABLED_STORAGE_KEY] === true);
     setFeishuSyncEnabled(local?.[FEISHU_SYNC_PROVIDER_ENABLED_KEY] !== false);
@@ -1068,11 +1074,6 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
         setNotionPendingState('');
         setNotionLastError('');
         setNotionPages(null);
-        setNotionParentPageId('');
-        setNotionParentPageTitle('');
-        setNotionChatDatabaseId('');
-        setNotionArticleDatabaseId('');
-        setNotionVideoDatabaseId('');
         setNotionPollingState(false);
         setLoadingNotionPages(false);
         return;
@@ -1547,9 +1548,14 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
   const applyNotionConfig = useCallback((config: any) => {
     setNotionParentPageId(String(config?.parentPageId || ''));
     setNotionParentPageTitle(String(config?.parentPageTitle || ''));
-    setNotionChatDatabaseId(String(config?.databaseIds?.chat || ''));
-    setNotionArticleDatabaseId(String(config?.databaseIds?.article || ''));
-    setNotionVideoDatabaseId(String(config?.databaseIds?.video || ''));
+    savedNotionDatabaseIds.current = {
+      chat: String(config?.databaseIds?.chat || ''),
+      article: String(config?.databaseIds?.article || ''),
+      video: String(config?.databaseIds?.video || ''),
+    };
+    setNotionChatDatabaseId(savedNotionDatabaseIds.current.chat);
+    setNotionArticleDatabaseId(savedNotionDatabaseIds.current.article);
+    setNotionVideoDatabaseId(savedNotionDatabaseIds.current.video);
   }, []);
 
   const onLoadNotionPages = useCallback(async () => {
@@ -1604,8 +1610,11 @@ export function useSettingsSceneController(args: UseSettingsSceneControllerArgs)
       const raw =
         kind === 'chat' ? notionChatDatabaseId : kind === 'article' ? notionArticleDatabaseId : notionVideoDatabaseId;
 
+      // A blur without edits must not overwrite a binding created by a background sync.
+      if (raw === savedNotionDatabaseIds.current[kind]) return;
       await runTask(
         async () => {
+          if (raw === savedNotionDatabaseIds.current[kind]) return;
           const response = await send<ApiResponse<any>>(NOTION_MESSAGE_TYPES.SAVE_CONFIG, {
             databaseIds: { [kind]: String(raw || '') },
           });

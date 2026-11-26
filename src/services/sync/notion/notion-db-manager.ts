@@ -2,17 +2,8 @@ import { buildAiOptions } from '@services/sync/notion/notion-ai.ts';
 import { notionFetch } from '@services/sync/notion/notion-api.ts';
 import type { ConversationKindDbSpec } from '@services/protocols/conversation-kind-contract.ts';
 import { normalizeNotionIdInput } from '@services/sync/notion/notion-id-utils';
-import {
-  cacheNotionManagedDatabaseId,
-  getNotionDatabaseId,
-  resetNotionDatabaseId,
-} from '@services/sync/notion/settings-store';
-
-const SEARCH_PAGE_SIZE = 100;
-
-async function clearCachedDatabaseId(kindId: string) {
-  await resetNotionDatabaseId(kindId);
-}
+import { listBlockChildren } from '@services/sync/notion/notion-section-blocks';
+import { cacheNotionManagedDatabaseId, getNotionDatabaseId } from '@services/sync/notion/settings-store';
 
 function isUsableDatabase(database: any): boolean {
   if (!database || typeof database !== 'object') return false;
@@ -61,8 +52,17 @@ function isMissingDatabaseError(error: unknown): boolean {
   return status === 404 || status === 410 || code === 'object_not_found';
 }
 
-async function getDatabase(accessToken: string, databaseId: string) {
-  return notionFetch({ accessToken, method: 'GET', path: `/v1/databases/${databaseId}` });
+async function getDatabase(accessToken: string, databaseId: string, retryRateLimit = false) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await notionFetch({ accessToken, method: 'GET', path: `/v1/databases/${databaseId}` });
+    } catch (error: any) {
+      // Cold discovery may read multiple databases; retry only safe reads within a bounded window.
+      const delay = Math.max(1000, Number(error?.retryAfterMs) || 0);
+      if (!retryRateLimit || error?.status !== 429 || attempt >= 2 || delay > 5000) throw error;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
 }
 
 export async function resolveNotionDatabaseId(
@@ -94,31 +94,54 @@ export async function resolveNotionDatabaseId(
   return id;
 }
 
-async function searchDatabases(accessToken: string, { query, parentPageId }: { query: string; parentPageId: string }) {
-  const results: any[] = [];
-  let cursor = '';
+function databaseResolutionError(message: string, code: string): Error {
+  return Object.assign(new Error(message), { code });
+}
 
-  for (;;) {
-    const body = {
-      query,
-      filter: { property: 'object', value: 'database' },
-      sort: { direction: 'descending', timestamp: 'last_edited_time' },
-      page_size: SEARCH_PAGE_SIZE,
-      ...(cursor ? { start_cursor: cursor } : {}),
-    };
-    const res = await notionFetch({ accessToken, method: 'POST', path: '/v1/search', body });
-    const pageResults = Array.isArray(res && (res as any).results) ? (res as any).results : [];
-    for (const item of pageResults) {
-      if (!isUsableDatabase(item)) continue;
-      if (!matchesParentPage(item, parentPageId)) continue;
-      results.push(item);
+function matchesManagedSchema(database: any, dbSpec: ConversationKindDbSpec): boolean {
+  const properties = database?.properties || {};
+  return Object.entries(dbSpec.properties).every(([name, spec]) => {
+    const property = properties[name] ?? (name === 'Last Activity' ? properties.Date : undefined);
+    return notionPropertyType(property) === Object.keys(spec as object)[0];
+  });
+}
+
+async function discoverDatabase(accessToken: string, parentPageId: string, dbSpec: ConversationKindDbSpec) {
+  // Search is eventually consistent. Read the actual destination's children before creating anything.
+  const children = await listBlockChildren(accessToken, parentPageId);
+  const wantedTitle = normalizeTitle(dbSpec.title);
+  const candidates: { database: any; recognizable: boolean }[] = [];
+  const seen = new Set<string>();
+  for (const child of children) {
+    if (child?.type !== 'child_database' || child.archived === true || child.in_trash === true) continue;
+    const id = normalizeNotionIdInput(child.id);
+    if (!id) throw new Error('Notion returned a child database without a valid ID.');
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const database = await getDatabase(accessToken, id, true);
+    if (database?.archived === true || database?.in_trash === true) continue;
+    if (!isUsableDatabase(database) || normalizeNotionId(database.id) !== id) {
+      throw databaseResolutionError(
+        'A child database is unavailable. Check its access before syncing.',
+        'notion_database_unavailable',
+      );
     }
-    if (!res || !res.has_more || !res.next_cursor) break;
-    cursor = String(res.next_cursor || '').trim();
-    if (!cursor) break;
+    if (!matchesParentPage(database, parentPageId)) continue;
+    const title = normalizeTitle(readDatabaseTitle(database));
+    const exactTitle = title === wantedTitle;
+    const recognizableName = title.startsWith(wantedTitle);
+    const managedSchema = matchesManagedSchema(database, dbSpec);
+    if (recognizableName || managedSchema) {
+      candidates.push({ database, recognizable: exactTitle || (recognizableName && managedSchema) });
+    }
   }
-
-  return { results };
+  if (candidates.length > 1 || (candidates.length === 1 && !candidates[0].recognizable)) {
+    throw databaseResolutionError(
+      `Existing databases may match ${dbSpec.title}. Select the intended database in Settings → Notion → Advanced.`,
+      'notion_database_ambiguous',
+    );
+  }
+  return candidates[0]?.database ?? null;
 }
 
 async function updateDatabase(
@@ -165,38 +188,34 @@ function schemaIncompatible(propertyName: string, expectedType: string, actualTy
 
 async function ensureDatabaseSchema({
   accessToken,
-  databaseId,
+  database,
   dbSpec,
 }: {
   accessToken: string;
-  databaseId: string;
+  database: any;
   dbSpec: ConversationKindDbSpec;
 }) {
-  const db = await getDatabase(accessToken, databaseId);
-  const props = { ...(db && db.properties ? db.properties : {}) } as Record<string, any>;
+  const databaseId = database.id;
+  const props = { ...(database.properties || {}) } as Record<string, any>;
   const patch = dbSpec.ensureSchemaPatch || {};
 
-  const lastActivity = props['Last Activity'];
-  if (lastActivity) {
-    const type = notionPropertyType(lastActivity);
-    if (type !== 'date') throw schemaIncompatible('Last Activity', 'date', type);
-  } else if (props.Date) {
-    const type = notionPropertyType(props.Date);
-    if (type !== 'date') throw schemaIncompatible('Date', 'date', type);
+  // Validate all managed fields before the first schema write.
+  const legacyDate = !props['Last Activity'] && props.Date;
+  for (const [name, spec] of Object.entries(dbSpec.properties)) {
+    const actualName = name === 'Last Activity' && legacyDate ? 'Date' : name;
+    const property = props[actualName];
+    const expected = Object.keys(spec as object)[0];
+    if (!property && patch[name]) continue;
+    const actual = notionPropertyType(property);
+    if (actual !== expected) throw schemaIncompatible(actualName, expected, actual);
+  }
+
+  if (legacyDate) {
     await updateDatabase(accessToken, {
       databaseId,
       properties: { Date: { name: 'Last Activity' } },
     });
     props['Last Activity'] = { ...props.Date, type: 'date' };
-    delete props.Date;
-  }
-
-  if (patch.AI) {
-    const ai = props.AI;
-    if (ai) {
-      const type = notionPropertyType(ai);
-      if (type !== 'multi_select') throw schemaIncompatible('AI', 'multi_select', type);
-    }
   }
 
   const missing: Record<string, any> = {};
@@ -222,45 +241,36 @@ async function ensureDatabase({
   kindId: string;
   dbSpec: ConversationKindDbSpec;
 }) {
-  const cached = await getNotionDatabaseId(kindId);
-  if (cached) {
-    try {
-      const db = await getDatabase(accessToken, cached);
-      if (!isUsableDatabase(db)) {
-        await clearCachedDatabaseId(kindId);
-      } else if (!matchesParentPage(db, parentPageId)) {
-        await clearCachedDatabaseId(kindId);
-      } else {
-        await ensureDatabaseSchema({ accessToken, databaseId: cached, dbSpec });
-        return { databaseId: cached, title: dbSpec.title, reused: true, database: db };
-      }
-    } catch (error) {
-      if (isMissingDatabaseError(error)) {
-        await clearCachedDatabaseId(kindId);
-      } else {
-        throw error;
-      }
+  const boundId = await getNotionDatabaseId(kindId);
+  if (boundId) {
+    const database = await getDatabase(accessToken, boundId);
+    if (!isUsableDatabase(database) || normalizeNotionId(database.id) !== normalizeNotionId(boundId)) {
+      throw databaseResolutionError(
+        'The configured Notion database is unavailable. Restore it or choose another database.',
+        'notion_database_unavailable',
+      );
     }
+    if (!matchesParentPage(database, parentPageId)) {
+      throw databaseResolutionError(
+        'The configured Notion database is no longer under the destination page. Choose the intended database.',
+        'notion_database_wrong_parent',
+      );
+    }
+    await ensureDatabaseSchema({ accessToken, database, dbSpec });
+    return { databaseId: boundId, title: dbSpec.title, reused: true, database };
   }
 
-  const found = await searchDatabases(accessToken, { query: dbSpec.title, parentPageId });
-  const results = found.results;
-  const wantedTitle = normalizeTitle(dbSpec.title);
-  const exact = results.find((d: any) => {
-    if (!matchesParentPage(d, parentPageId)) return false;
-    const title = readDatabaseTitle(d);
-    return normalizeTitle(title) === wantedTitle;
-  });
-  if (exact && exact.id) {
-    await cacheNotionManagedDatabaseId(kindId, exact.id);
-    await ensureDatabaseSchema({ accessToken, databaseId: exact.id, dbSpec });
-    return { databaseId: exact.id, title: dbSpec.title, reused: true, database: exact };
+  const found = await discoverDatabase(accessToken, parentPageId, dbSpec);
+  if (found) {
+    await ensureDatabaseSchema({ accessToken, database: found, dbSpec });
+    const databaseId = await cacheNotionManagedDatabaseId(kindId, found.id);
+    return { databaseId, title: dbSpec.title, reused: true, database: found };
   }
 
   const created = await createDatabase(accessToken, { parentPageId, dbSpec });
   if (!created || !created.id) throw new Error('create database failed');
-  await cacheNotionManagedDatabaseId(kindId, created.id);
-  return { databaseId: created.id, title: dbSpec.title, reused: false, database: created };
+  const databaseId = await cacheNotionManagedDatabaseId(kindId, created.id);
+  return { databaseId, title: dbSpec.title, reused: false, database: created };
 }
 
-export { ensureDatabase, clearCachedDatabaseId };
+export { ensureDatabase };

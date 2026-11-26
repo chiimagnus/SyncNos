@@ -13,14 +13,12 @@ import { normalizeNotionId } from '@services/shared/notion-id';
 import { normalizeNotionIdInput } from '@services/sync/notion/notion-id-utils';
 import { listNotionParentPages, resolveNotionParentPage } from '@services/sync/notion/notion-parent-pages.ts';
 import {
-  clearAllNotionSettings,
   getNotionParentPage,
   getNotionSettingsConfig,
   NOTION_DATABASE_KIND_IDS,
   type NotionDatabaseKindId,
   resetNotionDatabaseId,
-  setNotionDatabaseId,
-  setNotionParentPage,
+  saveNotionSettingsConfig,
 } from '@services/sync/notion/settings-store';
 
 type AnyRouter = {
@@ -105,14 +103,14 @@ export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
         }
 
         // Validate every new destination before writing any of the settings.
-        const updates: [NotionDatabaseKindId, string][] = [];
+        const updates: Partial<Record<NotionDatabaseKindId, string>> = {};
         const databaseIds = msg?.databaseIds && typeof msg.databaseIds === 'object' ? msg.databaseIds : null;
         if (databaseIds) {
           for (const kindId of NOTION_DATABASE_KIND_IDS) {
             if (!Object.prototype.hasOwnProperty.call(databaseIds, kindId)) continue;
             const raw = String(databaseIds[kindId] ?? '').trim();
             if (!raw) {
-              updates.push([kindId, '']);
+              updates[kindId] = '';
               continue;
             }
             const id = normalizeNotionIdInput(raw);
@@ -125,12 +123,10 @@ export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
               if (!token?.accessToken) return router.err('notion not connected');
               await resolveNotionDatabaseId(token.accessToken, id, parent.id);
             }
-            updates.push([kindId, id]);
+            updates[kindId] = id;
           }
         }
-        if (hasParentId || hasParentTitle) await setNotionParentPage(parent);
-        for (const [kindId, id] of updates) await setNotionDatabaseId(kindId, id);
-        return router.ok(await getNotionSettingsConfig());
+        return router.ok(await saveNotionSettingsConfig(parent, updates));
       });
     } catch (error) {
       return handlerError(router, error, 'failed to save Notion config');
@@ -176,10 +172,7 @@ export function registerNotionSettingsHandlers(router: AnyRouter, deps: Deps) {
 
   router.register(NOTION_MESSAGE_TYPES.DISCONNECT, async () => {
     try {
-      await deps.runExclusiveMaintenance(async () => {
-        await clearNotionOAuthAttemptAndToken();
-        await clearAllNotionSettings();
-      });
+      await deps.runExclusiveMaintenance(() => clearNotionOAuthAttemptAndToken());
       return router.ok({ disconnected: true });
     } catch (error) {
       return handlerError(router, error, 'notion disconnect failed');

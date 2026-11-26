@@ -8,10 +8,7 @@ import {
 } from '@services/comments/sync/notion-comments-renderer';
 import { computeArticleCommentThreadCount } from '@services/comments/domain/comment-metrics';
 import { parseArticleCommentDtos, type ArticleCommentDto } from '@services/comments/domain/comment-dto';
-import type {
-  ConversationKindDbSpec,
-  ConversationKindDefinition,
-} from '@services/protocols/conversation-kind-contract';
+import type { ConversationKindDefinition } from '@services/protocols/conversation-kind-contract';
 import { buildToggleHeadingBlock as buildNotionToggleHeadingBlock } from '@services/sync/notion/notion-section-blocks.ts';
 import {
   ensureSectionHeadingBlockId,
@@ -40,13 +37,6 @@ function isObjectNotFoundError(error: unknown): boolean {
       .trim()
       .toLowerCase() === 'object_not_found'
   );
-}
-
-function isMissingDatabaseError(error: unknown): boolean {
-  if (!isObjectNotFoundError(error)) return false;
-  return String((error as any)?.notionMessage || '')
-    .toLowerCase()
-    .includes('database');
 }
 
 function buildJobPersistenceError(): Error {
@@ -377,8 +367,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 
       const dbIdByKindId = new Map();
       const dbIdPromiseByKindId = new Map();
-      const recoveredMissingDbByKindId = new Set();
-      const dbRecoveryPromiseByKindId = new Map();
 
       async function ensureDbForKind(kind: ConversationKindDefinition) {
         const existing = dbIdByKindId.get(kind.id);
@@ -402,30 +390,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           return await dbPromise;
         } finally {
           dbIdPromiseByKindId.delete(kind.id);
-        }
-      }
-
-      async function recoverDbForKind(kind: ConversationKindDefinition, dbSpec: ConversationKindDbSpec) {
-        const pending = dbRecoveryPromiseByKindId.get(kind.id);
-        if (pending) return pending;
-        const recoveryPromise = (async () => {
-          await notionDbManager.clearCachedDatabaseId(kind.id);
-          const rebuiltDb = await notionDbManager.ensureDatabase({
-            accessToken: accessToken,
-            parentPageId,
-            kindId: kind.id,
-            dbSpec,
-          });
-          const rebuiltDbId = rebuiltDb.databaseId;
-          dbIdByKindId.set(kind.id, rebuiltDbId);
-          recoveredMissingDbByKindId.add(kind.id);
-          return rebuiltDbId;
-        })();
-        dbRecoveryPromiseByKindId.set(kind.id, recoveryPromise);
-        try {
-          return await recoveryPromise;
-        } finally {
-          dbRecoveryPromiseByKindId.delete(kind.id);
         }
       }
 
@@ -454,7 +418,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
 
           const kind = conversationKinds.pick(convo);
           if (!kind) throw new Error(`no conversation kind for ${toConvoLabel(convo)}`);
-          const dbSpec = kind.notion.dbSpec;
           const pageSpec = kind.notion.pageSpec;
           let articleCommentsLoaded = false;
           let articleCommentsLoadFailed = false;
@@ -496,7 +459,7 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
             return cachedArticleComments;
           };
 
-          let dbId = await ensureDbForKind(kind);
+          const dbId = await ensureDbForKind(kind);
 
           const messages = await storage.getMessagesByConversationId(id);
           const cursorSectionId = kind.id === 'chat' ? 'conversations' : null;
@@ -509,13 +472,8 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           let pageUsable = false;
           let existingPage = null;
           if (pageId) {
-            try {
-              const page = await notionSyncService.getPage(accessToken, pageId);
-              existingPage = page;
-              pageUsable = notionSyncService.isPageUsableForDatabase(page, dbId);
-            } catch (_e) {
-              pageUsable = false;
-            }
+            existingPage = await notionSyncService.getPage(accessToken, pageId);
+            pageUsable = notionSyncService.isPageUsableForDatabase(existingPage, dbId);
             if (!pageUsable) pageId = '';
             if (pageUsable && existingPage && (existingPage as any).url) {
               const pageUrl = String((existingPage as any).url || '').trim();
@@ -533,7 +491,6 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
           }
 
           if (!pageId) {
-            let created = null;
             const createProperties =
               kind.id === 'article'
                 ? (await ensureArticleCommentsLoaded(
@@ -541,25 +498,10 @@ export function createNotionSyncOrchestrator(services: NotionServices) {
                   ),
                   pageSpec.buildCreateProperties(convo))
                 : pageSpec.buildCreateProperties(convo);
-            try {
-              created = await notionSyncService.createPageInDatabase(accessToken, {
-                databaseId: dbId,
-                properties: createProperties,
-              });
-            } catch (createErr) {
-              const shouldRecoverDb = isMissingDatabaseError(createErr);
-              if (!shouldRecoverDb) throw createErr;
-              // Rebuild once per kind and share the recovery across concurrent conversations.
-              dbId =
-                recoveredMissingDbByKindId.has(kind.id) && dbIdByKindId.get(kind.id)
-                  ? String(dbIdByKindId.get(kind.id) || '')
-                  : await recoverDbForKind(kind, dbSpec);
-
-              created = await notionSyncService.createPageInDatabase(accessToken, {
-                databaseId: dbId,
-                properties: createProperties,
-              });
-            }
+            const created = await notionSyncService.createPageInDatabase(accessToken, {
+              databaseId: dbId,
+              properties: createProperties,
+            });
             pageId = created && created.id ? created.id : '';
             if (!pageId) throw new Error('create page failed');
 
